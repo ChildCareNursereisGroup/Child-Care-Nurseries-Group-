@@ -1465,12 +1465,20 @@ function renderDashboard(){
     el('bovcard').style.display='block';
     renderExpiryAlerts();
     el('bovgrid').innerHTML=BRANCHES.map(b=>`
-      <div class="bovc" style="background:${b.c}" onclick="switchBranch('${b.id}')">
-        <div style="font-size:1.25rem;margin-bottom:2px">${b.icon}</div>
-        <div style="font-weight:800;font-size:.88rem">${tBN(b)}</div>
-        ${b.id===curBid?'<div style="font-size:.7rem;background:rgba(255,255,255,.25);border-radius:8px;padding:2px 7px;margin-top:4px;display:inline-block">الفرع الحالي</div>':'<div style="font-size:.72rem;opacity:.85;margin-top:3px">اضغط للتبديل</div>'}
-        <div class="bg2">${b.icon}</div>
+      <div class="bovc" style="background:${b.c};user-select:none"
+           data-bid="${b.id}"
+           role="button" tabindex="0">
+        <div style="font-size:1.25rem;margin-bottom:2px;pointer-events:none">${b.icon}</div>
+        <div style="font-weight:800;font-size:.88rem;pointer-events:none">${tBN(b)}</div>
+        ${b.id===curBid
+          ?'<div style="font-size:.7rem;background:rgba(255,255,255,.25);border-radius:8px;padding:2px 7px;margin-top:4px;display:inline-block;pointer-events:none">✅ الفرع الحالي</div>'
+          :'<div style="font-size:.72rem;opacity:.85;margin-top:3px;pointer-events:none">👆 اضغط للتبديل</div>'}
+        <div class="bg2" style="pointer-events:none">${b.icon}</div>
       </div>`).join('');
+    // Attach click via addEventListener to avoid any inline handler issues
+    el('bovgrid').querySelectorAll('[data-bid]').forEach(card=>{
+      card.addEventListener('click', ()=>{ switchBranch(card.dataset.bid); });
+    });
   } else el('bovcard').style.display='none';
   renderPV();
   const recent=[...DB.children].sort((a,b)=>new Date(b.joinDate)-new Date(a.joinDate)).slice(0,5);
