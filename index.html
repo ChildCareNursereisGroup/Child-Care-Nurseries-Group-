@@ -1513,11 +1513,20 @@ function renderPV(){
   el('pvcont').innerHTML=`<div class="sboxes"><div class="sbox sg"><div class="sv">${ok}</div><div class="sk">${t('paid')}</div></div><div class="sbox sy"><div class="sv">${part}</div><div class="sk">${t('partial')}</div></div><div class="sbox sr"><div class="sv">${miss}</div><div class="sk">${t('notPaid')}</div></div></div>${rows}`;
 }
 async function switchBranch(bid){
-  curBid=bid;const b=CB();setBranchTheme(b);el('hbr').textContent=b.icon+' '+tBN(b);applyTranslations();
-  subscribeRealtime(bid);
-  await loadFromSupa(bid);
-  await Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings(), loadPWFromSupa()]).catch(()=>{});
-  renderDashboard();renderChildren();
+  curBid = bid;
+  const b = CB();
+  setBranchTheme(b);
+  if(el('hbr')) el('hbr').textContent = b.icon + ' ' + tBN(b);
+  applyTranslations();
+  try { subscribeRealtime(bid); } catch(e){}
+  await loadFromSupa(bid).catch(()=>{});
+  await Promise.all([
+    loadStaff(), loadBuses(), loadLicenses(),
+    loadBranchSettings(), loadPWFromSupa()
+  ]).catch(()=>{});
+  renderDashboard();
+  renderChildren();
+  if(typeof renderRecs === 'function') renderRecs();
 }
 
 // ═══════════════════════════════════════════════
