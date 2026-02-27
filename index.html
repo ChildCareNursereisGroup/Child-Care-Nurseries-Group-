@@ -3156,8 +3156,23 @@ function processExcelFile(file) {
           religion:    get('Religion','religion'),
           dob:         parseDate(r['Date of Birth'] ?? r['DOB'] ?? r['dob'] ?? ''),
           kidsTime:    get('Kids Time','Time','kids time'),
-          parentMom:   get('Mother contact','Mother Contact','M','mom','Mother','mother','Mom','MOM','Phone Mother','mother_contact','MotherContact','Mother Phone','Phone Mom','MOTHER'),
-          parentDad:   get('Father Contact','Father contact','F','dad','Father','father','Dad','DAD','Phone Father','father_contact','FatherContact','Father Phone','Phone Dad','FATHER'),
+          parentMom:   (()=>{
+            const v = get('M (Mother)','Mother contact','Mother Contact','M','mom','Mother','mother','Mom','MOM','Phone Mother','mother_contact','MotherContact','Mother Phone','Phone Mom','MOTHER');
+            if(!v) return '';
+            // Fix Excel stripping leading zero from UAE numbers
+            const s = String(v).trim().replace(/\.0$/, '');
+            if(/^\d{9}$/.test(s)) return '0'+s; // 9 digits → add leading 0
+            if(/^\d{8}$/.test(s)) return '05'+s.substring(1); // rare
+            return s;
+          })(),
+          parentDad:   (()=>{
+            const v = get('F (Father)','Father Contact','Father contact','F','dad','Father','father','Dad','DAD','Phone Father','father_contact','FatherContact','Father Phone','Phone Dad','FATHER');
+            if(!v) return '';
+            const s = String(v).trim().replace(/\.0$/, '');
+            if(/^\d{9}$/.test(s)) return '0'+s;
+            if(/^\d{8}$/.test(s)) return '05'+s.substring(1);
+            return s;
+          })(),
           email:       get('Email ID','Email','email'),
           joinDate:    parseDate(r['Join Date'] ?? r['join date'] ?? ''),
           regNum:      String(r['Registration No'] ?? r['Registration No'] ?? '').trim(),
@@ -3240,6 +3255,7 @@ async function importToSupabase() {
   
   prog.innerHTML = `<div class="alert aok">⏳ Importing 0 / ${rows.length}...</div>`;
   
+  let updated=0;
   for(let i=0; i<rows.length; i++) {
     const r = rows[i];
     prog.innerHTML = `<div class="alert aok">⏳ Importing ${i+1} / ${rows.length}: <b>${r.name}</b></div>`;
@@ -3257,8 +3273,8 @@ async function importToSupabase() {
       kids_time:   r.kidsTime || '',
       join_date:   r.joinDate || null,
       leave_date:  null,
-      parent_mom:  String(r.parentMom || '').replace(/[^\d+\s()-]/g,'').trim() || r.parentMom || '',
-      parent_dad:  String(r.parentDad || '').replace(/[^\d+\s()-]/g,'').trim() || r.parentDad || '',
+      parent_mom:  String(r.parentMom || '').trim(),
+      parent_dad:  String(r.parentDad || '').trim(),
       email:       r.email || '',
       fee:         r.fee || 0,
       bus_fee:     r.busFee || 0,
@@ -3266,12 +3282,21 @@ async function importToSupabase() {
       notes:       r.notes || '',
     };
     
-    const {error} = await sb.from('children').insert(row);
-    if(error) {
-      fail++;
-      errors.push(`Row ${i+1} (${r.name}): ${error.message}`);
+    // Check for duplicate by name + reg_num
+    const existing = DB.children.find(c =>
+      c.name.trim().toLowerCase() === r.name.trim().toLowerCase() &&
+      String(c.regNum||'') === String(r.regNum||'')
+    );
+    
+    if(existing) {
+      // UPDATE existing child instead of inserting duplicate
+      const {error} = await sb.from('children').update(row).eq('id', existing.id);
+      if(error){ fail++; errors.push(`Row ${i+1} (${r.name}): ${error.message}`); }
+      else updated++;
     } else {
-      ok++;
+      const {error} = await sb.from('children').insert(row);
+      if(error){ fail++; errors.push(`Row ${i+1} (${r.name}): ${error.message}`); }
+      else ok++;
     }
   }
   
@@ -3284,8 +3309,8 @@ async function importToSupabase() {
   prog.innerHTML = `
     <div class="alert ${fail===0?'aok':'aerr'}">
       ${fail===0
-        ? `✅ Successfully imported all ${ok} children to ${BRANCHES.find(b=>b.id===bid)?.ar}!`
-        : `⚠️ Imported ${ok} children. ${fail} failed.`}
+        ? `✅ Done! New: ${ok} children added, ${updated} updated in ${BRANCHES.find(b=>b.id===bid)?.ar}`
+        : `⚠️ New: ${ok} | Updated: ${updated} | Failed: ${fail}`}
     </div>${errHtml}
     <div style="margin-top:7px">
       <button class="btn bp bsm" onclick="showPage('children',null)">👧 View Children</button>
