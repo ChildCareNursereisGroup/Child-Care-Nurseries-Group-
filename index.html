@@ -254,7 +254,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
             <input type="checkbox" id="fday_fri" value="Fri" style="accent-color:#d97706" onchange="calcWeekendTotal()">
             <span style="font-weight:800;color:#d97706;font-size:.88rem">🟡 Friday</span>
           </label>
-          <div style="font-size:.72rem;color:#92400e;margin-bottom:3px">Fee per visit (AED)</div>
+          <div style="font-size:.72rem;color:#92400e;margin-bottom:3px">Fee per month (AED)</div>
           <input type="number" id="ffee_fri" placeholder="0" min="0" onchange="calcWeekendTotal()"
             style="width:100%;padding:5px;border:1px solid #fde68a;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
         </div>
@@ -263,7 +263,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
             <input type="checkbox" id="fday_sat" value="Sat" style="accent-color:#7c3aed" onchange="calcWeekendTotal()">
             <span style="font-weight:800;color:#7c3aed;font-size:.88rem">🟣 Saturday</span>
           </label>
-          <div style="font-size:.72rem;color:#5b21b6;margin-bottom:3px">Fee per visit (AED)</div>
+          <div style="font-size:.72rem;color:#5b21b6;margin-bottom:3px">Fee per month (AED)</div>
           <input type="number" id="ffee_sat" placeholder="0" min="0" onchange="calcWeekendTotal()"
             style="width:100%;padding:5px;border:1px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
         </div>
@@ -272,7 +272,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
             <input type="checkbox" id="fday_sun" value="Sun" style="accent-color:#0891b2" onchange="calcWeekendTotal()">
             <span style="font-weight:800;color:#0891b2;font-size:.88rem">🔵 Sunday</span>
           </label>
-          <div style="font-size:.72rem;color:#164e63;margin-bottom:3px">Fee per visit (AED)</div>
+          <div style="font-size:.72rem;color:#164e63;margin-bottom:3px">Fee per month (AED)</div>
           <input type="number" id="ffee_sun" placeholder="0" min="0" onchange="calcWeekendTotal()"
             style="width:100%;padding:5px;border:1px solid #cffafe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
         </div>
@@ -4273,15 +4273,63 @@ function switchImpTab(tab, btn){
 //  DOWNLOAD TEMPLATES
 // ═══════════════════════════════════════════════
 function downloadChildTemplate(){
-  const XLSX=window.XLSX; if(!XLSX) return;
-  const data=[
-    ['Kids Name','Class','ID Number','M/F','Nationality','Religion','DOB','Time','M (Mother)','F (Father)','Email ID','Join Date','Registration No','Monthly payment','Trans','Notes'],
-    ['Maria Ahmed','KG1','784-2025-1234567-1','F','UAE','Muslim','2021-03-15','08:00-03:00','0501234567','0507654321','parent@email.com','2025-09-01','101','1500','200',''],
+  const ws = XLSX.utils.aoa_to_sheet([
+    [
+      'Kids Name','Class','ID Number','M/F','Nationality','Religion',
+      'DOB','Time','Duty Days','M (Mother)','F (Father)','Email ID',
+      'Join Date','Registration No','Monthly payment','Trans',
+      'Fri Fee','Sat Fee','Sun Fee','Use Bus','Notes'
+    ],
+    [
+      'Maria Ahmed','KG1','784-2025-1234567-1','F','UAE','Muslim',
+      '2021-03-15','08:00-03:00','Mon,Tue,Wed,Thu',
+      '0501234567','0507654321','parent@email.com',
+      '2025-09-01','101',1500,200,
+      150,150,0,'Yes','Sample child'
+    ],
+    [
+      'Ahmed Khalid','KG2','784-2024-9876543-1','M','Egypt','Muslim',
+      '2020-06-10','08:00-03:00','Mon,Tue,Wed,Thu,Fri,Sat',
+      '0551234567','','ahmed@email.com',
+      '2025-09-01','102',1800,0,
+      200,200,0,'No','Weekend child'
+    ]
+  ]);
+  // Column widths
+  ws['!cols'] = [
+    {wch:20},{wch:8},{wch:22},{wch:5},{wch:12},{wch:10},
+    {wch:12},{wch:12},{wch:22},{wch:14},{wch:14},{wch:22},
+    {wch:12},{wch:8},{wch:10},{wch:8},
+    {wch:9},{wch:9},{wch:9},{wch:8},{wch:20}
   ];
-  const ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:18},{wch:8},{wch:20},{wch:5},{wch:12},{wch:10},{wch:12},{wch:12},{wch:14},{wch:14},{wch:20},{wch:12},{wch:14},{wch:16},{wch:8},{wch:15}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Children');
-  XLSX.writeFile(wb,'children_import_template.xlsx');
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Children');
+  
+  // Add instructions sheet
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['Column','Description','Example'],
+    ['Kids Name','Full name of child','Maria Ahmed'],
+    ['Class','Class name','KG1, A, B, Nursery'],
+    ['Duty Days','Regular attendance days (comma separated)','Mon,Tue,Wed,Thu'],
+    ['M (Mother)','Mother phone number','0501234567'],
+    ['F (Father)','Father phone number','0507654321'],
+    ['Monthly payment','Regular monthly fee (AED)','1500'],
+    ['Trans','Transportation fee (AED)','200'],
+    ['Fri Fee','Friday monthly fee (AED) — 0 if not attending','150'],
+    ['Sat Fee','Saturday monthly fee (AED) — 0 if not attending','150'],
+    ['Sun Fee','Sunday monthly fee (AED) — 0 if not attending','0'],
+    ['Use Bus','Yes or No','Yes'],
+    ['','',''],
+    ['Duty Days Examples','',''],
+    ['Regular only','Mon,Tue,Wed,Thu',''],
+    ['+ Friday','Mon,Tue,Wed,Thu,Fri',''],
+    ['+ Saturday','Mon,Tue,Wed,Thu,Sat',''],
+    ['Full weekend','Mon,Tue,Wed,Thu,Fri,Sat,Sun',''],
+  ]);
+  ws2['!cols']=[{wch:20},{wch:45},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Instructions');
+  
+  XLSX.writeFile(wb, 'children_import_template.xlsx');
 }
 
 function downloadReceiptsTemplate(){
