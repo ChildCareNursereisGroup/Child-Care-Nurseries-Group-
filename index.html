@@ -690,6 +690,37 @@ function saveBranchExtra(bid, data){
   _branchExtra[bid] = Object.assign(_branchExtra[bid]||{}, data);
   localStorage.setItem('branch_extra', JSON.stringify(_branchExtra));
 }
+async function loadBranchSettings(){
+  try{
+    const {data}=await sb.from('branch_settings').select('*');
+    if(data&&data.length){
+      data.forEach(row=>{
+        _branchExtra[row.branch_id]=_branchExtra[row.branch_id]||{};
+        if(row.trn) _branchExtra[row.branch_id].trn=row.trn;
+        if(row.logo) _branchExtra[row.branch_id].logo=row.logo;
+        if(row.receipt_color) _branchExtra[row.branch_id].receipt_color=row.receipt_color;
+        if(row.address) _branchExtra[row.branch_id].address=row.address;
+        if(row.phone) _branchExtra[row.branch_id].phone=row.phone;
+        if(row.email) _branchExtra[row.branch_id].email=row.email;
+      });
+      localStorage.setItem('branch_extra', JSON.stringify(_branchExtra));
+    }
+  }catch(e){ /* use localStorage fallback */ }
+}
+async function saveBranchExtraToSupa(bid){
+  const bx=_branchExtra[bid]||{};
+  // Don't store large base64 logo in Supabase (too big) — keep in localStorage
+  // But store TRN, colors, address, phone, email
+  const row={
+    branch_id:bid,
+    trn:bx.trn||null,
+    receipt_color:bx.receipt_color||null,
+    address:bx.address||null,
+    phone:bx.phone||null,
+    email_addr:bx.email||null,
+  };
+  await sb.from('branch_settings').upsert(row,{onConflict:'branch_id'});
+}
 // ─────────────────────────────────────────────────
 
 const BRANCHES = [
@@ -1285,7 +1316,7 @@ function initApp(){
   el('abr').innerHTML='<option value="all">All Branches — كل الفروع</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
   renderNav();applyTranslations();showPage('dashboard',null);
   // Load staff, buses, licenses in background
-  Promise.all([loadStaff(), loadBuses(), loadLicenses()]).catch(()=>{});
+  Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
 }
 function renderNav(){
   const pages=ROLES_PAGES[curRole];
@@ -1385,7 +1416,7 @@ async function switchBranch(bid){
   curBid=bid;const b=CB();setBranchTheme(b);el('hbr').textContent=b.icon+' '+tBN(b);applyTranslations();
   subscribeRealtime(bid);
   await loadFromSupa(bid);
-  await Promise.all([loadStaff(), loadBuses(), loadLicenses()]).catch(()=>{});
+  await Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
   renderDashboard();renderChildren();
 }
 
@@ -1686,7 +1717,7 @@ function prevRec(id){
   const payLabel={'cash':'Cash 💵','bank':'Bank Transfer 🏦','card':'Card Machine 💳'}[r.payMethod]||'Cash';
   const logoHtml=bx.logo?`<img src="${bx.logo}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid ${b.c}">`:
     `<div style="background:${b.c};color:#fff;border-radius:50%;width:54px;height:54px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">${b.icon}</div>`;
-  const trn=bx.trn||'';
+  const trn=bx.trn||''; const rcol=bx.receipt_color||b.c||'#1e3a8a';
   const signedLine=`<div style="text-align:center;padding:7px 14px;border-top:1px solid #ddd;font-size:.7rem;color:#6b7280;font-style:italic">
     ✅ This receipt is electronically signed and valid without a physical signature<br>
     هذا الإيصال موقّع إلكترونياً وصالح بدون توقيع يدوي
@@ -1694,23 +1725,25 @@ function prevRec(id){
   el('pprev').innerHTML=`
   <div id="inv-print" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #ccc;padding:0">
     <!-- HEADER -->
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:10px 14px;border-bottom:2px solid #1e3a8a">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:10px 14px;border-bottom:2px solid ${rcol}">
       <div style="font-size:.72rem;color:#333">
-        <div style="font-size:1rem;font-weight:900;color:#1e3a8a">${b.ar}</div>
+        <div style="font-size:1rem;font-weight:900;color:${rcol}">${b.ar}</div>
         <div style="font-size:.68rem">ذ.م.م شركة الشخص الواحد</div>
-        <div style="font-size:.62rem;color:#555">الشارقة، الإمارات العربية المتحدة</div>
+        <div style="font-size:.62rem;color:#555">${bx.address||'الشارقة، الإمارات العربية المتحدة'}</div>
+        ${bx.phone?`<div style="font-size:.62rem;color:#555">📞 ${bx.phone}</div>`:''}
+        ${bx.email?`<div style="font-size:.62rem;color:#555">✉️ ${bx.email}</div>`:''}
         <div style="font-size:.62rem;color:#555">www.childcarenurseriesgroup.com</div>
       </div>
       <div style="text-align:center">
         <div style="margin:0 auto;width:54px;height:54px">${logoHtml}</div>
       </div>
       <div style="text-align:left;font-size:.72rem;color:#333">
-        <div style="font-size:1rem;font-weight:900;color:#1e3a8a">${b.en||b.ar}</div>
+        <div style="font-size:1rem;font-weight:900;color:${rcol}">${b.en||b.ar}</div>
         <div style="font-size:.68rem">Sole Proprietorship LLC</div>
       </div>
     </div>
     <!-- INVOICE TITLE + TRN -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;background:#f0f4ff;border-bottom:1px solid #ddd">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;background:${rcol}18;border-bottom:1px solid #ddd">
       <div>
         <div style="font-size:1.1rem;font-weight:900">No. ${String(r.receiptNum).padStart(5,'0')}</div>
       </div>
@@ -1732,7 +1765,7 @@ function prevRec(id){
     <!-- TABLE — matches paper receipt exactly -->
     <table style="width:100%;border-collapse:collapse;font-size:.76rem">
       <thead>
-        <tr style="background:#1e3a8a;color:#fff;text-align:center">
+        <tr style="background:${rcol};color:#fff;text-align:center">
           <th style="padding:4px 7px;border:1px solid #9ca3af;text-align:left" colspan="2">Description / التفاصيل</th>
           <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:44px">Price<br>السعر<br>Dhs</th>
           <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:28px">Fils</th>
@@ -1807,7 +1840,7 @@ function prevRec(id){
         <table style="width:100%;border-collapse:collapse">
           <tr><td style="padding:4px 6px;border:1px solid #ddd">Total Items Amount</td><td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;text-align:center">${fmtNum(subTotal)}</td></tr>
           <tr><td style="padding:4px 6px;border:1px solid #ddd">Total Vat Amount 5%</td><td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;text-align:center">${fmtNum(r.vatAmount||0)}</td></tr>
-          <tr style="background:#1e3a8a;color:#fff"><td style="padding:5px 6px;font-weight:800">Grand Total</td><td style="padding:5px 6px;font-weight:800;text-align:center">${fmtNum(r.total)}</td></tr>
+          <tr style="background:${rcol};color:#fff"><td style="padding:5px 6px;font-weight:800">Grand Total</td><td style="padding:5px 6px;font-weight:800;text-align:center">${fmtNum(r.total)}</td></tr>
         </table>
       </div>
     </div>
@@ -4964,43 +4997,81 @@ function renderBranchSettings(){
     const bx=getBranchExtra(b.id);
     const safeId=b.id.replace(/[^a-z0-9]/g,'_');
     const logoPreview=bx.logo
-      ? `<img src="${bx.logo}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;margin-top:5px;border:2px solid ${b.c}">`
-      : `<div style="font-size:.7rem;color:#9ca3af;margin-top:3px">No logo yet</div>`;
-    return `<div style="border:1.5px solid var(--border);border-radius:11px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:800;color:${b.c};margin-bottom:9px;font-size:.9rem">${b.icon} ${tBN(b)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      ? `<img src="${bx.logo}" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid ${b.c}">`
+      : `<div style="width:50px;height:50px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:1.4rem">${b.icon}</div>`;
+    const rcol=bx.receipt_color||'#1e3a8a';
+    return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <!-- Branch title -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        ${logoPreview}
+        <div>
+          <div style="font-weight:900;color:${b.c};font-size:.95rem">${b.icon} ${tBN(b)}</div>
+          <div style="font-size:.72rem;color:#9ca3af">${bx.trn?'TRN: '+bx.trn:'No TRN set'}</div>
+        </div>
+      </div>
+      <!-- Fields grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
         <div class="fg">
-          <label>TRN (Tax Registration No.)</label>
+          <label>TRN — الرقم الضريبي *</label>
           <input id="trn_${safeId}" value="${bx.trn||''}" placeholder="104900585100003"
             style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
         <div class="fg">
-          <label>Branch Logo</label>
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
-            <button onclick="document.getElementById('lu_${safeId}').click()"
-              style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:.78rem;font-family:'Tajawal',sans-serif;font-weight:700">
-              📤 Upload Logo
-            </button>
-            ${bx.logo?`<button onclick="clearBranchLogo('${b.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:.75rem">🗑</button>`:''}
+          <label>Receipt Header Color</label>
+          <div style="display:flex;gap:7px;align-items:center">
+            <input type="color" id="color_${safeId}" value="${rcol}" style="width:44px;height:36px;border:none;border-radius:8px;cursor:pointer;padding:2px">
+            <span style="font-size:.76rem;color:#6b7280">Receipt & invoice color</span>
           </div>
-          <input type="file" id="lu_${safeId}" accept="image/*" style="display:none"
-            onchange="uploadBranchLogo('${b.id}',this)">
-          ${logoPreview}
+        </div>
+        <div class="fg">
+          <label>Address — العنوان</label>
+          <input id="addr_${safeId}" value="${bx.address||''}" placeholder="Sharjah, UAE"
+            style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label>Phone — الهاتف</label>
+          <input id="phone_${safeId}" value="${bx.phone||''}" placeholder="050-1234567"
+            style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label>Email — البريد الإلكتروني</label>
+          <input id="email_${safeId}" value="${bx.email||''}" placeholder="info@nursery.com"
+            style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label>Branch Logo — اللوجو</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="document.getElementById('lu_${safeId}').click()"
+              style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:7px 11px;cursor:pointer;font-size:.77rem;font-family:'Tajawal',sans-serif;font-weight:700">
+              📤 Upload
+            </button>
+            ${bx.logo?`<button onclick="clearBranchLogo('${b.id}')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:.75rem">🗑 Remove</button>`:'<span style="font-size:.7rem;color:#9ca3af">No logo</span>'}
+          </div>
+          <input type="file" id="lu_${safeId}" accept="image/*" style="display:none" onchange="uploadBranchLogo('${b.id}',this)">
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <button onclick="saveBranchSettings('${b.id}','${safeId}')" class="btn bp bsm">💾 Save</button>
-        <span id="bsave_${safeId}" style="font-size:.75rem;color:#059669"></span>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:5px">
+        <button onclick="saveBranchSettings('${b.id}','${safeId}')"
+          style="background:${b.c};color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+          💾 Save ${b.en||b.ar}
+        </button>
+        <span id="bsave_${safeId}" style="font-size:.78rem;color:#059669;font-weight:700"></span>
       </div>
     </div>`;
   }).join('');
 }
 
-function saveBranchSettings(bid, safeId){
-  const trn=document.getElementById('trn_'+safeId)?.value?.trim()||'';
-  saveBranchExtra(bid,{trn});
+async function saveBranchSettings(bid, safeId){
+  const get=id=>document.getElementById(id)?.value?.trim()||'';
+  const trn=get('trn_'+safeId);
+  const address=get('addr_'+safeId);
+  const phone=get('phone_'+safeId);
+  const email=get('email_'+safeId);
+  const color=get('color_'+safeId)||'#1e3a8a';
+  saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color});
+  await saveBranchExtraToSupa(bid);
   const lbl=document.getElementById('bsave_'+safeId);
-  if(lbl){lbl.textContent='✅ Saved!'; setTimeout(()=>lbl.textContent='',2000);}
+  if(lbl){lbl.textContent='✅ Saved to cloud!'; setTimeout(()=>{lbl.textContent='';renderBranchSettings();},1500);}
 }
 
 function clearBranchLogo(bid){
