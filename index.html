@@ -2017,7 +2017,7 @@ async function delRec(id){
 function renderAtt(){
   const date=el('attdate').value||today();
   const active=DB.children.filter(c=>!c.leaveDate);
-  if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👶</div><p>لا يوجد أطفال</p></div>`;return;}
+  if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👶</div><p>${lang==='ar'?'لا يوجد أطفال':'No children found'}</p></div>`;return;}
   if(!DB.attendance[date])DB.attendance[date]={};
 
   // Group by class
