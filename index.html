@@ -236,6 +236,48 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div class="fg"><label data-t="dob">Date of Birth</label><input type="date" id="fdob"></div>
     <div class="fg"><label data-t="kidsTime">Kids Time (hours)</label><input type="text" id="fktime" placeholder="e.g. 08:00-03:00 or 6hrs"></div>
+    <div class="fg" style="grid-column:1/-1">
+      <label>📅 Attendance Days — أيام الحضور</label>
+      <!-- Regular Days -->
+      <div style="margin-top:6px;margin-bottom:4px;font-size:.74rem;font-weight:700;color:#1e3a8a">📚 Regular Days (Mon–Thu)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:#eff6ff;border-radius:8px;padding:5px 12px;font-size:.83rem;font-weight:600;border:1.5px solid #bfdbfe"><input type="checkbox" id="fday_mon" value="Mon" style="accent-color:#1e3a8a"> Mon</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:#eff6ff;border-radius:8px;padding:5px 12px;font-size:.83rem;font-weight:600;border:1.5px solid #bfdbfe"><input type="checkbox" id="fday_tue" value="Tue" style="accent-color:#1e3a8a"> Tue</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:#eff6ff;border-radius:8px;padding:5px 12px;font-size:.83rem;font-weight:600;border:1.5px solid #bfdbfe"><input type="checkbox" id="fday_wed" value="Wed" style="accent-color:#1e3a8a"> Wed</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:#eff6ff;border-radius:8px;padding:5px 12px;font-size:.83rem;font-weight:600;border:1.5px solid #bfdbfe"><input type="checkbox" id="fday_thu" value="Thu" style="accent-color:#1e3a8a"> Thu</label>
+      </div>
+      <!-- Weekend Days with fees -->
+      <div style="margin-bottom:4px;font-size:.74rem;font-weight:700;color:#d97706">🎉 Weekend Days (Fri/Sat/Sun) — رسوم إضافية</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="border:1.5px solid #fde68a;border-radius:10px;padding:8px;background:#fffbeb">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="fday_fri" value="Fri" style="accent-color:#d97706" onchange="calcWeekendTotal()">
+            <span style="font-weight:800;color:#d97706;font-size:.88rem">🟡 Friday</span>
+          </label>
+          <div style="font-size:.72rem;color:#92400e;margin-bottom:3px">Fee per visit (AED)</div>
+          <input type="number" id="ffee_fri" placeholder="0" min="0" onchange="calcWeekendTotal()"
+            style="width:100%;padding:5px;border:1px solid #fde68a;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+        <div style="border:1.5px solid #ddd6fe;border-radius:10px;padding:8px;background:#f5f3ff">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="fday_sat" value="Sat" style="accent-color:#7c3aed" onchange="calcWeekendTotal()">
+            <span style="font-weight:800;color:#7c3aed;font-size:.88rem">🟣 Saturday</span>
+          </label>
+          <div style="font-size:.72rem;color:#5b21b6;margin-bottom:3px">Fee per visit (AED)</div>
+          <input type="number" id="ffee_sat" placeholder="0" min="0" onchange="calcWeekendTotal()"
+            style="width:100%;padding:5px;border:1px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+        <div style="border:1.5px solid #cffafe;border-radius:10px;padding:8px;background:#ecfeff">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="fday_sun" value="Sun" style="accent-color:#0891b2" onchange="calcWeekendTotal()">
+            <span style="font-weight:800;color:#0891b2;font-size:.88rem">🔵 Sunday</span>
+          </label>
+          <div style="font-size:.72rem;color:#164e63;margin-bottom:3px">Fee per visit (AED)</div>
+          <input type="number" id="ffee_sun" placeholder="0" min="0" onchange="calcWeekendTotal()"
+            style="width:100%;padding:5px;border:1px solid #cffafe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+      </div>
+    </div>
     <div class="fg"><label data-t="joinDate">Join Date *</label><input type="date" id="fjoin"></div>
     <div class="fg"><label data-t="regNo">Registration No</label><input type="text" id="fr"></div>
   </div>
@@ -251,14 +293,20 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <hr class="sep">
   <div class="slbl" data-t="feesTransport">💰 Fees & Transport — الرسوم والمواصلات</div>
   <div class="g3" style="margin-bottom:9px">
-    <div class="fg"><label data-t="monthlyPayment">Monthly Payment (AED)</label><input type="number" id="ffee" placeholder="0"></div>
-    <div class="fg"><label data-t="transportPayment">Transportation Payment (AED)</label><input type="number" id="fbfee" placeholder="0"></div>
+    <div class="fg"><label data-t="monthlyPayment">Monthly Payment (AED)</label><input type="number" id="ffee" placeholder="0" onchange="calcWeekendTotal()"></div>
+    <div class="fg"><label data-t="transportPayment">Transportation Payment (AED)</label><input type="number" id="fbfee" placeholder="0" onchange="calcWeekendTotal()"></div>
     <div class="fg"><label data-t="useBus">Use Bus</label>
-      <select id="fbus">
+      <select id="fbus" onchange="calcWeekendTotal()">
         <option value="No">No 🚶</option>
         <option value="Yes">Yes 🚌</option>
       </select>
     </div>
+  </div>
+  <!-- Total summary -->
+  <div id="reg-total-summary" style="display:none;background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;border-radius:11px;padding:11px 14px;margin-bottom:10px">
+    <div style="font-size:.78rem;opacity:.85;margin-bottom:4px">💰 Total Monthly Payment</div>
+    <div style="font-size:1.4rem;font-weight:900" id="reg-total-amount">0 AED</div>
+    <div style="font-size:.72rem;opacity:.8;margin-top:3px" id="reg-total-breakdown"></div>
   </div>
 
   <div class="fg" style="margin-bottom:10px"><label data-t="notesLabel">Notes</label><textarea id="fnotes" rows="2" placeholder="Any additional notes..."></textarea></div>
@@ -353,9 +401,38 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <input type="date" id="attdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderAtt()">
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
+
+<!-- ATTENDANCE REPORT MODAL -->
+<div class="mover" id="att-report-modal">
+  <div class="mbox" style="max-width:480px">
+    <div class="mh"><div class="mt">📊 تقرير الغياب الشهري</div><button class="xb" onclick="el('att-report-modal').classList.remove('on')">✕</button></div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg">
+          <label>من تاريخ / From</label>
+          <input type="date" id="att-rep-from" style="font-family:'Tajawal',sans-serif">
+        </div>
+        <div class="fg">
+          <label>إلى تاريخ / To</label>
+          <input type="date" id="att-rep-to" style="font-family:'Tajawal',sans-serif">
+        </div>
+      </div>
+      <div class="fg">
+        <label>الفصل / Class (اتركه فاضي للكل)</label>
+        <select id="att-rep-class" style="font-family:'Tajawal',sans-serif">
+          <option value="">كل الفصول / All Classes</option>
+        </select>
+      </div>
+      <button onclick="printAttReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">
+        🖨️ طباعة التقرير
+      </button>
+    </div>
+  </div>
+</div>
   </div>
   <div id="attlist"></div>
   <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
@@ -798,6 +875,16 @@ const EXP_CATS = [
    fields:[{id:'a1',ar:'القناة / الوسيلة',t:'text'},{id:'a2',ar:'Amount (AED)',t:'number'},{id:'aad',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('a2')},
 
+  {k:'weekend',  ic:'🎉', ar:()=>lang==='ar'?'مصاريف الويكند':'Weekend Expenses',
+   fields:[
+     {id:'wk1',ar:'Day',t:'select',opts:['Friday','Saturday','Sunday','Friday & Saturday','Sat & Sun','Full Weekend']},
+     {id:'wk2',ar:'Activity / Description',t:'text'},
+     {id:'wk3',ar:'No. of Children',t:'number'},
+     {id:'wk4',ar:'Amount (AED)',t:'number'},
+     {id:'wkd',ar:'Date',t:'date'}
+   ],
+   getAmt:()=>n('wk4')},
+
   {k:'other',    ic:'📝', ar:()=>lang==='ar'?'أخرى':'Other',
    fields:[{id:'o1',ar:'Item Name',t:'text'},{id:'o2',ar:'Amount (AED)',t:'number'},{id:'od',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('o2')},
@@ -859,7 +946,7 @@ async function loadFromSupa(bid) {
     DB.children = (c.data||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
-      dob:x.dob||null, kidsTime:x.kids_time||'Full Day',
+      dob:x.dob||null, kidsTime:x.kids_time||'Full Day', dutyDays:x.duty_days||'', friFee:x.fri_fee||0, satFee:x.sat_fee||0, sunFee:x.sun_fee||0,
       joinDate:x.join_date||null, leaveDate:x.leave_date||null,
       parentMom:x.parent_mom||'', parentDad:x.parent_dad||'', email:x.email||'',
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
@@ -1422,7 +1509,7 @@ async function switchBranch(bid){
   curBid=bid;const b=CB();setBranchTheme(b);el('hbr').textContent=b.icon+' '+tBN(b);applyTranslations();
   subscribeRealtime(bid);
   await loadFromSupa(bid);
-  await Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
+  await Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings(), loadPWFromSupa()]).catch(()=>{});
   renderDashboard();renderChildren();
 }
 
@@ -1460,14 +1547,17 @@ function renderChildren(){
         <span>📞 ${c.parentMom||'-'}</span>
         <span>🎂 ${calcAge(c.dob)||'-'}</span>
         ${(()=>{
-          const total = (c.fee||0) + ((c.bus==='Yes'||c.bus==='نعم') ? c.busFee||0 : 0);
-          const hasBus = (c.bus==='Yes'||c.bus==='نعم') && c.busFee>0;
+          const wkFee=(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+          const hasBus=(c.bus==='Yes'||c.bus==='نعم')&&c.busFee>0;
+          const total=(c.fee||0)+(hasBus?c.busFee||0:0)+wkFee;
           if(!total) return '';
-          return `<span style="color:var(--ok);font-weight:700">
-            💵 ${fmtNum(c.fee)}${hasBus?` + 🚌${fmtNum(c.busFee)}`:''}
-            ${hasBus?`= <b>${fmtNum(total)}</b>`:''}
-            ${lang==='ar'?'د.إ':'AED'}
-          </span>`;
+          let parts=[];
+          if(c.fee) parts.push('💵 '+fmtNum(c.fee));
+          if(hasBus) parts.push('🚌'+fmtNum(c.busFee));
+          if(c.friFee) parts.push('🟡Fri:'+fmtNum(c.friFee));
+          if(c.satFee) parts.push('🟣Sat:'+fmtNum(c.satFee));
+          if(c.sunFee) parts.push('🔵Sun:'+fmtNum(c.sunFee));
+          return `<span style="color:var(--ok);font-weight:700">${parts.join(' + ')} = <b>${fmtNum(total)}</b> AED</span>`;
         })()}
       </div>
     </div>`).join('');
@@ -1496,6 +1586,10 @@ async function saveChild(){
     religion:el('frel').value,
     dob:el('fdob').value||null,
     kids_time:v('fktime'),
+    duty_days: ['mon','tue','wed','thu','fri','sat','sun'].filter(d=>document.getElementById('fday_'+d)?.checked).map(d=>d.charAt(0).toUpperCase()+d.slice(1)).join(','),
+    fri_fee: Number(el('ffee_fri')?.value)||0,
+    sat_fee: Number(el('ffee_sat')?.value)||0,
+    sun_fee: Number(el('ffee_sun')?.value)||0,
     join_date:join,
     leave_date:null,
     parent_mom:mom,
@@ -1942,7 +2036,19 @@ function renderAtt(){
             <div style="display:flex;align-items:center;gap:8px;flex:1">
               <div class="av" style="background:${chCol(c.id)};width:30px;height:30px;font-size:.78rem;flex-shrink:0">${(c.name||'؟')[0]}</div>
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:.85rem">${c.name}</div>
+                <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                  <span style="font-weight:700;font-size:.85rem">${c.name}</span>
+                  ${(()=>{
+                    const attDate=el('attdate').value||today();
+                    const month=monthOf(attDate);
+                    const paid=DB.receipts.filter(r=>r.childId===c.id&&monthOf(r.date)===month).reduce((s,r)=>s+r.total,0);
+                    const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
+                    if(!exp) return '';
+                    if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">✅ Paid</span>';
+                    if(paid>0) return '<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">⚡ Partial</span>';
+                    return '<span style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">❌ Unpaid</span>';
+                  })()}
+                </div>
                 <div style="font-size:.68rem;color:var(--muted)">${phone||''}</div>
               </div>
             </div>
@@ -2508,6 +2614,18 @@ function showDTab(tab,btn){
         <div class="fg"><label data-t="dob">Date of Birth</label><input type="date" value="${c.dob||''}" onchange="updateField('dob',this.value)"></div>
         <div class="fg"><label>${lang==='ar'?'العمر — Age':'Age'}</label><input value="${calcAge(c.dob)||'-'}" readonly></div>
         <div class="fg"><label data-t="kidsTime">Kids Time (hours)</label><input value="${c.kidsTime||''}" placeholder="e.g. 08:00-03:00 or Full Day" onchange="updateField('kidsTime',this.value)"></div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>📅 Attendance Days</label>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
+            ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>{
+              const checked=(c.dutyDays||'').split(',').map(x=>x.trim()).includes(d);
+              const color=d==='Fri'?'#d97706':d==='Sat'?'#7c3aed':'#1e3a8a';
+              return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:${checked?color+'22':'#f3f4f6'};border-radius:8px;padding:5px 10px;font-size:.82rem;font-weight:600;border:1.5px solid ${checked?color:'var(--border)'}">
+                <input type="checkbox" ${checked?'checked':''} value="${d}" style="accent-color:${color}" onchange="updateDutyDays(this)"> <span style="color:${checked?color:'inherit'}">${d}</span>
+              </label>`;
+            }).join('')}
+          </div>
+        </div>
         <div class="fg"><label>Join Date</label><input type="date" value="${c.joinDate||''}" onchange="updateField('joinDate',this.value)"></div>
         <div class="fg"><label>Mother Contact</label><input value="${c.parentMom||''}" onchange="updateField('parentMom',this.value)"></div>
         <div class="fg"><label data-t="fatherContact">Father Contact</label><input value="${c.parentDad||''}" onchange="updateField('parentDad',this.value)"></div>
@@ -3026,7 +3144,7 @@ async function updateField(field,value){
     name:'name', className:'class_name', regNum:'reg_num', idNumber:'id_number', gender:'gender',
     nationality:'nationality', religion:'religion', dob:'dob', kidsTime:'kids_time',
     joinDate:'join_date', leaveDate:'leave_date',
-    parentMom:'parent_mom', parentDad:'parent_dad', email:'email',
+    parentMom:'parent_mom', parentDad:'parent_dad', email:'email', dutyDays:'duty_days', friFee:'fri_fee', satFee:'sat_fee', sunFee:'sun_fee',
     fee:'fee', busFee:'bus_fee', bus:'bus', notes:'notes'
   };
   c[field]=value;
@@ -3156,6 +3274,10 @@ function processExcelFile(file) {
           religion:    get('Religion','religion'),
           dob:         parseDate(r['Date of Birth'] ?? r['DOB'] ?? r['dob'] ?? ''),
           kidsTime:    get('Kids Time','Time','kids time'),
+          dutyDays:    get('Duty Days','Attendance Days','Days','duty days','attendance days'),
+          friFee:      parseFee(r['Fri Fee']??r['Friday Fee']??r['fri_fee']??0),
+          satFee:      parseFee(r['Sat Fee']??r['Saturday Fee']??r['sat_fee']??0),
+          sunFee:      parseFee(r['Sun Fee']??r['Sunday Fee']??r['sun_fee']??0),
           parentMom:   (()=>{
             const v = get('M (Mother)','Mother contact','Mother Contact','M','mom','Mother','mother','Mom','MOM','Phone Mother','mother_contact','MotherContact','Mother Phone','Phone Mom','MOTHER');
             if(!v) return '';
@@ -3278,6 +3400,10 @@ async function importToSupabase() {
       email:       r.email || '',
       fee:         r.fee || 0,
       bus_fee:     r.busFee || 0,
+      duty_days:   r.dutyDays || '',
+      fri_fee:     r.friFee || 0,
+      sat_fee:     r.satFee || 0,
+      sun_fee:     r.sunFee || 0,
       bus:         r.bus || 'No',
       notes:       r.notes || '',
     };
@@ -3369,7 +3495,7 @@ async function loadStaff(){
     id:x.id, branchId:x.branch_id,
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
-    emergencyContact:x.emergency_contact||'', workingPlace:x.working_place||'',
+    emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
     position:x.position||'', email:x.email||'',
     contractStart:x.contract_start||'', contractEnd:x.contract_end||'',
     passportExpire:x.passport_expire||'', idExpire:x.id_expire||'',
@@ -3477,6 +3603,7 @@ function openStaffForm(id){
       <div class="fg"><label>Email Address</label><input type="email" id="sf_email" value="${s?.email||''}"></div>
       <div class="fg"><label>Address</label><input id="sf_addr" value="${s?.address||''}"></div>
       <div class="fg"><label>Emergency Contact (Name + Relation)</label><input id="sf_emname" value="${s?.emergencyContact||''}" placeholder="e.g. Ahmed - Brother"></div>
+      <div class="fg"><label>Emergency Phone Number 🚨</label><input id="sf_emphone" type="tel" value="${s?.emergencyPhone||''}" placeholder="+971 50 000 0000"></div>
     </div>
     <div style="background:#f0f4ff;border-radius:9px;padding:10px;margin-bottom:9px">
       <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">📅 Contract Dates — تواريخ العقد</div>
@@ -3518,6 +3645,7 @@ async function saveStaff(id){
     email: document.getElementById('sf_email')?.value||'',
     address: document.getElementById('sf_addr')?.value||'',
     emergency_contact: document.getElementById('sf_emname')?.value||'',
+    emergency_phone: document.getElementById('sf_emphone')?.value||'',
     contract_start: document.getElementById('sf_cstart')?.value||null,
     contract_end: document.getElementById('sf_cend')?.value||null,
     passport_expire: document.getElementById('sf_pass')?.value||null,
@@ -5137,6 +5265,190 @@ function uploadBranchLogo(bid, input){
     renderBranchSettings();
   };
   r.readAsDataURL(file);
+}
+
+// ─── Attendance Report ─────────────────────────
+function openAttReport(){
+  // Populate class dropdown
+  const classes=[...new Set(DB.children.filter(c=>!c.leaveDate).map(c=>c.className||'—'))].sort();
+  const sel=el('att-rep-class');
+  sel.innerHTML='<option value="">كل الفصول / All Classes</option>'+
+    classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+  // Default dates: first day of current month to today
+  const now=new Date();
+  const first=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+  if(!el('att-rep-from').value) el('att-rep-from').value=first;
+  if(!el('att-rep-to').value) el('att-rep-to').value=today();
+  el('att-report-modal').classList.add('on');
+}
+
+function printAttReport(){
+  const from=el('att-rep-from').value;
+  const to=el('att-rep-to').value;
+  const cls=el('att-rep-class').value;
+  if(!from||!to){alert('اختاري التاريخ');return;}
+
+  const b=CB();
+  const kids=DB.children.filter(c=>!c.leaveDate&&(!cls||(c.className||'—')===cls));
+  
+  // Get all dates in range
+  const dates=[];
+  let d=new Date(from);
+  const toD=new Date(to);
+  while(d<=toD){
+    dates.push(d.toISOString().split('T')[0]);
+    d.setDate(d.getDate()+1);
+  }
+
+  // Group by class
+  const classMap={};
+  kids.forEach(c=>{
+    const cl=c.className||'—';
+    if(!classMap[cl])classMap[cl]=[];
+    classMap[cl].push(c);
+  });
+
+  const formatD=s=>{ if(!s)return''; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+
+  let html=`<html dir="rtl"><head><meta charset="UTF-8">
+  <style>
+    body{font-family:'Tajawal',Arial,sans-serif;padding:15px;font-size:.78rem;direction:rtl}
+    h1{color:${b.c};font-size:1.1rem;margin-bottom:4px}
+    h2{color:#6b7280;font-size:.85rem;margin-bottom:10px;font-weight:400}
+    .cls-title{background:${b.c};color:#fff;padding:5px 10px;font-weight:700;margin:12px 0 4px;border-radius:5px}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:.72rem}
+    th{background:#1e3a8a;color:#fff;padding:4px 5px;border:1px solid #9ca3af;text-align:center;white-space:nowrap}
+    td{padding:3px 5px;border:1px solid #ddd;text-align:center}
+    td.name{text-align:right;font-weight:600;min-width:100px}
+    .abs{background:#fee2e2;color:#991b1b;font-weight:700}
+    .pres{color:#065f46}
+    .sum{background:#f0f9ff;font-weight:700}
+    @media print{body{padding:5px}}
+  </style></head><body>
+  <h1>📊 تقرير الغياب — ${b.ar}</h1>
+  <h2>من ${formatD(from)} إلى ${formatD(to)} ${cls?'| فصل: '+cls:''}</h2>`;
+
+  Object.entries(classMap).sort().forEach(([clsName,clsKids])=>{
+    html+=`<div class="cls-title">🏫 فصل: ${clsName} (${clsKids.length} طفل)</div>
+    <table>
+      <thead><tr>
+        <th style="text-align:right;min-width:100px">الاسم</th>
+        ${dates.map(d=>`<th>${new Date(d).getDate()}</th>`).join('')}
+        <th>غياب</th><th>حضور</th>
+      </tr></thead>
+      <tbody>`;
+    
+    clsKids.forEach(c=>{
+      let absCount=0, presCount=0;
+      const cells=dates.map(d=>{
+        const st=(DB.attendance[d]||{})[c.id]||(DB.attendance[d]||{})[String(c.id)];
+        if(st==='حضور'){presCount++;return`<td class="pres">✓</td>`;}
+        else if(st==='غياب'){absCount++;return`<td class="abs">✗</td>`;}
+        else return`<td style="color:#d1d5db">-</td>`;
+      }).join('');
+      html+=`<tr><td class="name">${c.name}</td>${cells}<td class="abs">${absCount}</td><td class="pres">${presCount}</td></tr>`;
+    });
+
+    // Summary row
+    const totals=dates.map(d=>{
+      const dayAtt=DB.attendance[d]||{};
+      const present=clsKids.filter(c=>dayAtt[c.id]==='حضور'||dayAtt[String(c.id)]==='حضور').length;
+      return`<td class="sum" style="font-size:.68rem">${present}/${clsKids.length}</td>`;
+    }).join('');
+    html+=`<tr style="background:#fef9c3"><td class="name" style="font-weight:800">المجموع اليومي</td>${totals}<td colspan="2"></td></tr>`;
+    html+=`</tbody></table>`;
+  });
+
+  html+=`</body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
+  el('att-report-modal').classList.remove('on');
+}
+
+function updateDutyDays(cb){
+  if(!curChild) return;
+  const form = cb.closest('div');
+  const days = Array.from(form.querySelectorAll('input[type=checkbox]'))
+    .filter(x=>x.checked).map(x=>x.value);
+  updateField('dutyDays', days.join(','));
+}
+
+// ─── Duty Days Report ──────────────────────────
+function printDutyReport(){
+  const b=CB();
+  const kids=DB.children.filter(c=>!c.leaveDate);
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  
+  // Count kids per day
+  const dayCounts={};
+  days.forEach(d=>{dayCounts[d]=[];});
+  kids.forEach(c=>{
+    (c.dutyDays||'').split(',').map(x=>x.trim()).forEach(d=>{
+      if(dayCounts[d]) dayCounts[d].push(c);
+    });
+  });
+
+  let html=`<html dir="ltr"><head><meta charset="UTF-8">
+  <style>
+    body{font-family:Arial,sans-serif;padding:20px;font-size:.82rem}
+    h1{color:#1e3a8a} h2{color:#7c3aed;margin:15px 0 5px}
+    .day-card{border:1.5px solid #e5e7eb;border-radius:9px;padding:10px;margin-bottom:10px}
+    .day-title{font-weight:800;font-size:.95rem;margin-bottom:7px;color:#1e3a8a}
+    .fri .day-title{color:#d97706} .sat .day-title{color:#7c3aed}
+    table{width:100%;border-collapse:collapse;font-size:.78rem}
+    th{background:#1e3a8a;color:#fff;padding:4px 7px;text-align:left}
+    td{padding:4px 7px;border-bottom:1px solid #f3f4f6}
+    .badge{background:#e0e7ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:.7rem}
+    @media print{.day-card{break-inside:avoid}}
+  </style></head><body>
+  <h1>📅 Attendance Duty Schedule — ${b.en||b.ar}</h1>
+  <p style="color:#6b7280;margin-bottom:15px">Total Active Children: <b>${kids.length}</b></p>`;
+
+  days.forEach(d=>{
+    const list=dayCounts[d];
+    const cls=d==='Fri'?'fri':d==='Sat'?'sat':'';
+    html+=`<div class="day-card ${cls}">
+      <div class="day-title">${d==='Fri'?'🟡':d==='Sat'||d==='Sun'?'🟣':'📅'} ${d}  <span class="badge">${list.length} children</span></div>`;
+    if(list.length){
+      const byClass={};
+      list.forEach(c=>{const cl=c.className||'—';if(!byClass[cl])byClass[cl]=[];byClass[cl].push(c);});
+      Object.entries(byClass).sort().forEach(([cl,kids])=>{
+        html+=`<div style="font-size:.72rem;color:#6b7280;margin-bottom:3px">Class: <b>${cl}</b> (${kids.length})</div>
+        <table><tr><th>#</th><th>Name</th><th>Class</th><th>Time</th></tr>
+        ${kids.map((c,i)=>`<tr><td>${i+1}</td><td><b>${c.name}</b></td><td>${c.className||'—'}</td><td>${c.kidsTime||'—'}</td></tr>`).join('')}
+        </table><br>`;
+      });
+    } else {
+      html+=`<p style="color:#9ca3af;font-style:italic">No children scheduled</p>`;
+    }
+    html+=`</div>`;
+  });
+  html+=`</body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+}
+
+function calcWeekendTotal(){
+  const fee=Number(el('ffee')?.value)||0;
+  const bus=el('fbus')?.value==='Yes'?Number(el('fbfee')?.value)||0:0;
+  const friFee=el('fday_fri')?.checked?Number(el('ffee_fri')?.value)||0:0;
+  const satFee=el('fday_sat')?.checked?Number(el('ffee_sat')?.value)||0:0;
+  const sunFee=el('fday_sun')?.checked?Number(el('ffee_sun')?.value)||0:0;
+  const wkTotal=friFee+satFee+sunFee;
+  const grand=fee+bus+wkTotal;
+  const summary=el('reg-total-summary');
+  if(!summary)return;
+  if(!grand){summary.style.display='none';return;}
+  summary.style.display='block';
+  el('reg-total-amount').textContent=fmtNum(grand)+' AED';
+  const parts=[];
+  if(fee) parts.push('Monthly: '+fmtNum(fee));
+  if(bus) parts.push('Bus: '+fmtNum(bus));
+  if(friFee) parts.push('🟡Fri: '+fmtNum(friFee));
+  if(satFee) parts.push('🟣Sat: '+fmtNum(satFee));
+  if(sunFee) parts.push('🔵Sun: '+fmtNum(sunFee));
+  el('reg-total-breakdown').textContent=parts.join(' + ');
 }
 
 boot();
