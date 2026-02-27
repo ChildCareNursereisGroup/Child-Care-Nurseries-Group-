@@ -3134,9 +3134,15 @@ function processExcelFile(file) {
       // Map columns — handles variations
       const mapped = rows.map((r,i) => {
         const get = (...keys) => {
+          // Build case-insensitive lookup map once
+          const rLower = {};
+          Object.keys(r).forEach(k => { rLower[k.toLowerCase().trim()] = r[k]; });
           for(const k of keys) {
-            const val = r[k] ?? r[k.toLowerCase()] ?? r[k.toUpperCase()];
-            if(val !== undefined && val !== '') return String(val).trim();
+            // Try exact match first
+            if(r[k] !== undefined && r[k] !== '') return String(r[k]).trim();
+            // Try case-insensitive
+            const kl = k.toLowerCase().trim();
+            if(rLower[kl] !== undefined && rLower[kl] !== '') return String(rLower[kl]).trim();
           }
           return '';
         };
