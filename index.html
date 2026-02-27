@@ -604,7 +604,14 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <hr class="sep">
   <div class="g3">
     <div class="fg"><label data-t="branch">الفرع</label><select id="abr"><option value="all">All Branches — كل الفروع</option></select></div>
-    <div class="fg"><label data-t="role">الدور</label><select id="arole"><option value="admin" data-t="roleAdminOpt">Admin</option><option value="attendance" data-t="roleAttOpt">Attendance Staff</option><option value="expenses" data-t="roleExpOpt">Expenses Staff</option></select></div>
+    <div class="fg"><label data-t="role">الدور</label><select id="arole">
+  <option value="admin">👩‍💼 Admin</option>
+  <option value="receipts">🧾 Receipts &amp; Children</option>
+  <option value="attendance">📋 Attendance Staff</option>
+  <option value="expenses">💸 Expenses Staff</option>
+  <option value="cashier">💳 Cashier</option>
+  <option value="public_reg">📝 Public Registration</option>
+</select></div>
     <div class="fg"><label data-t="newPass">الباسورد الجديد</label><input type="text" id="apw" placeholder="min 4 chars"></div>
   </div>
   <div style="margin-top:9px"><button class="btn bp" onclick="changePW()">💾 حفظ</button></div>
@@ -3183,11 +3190,23 @@ function renderAdmin(){
     // Default to current branch
     impBr.value = curBid;
   }
+    const ALL_ROLES=[
+    {k:'admin',      icon:'👩‍💼', label:'Admin'},
+    {k:'receipts',   icon:'🧾', label:'Receipts'},
+    {k:'attendance', icon:'📋', label:'Attendance'},
+    {k:'expenses',   icon:'💸', label:'Expenses'},
+    {k:'cashier',    icon:'💳', label:'Cashier'},
+    {k:'public_reg', icon:'📝', label:'Public Reg'},
+  ];
   el('pwlist').innerHTML=BRANCHES.map(b=>`
-    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="font-weight:800;color:${b.c};margin-bottom:5px">${b.icon} ${tBN(b)}</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.79rem">
-        ${['admin','attendance','expenses'].map(r=>`<span style="color:var(--muted)">${lang==='ar'?{admin:'مديرة',attendance:'حضور',expenses:'مصاريف'}[r]:{admin:'Admin',attendance:'Attendance',expenses:'Expenses'}[r]}: <b>${'•'.repeat(getPW(b.id,r).length)}</b></span>`).join('')}
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:8px">
+      <div style="font-weight:800;color:${b.c};margin-bottom:7px;font-size:.88rem">${b.icon} ${tBN(b)}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">
+        ${ALL_ROLES.map(r=>`
+          <div style="background:#f9fafb;border-radius:8px;padding:5px 8px;font-size:.75rem">
+            <div style="color:var(--muted);margin-bottom:2px">${r.icon} ${r.label}</div>
+            <div style="font-weight:700;letter-spacing:1px">${'•'.repeat(Math.min(getPW(b.id,r.k).length,10))}</div>
+          </div>`).join('')}
       </div>
     </div>`).join('');
 }
