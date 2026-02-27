@@ -709,8 +709,6 @@ async function loadBranchSettings(){
 }
 async function saveBranchExtraToSupa(bid){
   const bx=_branchExtra[bid]||{};
-  // Don't store large base64 logo in Supabase (too big) — keep in localStorage
-  // But store TRN, colors, address, phone, email
   const row={
     branch_id:bid,
     trn:bx.trn||null,
@@ -719,7 +717,15 @@ async function saveBranchExtraToSupa(bid){
     phone:bx.phone||null,
     email_addr:bx.email||null,
   };
-  await sb.from('branch_settings').upsert(row,{onConflict:'branch_id'});
+  try {
+    const {error} = await sb.from('branch_settings').upsert(row,{onConflict:'branch_id'});
+    if(error) throw error;
+    return true;
+  } catch(err) {
+    console.error('Branch settings save error:', err);
+    alert('❌ Save error: ' + (err.message||JSON.stringify(err)));
+    return false;
+  }
 }
 // ─────────────────────────────────────────────────
 
@@ -3138,8 +3144,8 @@ function processExcelFile(file) {
           religion:    get('Religion','religion'),
           dob:         parseDate(r['Date of Birth'] ?? r['DOB'] ?? r['dob'] ?? ''),
           kidsTime:    get('Kids Time','Time','kids time'),
-          parentMom:   get('Mother contact','Mother Contact','M','mom'),
-          parentDad:   get('Father Contact','Father contact','F','dad'),
+          parentMom:   get('Mother contact','Mother Contact','M','mom','Mother','mother','Mom','MOM','Phone Mother','mother_contact','MotherContact','Mother Phone','Phone Mom','MOTHER'),
+          parentDad:   get('Father Contact','Father contact','F','dad','Father','father','Dad','DAD','Phone Father','father_contact','FatherContact','Father Phone','Phone Dad','FATHER'),
           email:       get('Email ID','Email','email'),
           joinDate:    parseDate(r['Join Date'] ?? r['join date'] ?? ''),
           regNum:      String(r['Registration No'] ?? r['Registration No'] ?? '').trim(),
@@ -3239,8 +3245,8 @@ async function importToSupabase() {
       kids_time:   r.kidsTime || '',
       join_date:   r.joinDate || null,
       leave_date:  null,
-      parent_mom:  r.parentMom || '',
-      parent_dad:  r.parentDad || '',
+      parent_mom:  String(r.parentMom || '').replace(/[^\d+\s()-]/g,'').trim() || r.parentMom || '',
+      parent_dad:  String(r.parentDad || '').replace(/[^\d+\s()-]/g,'').trim() || r.parentDad || '',
       email:       r.email || '',
       fee:         r.fee || 0,
       bus_fee:     r.busFee || 0,
@@ -5069,9 +5075,14 @@ async function saveBranchSettings(bid, safeId){
   const email=get('email_'+safeId);
   const color=get('color_'+safeId)||'#1e3a8a';
   saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color});
-  await saveBranchExtraToSupa(bid);
   const lbl=document.getElementById('bsave_'+safeId);
-  if(lbl){lbl.textContent='✅ Saved to cloud!'; setTimeout(()=>{lbl.textContent='';renderBranchSettings();},1500);}
+  if(lbl) lbl.textContent='⏳ Saving...';
+  const ok = await saveBranchExtraToSupa(bid);
+  if(lbl){
+    lbl.textContent = ok ? '✅ Saved!' : '❌ Failed — check console';
+    lbl.style.color = ok ? '#059669' : '#dc2626';
+    if(ok) setTimeout(()=>{lbl.textContent='';renderBranchSettings();},1500);
+  }
 }
 
 function clearBranchLogo(bid){
@@ -5079,12 +5090,7 @@ function clearBranchLogo(bid){
   renderBranchSettings();
 }
 
-function saveBranchSettings(bid){
-  const trn=document.getElementById('trn_'+bid)?.value?.trim()||'';
-  saveBranchExtra(bid,{trn});
-  const lbl=document.getElementById('branch-save-'+bid);
-  if(lbl){lbl.textContent='✅ Saved!'; setTimeout(()=>lbl.textContent='',2000);}
-}
+// duplicate removed
 
 function uploadBranchLogo(bid, input){
   const file=input.files[0]; if(!file) return;
