@@ -1803,7 +1803,10 @@ function updateSerialByPayMethod(){
 
 function initRecForm(){
   const sel=el('rch');
-  sel.innerHTML='<option value="">-- اختر --</option>'+DB.children.filter(c=>!c.leaveDate).map(c=>`<option value="${c.id}">${c.name} (${c.className||''})</option>`).join('');
+  sel.innerHTML='<option value="">-- اختر --</option>'
+    +'<option value="__guest__">👶 زائر / Guest (غير مسجل)</option>'
+    +'<option disabled style="color:#ccc">─────────────────</option>'
+    +DB.children.filter(c=>!c.leaveDate).map(c=>`<option value="${c.id}">${c.name} (${c.className||''})</option>`).join('');
   if(!el('rdate').value)el('rdate').value=today();
   updateSerialByPayMethod();
 }
