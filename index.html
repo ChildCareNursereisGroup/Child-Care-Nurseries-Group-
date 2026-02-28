@@ -1055,7 +1055,12 @@ const v=id=>document.getElementById(id)?.value?.trim()||'';
 const el=id=>document.getElementById(id);
 const today=()=>new Date().toISOString().split('T')[0];
 const monthOf=d=>{if(!d)return'';const dt=new Date(d);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
-const fmtDate=d=>d?new Date(d).toLocaleDateString('ar-AE'):'-';
+const fmtDate=d=>{
+  if(!d)return'-';
+  const p=String(d).split('T')[0].split('-');
+  if(p.length===3)return p[2].padStart(2,'0')+'/'+p[1].padStart(2,'0')+'/'+p[0];
+  return d;
+};
 const fmtNum=x=>Number(x||0).toLocaleString('ar-AE');
 const CB=()=>BRANCHES.find(b=>b.id===curBid);
 const tBN=b=>lang==='ar'?b.ar:b.en;
