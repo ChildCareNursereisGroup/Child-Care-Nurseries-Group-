@@ -528,10 +528,61 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         <input type="month" id="efmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderExps()">
         <span style="font-weight:800;color:var(--err)">إجمالي: <span id="exptot">0</span> د.إ</span>
+        <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
     <div id="explist"></div>
+  </div>
+</div>
+
+<!-- EXPENSE REPORT MODAL -->
+<div class="mover" id="exp-report-modal">
+  <div class="mbox" style="max-width:500px">
+    <div class="mh">
+      <div class="mt">📊 Expense Report</div>
+      <button class="xb" onclick="el('exp-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg">
+          <label>From Month</label>
+          <input type="month" id="exp-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label>To Month</label>
+          <input type="month" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Category — البند</label>
+        <select id="exp-rep-cat" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+          <option value="all">📋 All Categories — كل البنود</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Language — اللغة</label>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="exp-lang" value="en" checked> 🇬🇧 English
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="exp-lang" value="ar"> 🇦🇪 العربية
+          </label>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <button onclick="printExpReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          🖨️ Print/PDF
+        </button>
+        <button onclick="printExpReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          📊 Excel
+        </button>
+        <button onclick="printExpReport('pdf')" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          📄 PDF
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1673,7 +1724,7 @@ async function saveChild(){
     religion:el('frel').value,
     dob:el('fdob').value||null,
     kids_time:v('fktime'),
-    duty_days: ['mon','tue','wed','thu','fri','sat','sun'].filter(d=>document.getElementById('fday_'+d)?.checked).map(d=>d.charAt(0).toUpperCase()+d.slice(1)).join(','),
+    duty_days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].filter(d=>document.getElementById('fday_'+d.toLowerCase())?.checked).join(','),
     fri_fee: Number(el('ffee_fri')?.value)||0,
     sat_fee: Number(el('ffee_sat')?.value)||0,
     sun_fee: Number(el('ffee_sun')?.value)||0,
@@ -2964,7 +3015,7 @@ function showDTab(tab,btn){
           <label>📅 Attendance Days</label>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
             ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>{
-              const checked=(c.dutyDays||'').split(',').map(x=>x.trim()).includes(d);
+              const checked=(c.dutyDays||'').split(',').map(x=>x.trim().charAt(0).toUpperCase()+x.trim().slice(1).toLowerCase()).includes(d);
               const color=d==='Fri'?'#d97706':d==='Sat'?'#7c3aed':'#1e3a8a';
               return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:${checked?color+'22':'#f3f4f6'};border-radius:8px;padding:5px 10px;font-size:.82rem;font-weight:600;border:1.5px solid ${checked?color:'var(--border)'}">
                 <input type="checkbox" ${checked?'checked':''} value="${d}" style="accent-color:${color}" onchange="updateDutyDays(this)"> <span style="color:${checked?color:'inherit'}">${d}</span>
@@ -2985,18 +3036,53 @@ function showDTab(tab,btn){
           </select>
         </div>
         <div class="fg"><label>Leave Date</label><input type="date" value="${c.leaveDate||''}" onchange="updateField('leaveDate',this.value||null)"></div>
-      </div>
-      <!-- TOTAL EXPECTED MONTHLY -->
-      <div style="background:${CB().l};border:1.5px solid ${CB().c};border-radius:11px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-        <div>
-          <div style="font-size:.72rem;color:${CB().c};font-weight:700;margin-bottom:3px">${lang==='ar'?'💰 إجمالي الدفع الشهري المتوقع':'💰 Total Expected Monthly Payment'}</div>
-          <div style="font-size:.79rem;color:#6b7280">
-            ${lang==='ar'?'رسوم':'Fees'}: <b>${fmtNum(c.fee)} AED</b>
-            ${c.bus==='Yes'&&c.busFee ? ` + ${lang==='ar'?'مواصلات':'Transport'}: <b>${fmtNum(c.busFee)} AED</b>` : ''}
+        <!-- Weekend Fees -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>🎉 Weekend Fees — رسوم الويكند (per month / شهرياً)</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:5px">
+            <div style="border:1.5px solid #fde68a;border-radius:10px;padding:8px;background:#fffbeb">
+              <div style="font-weight:800;color:#d97706;font-size:.83rem;margin-bottom:4px">🟡 Friday</div>
+              <div style="font-size:.7rem;color:#92400e;margin-bottom:3px">Fee/month (AED)</div>
+              <input type="number" value="${c.friFee||0}" min="0" placeholder="0"
+                onchange="updateField('friFee',Number(this.value))"
+                style="width:100%;padding:5px;border:1px solid #fde68a;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            </div>
+            <div style="border:1.5px solid #ddd6fe;border-radius:10px;padding:8px;background:#f5f3ff">
+              <div style="font-weight:800;color:#7c3aed;font-size:.83rem;margin-bottom:4px">🟣 Saturday</div>
+              <div style="font-size:.7rem;color:#5b21b6;margin-bottom:3px">Fee/month (AED)</div>
+              <input type="number" value="${c.satFee||0}" min="0" placeholder="0"
+                onchange="updateField('satFee',Number(this.value))"
+                style="width:100%;padding:5px;border:1px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            </div>
+            <div style="border:1.5px solid #cffafe;border-radius:10px;padding:8px;background:#ecfeff">
+              <div style="font-weight:800;color:#0891b2;font-size:.83rem;margin-bottom:4px">🔵 Sunday</div>
+              <div style="font-size:.7rem;color:#164e63;margin-bottom:3px">Fee/month (AED)</div>
+              <input type="number" value="${c.sunFee||0}" min="0" placeholder="0"
+                onchange="updateField('sunFee',Number(this.value))"
+                style="width:100%;padding:5px;border:1px solid #cffafe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            </div>
           </div>
         </div>
-        <div style="font-size:1.3rem;font-weight:900;color:${CB().c}">${fmtNum(c.fee+(c.bus==='Yes'?c.busFee||0:0))} AED</div>
       </div>
+      <!-- TOTAL EXPECTED MONTHLY -->
+      ${(()=>{
+        const wk=(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+        const bus=(c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0;
+        const tot=(c.fee||0)+bus+wk;
+        const parts=[];
+        if(c.fee) parts.push((lang==='ar'?'رسوم':'Fees')+': '+fmtNum(c.fee));
+        if(bus)   parts.push((lang==='ar'?'مواصلات':'Bus')+': '+fmtNum(bus));
+        if(c.friFee) parts.push('🟡Fri: '+fmtNum(c.friFee));
+        if(c.satFee) parts.push('🟣Sat: '+fmtNum(c.satFee));
+        if(c.sunFee) parts.push('🔵Sun: '+fmtNum(c.sunFee));
+        return `<div style="background:${CB().l};border:1.5px solid ${CB().c};border-radius:11px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
+          <div>
+            <div style="font-size:.72rem;color:${CB().c};font-weight:700;margin-bottom:3px">${lang==='ar'?'💰 إجمالي الدفع الشهري المتوقع':'💰 Total Expected Monthly Payment'}</div>
+            <div style="font-size:.76rem;color:#6b7280">${parts.join(' + ')}</div>
+          </div>
+          <div style="font-size:1.3rem;font-weight:900;color:${CB().c}">${fmtNum(tot)} AED</div>
+        </div>`;
+      })()}
       <div class="fg" style="margin-bottom:9px"><label>Notes</label><textarea rows="2" onchange="updateField('notes',this.value)">${c.notes||''}</textarea></div>
       <button class="btn bd bsm" onclick="deleteChild()">🗑 Delete Child</button>`;
   }
@@ -3632,7 +3718,12 @@ function processExcelFile(file) {
           religion:    get('Religion','religion'),
           dob:         parseDate(r['Date of Birth'] ?? r['DOB'] ?? r['dob'] ?? ''),
           kidsTime:    get('Kids Time','Time','kids time'),
-          dutyDays:    get('Duty Days','Attendance Days','Days','duty days','attendance days'),
+          dutyDays:    (()=>{
+            const raw = get('Duty Days','Attendance Days','Days','duty days','attendance days');
+            // Normalize: 'mon,Tue,wed,Thu,fri, sat' → 'Mon,Tue,Wed,Thu,Fri,Sat'
+            const dayMap={'sun':'Sun','mon':'Mon','tue':'Tue','wed':'Wed','thu':'Thu','fri':'Fri','sat':'Sat'};
+            return raw.split(',').map(d=>{ const k=d.trim().toLowerCase(); return dayMap[k]||d.trim(); }).filter(Boolean).join(',');
+          })(),
           friFee:      parseFee(r['Fri Fee']??r['Friday Fee']??r['fri_fee']??0),
           satFee:      parseFee(r['Sat Fee']??r['Saturday Fee']??r['sat_fee']??0),
           sunFee:      parseFee(r['Sun Fee']??r['Sunday Fee']??r['sun_fee']??0),
@@ -5777,7 +5868,8 @@ function updateDutyDays(cb){
   if(!curChild) return;
   const form = cb.closest('div');
   const days = Array.from(form.querySelectorAll('input[type=checkbox]'))
-    .filter(x=>x.checked).map(x=>x.value);
+    .filter(x=>x.checked)
+    .map(x=>{ const v=x.value.trim(); return v.charAt(0).toUpperCase()+v.slice(1).toLowerCase(); });
   updateField('dutyDays', days.join(','));
 }
 
@@ -5791,7 +5883,7 @@ function printDutyReport(){
   const dayCounts={};
   days.forEach(d=>{dayCounts[d]=[];});
   kids.forEach(c=>{
-    (c.dutyDays||'').split(',').map(x=>x.trim()).forEach(d=>{
+    (c.dutyDays||'').split(',').map(x=>{const t=x.trim();return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();}).forEach(d=>{
       if(dayCounts[d]) dayCounts[d].push(c);
     });
   });
@@ -5855,6 +5947,215 @@ function calcWeekendTotal(){
   if(satFee) parts.push('🟣Sat: '+fmtNum(satFee));
   if(sunFee) parts.push('🔵Sun: '+fmtNum(sunFee));
   el('reg-total-breakdown').textContent=parts.join(' + ');
+}
+
+// ─── Expense Report ────────────────────────────
+function openExpReportModal(){
+  const now = el('efmon')?.value || monthOf(new Date());
+  if(!el('exp-rep-from').value) el('exp-rep-from').value = now;
+  if(!el('exp-rep-to').value)   el('exp-rep-to').value   = now;
+  // Populate categories
+  const sel = el('exp-rep-cat');
+  sel.innerHTML = '<option value="all">📋 All Categories — كل البنود</option>' +
+    EXP_CATS.map(c=>`<option value="${c.k}">${c.ic} ${typeof c.ar==='function'?c.ar():c.ar}</option>`).join('');
+  // Pre-select current filter
+  if(expFilt !== 'all') sel.value = expFilt;
+  el('exp-report-modal').classList.add('on');
+}
+
+function printExpReport(exportType='print'){
+  const from   = el('exp-rep-from').value;
+  const to     = el('exp-rep-to').value;
+  const catF   = el('exp-rep-cat').value;
+  const rLang  = document.querySelector('input[name="exp-lang"]:checked')?.value || 'en';
+  const isAr   = rLang === 'ar';
+  const dir    = isAr ? 'rtl' : 'ltr';
+  const b      = CB();
+
+  if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
+
+  // Filter expenses
+  let list = DB.expenses.filter(e => {
+    const m = monthOf(e.date);
+    return m >= from && m <= to;
+  });
+  if(catF !== 'all') list = list.filter(e => e.category === catF);
+
+  const fmt = n => (Math.round((n||0)*100)/100).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtD = s => { if(!s)return'—'; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+
+  // Group by category
+  const bycat = {};
+  EXP_CATS.forEach(c=>{ bycat[c.k]={cat:c, items:[], total:0, vatTotal:0}; });
+  bycat['other'] = bycat['other'] || {cat:{ic:'📝',ar:isAr?'أخرى':'Other',k:'other'}, items:[], total:0, vatTotal:0};
+  list.forEach(e=>{
+    const k = e.category || 'other';
+    if(!bycat[k]) bycat[k]={cat:{ic:'📝',ar:e.type||k,k}, items:[], total:0, vatTotal:0};
+    bycat[k].items.push(e);
+    bycat[k].total    += (e.totalAmount||e.amount||0);
+    bycat[k].vatTotal += (e.vatAmount||0);
+  });
+
+  const grandTotal    = list.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+  const grandVAT      = list.reduce((s,e)=>s+(e.vatAmount||0),0);
+  const grandPreTax   = grandTotal - grandVAT;
+
+  const catLabel = c => typeof c.ar==='function' ? c.ar() : (c.ar||c.k);
+
+  const T = {
+    title:    isAr ? 'تقرير المصاريف' : 'Expense Report',
+    period:   isAr ? 'الفترة' : 'Period',
+    category: isAr ? 'البند' : 'Category',
+    date:     isAr ? 'التاريخ' : 'Date',
+    supplier: isAr ? 'المورد' : 'Supplier',
+    desc:     isAr ? 'البيان' : 'Description',
+    preTax:   isAr ? 'قبل الضريبة' : 'Pre-Tax',
+    vat:      isAr ? 'الضريبة' : 'VAT',
+    total:    isAr ? 'الإجمالي' : 'Total',
+    grandPre: isAr ? 'إجمالي قبل الضريبة' : 'Grand Total Pre-Tax',
+    grandVat: isAr ? 'إجمالي الضريبة' : 'Total VAT',
+    grandTot: isAr ? 'الإجمالي الكلي' : 'Grand Total',
+    subtotal: isAr ? 'مجموع' : 'Sub-Total',
+    noExp:    isAr ? 'لا توجد مصاريف' : 'No expenses',
+    allCats:  isAr ? 'كل البنود' : 'All Categories',
+  };
+
+  const catFilter = catF==='all' ? T.allCats : (()=>{ const c=EXP_CATS.find(x=>x.k===catF); return c?c.ic+' '+catLabel(c):catF; })();
+
+  // Build category tables for print
+  const mkCatTable = (grp) => {
+    if(!grp.items.length) return '';
+    const cl = catLabel(grp.cat);
+    return `
+    <div style="margin-bottom:18px;break-inside:avoid">
+      <div style="background:#1e3a8a;color:#fff;padding:7px 12px;border-radius:8px 8px 0 0;font-weight:800;font-size:.88rem">
+        ${grp.cat.ic} ${cl} — ${grp.items.length} ${isAr?'بند':'items'}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.77rem">
+        <thead><tr style="background:#eff6ff">
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:${isAr?'right':'left'}">${T.date}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:${isAr?'right':'left'}">${T.supplier}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:${isAr?'right':'left'}">${T.desc}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:center">${T.preTax}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:center;color:#d97706">${T.vat}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:center;font-weight:800">${T.total}</th>
+        </tr></thead>
+        <tbody>
+        ${grp.items.map((e,i)=>`<tr style="background:${i%2?'#fafafa':'#fff'}">
+          <td style="padding:4px 7px;border:1px solid #e5e7eb">${fmtD(e.date)}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb">${e.supplierName||'—'}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb">${e.subType||e.note||e.type||'—'}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(e.amount||0)} AED</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center;color:#d97706">${fmt(e.vatAmount||0)} AED</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${fmt(e.totalAmount||e.amount||0)} AED</td>
+        </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:#eff6ff;font-weight:800">
+          <td colspan="3" style="padding:6px 7px;border:1px solid #e5e7eb">${T.subtotal}</td>
+          <td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(grp.total-grp.vatTotal)} AED</td>
+          <td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center;color:#d97706">${fmt(grp.vatTotal)} AED</td>
+          <td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(grp.total)} AED</td>
+        </tfoot>
+      </table>
+    </div>`;
+  };
+
+  // Summary by category table
+  const activeCats = Object.values(bycat).filter(g=>g.items.length);
+
+  const summaryTable = `
+  <table style="width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:18px">
+    <thead><tr style="background:#1e3a8a;color:#fff">
+      <th style="padding:6px 10px;text-align:${isAr?'right':'left'}">${T.category}</th>
+      <th style="padding:6px 10px;text-align:center">${isAr?'عدد البنود':'Items'}</th>
+      <th style="padding:6px 10px;text-align:center">${T.preTax}</th>
+      <th style="padding:6px 10px;text-align:center;color:#fde68a">${T.vat}</th>
+      <th style="padding:6px 10px;text-align:center">${T.total}</th>
+    </tr></thead>
+    <tbody>
+    ${activeCats.map((g,i)=>`<tr style="background:${i%2?'#fafafa':'#fff'}">
+      <td style="padding:5px 10px;border:1px solid #e5e7eb;font-weight:700">${g.cat.ic} ${catLabel(g.cat)}</td>
+      <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center">${g.items.length}</td>
+      <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center">${fmt(g.total-g.vatTotal)} AED</td>
+      <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center;color:#d97706">${fmt(g.vatTotal)} AED</td>
+      <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:800">${fmt(g.total)} AED</td>
+    </tr>`).join('')}
+    </tbody>
+    <tfoot><tr style="background:#1e3a8a;color:#fff;font-weight:900">
+      <td style="padding:6px 10px">${T.grandTot}</td>
+      <td style="padding:6px 10px;text-align:center">${list.length}</td>
+      <td style="padding:6px 10px;text-align:center">${fmt(grandPreTax)} AED</td>
+      <td style="padding:6px 10px;text-align:center;color:#fde68a">${fmt(grandVAT)} AED</td>
+      <td style="padding:6px 10px;text-align:center">${fmt(grandTotal)} AED</td>
+    </tfoot>
+  </table>`;
+
+  if(exportType==='excel'){
+    const wsData = [
+      [isAr?'تقرير المصاريف':'Expense Report', b.en||b.ar, `${from} → ${to}`, catFilter],
+      [],
+      [T.category, isAr?'بنود':'Items', T.preTax, T.vat, T.total],
+      ...activeCats.map(g=>[catLabel(g.cat), g.items.length, g.total-g.vatTotal, g.vatTotal, g.total]),
+      [],
+      [T.grandTot, list.length, grandPreTax, grandVAT, grandTotal],
+      [],
+      // Detail
+      [T.category, T.date, T.supplier, T.desc, isAr?'نوع الضريبة':'VAT Type', T.preTax, T.vat, T.total],
+      ...list.map(e=>{
+        const c=EXP_CATS.find(x=>x.k===e.category)||{ar:e.type||''};
+        return [catLabel(c), fmtD(e.date), e.supplierName||'', e.subType||e.note||'', e.vatType||'', e.amount||0, e.vatAmount||0, e.totalAmount||e.amount||0];
+      })
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:18},{wch:12},{wch:20},{wch:25},{wch:10},{wch:12},{wch:10},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isAr?'المصاريف':'Expenses');
+    XLSX.writeFile(wb, `Expense_Report_${from}_${to}.xlsx`);
+    el('exp-report-modal').classList.remove('on');
+    return;
+  }
+
+  const html = `<!DOCTYPE html>
+<html dir="${dir}" lang="${rLang}">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:20px;max-width:980px;margin:0 auto;color:#111;font-size:.83rem}
+  .summary-box{background:linear-gradient(135deg,#dc2626,#9f1239);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .sbox{text-align:center}.sbox .sv{font-size:1.3rem;font-weight:900}.sbox .sk{font-size:.72rem;opacity:.8;margin-top:2px}
+  @media print{body{padding:8px}@page{margin:10mm}}
+</style></head>
+<body>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:2px solid #dc2626;padding-bottom:10px">
+    <div>
+      <h1 style="font-size:1.3rem;color:#dc2626">📊 ${T.title}</h1>
+      <div style="font-size:.88rem;color:#6b7280;margin-top:3px">${b.icon} ${b.en||b.ar} | ${T.period}: ${from} → ${to} | ${catFilter}</div>
+    </div>
+    <div style="font-size:.75rem;color:#6b7280;text-align:${isAr?'left':'right'}">
+      <div>${new Date().toLocaleDateString('en-GB')}</div>
+      <div>${list.length} ${isAr?'بند':'items'}</div>
+    </div>
+  </div>
+
+  <div class="summary-box">
+    <div class="sbox"><div class="sv">${fmt(grandPreTax)} AED</div><div class="sk">${T.grandPre}</div></div>
+    <div class="sbox"><div class="sv" style="color:#fde68a">${fmt(grandVAT)} AED</div><div class="sk">${T.grandVat}</div></div>
+    <div class="sbox"><div class="sv" style="font-size:1.5rem">${fmt(grandTotal)} AED</div><div class="sk">${T.grandTot}</div></div>
+  </div>
+
+  <h3 style="color:#374151;font-size:.9rem;margin-bottom:8px">📋 ${isAr?'ملخص حسب البند':'Summary by Category'}</h3>
+  ${summaryTable}
+
+  <h3 style="color:#374151;font-size:.9rem;margin:16px 0 10px">📄 ${isAr?'التفاصيل':'Details'}</h3>
+  ${activeCats.map(g=>mkCatTable(g)).join('')}
+</body></html>`;
+
+  el('exp-report-modal').classList.remove('on');
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 700);
 }
 
 boot();
