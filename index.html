@@ -433,9 +433,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
           </label>
         </div>
       </div>
-      <button onclick="printVATReport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.95rem">
-        🖨️ Print Report
-      </button>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <button onclick="printVATReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">
+          🖨️ Print / PDF
+        </button>
+        <button onclick="printVATReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">
+          📊 Excel
+        </button>
+        <button onclick="printVATReport('pdf')" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">
+          📄 PDF
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1789,11 +1797,13 @@ function renderRecs(){
   const vatTot=list.reduce((s,r)=>s+(r.vatAmount||0),0);
   el('rectot').textContent=fmtNum(tot);
   if(!list.length){el('reclist').innerHTML=`<div class="empty"><div class="ei">🧾</div><p>${lang==='ar'?'لا توجد إيصالات':'No receipts found'}</p></div>`;return;}
+  const ar=lang==='ar';
+  const PAY_EN={cash:'Cash 💵',bank:'Bank Transfer 🏦',card:'Card 💳'};
   el('reclist').innerHTML=`
     <div style="background:#fef3c7;border-radius:9px;padding:9px 12px;margin-bottom:9px;display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem">
-      <span>💰 إجمالي المحصّل: <b>${fmtNum(tot)} د.إ</b></span>
-      <span>🧾 إجمالي الضريبة: <b style="color:var(--warn)">${fmtNum(vatTot)} د.إ</b></span>
-      <span>📄 عدد الإيصالات: <b>${list.length}</b></span>
+      <span>💰 ${ar?'إجمالي المحصّل':'Total Collected'}: <b>${fmtNum(tot)} ${ar?'د.إ':'AED'}</b></span>
+      <span>🧾 ${ar?'إجمالي الضريبة':'Total VAT'}: <b style="color:var(--warn)">${fmtNum(vatTot)} ${ar?'د.إ':'AED'}</b></span>
+      <span>📄 ${ar?'عدد الإيصالات':'Receipts'}: <b>${list.length}</b></span>
     </div>
   `+list.map(r=>`
     <div class="rc">
@@ -1801,27 +1811,27 @@ function renderRecs(){
         <div><div style="font-weight:800">${r.childName}</div><div style="font-size:.72rem;color:var(--muted)">${r.className||''}</div></div>
         <div style="text-align:center"><div style="font-size:.7rem;color:var(--muted)">#</div><div style="font-weight:800;color:var(--bc)">${r.receiptNum}</div></div>
         <div style="text-align:center">
-          <div style="font-size:.7rem;color:var(--muted)">التاريخ</div>
+          <div style="font-size:.7rem;color:var(--muted)">${ar?'التاريخ':'Date'}</div>
           <div style="font-weight:700">${fmtDate(r.date)}</div>
         </div>
-        <div><span class="bdg dbus">${PAY_LABELS[r.payMethod]||r.payMethod||'كاش'}</span></div>
+        <div><span class="bdg dbus">${ar?(PAY_LABELS[r.payMethod]||r.payMethod||'كاش'):(PAY_EN[r.payMethod]||r.payMethod||'Cash')}</span></div>
       </div>
       <div class="rb">
-        ${r.fromDate||r.toDate?`<div style="font-size:.74rem;color:var(--muted);margin-bottom:5px">📅 من: ${fmtDate(r.fromDate)} — إلى: ${fmtDate(r.toDate)}</div>`:''}
-        ${r.fee?`<div class="rrow"><span>الرسوم الشهرية</span><span style="font-weight:700">${fmtNum(r.fee)} د.إ</span></div>`:''}
-        ${r.reg?`<div class="rrow"><span>مصاريف التسجيل</span><span>${fmtNum(r.reg)} د.إ</span></div>`:''}
-        ${r.bus?`<div class="rrow"><span>المواصلات</span><span>${fmtNum(r.bus)} د.إ</span></div>`:''}
-        ${r.clothes?`<div class="rrow"><span>ملابس</span><span>${fmtNum(r.clothes)} د.إ</span></div>`:''}
-        ${r.tools?`<div class="rrow"><span>أدوات دراسية</span><span>${fmtNum(r.tools)} د.إ</span></div>`:''}
+        ${r.fromDate||r.toDate?`<div style="font-size:.74rem;color:var(--muted);margin-bottom:5px">📅 ${ar?'من':'From'}: ${fmtDate(r.fromDate)} — ${ar?'إلى':'To'}: ${fmtDate(r.toDate)}</div>`:''}
+        ${r.fee?`<div class="rrow"><span>${ar?'الرسوم الشهرية':'Monthly Fees'}</span><span style="font-weight:700">${fmtNum(r.fee)} ${ar?'د.إ':'AED'}</span></div>`:''}
+        ${r.reg?`<div class="rrow"><span>${ar?'مصاريف التسجيل':'Registration Fees'}</span><span>${fmtNum(r.reg)} ${ar?'د.إ':'AED'}</span></div>`:''}
+        ${r.bus?`<div class="rrow"><span>${ar?'المواصلات':'Transportation'}</span><span>${fmtNum(r.bus)} ${ar?'د.إ':'AED'}</span></div>`:''}
+        ${r.clothes?`<div class="rrow"><span>${ar?'ملابس':'Uniforms'}</span><span>${fmtNum(r.clothes)} ${ar?'د.إ':'AED'}</span></div>`:''}
+        ${r.tools?`<div class="rrow"><span>${ar?'أدوات دراسية':'Stationary'}</span><span>${fmtNum(r.tools)} ${ar?'د.إ':'AED'}</span></div>`:''}
         <div class="rrow" style="color:var(--warn)">
-          <span>🧾 الضريبة (${VAT_LABELS[r.vatType]||r.vatType||'معفى'})</span>
-          <span style="font-weight:700">${fmtNum(r.vatAmount||0)} د.إ</span>
+          <span>🧾 ${ar?'الضريبة':'VAT'} (${VAT_LABELS[r.vatType]||r.vatType||(ar?'معفى':'Exempt')})</span>
+          <span style="font-weight:700">${fmtNum(r.vatAmount||0)} ${ar?'د.إ':'AED'}</span>
         </div>
         ${r.notes?`<div style="font-size:.74rem;color:var(--muted);margin-top:4px">📝 ${r.notes}</div>`:''}
-        <div class="rtot"><span>الإجمالي شامل الضريبة</span><span>${fmtNum(r.total)} د.إ</span></div>
+        <div class="rtot"><span>${ar?'الإجمالي شامل الضريبة':'Grand Total incl. VAT'}</span><span>${fmtNum(r.total)} ${ar?'د.إ':'AED'}</span></div>
       </div>
       <div style="padding:5px 12px;display:flex;gap:5px;border-top:1px solid var(--border)" class="np">
-        <button class="btn bo bsm" onclick="prevRec('${r.id}')">👁 معاينة</button>
+        <button class="btn bo bsm" onclick="prevRec('${r.id}')">👁 ${ar?'معاينة':'Preview'}</button>
         <button class="btn bd bsm" onclick="delRec('${r.id}')">🗑</button>
       </div>
     </div>`).join('');
@@ -1833,7 +1843,7 @@ function openVATReportModal(){
   el('vat-report-modal').classList.add('on');
 }
 
-function printVATReport(){
+function printVATReport(exportType='print'){
   const fm = el('vat-rep-month')?.value || el('rfmon')?.value || monthOf(new Date());
   const payF = el('vat-rep-pay')?.value || 'all';
   const rLang = document.querySelector('input[name="vat-lang"]:checked')?.value || 'en';
@@ -2047,10 +2057,49 @@ function printVATReport(){
 </body></html>`;
 
   el('vat-report-modal').classList.remove('on');
+
+  if(exportType==='excel'){
+    // Export to Excel
+    const wsData=[
+      [isAr?'التقرير الضريبي الشهري':'Monthly VAT Report', T.branch, fm, payFilterLabel],
+      [],
+      [isAr?'نوع الضريبة':'VAT Type', isAr?'عدد الإيصالات':'Receipts', isAr?'قبل الضريبة':'Pre-Tax', isAr?'مبلغ الضريبة':'VAT Amt', isAr?'الإجمالي':'Total'],
+      [T.taxable5, vatFive.length, sumPre(vatFive), sumVat(vatFive), sum(vatFive)],
+      [T.zeroR,    vatZero.length, sum(vatZero), 0, sum(vatZero)],
+      [T.exempt_,  vatExempt.length, sum(vatExempt), 0, sum(vatExempt)],
+      [],
+      [isAr?'الإجمالي':'Grand Total', list.length, grandPreTax, grandVAT, grandTotal],
+      [],
+      // Detail rows
+      [isAr?'#إيصال':'Receipt#', isAr?'الطفل':'Child', isAr?'الفصل':'Class', isAr?'التاريخ':'Date',
+       isAr?'طريقة الدفع':'Pay Method', isAr?'الرسوم':'Fees', isAr?'تسجيل':'Reg',
+       isAr?'مواصلات':'Transport', isAr?'ملابس':'Uniforms', isAr?'أدوات':'Stationary',
+       isAr?'الضريبة':'VAT', isAr?'الإجمالي':'Total'],
+      ...list.map(r=>[
+        r.receiptNum, r.childName, r.className||'', fmtDate(r.date),
+        payLabel(r.payMethod),
+        r.fee||0, r.reg||0, r.bus||0, r.clothes||0, r.tools||0,
+        r.vatAmount||0, r.total
+      ])
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:12},{wch:25},{wch:8},{wch:12},{wch:15},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:8},{wch:10}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isAr?'تقرير الضريبة':'VAT Report');
+    XLSX.writeFile(wb, `VAT_Report_${fm}_${payF}.xlsx`);
+    return;
+  }
+
+  // Print or PDF
   const w = window.open('','_blank');
   w.document.write(html);
   w.document.close();
-  setTimeout(()=>w.print(), 700);
+  if(exportType==='pdf'){
+    // PDF via print dialog — user selects "Save as PDF"
+    setTimeout(()=>{ w.print(); }, 700);
+  } else {
+    setTimeout(()=>w.print(), 700);
+  }
 }
 function prevRec(id){
   _previewReceiptId=id;
