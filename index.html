@@ -488,6 +488,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="ct" data-t="dailyAtt">📋 Daily Attendance — الحضور اليومي</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <input type="date" id="attdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderAtt()">
+      <span id="att-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#e0e7ff;color:#3730a3"></span>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
@@ -2473,8 +2474,31 @@ async function delRec(id){
 // ═══════════════════════════════════════════════
 function renderAtt(){
   const date=el('attdate').value||today();
-  const active=DB.children.filter(c=>!c.leaveDate);
-  if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👶</div><p>${lang==='ar'?'لا يوجد أطفال':'No children found'}</p></div>`;return;}
+
+  // Get day name from date to filter children booked for this day
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dateObj=new Date(date+'T00:00:00');
+  const todayDayName=dayNames[dateObj.getDay()]; // e.g. 'Fri'
+
+  // Filter: only children who have this day in their dutyDays
+  // If child has no dutyDays set → show them always (backwards compat)
+  const active=DB.children.filter(c=>{
+    if(c.leaveDate) return false;
+    if(!c.dutyDays||c.dutyDays.trim()==='') return true; // no schedule set = always show
+    const days=c.dutyDays.split(',').map(d=>{const t=d.trim();return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();});
+    return days.includes(todayDayName);
+  });
+
+  const allActive=DB.children.filter(c=>!c.leaveDate);
+  const filtered=allActive.length-active.length;
+
+  if(!active.length){
+    el('attlist').innerHTML=`<div class="empty"><div class="ei">📅</div>
+      <p>${lang==='ar'?'لا يوجد أطفال مجدولون ليوم':'No children scheduled for'} ${todayDayName}</p>
+      <p style="font-size:.75rem;color:#9ca3af;margin-top:5px">${lang==='ar'?'كل الأطفال لديهم أيام مختلفة':'All children are on different days'}</p>
+    </div>`;
+    return;
+  }
   if(!DB.attendance[date])DB.attendance[date]={};
 
   // Group by class
@@ -2548,11 +2572,21 @@ function renderAtt(){
     </div>`;
   }).join('');
 
+  // Update day badge
+  const dayAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dayColors={Sun:'#ecfdf5',Mon:'#eff6ff',Tue:'#fdf4ff',Wed:'#fffbeb',Thu:'#f0f9ff',Fri:'#fef9c3',Sat:'#fdf2f8'};
+  const dayTxtColors={Sun:'#065f46',Mon:'#1e3a8a',Tue:'#7e22ce',Wed:'#92400e',Thu:'#0c4a6e',Fri:'#854d0e',Sat:'#9d174d'};
+  const badge=el('att-day-badge');
+  if(badge){
+    badge.textContent=(lang==='ar'?dayAr[dateObj.getDay()]:todayDayName)+' 📅';
+    badge.style.background=dayColors[todayDayName]||'#f3f4f6';
+    badge.style.color=dayTxtColors[todayDayName]||'#374151';
+  }
   el('attsum').innerHTML=`
     <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.82rem;padding:4px 0">
       <span style="color:var(--ok);font-weight:700">✅ ${lang==='ar'?'حضور':'Present'}: ${totalPresent}</span>
       <span style="color:var(--err);font-weight:700">❌ ${lang==='ar'?'غياب':'Absent'}: ${totalAbsent}</span>
-      <span style="color:var(--muted)">📊 ${lang==='ar'?'إجمالي':'Total'}: ${active.length}</span>
+      <span style="color:var(--muted)">📊 ${lang==='ar'?'مجدول اليوم':'Scheduled today'}: ${active.length}</span>
       <span style="color:var(--muted)">🏫 ${classes.length} ${lang==='ar'?'فصول':'classes'}</span>
     </div>`;
 }
