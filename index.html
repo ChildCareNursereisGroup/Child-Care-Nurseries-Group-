@@ -1787,6 +1787,7 @@ function getNextSerial(payMethod){
     const rn=String(r.receiptNum||'');
     return rn.startsWith(prefix+'-')||rn.startsWith(prefix);
   });
+  // Use max number + 1 to avoid duplicates regardless of date
   const nums=filtered.map(r=>{
     const rn=String(r.receiptNum||'');
     const m=rn.match(/(\d+)$/);
@@ -1794,6 +1795,8 @@ function getNextSerial(payMethod){
   });
   const maxN=nums.length?Math.max(...nums)+1:1;
   return prefix+'-'+String(maxN).padStart(4,'0');
+  // Note: Receipt numbers are sequential by entry order, not by date.
+  // Display is sorted by receipt DATE. This is intentional.
 }
 
 function updateSerialByPayMethod(){
@@ -1909,6 +1912,15 @@ const VAT_LABELS={'exempt':'معفى','zero':'0%','5':'5%'};
 function renderRecs(){
   const fm=el('rfmon')?.value||'';
   let list=fm?DB.receipts.filter(r=>monthOf(r.date)===fm):[...DB.receipts];
+  // Sort by date DESC (newest first), then by receipt number
+  list.sort((a,b)=>{
+    const dd=new Date(b.date||0)-new Date(a.date||0);
+    if(dd!==0) return dd;
+    // Same date? sort by receipt number
+    const na=parseInt((String(a.receiptNum||'').match(/(\d+)$/)||[0,0])[1]);
+    const nb=parseInt((String(b.receiptNum||'').match(/(\d+)$/)||[0,0])[1]);
+    return nb-na;
+  });
   const tot=list.reduce((s,r)=>s+r.total,0);
   const vatTot=list.reduce((s,r)=>s+(r.vatAmount||0),0);
   el('rectot').textContent=fmtNum(tot);
