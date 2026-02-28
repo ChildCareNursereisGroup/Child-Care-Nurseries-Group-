@@ -386,11 +386,58 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
       <input type="month" id="rfmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderRecs()">
       <span style="font-weight:800;color:var(--ok)">إجمالي: <span id="rectot">0</span> د.إ</span>
-      <button class="btn bo bsm np" onclick="printVATReport()">🧾 تقرير الضريبة</button>
+      <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
+        <option value="all">💰 All Payments</option>
+        <option value="cash">💵 Cash only</option>
+        <option value="bank">🏦 Bank Transfer only</option>
+        <option value="card">💳 Card only</option>
+      </select>
+      <button class="btn bo bsm np" onclick="openVATReportModal()">🧾 VAT Report</button>
     </div>
   </div>
   <div id="reclist"></div>
 </div>
+</div>
+
+<!-- VAT REPORT MODAL -->
+<div class="mover" id="vat-report-modal">
+  <div class="mbox" style="max-width:500px">
+    <div class="mh">
+      <div class="mt">🧾 VAT Report Options</div>
+      <button class="xb" onclick="el('vat-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg">
+          <label>Month — الشهر</label>
+          <input type="month" id="vat-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label>Payment Method — طريقة الدفع</label>
+          <select id="vat-rep-pay" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">💰 All Methods</option>
+            <option value="cash">💵 Cash فقط</option>
+            <option value="bank">🏦 Bank Transfer فقط</option>
+            <option value="card">💳 Card فقط</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Language — اللغة</label>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="vat-lang" value="en" checked> 🇬🇧 English
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="vat-lang" value="ar"> 🇦🇪 العربية
+          </label>
+        </div>
+      </div>
+      <button onclick="printVATReport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.95rem">
+        🖨️ Print Report
+      </button>
+    </div>
+  </div>
 </div>
 
 <div class="page" id="pg-attendance">
@@ -1780,55 +1827,230 @@ function renderRecs(){
     </div>`).join('');
 }
 
+function openVATReportModal(){
+  const m=el('vat-rep-month');
+  if(m&&!m.value) m.value=el('rfmon')?.value||monthOf(new Date());
+  el('vat-report-modal').classList.add('on');
+}
+
 function printVATReport(){
-  const fm=el('rfmon')?.value||monthOf(new Date());
-  const list=DB.receipts.filter(r=>monthOf(r.date)===fm);
-  const b=CB();
-  const vatRows={exempt:[],zero:[],five:[]};
-  list.forEach(r=>{
-    if(r.vatType==='5') vatRows.five.push(r);
-    else if(r.vatType==='zero') vatRows.zero.push(r);
-    else vatRows.exempt.push(r);
-  });
-  const mkTable=(rows,title,color)=>rows.length?`
-    <h3 style="color:${color};margin:12px 0 6px">${title} (${rows.length} إيصال)</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:.8rem">
-      <tr style="background:${color};color:white">
-        <th style="padding:5px">#إيصال</th><th style="padding:5px">الطفل</th><th style="padding:5px">الفصل</th>
-        <th style="padding:5px">التاريخ</th><th style="padding:5px">المجموع قبل الضريبة</th>
-        <th style="padding:5px">الضريبة</th><th style="padding:5px">الإجمالي</th>
-      </tr>
-      ${rows.map(r=>`<tr style="border-bottom:1px solid #ddd">
-        <td style="padding:4px 5px">${r.receiptNum}</td>
-        <td style="padding:4px 5px">${r.childName}</td>
-        <td style="padding:4px 5px">${r.className||''}</td>
-        <td style="padding:4px 5px">${fmtDate(r.date)}</td>
-        <td style="padding:4px 5px">${fmtNum(r.total-(r.vatAmount||0))} د.إ</td>
-        <td style="padding:4px 5px;color:${color};font-weight:bold">${fmtNum(r.vatAmount||0)} د.إ</td>
-        <td style="padding:4px 5px;font-weight:bold">${fmtNum(r.total)} د.إ</td>
-      </tr>`).join('')}
-      <tr style="background:#f9fafb;font-weight:bold">
-        <td colspan="5" style="padding:5px">الإجمالي</td>
-        <td style="padding:5px;color:${color}">${fmtNum(rows.reduce((s,r)=>s+(r.vatAmount||0),0))} د.إ</td>
-        <td style="padding:5px">${fmtNum(rows.reduce((s,r)=>s+r.total,0))} د.إ</td>
-      </tr>
-    </table>`:'';
-  const html=`<html dir="rtl"><head><meta charset="UTF-8"><style>
-    body{font-family:sans-serif;padding:20px;max-width:900px;margin:0 auto}
-    h1{color:#1e3a8a} h2{color:#6b7280}
-  </style></head><body>
-    <h1>🧾 تقرير الضريبة الشهري</h1>
-    <h2>${b.icon} ${b.ar} — ${fm}</h2>
-    <div style="display:flex;gap:20px;margin:10px 0;font-size:.85rem">
-      <span>إجمالي الإيصالات: <b>${list.length}</b></span>
-      <span>إجمالي الضريبة: <b style="color:#d97706">${fmtNum(list.reduce((s,r)=>s+(r.vatAmount||0),0))} د.إ</b></span>
-      <span>إجمالي المحصّل: <b>${fmtNum(list.reduce((s,r)=>s+r.total,0))} د.إ</b></span>
+  const fm = el('vat-rep-month')?.value || el('rfmon')?.value || monthOf(new Date());
+  const payF = el('vat-rep-pay')?.value || 'all';
+  const rLang = document.querySelector('input[name="vat-lang"]:checked')?.value || 'en';
+  const isAr = rLang === 'ar';
+  const dir = isAr ? 'rtl' : 'ltr';
+  const b = CB();
+  const bx = getBranchExtra(b.id);
+
+  // Filter by month + payment method
+  let list = DB.receipts.filter(r => monthOf(r.date) === fm);
+  if(payF !== 'all') list = list.filter(r => r.payMethod === payF);
+
+  // Split by payment method for sections
+  const byPay = {cash:[], bank:[], card:[]};
+  list.forEach(r => { (byPay[r.payMethod] || byPay.cash).push(r); });
+
+  // Split by VAT type
+  const vatFive   = list.filter(r => r.vatType === '5');
+  const vatZero   = list.filter(r => r.vatType === 'zero');
+  const vatExempt = list.filter(r => !r.vatType || r.vatType === 'exempt');
+
+  const sum = arr => arr.reduce((s,r) => s + (r.total||0), 0);
+  const sumVat = arr => arr.reduce((s,r) => s + (r.vatAmount||0), 0);
+  const sumPre = arr => arr.reduce((s,r) => s + ((r.total||0)-(r.vatAmount||0)), 0);
+  const sumBus = arr => arr.reduce((s,r) => s + (r.bus||0), 0);
+  const sumFee = arr => arr.reduce((s,r) => s + (r.fee||0), 0);
+  const sumReg = arr => arr.reduce((s,r) => s + (r.reg||0), 0);
+  const fmt = n => (Math.round(n*100)/100).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  const payLabel = m => ({cash: isAr?'كاش 💵':'Cash 💵', bank: isAr?'تحويل بنكي 🏦':'Bank Transfer 🏦', card: isAr?'بطاقة 💳':'Card 💳'})[m] || m;
+  const payMethods = payF === 'all' ? ['cash','bank','card'] : [payF];
+
+  const T = {
+    title:   isAr ? 'تقرير الضريبة الشهري'   : 'Monthly VAT Report',
+    branch:  isAr ? b.ar : (b.en||b.ar),
+    receipts:isAr ? 'إيصالات' : 'Receipts',
+    payBy:   isAr ? 'مدفوعة بـ' : 'Paid by',
+    child:   isAr ? 'الطفل' : 'Child',
+    class_:  isAr ? 'الفصل' : 'Class',
+    date:    isAr ? 'التاريخ' : 'Date',
+    preTax:  isAr ? 'قبل الضريبة' : 'Pre-Tax Amount',
+    taxAmt:  isAr ? 'مبلغ الضريبة' : 'VAT Amount',
+    total:   isAr ? 'الإجمالي' : 'Total',
+    subtotal:isAr ? 'المجموع' : 'Sub-Total',
+    taxable5:isAr ? 'خاضع للضريبة 5%' : 'Taxable at 5% VAT',
+    zeroR:   isAr ? 'خاضع بنسبة 0% (رسوم + تسجيل)' : 'Zero-Rated 0% (Fees & Reg)',
+    exempt_: isAr ? 'معفى (مواصلات)' : 'Exempt (Transportation)',
+    grandPre:isAr ? 'إجمالي قبل الضريبة' : 'Grand Total Pre-Tax',
+    grandVat:isAr ? 'إجمالي الضريبة' : 'Total VAT',
+    grandTot:isAr ? 'الإجمالي شامل الضريبة' : 'Grand Total incl. VAT',
+    noRec:   isAr ? 'لا توجد إيصالات' : 'No receipts',
+  };
+
+  const mkTable = (rows, title, color, showVat=true) => {
+    if(!rows.length) return '';
+    return `
+    <div style="margin-bottom:18px">
+      <div style="background:${color};color:#fff;padding:7px 12px;border-radius:8px 8px 0 0;font-weight:800;font-size:.88rem">
+        ${title} — ${rows.length} ${T.receipts}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+        <thead><tr style="background:${color}22;color:#333">
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:${isAr?'right':'left'}">#</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;text-align:${isAr?'right':'left'}">${T.child}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb">${T.class_}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb">${T.date}</th>
+          ${showVat?`<th style="padding:5px 7px;border:1px solid #e5e7eb">${T.preTax}</th>
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;color:${color}">${T.taxAmt}</th>`:''}
+          <th style="padding:5px 7px;border:1px solid #e5e7eb;font-weight:800">${T.total}</th>
+        </tr></thead>
+        <tbody>
+        ${rows.map((r,i)=>`<tr style="background:${i%2?'#fafafa':'#fff'}">
+          <td style="padding:4px 7px;border:1px solid #e5e7eb">${r.receiptNum}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;font-weight:600">${r.childName}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center">${r.className||'-'}</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center">${fmtDate(r.date)}</td>
+          ${showVat?`<td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(r.total-(r.vatAmount||0))} AED</td>
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center;color:${color};font-weight:700">${fmt(r.vatAmount||0)} AED</td>`:''}
+          <td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${fmt(r.total)} AED</td>
+        </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:${color}15;font-weight:800">
+          <td colspan="${showVat?4:3}" style="padding:6px 7px;border:1px solid #e5e7eb">${T.subtotal}</td>
+          ${showVat?`<td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(sumPre(rows))} AED</td>
+          <td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center;color:${color}">${fmt(sumVat(rows))} AED</td>`:''}
+          <td style="padding:6px 7px;border:1px solid #e5e7eb;text-align:center">${fmt(sum(rows))} AED</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  };
+
+  const mkPaySection = (payM, rows) => {
+    if(!rows.length) return '';
+    const fiveR = rows.filter(r=>r.vatType==='5');
+    const zeroR = rows.filter(r=>r.vatType==='zero');
+    const exR   = rows.filter(r=>!r.vatType||r.vatType==='exempt');
+    return `
+    <div style="margin-bottom:25px;border:2px solid #e5e7eb;border-radius:10px;overflow:hidden">
+      <div style="background:#1e3a8a;color:#fff;padding:9px 14px;font-weight:900;font-size:.95rem">
+        ${payLabel(payM)} — ${rows.length} ${T.receipts}
+      </div>
+      <div style="padding:12px">
+        ${mkTable(fiveR, T.taxable5, '#d97706', true)}
+        ${mkTable(zeroR, T.zeroR, '#0891b2', false)}
+        ${mkTable(exR, T.exempt_, '#059669', false)}
+        ${!fiveR.length&&!zeroR.length&&!exR.length?`<p style="color:#9ca3af;font-style:italic">${T.noRec}</p>`:''}
+        <!-- Payment sub-summary -->
+        <div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;font-size:.82rem">
+          <span>${T.grandPre}: <b>${fmt(sumPre(rows))} AED</b></span>
+          <span style="color:#d97706">${T.grandVat}: <b>${fmt(sumVat(rows))} AED</b></span>
+          <span style="font-size:.95rem;font-weight:900;color:#1e3a8a">${T.grandTot}: <b>${fmt(sum(rows))} AED</b></span>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const grandPreTax = sumPre(list);
+  const grandVAT    = sumVat(list);
+  const grandTotal  = sum(list);
+  const grandBus    = sumBus(list);
+  const grandFee    = sumFee(list);
+  const grandReg    = sumReg(list);
+
+  const payFilterLabel = payF==='all' ? (isAr?'كل طرق الدفع':'All Payment Methods') : payLabel(payF);
+
+  const html = `<!DOCTYPE html>
+<html dir="${dir}" lang="${rLang}">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:20px;max-width:950px;margin:0 auto;color:#111;font-size:.83rem}
+  h1{font-size:1.3rem;color:#1e3a8a;margin-bottom:3px}
+  h2{font-size:.9rem;color:#6b7280;font-weight:400;margin-bottom:12px}
+  .summary-box{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .sbox{text-align:center}.sbox .sv{font-size:1.3rem;font-weight:900}.sbox .sk{font-size:.72rem;opacity:.8;margin-top:2px}
+  .breakdown{background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px 16px;margin-bottom:20px}
+  .breakdown h3{color:#374151;font-size:.88rem;margin-bottom:10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+  .brow{display:flex;justify-content:space-between;padding:4px 0;font-size:.82rem;border-bottom:1px dashed #f3f4f6}
+  .brow.total{font-weight:900;font-size:.92rem;color:#1e3a8a;border-bottom:none;margin-top:4px;padding-top:6px;border-top:2px solid #1e3a8a}
+  .brow.vat{color:#d97706;font-weight:700}
+  @media print{body{padding:8px}@page{margin:10mm}}
+</style></head>
+<body>
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:2px solid #1e3a8a;padding-bottom:10px">
+    <div>
+      <h1>🧾 ${T.title}</h1>
+      <h2>${b.icon} ${T.branch} — ${fm} | ${payFilterLabel}</h2>
+      ${bx.trn?`<div style="font-size:.75rem;color:#6b7280">TRN: ${bx.trn}</div>`:''}
     </div>
-    ${mkTable(vatRows.five,'خاضع للضريبة 5%','#d97706')}
-    ${mkTable(vatRows.zero,'صفر بالمئة (0%)','#0891b2')}
-    ${mkTable(vatRows.exempt,'معفى من الضريبة','#059669')}
-  </body></html>`;
-  const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+    <div style="text-align:${isAr?'left':'right'};font-size:.75rem;color:#6b7280">
+      <div>${new Date().toLocaleDateString('en-GB')}</div>
+      <div>${list.length} ${T.receipts}</div>
+    </div>
+  </div>
+
+  <!-- Grand Summary Box -->
+  <div class="summary-box">
+    <div class="sbox">
+      <div class="sv">${fmt(grandPreTax)} AED</div>
+      <div class="sk">${T.grandPre}</div>
+    </div>
+    <div class="sbox">
+      <div class="sv" style="color:#fde68a">${fmt(grandVAT)} AED</div>
+      <div class="sk">${T.grandVat} (5%)</div>
+    </div>
+    <div class="sbox">
+      <div class="sv" style="font-size:1.5rem">${fmt(grandTotal)} AED</div>
+      <div class="sk">${T.grandTot}</div>
+    </div>
+  </div>
+
+  <!-- Breakdown by type -->
+  <div class="breakdown">
+    <h3>📊 ${isAr?'تفصيل حسب نوع الضريبة':'Breakdown by VAT Type'}</h3>
+    <div class="brow">
+      <span>🟡 ${T.taxable5}</span>
+      <span>${fmt(sum(vatFive))} AED (${isAr?'ضريبة':'VAT'}: ${fmt(sumVat(vatFive))} AED)</span>
+    </div>
+    <div class="brow">
+      <span>🔵 ${T.zeroR}</span>
+      <span>${fmt(sum(vatZero))} AED</span>
+    </div>
+    <div class="brow">
+      <span>🟢 ${T.exempt_} (${isAr?'مواصلات':'Transport'})</span>
+      <span>${fmt(sum(vatExempt))} AED</span>
+    </div>
+    <div class="brow total">
+      <span>${T.grandTot}</span>
+      <span>${fmt(grandTotal)} AED</span>
+    </div>
+  </div>
+
+  <!-- Sections by payment method -->
+  ${payMethods.map(pm => mkPaySection(pm, payF==='all' ? (byPay[pm]||[]) : list)).join('')}
+
+  <!-- Final Grand Total -->
+  <div style="background:#1e3a8a;color:#fff;border-radius:10px;padding:14px 18px;margin-top:10px">
+    <div style="font-size:.82rem;opacity:.8;margin-bottom:8px">${isAr?'الإجمالي النهائي':'Final Summary'}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:.83rem">
+      <div>${isAr?'رسوم شهرية':'Monthly Fees'}: <b>${fmt(grandFee)} AED</b></div>
+      <div>${isAr?'رسوم تسجيل':'Registration'}: <b>${fmt(grandReg)} AED</b></div>
+      <div>${isAr?'مواصلات (معفى)':'Transport (Exempt)'}: <b>${fmt(grandBus)} AED</b></div>
+      <div style="color:#fde68a">${T.grandVat} (5%): <b>${fmt(grandVAT)} AED</b></div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.3);margin-top:10px;padding-top:10px;font-size:1.1rem;font-weight:900">
+      ${T.grandTot}: ${fmt(grandTotal)} AED
+    </div>
+  </div>
+</body></html>`;
+
+  el('vat-report-modal').classList.remove('on');
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 700);
 }
 function prevRec(id){
   _previewReceiptId=id;
