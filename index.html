@@ -1532,6 +1532,7 @@ async function doLogin(){
   el('login').style.display='none';
   el('app').style.display='block';
   subscribeRealtime(curBid);
+  await loadFromSupa(curBid);
   initApp();
 }
 el('pwi').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
@@ -1554,7 +1555,12 @@ function initApp(){
   ['pvmon','rfmon','efmon','repmon'].forEach(id=>{const e=el(id);if(e&&!e.value)e.value=ms;});
   if(!el('attdate').value)el('attdate').value=today();
   el('abr').innerHTML='<option value="all">All Branches — كل الفروع</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
-  renderNav();applyTranslations();showPage('dashboard',null);
+  renderNav();applyTranslations();
+  // Go to role's natural home page
+  if(curRole==='attendance') showPage('attendance',null);
+  else if(curRole==='expenses') showPage('expenses',null);
+  else if(curRole==='receipts') showPage('receipts',null);
+  else showPage('dashboard',null);
   // Load staff, buses, licenses in background
   Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
 }
