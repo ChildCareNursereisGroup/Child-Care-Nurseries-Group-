@@ -339,8 +339,18 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <!-- بيانات الإيصال الأساسية -->
   <div class="slbl" id="rec-info-title">📋 بيانات الإيصال</div>
   <div class="g3" style="margin-bottom:9px">
-    <div class="fg"><label data-t="childName">Kid's Name *</label><select id="rch" onchange="fillFromChild()"><option value="">-- اختر --</option></select></div>
-    <div class="fg"><label data-t="classNameLabel">Class Name</label><input type="text" id="rcls" readonly></div>
+    <div class="fg">
+      <label data-t="childName">Kid's Name *</label>
+      <select id="rch" onchange="fillFromChild()">
+        <option value="">-- اختر --</option>
+        <option value="__guest__">👶 زائر / Guest (غير مسجل)</option>
+      </select>
+    </div>
+    <div class="fg" id="guest-name-wrap" style="display:none">
+      <label>👶 اسم الزائر / Guest Name *</label>
+      <input type="text" id="rch-guest" placeholder="أدخل اسم الطفل..." style="font-family:'Tajawal',sans-serif">
+    </div>
+    <div class="fg"><label data-t="classNameLabel">Class Name</label><input type="text" id="rcls" placeholder="اختياري"></div>
     <div class="fg"><label data-t="receiptNo">Receipt No. *</label><input type="text" id="rnum"></div>
     <div class="fg"><label data-t="payDate">Payment Date *</label><input type="date" id="rdate"></div>
     <div class="fg"><label data-t="feesFrom">Fees From Date</label><input type="date" id="rfrom"></div>
@@ -1798,13 +1808,26 @@ function initRecForm(){
   updateSerialByPayMethod();
 }
 function fillFromChild(){
-  const id=el('rch').value;if(!id){el('rcls').value='';return;}
+  const id=el('rch').value;
+  // Show/hide guest name input
+  const guestWrap=el('guest-name-wrap');
+  if(guestWrap) guestWrap.style.display = id==='__guest__' ? 'block' : 'none';
+  if(!id){ el('rcls').value=''; return; }
+  if(id==='__guest__'){
+    // Clear amounts for manual entry
+    if(el('rfee')) el('rfee').value='';
+    if(el('rbus')) el('rbus').value='';
+    if(el('rfri')) el('rfri').value='';
+    if(el('rsat')) el('rsat').value='';
+    if(el('rsun')) el('rsun').value='';
+    if(el('rcls')) el('rcls').value='';
+    calcTotal();
+    return;
+  }
   const c=DB.children.find(x=>x.id===id||String(x.id)===id);if(!c)return;
   el('rcls').value=c.className||'';
-  // Always auto-fill fees from child data
   if(el('rfee')) el('rfee').value = c.fee||0;
   if(el('rbus')) el('rbus').value = (c.bus==='Yes'||c.bus==='نعم') ? (c.busFee||0) : 0;
-  // Weekend fees — always fill from child profile
   if(el('rfri')) el('rfri').value = c.friFee||0;
   if(el('rsat')) el('rsat').value = c.satFee||0;
   if(el('rsun')) el('rsun').value = c.sunFee||0;
@@ -1833,7 +1856,10 @@ function calcTotal(){
 async function saveReceipt(){
   const childId=el('rch').value;const rDate=el('rdate').value;const rNum=v('rnum');
   if(!childId||!rDate||!rNum){showAlert('recalert',t('fillRequired'),true);return;}
-  const c=DB.children.find(x=>x.id===childId||String(x.id)===childId);
+  const isGuest = childId==='__guest__';
+  const guestName = el('rch-guest')?.value?.trim()||'';
+  if(isGuest&&!guestName){showAlert('recalert',lang==='ar'?'❌ أدخل اسم الزائر':'❌ Enter guest name',true);return;}
+  const c = isGuest ? null : DB.children.find(x=>x.id===childId||String(x.id)===childId);
   const fee=n('rfee'),bus=n('rbus'),clothes=n('rclo'),reg=n('rreg'),tools=n('rsup');
   const fri=n('rfri'),sat=n('rsat'),sun=n('rsun');
   const wkFee=fri+sat+sun;
@@ -1845,7 +1871,10 @@ async function saveReceipt(){
   const payMethod=el('rpaymethod')?.value||'cash';
   setSyncing(true);
   const row={
-    branch_id:curBid,child_id:childId,child_name:c?.name||'',class_name:c?.className||'',
+    branch_id:curBid,
+    child_id: isGuest ? null : childId,
+    child_name: isGuest ? guestName+'  👶' : (c?.name||''),
+    class_name: el('rcls')?.value || c?.className||'',
     receipt_num:rNum,date:rDate,from_date:el('rfrom').value||null,to_date:el('rto').value||null,
     fee,bus,clothes,reg,tools,fri_fee:fri,sat_fee:sat,sun_fee:sun,
     vat_type:vatType,vat_amount:vatAmt,pay_method:payMethod,
@@ -1863,6 +1892,8 @@ async function saveReceipt(){
 }
 function clearRec(){
   el('rch').value='';el('rcls').value='';
+  if(el('rch-guest'))el('rch-guest').value='';
+  if(el('guest-name-wrap'))el('guest-name-wrap').style.display='none';
   ['rfee','rbus','rclo','rreg','rsup','rfri','rsat','rsun','rtot','rvatamt','rnotes','rfrom','rto'].forEach(i=>{if(el(i))el(i).value='';});
   el('rdate').value=today();
   if(el('rvat'))el('rvat').value='exempt';
@@ -1890,7 +1921,13 @@ function renderRecs(){
   `+list.map(r=>`
     <div class="rc">
       <div class="rh">
-        <div><div style="font-weight:800">${r.childName}</div><div style="font-size:.72rem;color:var(--muted)">${r.className||''}</div></div>
+        <div>
+          <div style="font-weight:800">
+            ${r.childName}
+            ${!r.childId?'<span style="background:#fef3c7;color:#92400e;font-size:.64rem;padding:1px 6px;border-radius:6px;margin-right:4px">👶 زائر</span>':''}
+          </div>
+          <div style="font-size:.72rem;color:var(--muted)">${r.className||''}</div>
+        </div>
         <div style="text-align:center"><div style="font-size:.7rem;color:var(--muted)">#</div><div style="font-weight:800;color:var(--bc)">${r.receiptNum}</div></div>
         <div style="text-align:center">
           <div style="font-size:.7rem;color:var(--muted)">${ar?'التاريخ':'Date'}</div>
