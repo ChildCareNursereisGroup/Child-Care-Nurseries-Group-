@@ -5991,41 +5991,46 @@ function printAttReport(){
 
   const formatD=s=>{ if(!s)return''; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
 
-  let html=`<html dir="rtl"><head><meta charset="UTF-8">
+  let html=`<html dir="ltr"><head><meta charset="UTF-8">
   <style>
-    body{font-family:'Tajawal',Arial,sans-serif;padding:15px;font-size:.78rem;direction:rtl}
+    body{font-family:Arial,sans-serif;padding:15px;font-size:.78rem;direction:ltr}
     h1{color:${b.c};font-size:1.1rem;margin-bottom:4px}
     h2{color:#6b7280;font-size:.85rem;margin-bottom:10px;font-weight:400}
     .cls-title{background:${b.c};color:#fff;padding:5px 10px;font-weight:700;margin:12px 0 4px;border-radius:5px}
     table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:.72rem}
     th{background:#1e3a8a;color:#fff;padding:4px 5px;border:1px solid #9ca3af;text-align:center;white-space:nowrap}
     td{padding:3px 5px;border:1px solid #ddd;text-align:center}
-    td.name{text-align:right;font-weight:600;min-width:100px}
+    td.name{text-align:left;font-weight:600;min-width:140px;white-space:nowrap}
     .abs{background:#fee2e2;color:#991b1b;font-weight:700}
     .pres{color:#065f46}
     .sum{background:#f0f9ff;font-weight:700}
-    @media print{body{padding:5px}}
+    @media print{body{padding:5px}@page{size:A4 landscape;margin:8mm}}
   </style></head><body>
-  <h1>📊 تقرير الغياب — ${b.ar}</h1>
-  <h2>من ${formatD(from)} إلى ${formatD(to)} ${cls?'| فصل: '+cls:''}</h2>`;
+  <h1>📊 Attendance Report — ${b.en||b.ar}</h1>
+  <h2>From ${formatD(from)} to ${formatD(to)} ${cls?'| Class: '+cls:''}</h2>`;
 
   Object.entries(classMap).sort().forEach(([clsName,clsKids])=>{
-    html+=`<div class="cls-title">🏫 فصل: ${clsName} (${clsKids.length} طفل)</div>
+    html+=`<div class="cls-title">🏫 Class: ${clsName} (${clsKids.length} children)</div>
     <table>
       <thead><tr>
-        <th style="text-align:right;min-width:100px">الاسم</th>
-        ${dates.map(d=>`<th>${new Date(d).getDate()}</th>`).join('')}
-        <th>غياب</th><th>حضور</th>
+        <th style="text-align:left;min-width:140px">Name</th>
+        ${dates.map(d=>{
+          const dn=new Date(d+'T00:00:00');
+          const dayN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dn.getDay()];
+          const isWk=dn.getDay()===0||dn.getDay()===5||dn.getDay()===6;
+          return`<th style="${isWk?'background:#7c3aed':'background:#1e3a8a'}">${dn.getDate()}<br><span style="font-size:.6rem;opacity:.8">${dayN}</span></th>`;
+        }).join('')}
+        <th style="background:#dc2626">Abs</th><th style="background:#059669">Pres</th>
       </tr></thead>
       <tbody>`;
     
-    clsKids.forEach(c=>{
+    clsKids.sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
       let absCount=0, presCount=0;
       const cells=dates.map(d=>{
         const st=(DB.attendance[d]||{})[c.id]||(DB.attendance[d]||{})[String(c.id)];
         if(st==='حضور'){presCount++;return`<td class="pres">✓</td>`;}
         else if(st==='غياب'){absCount++;return`<td class="abs">✗</td>`;}
-        else return`<td style="color:#d1d5db">-</td>`;
+        else return`<td style="color:#d1d5db">–</td>`;
       }).join('');
       html+=`<tr><td class="name">${c.name}</td>${cells}<td class="abs">${absCount}</td><td class="pres">${presCount}</td></tr>`;
     });
@@ -6036,7 +6041,7 @@ function printAttReport(){
       const present=clsKids.filter(c=>dayAtt[c.id]==='حضور'||dayAtt[String(c.id)]==='حضور').length;
       return`<td class="sum" style="font-size:.68rem">${present}/${clsKids.length}</td>`;
     }).join('');
-    html+=`<tr style="background:#fef9c3"><td class="name" style="font-weight:800">المجموع اليومي</td>${totals}<td colspan="2"></td></tr>`;
+    html+=`<tr style="background:#fef9c3"><td class="name" style="font-weight:800;text-align:left">Daily Total</td>${totals}<td colspan="2"></td></tr>`;
     html+=`</tbody></table>`;
   });
 
