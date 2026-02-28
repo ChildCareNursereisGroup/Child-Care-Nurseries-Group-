@@ -1860,10 +1860,23 @@ function printVATReport(exportType='print'){
   const byPay = {cash:[], bank:[], card:[]};
   list.forEach(r => { (byPay[r.payMethod] || byPay.cash).push(r); });
 
-  // Split by VAT type
-  const vatFive   = list.filter(r => r.vatType === '5');
-  const vatZero   = list.filter(r => r.vatType === 'zero');
-  const vatExempt = list.filter(r => !r.vatType || r.vatType === 'exempt');
+  // Split by VAT type — based on actual content not stored vatType
+  // 5%: has clothes or tools
+  const vatFive   = list.filter(r => (r.clothes||0)+(r.tools||0) > 0);
+  // Exempt: has ONLY transportation (no fees, no reg, no clothes/tools)
+  const vatExempt = list.filter(r => (r.bus||0)>0 && (r.fee||0)===0 && (r.reg||0)===0 && (r.clothes||0)===0 && (r.tools||0)===0);
+  // Zero-Rated: has monthly fees OR registration (may also have bus)
+  const vatZero   = list.filter(r => (r.fee||0)+(r.reg||0) > 0 && (r.clothes||0)+(r.tools||0) === 0);
+  // Mixed (has both zero-rated and taxable items) — include in vatFive for VAT purposes
+  // Most receipts will be either vatFive OR vatZero OR vatExempt
+
+  // For amounts: calculate each component separately across ALL receipts
+  const totalFees   = list.reduce((s,r)=>s+(r.fee||0),0);
+  const totalReg    = list.reduce((s,r)=>s+(r.reg||0),0);
+  const totalBus    = list.reduce((s,r)=>s+(r.bus||0),0);
+  const totalUni    = list.reduce((s,r)=>s+(r.clothes||0),0);
+  const totalStat   = list.reduce((s,r)=>s+(r.tools||0),0);
+  const totalWkFee  = list.reduce((s,r)=>s+((r.friFee||0)+(r.satFee||0)+(r.sunFee||0)),0);
 
   const sum = arr => arr.reduce((s,r) => s + (r.total||0), 0);
   const sumVat = arr => arr.reduce((s,r) => s + (r.vatAmount||0), 0);
@@ -1960,12 +1973,12 @@ function printVATReport(exportType='print'){
     </div>`;
   };
 
-  const grandPreTax = sumPre(list);
   const grandVAT    = sumVat(list);
   const grandTotal  = sum(list);
-  const grandBus    = sumBus(list);
-  const grandFee    = sumFee(list);
-  const grandReg    = sumReg(list);
+  const grandBus    = totalBus;
+  const grandFee    = totalFees;
+  const grandReg    = totalReg;
+  const grandPreTax = grandTotal - grandVAT;
 
   const payFilterLabel = payF==='all' ? (isAr?'كل طرق الدفع':'All Payment Methods') : payLabel(payF);
 
@@ -2022,17 +2035,45 @@ function printVATReport(exportType='print'){
     <h3>📊 ${isAr?'تفصيل حسب نوع الضريبة':'Breakdown by VAT Type'}</h3>
     <div class="brow">
       <span>🟡 ${T.taxable5}</span>
-      <span>${fmt(sum(vatFive))} AED (${isAr?'ضريبة':'VAT'}: ${fmt(sumVat(vatFive))} AED)</span>
+      <span>${fmt(totalUni+totalStat)} AED → ${isAr?'ضريبة 5%':'VAT 5%'}: <b style="color:#d97706">${fmt(grandVAT)} AED</b></span>
     </div>
-    <div class="brow">
+    <div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'ملابس':'Uniforms'}</span>
+      <span style="color:#6b7280">${fmt(totalUni)} AED</span>
+    </div>
+    <div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'أدوات':'Stationary'}</span>
+      <span style="color:#6b7280">${fmt(totalStat)} AED</span>
+    </div>
+    <div class="brow" style="margin-top:6px">
       <span>🔵 ${T.zeroR}</span>
-      <span>${fmt(sum(vatZero))} AED</span>
+      <span>${fmt(totalFees+totalReg+totalWkFee)} AED</span>
     </div>
-    <div class="brow">
-      <span>🟢 ${T.exempt_} (${isAr?'مواصلات':'Transport'})</span>
-      <span>${fmt(sum(vatExempt))} AED</span>
+    <div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'الرسوم الشهرية':'Monthly Fees'}</span>
+      <span style="color:#6b7280">${fmt(totalFees)} AED</span>
+    </div>
+    <div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'رسوم التسجيل':'Registration Fees'}</span>
+      <span style="color:#6b7280">${fmt(totalReg)} AED</span>
+    </div>
+    ${totalWkFee>0?`<div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'رسوم الويكند':'Weekend Fees'}</span>
+      <span style="color:#6b7280">${fmt(totalWkFee)} AED</span>
+    </div>`:''}
+    <div class="brow" style="margin-top:6px">
+      <span>🟢 ${T.exempt_}</span>
+      <span>${fmt(totalBus)} AED</span>
     </div>
     <div class="brow total">
+      <span>${T.grandPre}</span>
+      <span>${fmt(grandPreTax)} AED</span>
+    </div>
+    <div class="brow vat">
+      <span>${T.grandVat} (5%)</span>
+      <span>${fmt(grandVAT)} AED</span>
+    </div>
+    <div class="brow total" style="font-size:1rem">
       <span>${T.grandTot}</span>
       <span>${fmt(grandTotal)} AED</span>
     </div>
@@ -2045,9 +2086,11 @@ function printVATReport(exportType='print'){
   <div style="background:#1e3a8a;color:#fff;border-radius:10px;padding:14px 18px;margin-top:10px">
     <div style="font-size:.82rem;opacity:.8;margin-bottom:8px">${isAr?'الإجمالي النهائي':'Final Summary'}</div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:.83rem">
-      <div>${isAr?'رسوم شهرية':'Monthly Fees'}: <b>${fmt(grandFee)} AED</b></div>
-      <div>${isAr?'رسوم تسجيل':'Registration'}: <b>${fmt(grandReg)} AED</b></div>
-      <div>${isAr?'مواصلات (معفى)':'Transport (Exempt)'}: <b>${fmt(grandBus)} AED</b></div>
+      <div>${isAr?'🔵 رسوم شهرية (0%)':'🔵 Monthly Fees (0%)'}: <b>${fmt(totalFees)} AED</b></div>
+      <div>${isAr?'🔵 رسوم التسجيل (0%)':'🔵 Registration (0%)'}: <b>${fmt(totalReg)} AED</b></div>
+      ${totalWkFee>0?`<div>${isAr?'🔵 رسوم الويكند (0%)':'🔵 Weekend Fees (0%)'}: <b>${fmt(totalWkFee)} AED</b></div>`:''}
+      <div>${isAr?'🟢 مواصلات (معفى)':'🟢 Transport (Exempt)'}: <b>${fmt(totalBus)} AED</b></div>
+      <div>${isAr?'🟡 ملابس+أدوات':'🟡 Uniforms+Stationary'}: <b>${fmt(totalUni+totalStat)} AED</b></div>
       <div style="color:#fde68a">${T.grandVat} (5%): <b>${fmt(grandVAT)} AED</b></div>
     </div>
     <div style="border-top:1px solid rgba(255,255,255,.3);margin-top:10px;padding-top:10px;font-size:1.1rem;font-weight:900">
@@ -2064,9 +2107,9 @@ function printVATReport(exportType='print'){
       [isAr?'التقرير الضريبي الشهري':'Monthly VAT Report', T.branch, fm, payFilterLabel],
       [],
       [isAr?'نوع الضريبة':'VAT Type', isAr?'عدد الإيصالات':'Receipts', isAr?'قبل الضريبة':'Pre-Tax', isAr?'مبلغ الضريبة':'VAT Amt', isAr?'الإجمالي':'Total'],
-      [T.taxable5, vatFive.length, sumPre(vatFive), sumVat(vatFive), sum(vatFive)],
-      [T.zeroR,    vatZero.length, sum(vatZero), 0, sum(vatZero)],
-      [T.exempt_,  vatExempt.length, sum(vatExempt), 0, sum(vatExempt)],
+      [T.taxable5+' (Uniforms+Stationary)', vatFive.length, totalUni+totalStat, grandVAT, totalUni+totalStat+grandVAT],
+      [T.zeroR+' (Fees+Reg+Weekend)', vatZero.length, totalFees+totalReg+totalWkFee, 0, totalFees+totalReg+totalWkFee],
+      [T.exempt_+' (Transport)', vatExempt.length, totalBus, 0, totalBus],
       [],
       [isAr?'الإجمالي':'Grand Total', list.length, grandPreTax, grandVAT, grandTotal],
       [],
