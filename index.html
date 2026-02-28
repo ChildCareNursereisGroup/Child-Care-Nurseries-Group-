@@ -130,9 +130,33 @@ main{padding:12px;max-width:960px;margin:0 auto}
 .dtab{padding:5px 10px;border-radius:18px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;font-size:.73rem;white-space:nowrap;transition:all .2s}
 .dtab.on{background:var(--bc);color:#fff;border-color:var(--bc)}
 @media print{header,nav,.np{display:none!important}.card{box-shadow:none!important}body{background:#fff}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.wa-summary{background:#d1fae5;border:1.5px solid #34d399;border-radius:10px;padding:7px 12px;margin-bottom:8px;font-size:.78rem;display:flex;align-items:center;gap:8px}
 </style>
 </head>
 <body>
+
+<!-- DAILY REPORT MODAL -->
+<div class="mover" id="daily-report-modal">
+  <div class="mbox" style="max-width:480px">
+    <div class="mh">
+      <div class="mt">📊 تقرير اليوم</div>
+      <button class="xb" onclick="el('daily-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div id="daily-report-preview" style="background:#f9fafb;border-radius:10px;padding:12px;font-size:.8rem;max-height:350px;overflow-y:auto;white-space:pre-wrap;font-family:'Tajawal',monospace;line-height:1.7"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="sendDailyWhatsApp()" style="background:#25d366;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
+          💬 إرسال واتساب
+        </button>
+        <button onclick="copyDailyReport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
+          📋 نسخ التقرير
+        </button>
+      </div>
+      <div id="daily-copy-ok" style="display:none;text-align:center;color:#059669;font-weight:700;font-size:.85rem">✅ تم النسخ! الصق في واتساب</div>
+    </div>
+  </div>
+</div>
 
 <div id="loading"><div class="spinner"></div><p id="lmsg">جاري الاتصال...</p></div>
 
@@ -174,6 +198,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="hstat"><div class="hn" id="hact">0</div><div class="hl2">نشطين</div></div>
     <span class="sind" id="sind">☁️ محفوظ</span>
     <button class="hbtn" onclick="toggleLang()">EN/ع</button>
+    <button class="hbtn" style="background:rgba(255,255,255,.15)" onclick="openDailyReport()">📊 تقرير اليوم</button>
     <button class="hbtn" id="logout-btn" onclick="doLogout()">خروج 🚪</button>
   </div>
 </header>
@@ -1902,6 +1927,7 @@ async function saveReceipt(){
   setSyncing(false);
   if(error){showAlert('recalert','❌ خطأ: '+error.message,true);return;}
   showAlert('recalert',t('receiptSaved'),false);
+  { const _la=_actLog[_actLog.length]; logActivity('receipt', (c?.name||guestName||'?')+' — '+fmtNum(total)+' د.إ ('+rNum+')'); if(_actLog[_actLog.length-1]) _actLog[_actLog.length-1].amount=total; }
   const newR=DB.receipts.find(x=>x.receiptNum===rNum)||{id:Date.now()};
   clearRec();await loadFromSupa(curBid);renderRecs();renderDashboard();
   // Show option to preview/send receipt
@@ -2559,7 +2585,15 @@ function renderAtt(){
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-              ${!isP&&phone?`<button onclick="sendAbsenceWhatsApp('${c.id}','${date}')" title="Send WhatsApp" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.75rem">💬</button>`:''}
+              ${(()=>{
+                if(isP||!phone) return '';
+                const sentKey='wa_sent_'+curBid+'_'+date+'_'+c.id;
+                const sentTime=localStorage.getItem(sentKey);
+                if(sentTime){
+                  return `<button onclick="sendAbsenceWhatsApp('${c.id}','${date}')" title="إعادة الإرسال" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.72rem;opacity:.85">✅💬 ${sentTime}</button>`;
+                }
+                return `<button onclick="sendAbsenceWhatsApp('${c.id}','${date}')" title="إرسال واتساب غياب" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.75rem;animation:pulse 1.5s infinite">💬</button>`;
+              })()}
               <span onclick="toggleAtt('${c.id}','${date}')" style="padding:4px 13px;border-radius:18px;cursor:pointer;font-weight:700;font-size:.76rem;min-width:65px;text-align:center;${isP?'background:#d1fae5;color:#065f46':'background:#fee2e2;color:#991b1b'}">${isP?t('attPresent'):t('attAbsent')}</span>
             </div>
           </div>`;
@@ -2583,6 +2617,19 @@ function renderAtt(){
     badge.style.background=dayColors[todayDayName]||'#f3f4f6';
     badge.style.color=dayTxtColors[todayDayName]||'#374151';
   }
+  // WhatsApp sent summary
+  const absentKids=active.filter(c=>{
+    const st=DB.attendance[date]?.[c.id]||DB.attendance[date]?.[String(c.id)];
+    return st!=='حضور';
+  });
+  const sentCount=absentKids.filter(c=>localStorage.getItem('wa_sent_'+curBid+'_'+date+'_'+c.id)).length;
+  const notSentCount=absentKids.filter(c=>{
+    const phone=c.parentMom||c.parentDad||'';
+    return phone && !localStorage.getItem('wa_sent_'+curBid+'_'+date+'_'+c.id);
+  }).length;
+  
+  updateWaSummaryBar(absentKids, sentCount, notSentCount, date);
+
   el('attsum').innerHTML=`
     <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.82rem;padding:4px 0">
       <span style="color:var(--ok);font-weight:700">✅ ${lang==='ar'?'حضور':'Present'}: ${totalPresent}</span>
@@ -2635,12 +2682,22 @@ We hope everything is okay. Please let us know if there is any issue.
 
 Best regards 🌸`;
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  // Mark as sent
+  const sentKey='wa_sent_'+curBid+'_'+date+'_'+childId;
+  localStorage.setItem(sentKey, new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+  logActivity('whatsapp', c.name+' — واتساب غياب أُرسل');
+  // Update button visually
+  renderAtt();
 }
 
 function sendAllAbsentWhatsApp(cls, date){
   const kids=DB.children.filter(c=>{
-    if(c.leaveDate||(c.className||'—')!==cls)return false;
+    if(c.leaveDate) return false;
+    if(cls!=='__all__' && (c.className||'—')!==cls) return false;
     const st=DB.attendance[date]?.[c.id]||DB.attendance[date]?.[String(c.id)];
+    const alreadySent=localStorage.getItem('wa_sent_'+curBid+'_'+date+'_'+c.id);
+    // For __all__, skip already sent
+    if(cls==='__all__'&&alreadySent) return false;
     return st!=='حضور';
   });
   if(!kids.length){alert(lang==='ar'?'لا يوجد غائبون في هذا الفصل':'No absent children in this class');return;}
@@ -2659,7 +2716,12 @@ function sendAllAbsentWhatsApp(cls, date){
 ${b.ar} — نتواصل معكم بخصوص *${c.name}*.
 لم يحضر/تحضر اليوم ${dateStr}. نرجو الاطمئنان وإعلامنا. 🌸`
       :`${b.en} — Regarding *${c.name}*: absent today ${dateStr}. Hope all is well! 🌸`;
-    setTimeout(()=>window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank'), i*600);
+    setTimeout(()=>{
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+      const sk='wa_sent_'+curBid+'_'+date+'_'+c.id;
+      localStorage.setItem(sk,new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+      logActivity('whatsapp', c.name+' — واتساب غياب أُرسل');
+    }, i*600);
     sent++;
   });
   setTimeout(()=>alert(`${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`),300);
@@ -2667,6 +2729,8 @@ ${b.ar} — نتواصل معكم بخصوص *${c.name}*.
 async function toggleAtt(childId,date){
   const cur=DB.attendance[date]?.[childId]||DB.attendance[date]?.[String(childId)];
   const newSt=cur==='حضور'?'غياب':'حضور';
+  const _attChild=DB.children.find(c=>String(c.id)===String(childId));
+  if(_attChild) logActivity('attendance', _attChild.name+' → '+newSt);
   if(!DB.attendance[date])DB.attendance[date]={};
   DB.attendance[date][childId]=newSt;
   renderAtt();
@@ -2791,6 +2855,7 @@ async function saveExp(){
   setSyncing(false);
   if(error){showAlert('expalert','❌ خطأ: '+error.message,true);return;}
   showAlert('expalert',t('expSaved'),false);
+  { const _ec=EXP_CATS.find(c=>c.k===expCat); logActivity('expense', (typeof _ec?.ar==='function'?_ec.ar():_ec?.ar||expCat)+' — '+fmtNum(amount)+' د.إ'); }
   renderEForm();await loadFromSupa(curBid);renderExps();
 }
 async function delExp(id){
@@ -6275,6 +6340,131 @@ function printExpReport(exportType='print'){
   w.document.write(html);
   w.document.close();
   setTimeout(()=>w.print(), 700);
+}
+
+// ─── Daily Activity Log ──────────────────────
+const _actLog = [];
+function logActivity(type, msg){
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  _actLog.push({type, msg, time, role:curRole||'', branch:curBid||''});
+}
+
+function buildDailyReport(){
+  const b = CB();
+  const now = new Date();
+  const dateStr = now.getDate().toString().padStart(2,'0')+'/'+(now.getMonth()+1).toString().padStart(2,'0')+'/'+now.getFullYear();
+  const bname = lang==='ar' ? b.ar : (b.en||b.ar);
+  
+  // Count by type
+  const att    = _actLog.filter(a=>a.type==='attendance');
+  const recs   = _actLog.filter(a=>a.type==='receipt');
+  const exps   = _actLog.filter(a=>a.type==='expense');
+  const kids   = _actLog.filter(a=>a.type==='child');
+  const other  = _actLog.filter(a=>!['attendance','receipt','expense','child'].includes(a.type));
+
+  // Attendance summary
+  const present = att.filter(a=>a.msg.includes('حضور')||a.msg.includes('Present'));
+  const absent  = att.filter(a=>a.msg.includes('غياب')||a.msg.includes('Absent'));
+  
+  // Receipt total
+  const recTotal = recs.reduce((s,r)=>s+(r.amount||0),0);
+
+  const NL='\n';
+  let report = '';
+  report += '🏫 *'+bname+'*'+NL;
+  report += '📅 تقرير يوم: '+dateStr+NL;
+  report += '─────────────────────'+NL;
+  
+  if(att.length){
+    report += NL+'📋 *الحضور والغياب*'+NL;
+    report += '✅ حضور: '+present.length+' طفل'+NL;
+    report += '❌ غياب: '+absent.length+' طفل'+NL;
+    if(att.length<=15){
+      present.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+      absent.forEach(a=>{  report += '  · '+a.msg+' ('+a.time+')'+NL; });
+    }
+  }
+  
+  if(recs.length){
+    report += NL+'💰 *الإيصالات المحصلة*'+NL;
+    report += '📄 عدد الإيصالات: '+recs.length+NL;
+    if(recTotal>0) report += '💵 الإجمالي: '+fmtNum(recTotal)+' د.إ'+NL;
+    recs.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+  }
+  
+  if(exps.length){
+    report += NL+'💸 *المصاريف المسجلة*'+NL;
+    report += '📝 عدد البنود: '+exps.length+NL;
+    exps.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+  }
+  
+  if(kids.length){
+    report += NL+'👶 *الأطفال المضافة/المعدلة*'+NL;
+    kids.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+  }
+  
+  if(!att.length&&!recs.length&&!exps.length&&!kids.length){
+    report += NL+'📭 لا توجد نشاطات مسجلة اليوم'+NL;
+  }
+  
+  report += NL+'─────────────────────'+NL;
+  report += '🤖 تقرير تلقائي - مجموعة رعاية الطفل';
+  
+  return report;
+}
+
+function openDailyReport(){
+  const report = buildDailyReport();
+  el('daily-report-preview').textContent = report;
+  el('daily-copy-ok').style.display='none';
+  el('daily-report-modal').classList.add('on');
+}
+
+function copyDailyReport(){
+  const report = buildDailyReport();
+  navigator.clipboard.writeText(report).then(()=>{
+    el('daily-copy-ok').style.display='block';
+    setTimeout(()=>el('daily-copy-ok').style.display='none',3000);
+  }).catch(()=>{
+    // Fallback
+    const ta=document.createElement('textarea');
+    ta.value=report; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    el('daily-copy-ok').style.display='block';
+    setTimeout(()=>el('daily-copy-ok').style.display='none',3000);
+  });
+}
+
+function sendDailyWhatsApp(){
+  const report = buildDailyReport();
+  const encoded = encodeURIComponent(report);
+  window.open('https://wa.me/?text='+encoded,'_blank');
+}
+
+function updateWaSummaryBar(absentKids, sentCount, notSentCount, date){
+  const containerId = 'wa-summary-bar';
+  let bar = document.getElementById(containerId);
+  if(!absentKids.length){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = containerId;
+    bar.className = 'wa-summary';
+    const attlistEl = el('attlist');
+    if(attlistEl) attlistEl.parentNode.insertBefore(bar, attlistEl);
+  }
+  const ar = lang==='ar';
+  let html = '<span>💬 '+(ar?'واتساب الغياب':'Absence WhatsApp')+'</span>';
+  html += '<span style="background:#065f46;color:#fff;border-radius:8px;padding:2px 8px;font-weight:800">✅ '+sentCount+' '+(ar?'أُرسل':'sent')+'</span>';
+  if(notSentCount>0){
+    html += '<span style="background:#dc2626;color:#fff;border-radius:8px;padding:2px 8px;font-weight:800;animation:pulse 1.5s infinite">⚠️ '+notSentCount+' '+(ar?'لم يُرسل':'not sent')+'</span>';
+    const btnClick = "sendAllAbsentWhatsApp('__all__','" + date + "')";
+    html += '<button onclick="'+btnClick+'" style="background:#25d366;border:none;color:#fff;border-radius:8px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:700;margin-right:auto">💬 '+(ar?'إرسال الكل':'Send All')+'</button>';
+  } else {
+    html += '<span style="color:#065f46;font-weight:700">🎉 '+(ar?'تم إرسال الكل!':'All sent!')+'</span>';
+  }
+  bar.innerHTML = html;
 }
 
 boot();
