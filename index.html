@@ -1801,8 +1801,13 @@ function fillFromChild(){
   const id=el('rch').value;if(!id){el('rcls').value='';return;}
   const c=DB.children.find(x=>x.id===id||String(x.id)===id);if(!c)return;
   el('rcls').value=c.className||'';
-  if(!el('rfee').value&&c.fee)el('rfee').value=c.fee;
-  if(!el('rbus').value&&c.busFee&&(c.bus==='Yes'||c.bus==='نعم'))el('rbus').value=c.busFee;
+  // Always auto-fill fees from child data
+  if(el('rfee')) el('rfee').value = c.fee||0;
+  if(el('rbus')) el('rbus').value = (c.bus==='Yes'||c.bus==='نعم') ? (c.busFee||0) : 0;
+  // Weekend fees — always fill from child profile
+  if(el('rfri')) el('rfri').value = c.friFee||0;
+  if(el('rsat')) el('rsat').value = c.satFee||0;
+  if(el('rsun')) el('rsun').value = c.sunFee||0;
   calcTotal();
 }
 function calcTotal(){
