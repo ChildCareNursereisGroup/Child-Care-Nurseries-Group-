@@ -2869,6 +2869,7 @@ async function delExp(id){
 // ═══════════════════════════════════════════════
 async function genReport(){
   const type=el('reptype').value;
+  if(type==='enrollment'){ printEnrollmentReport(); return; }
   const month=el('repmon').value||monthOf(new Date());
   const year=Number(el('repyear')?.value)||new Date().getFullYear();
   const b=CB();
@@ -6470,6 +6471,147 @@ function updateWaSummaryBar(absentKids, sentCount, notSentCount, date){
     html += '<span style="color:#065f46;font-weight:700">🎉 '+(ar?'تم إرسال الكل!':'All sent!')+'</span>';
   }
   bar.innerHTML = html;
+}
+
+// ─── Monthly Enrollment Report ──────────────────
+function printEnrollmentReport(){
+  const mon = el('repmon').value || (()=>{ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); })();
+  const b = CB();
+  const NL = '\n';
+
+  const fmtD = s => {
+    if(!s) return '—';
+    const p = String(s).split('T')[0].split('-');
+    return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+  };
+
+  const monthOf = s => s ? String(s).substring(0,7) : '';
+
+  // New registrations this month
+  const newKids = DB.children.filter(c => monthOf(c.joinDate) === mon)
+    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+
+  // Left (leaveDate) this month
+  const leftKids = DB.children.filter(c => c.leaveDate && monthOf(c.leaveDate) === mon)
+    .sort((a,b) => new Date(a.leaveDate) - new Date(b.leaveDate));
+
+  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+
+  let html = `<!DOCTYPE html><html dir="ltr"><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;padding:22px;max-width:900px;margin:0 auto;color:#111;font-size:.83rem}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1e3a8a;padding-bottom:12px;margin-bottom:18px}
+    .title{font-size:1.3rem;font-weight:900;color:#1e3a8a}
+    .subtitle{font-size:.85rem;color:#6b7280;margin-top:3px}
+    .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .scard{border-radius:12px;padding:14px;text-align:center}
+    .scard .num{font-size:1.8rem;font-weight:900}
+    .scard .lbl{font-size:.72rem;margin-top:3px;opacity:.8}
+    .section-title{font-size:.95rem;font-weight:800;padding:8px 12px;border-radius:8px;margin:16px 0 8px;display:flex;align-items:center;gap:7px}
+    table{width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:16px}
+    thead tr{background:#1e3a8a;color:#fff}
+    th{padding:7px 10px;text-align:left;font-weight:700}
+    tbody tr:nth-child(even){background:#f9fafb}
+    tbody tr:hover{background:#eff6ff}
+    td{padding:6px 10px;border-bottom:1px solid #e5e7eb}
+    .badge-new{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:8px;font-weight:700;font-size:.72rem}
+    .badge-left{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-weight:700;font-size:.72rem}
+    .empty-msg{text-align:center;color:#9ca3af;font-style:italic;padding:14px}
+    @media print{body{padding:8px}@page{margin:10mm}}
+  </style></head><body>
+
+  <div class="header">
+    <div>
+      <div class="title">📋 Monthly Enrollment Report</div>
+      <div class="title" style="font-size:1rem;color:#7c3aed">تقرير التسجيل الشهري</div>
+      <div class="subtitle">${b.en||b.ar} | ${monLabel}</div>
+    </div>
+    <div style="text-align:right;font-size:.75rem;color:#6b7280">
+      <div>Generated: ${new Date().toLocaleDateString('en-GB')}</div>
+      <div>Total Active Children: ${DB.children.filter(c=>!c.leaveDate).length}</div>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="scard" style="background:#d1fae5;color:#065f46">
+      <div class="num">${newKids.length}</div>
+      <div class="lbl">🆕 New Enrollments<br>تسجيلات جديدة</div>
+    </div>
+    <div class="scard" style="background:#fee2e2;color:#991b1b">
+      <div class="num">${leftKids.length}</div>
+      <div class="lbl">🚪 Withdrawals<br>مغادرات</div>
+    </div>
+    <div class="scard" style="background:#dbeafe;color:#1e3a8a">
+      <div class="num">${newKids.length - leftKids.length >= 0 ? '+' : ''}${newKids.length - leftKids.length}</div>
+      <div class="lbl">📊 Net Change<br>صافي التغيير</div>
+    </div>
+  </div>`;
+
+  // New enrollments table
+  html += `<div class="section-title" style="background:#d1fae5;color:#065f46">
+    🆕 New Enrollments — تسجيلات جديدة هذا الشهر (${newKids.length})
+  </div>`;
+
+  if(newKids.length){
+    html += `<table><thead><tr>
+      <th>#</th><th>Child Name — اسم الطفل</th><th>Class — الفصل</th>
+      <th>Join Date — تاريخ التسجيل</th><th>Monthly Fee — الرسوم</th><th>Bus — باص</th>
+    </tr></thead><tbody>`;
+    newKids.forEach((c,i)=>{
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><b>${c.name}</b></td>
+        <td><span style="background:#eff6ff;padding:2px 8px;border-radius:6px">${c.className||'—'}</span></td>
+        <td>${fmtD(c.joinDate)} <span class="badge-new">New</span></td>
+        <td>${c.fee?c.fee+' AED':'—'}</td>
+        <td>${(c.bus==='Yes'||c.bus==='نعم')?'🚌 Yes':'—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  } else {
+    html += `<div class="empty-msg">No new enrollments this month — لا توجد تسجيلات جديدة</div>`;
+  }
+
+  // Withdrawals table
+  html += `<div class="section-title" style="background:#fee2e2;color:#991b1b">
+    🚪 Withdrawals — مغادرات هذا الشهر (${leftKids.length})
+  </div>`;
+
+  if(leftKids.length){
+    html += `<table><thead><tr>
+      <th>#</th><th>Child Name — اسم الطفل</th><th>Class — الفصل</th>
+      <th>Join Date — تاريخ التسجيل</th><th>Leave Date — تاريخ المغادرة</th>
+      <th>Duration — المدة</th><th>Reason — السبب</th>
+    </tr></thead><tbody>`;
+    leftKids.forEach((c,i)=>{
+      // Calculate duration
+      const dur = c.joinDate && c.leaveDate ? (()=>{
+        const months = Math.round((new Date(c.leaveDate)-new Date(c.joinDate))/(1000*60*60*24*30));
+        return months > 0 ? months+' months' : '<1 month';
+      })() : '—';
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><b>${c.name}</b></td>
+        <td><span style="background:#fff1f2;padding:2px 8px;border-radius:6px">${c.className||'—'}</span></td>
+        <td>${fmtD(c.joinDate)}</td>
+        <td>${fmtD(c.leaveDate)} <span class="badge-left">Left</span></td>
+        <td style="color:#6b7280">${dur}</td>
+        <td style="color:#991b1b">${c.notes||'—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  } else {
+    html += `<div class="empty-msg">No withdrawals this month — لا توجد مغادرات</div>`;
+  }
+
+  html += `</body></html>`;
+
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 700);
 }
 
 boot();
