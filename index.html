@@ -444,14 +444,14 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="ct">📋 Receipts Log — سجل الإيصالات</div>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
       <input type="month" id="rfmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderRecs()">
-      <span style="font-weight:800;color:var(--ok)">إجمالي: <span id="rectot">0</span> د.إ</span>
+      <span id="rectot-wrap" style="font-weight:800;color:var(--ok)">إجمالي: <span id="rectot">0</span> د.إ</span>
       <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
         <option value="all">💰 All Payments</option>
         <option value="cash">💵 Cash only</option>
         <option value="bank">🏦 Bank Transfer only</option>
         <option value="card">💳 Card only</option>
       </select>
-      <button class="btn bo bsm np" onclick="openVATReportModal()">🧾 VAT Report</button>
+      <button id="vat-report-btn" class="btn bo bsm np" onclick="openVATReportModal()">🧾 VAT Report</button>
     </div>
   </div>
   <div id="reclist"></div>
@@ -1617,7 +1617,12 @@ async function showPage(page,btn){
   if(page==='dashboard')renderDashboard();
   if(page==='children')renderChildren();
   if(page==='add')initAddForm();
-  if(page==='receipts'){initRecForm();renderRecs();}
+  if(page==='receipts'){
+    initRecForm();renderRecs();
+    // Show/hide admin-only elements
+    const tw=el('rectot-wrap'); if(tw) tw.style.display=curRole==='admin'?'':'none';
+    const vb=el('vat-report-btn'); if(vb) vb.style.display=curRole==='admin'?'':'none';
+  }
   if(page==='attendance')renderAtt();
   if(page==='expenses'){renderECats();renderExps();}
   if(page==='admin')renderAdmin();
