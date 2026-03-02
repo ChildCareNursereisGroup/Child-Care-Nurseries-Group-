@@ -228,7 +228,14 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div id="pvcont"></div>
   </div>
   <div class="card">
-    <div class="ch"><div class="ct">📅 آخر المسجلين</div></div>
+    <div class="ch">
+      <div class="ct">📅 تسجيلات الشهر</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="month" id="recent-mon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecentByMonth()">
+        <button id="reg-report-btn" onclick="printMonthlyRegReport()" style="display:none;background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 11px;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Tajawal',sans-serif">🖨️ طباعة</button>
+        <button id="reg-wa-btn" onclick="sendRegReportWA()" style="display:none;background:#25d366;color:#fff;border:none;border-radius:8px;padding:4px 11px;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Tajawal',sans-serif">💬 واتساب</button>
+      </div>
+    </div>
     <div id="recentl"></div>
   </div>
 </div>
@@ -1748,25 +1755,10 @@ function renderDashboard(){
     });
   } else el('bovcard').style.display='none';
   renderPV();
-  // Recent: current month only
-  const _nowM = monthOf(new Date());
-  const recent = [...DB.children]
-    .filter(c => monthOf(c.joinDate) === _nowM)
-    .sort((a,b) => new Date(b.joinDate) - new Date(a.joinDate));
-  const recentMonLabel = new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  el('recentl').innerHTML = !recent.length
-    ? `<div class="empty"><div class="ei">👶</div><p>لا توجد تسجيلات جديدة في ${recentMonLabel}</p></div>`
-    : `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px;padding:0 2px">📅 تسجيلات ${recentMonLabel} — ${recent.length} طفل</div>`
-    + recent.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openChild('${c.id}')">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="av" style="background:${chCol(c.id)};width:32px;height:32px;font-size:.8rem">${(c.name||'؟')[0]}</div>
-        <div>
-          <div style="font-weight:700">${c.name}</div>
-          <div style="font-size:.71rem;color:var(--muted)">${c.className||''} · ${fmtDate(c.joinDate)}</div>
-        </div>
-      </div>
-      <span class="bdg dok">🆕 جديد</span>
-    </div>`).join('');
+  // Set default month if not set, then render
+  const _rMonEl = el('recent-mon');
+  if(_rMonEl && !_rMonEl.value) _rMonEl.value = monthOf(new Date());
+  renderRecentByMonth();
 }
 function renderPV(){
   if(curRole!=='admin'){el('pvcard').style.display='none';return;}
@@ -6900,6 +6892,135 @@ function openDailyPaymentReport(){
 function _quickSendWA(id){
   _previewReceiptId = id;
   sendReceiptWhatsApp();
+}
+
+// ─── Monthly Registration Report ────────────────
+function renderRecentByMonth(){
+  const mon = el('recent-mon')?.value || monthOf(new Date());
+  const recent = [...DB.children]
+    .filter(c => monthOf(c.joinDate) === mon)
+    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+
+  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const isAdmin = curRole==='admin';
+
+  // Show/hide print + WA buttons for admin
+  if(el('reg-report-btn')) el('reg-report-btn').style.display = isAdmin&&recent.length?'':'none';
+  if(el('reg-wa-btn'))     el('reg-wa-btn').style.display     = isAdmin&&recent.length?'':'none';
+
+  if(!recent.length){
+    el('recentl').innerHTML = `<div class="empty"><div class="ei">👶</div><p>لا توجد تسجيلات في ${monLabel}</p></div>`;
+    return;
+  }
+
+  el('recentl').innerHTML =
+    `<div style="background:#eff6ff;border-radius:9px;padding:7px 12px;margin-bottom:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:.79rem">
+       <span>📅 <b>${monLabel}</b></span>
+       <span>👶 <b>${recent.length}</b> طفل مسجل</span>
+       <span style="color:#059669">✅ نشط: <b>${recent.filter(c=>!c.leaveDate).length}</b></span>
+       <span style="color:#dc2626">🚌 باص: <b>${recent.filter(c=>c.bus==='Yes'||c.bus==='نعم').length}</b></span>
+     </div>`
+    + recent.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openChild('${c.id}')">
+      <div style="font-size:.72rem;color:var(--muted);min-width:22px;text-align:center;font-weight:700">${i+1}</div>
+      <div class="av" style="background:${chCol(c.id)};width:32px;height:32px;font-size:.8rem;flex-shrink:0">${(c.name||'؟')[0]}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.85rem">${c.name} ${(c.bus==='Yes'||c.bus==='نعم')?'<span style="background:#dbeafe;color:#1e3a8a;font-size:.62rem;padding:1px 5px;border-radius:5px">🚌</span>':''}</div>
+        <div style="font-size:.7rem;color:var(--muted)">${c.className||'—'} · ${fmtDate(c.joinDate)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.75rem;font-weight:700;color:${c.fee?'#1e3a8a':'#9ca3af'}">${c.fee?fmtNum(c.fee)+' AED':''}</div>
+        <span class="bdg ${c.leaveDate?'derr':'dok'}" style="font-size:.62rem">${c.leaveDate?'غادر':'🆕 جديد'}</span>
+      </div>
+    </div>`).join('');
+}
+
+function printMonthlyRegReport(){
+  const mon = el('recent-mon')?.value || monthOf(new Date());
+  const recent = [...DB.children]
+    .filter(c => monthOf(c.joinDate) === mon)
+    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+  const b = CB();
+  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const fmtD2 = s=>{ if(!s)return'—'; const p=String(s).split('T')[0].split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+
+  let html = `<!DOCTYPE html><html dir="ltr"><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;padding:18px;font-size:.8rem;color:#111}
+    .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid ${b.c};padding-bottom:10px;margin-bottom:14px}
+    .title{font-size:1.2rem;font-weight:900;color:${b.c}}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .sbox{border-radius:10px;padding:10px;text-align:center}
+    .sbox .n{font-size:1.5rem;font-weight:900}
+    .sbox .l{font-size:.7rem;margin-top:2px;opacity:.8}
+    table{width:100%;border-collapse:collapse;font-size:.78rem}
+    thead tr{background:${b.c};color:#fff}
+    th{padding:7px 9px;text-align:left;font-weight:700}
+    tbody tr:nth-child(even){background:#f9fafb}
+    tbody tr:hover{background:#eff6ff}
+    td{padding:6px 9px;border-bottom:1px solid #e5e7eb}
+    @media print{@page{margin:8mm;size:A4}}
+  </style></head><body>
+  <div class="hdr">
+    <div>
+      <div class="title">📅 Monthly Registration Report</div>
+      <div class="title" style="font-size:.95rem;color:#7c3aed">تقرير التسجيلات الشهرية</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:3px">${b.en||b.ar} | ${monLabel}</div>
+    </div>
+    <div style="font-size:.72rem;color:#9ca3af">Generated: ${new Date().toLocaleDateString('en-GB')}</div>
+  </div>
+  <div class="summary">
+    <div class="sbox" style="background:#dbeafe;color:#1e3a8a"><div class="n">${recent.length}</div><div class="l">Total Registered<br>إجمالي المسجلين</div></div>
+    <div class="sbox" style="background:#d1fae5;color:#065f46"><div class="n">${recent.filter(c=>!c.leaveDate).length}</div><div class="l">Active<br>نشط</div></div>
+    <div class="sbox" style="background:#e0e7ff;color:#4338ca"><div class="n">${recent.filter(c=>c.bus==='Yes'||c.bus==='نعم').length}</div><div class="l">Using Bus<br>باص</div></div>
+    <div class="sbox" style="background:#fef3c7;color:#92400e"><div class="n">${fmtNum(recent.reduce((s,c)=>s+(c.fee||0),0))}</div><div class="l">Total Fees AED<br>إجمالي الرسوم</div></div>
+  </div>
+  <table><thead><tr>
+    <th>#</th><th>Child Name — اسم الطفل</th><th>Class</th>
+    <th>Join Date</th><th>Fee (AED)</th><th>Bus</th><th>Status</th>
+  </tr></thead><tbody>`;
+
+  recent.forEach((c,i)=>{
+    html += `<tr>
+      <td style="color:#9ca3af">${i+1}</td>
+      <td><b>${c.name}</b><br><span style="font-size:.68rem;color:#6b7280">${c.nationality||''}</span></td>
+      <td><span style="background:#eff6ff;padding:2px 7px;border-radius:6px">${c.className||'—'}</span></td>
+      <td>${fmtD2(c.joinDate)}</td>
+      <td style="font-weight:700;color:#1e3a8a">${c.fee?fmtNum(c.fee)+' AED':'—'}</td>
+      <td>${(c.bus==='Yes'||c.bus==='نعم')?'🚌':'—'}</td>
+      <td><span style="background:${c.leaveDate?'#fee2e2':'#d1fae5'};color:${c.leaveDate?'#991b1b':'#065f46'};padding:2px 8px;border-radius:8px;font-size:.72rem">${c.leaveDate?'Left — غادر':'Active — نشط'}</span></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></body></html>`;
+  const w = window.open('','_blank');
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+
+function sendRegReportWA(){
+  const mon = el('recent-mon')?.value || monthOf(new Date());
+  const recent = [...DB.children]
+    .filter(c => monthOf(c.joinDate) === mon)
+    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+  const b = CB();
+  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const NL = '\n';
+  let msg = '🏫 *'+(b.en||b.ar)+'*'+NL;
+  msg += '📅 Monthly Registration Report — تقرير التسجيلات'+NL;
+  msg += '🗓 '+monLabel+NL;
+  msg += '─────────────────────'+NL;
+  msg += '👶 Total: *'+recent.length+'* children'+NL;
+  msg += '✅ Active: *'+recent.filter(c=>!c.leaveDate).length+'*'+NL;
+  msg += '🚌 Bus: *'+recent.filter(c=>c.bus==='Yes'||c.bus==='نعم').length+'*'+NL;
+  msg += '─────────────────────'+NL;
+  recent.forEach((c,i)=>{
+    msg += (i+1)+'. *'+c.name+'* ('+( c.className||'—')+') — '+(c.fee?fmtNum(c.fee)+' AED':'—')+(c.bus==='Yes'||c.bus==='نعم'?' 🚌':'')+NL;
+  });
+  msg += '─────────────────────'+NL+'🤖 مجموعة رعاية الطفل';
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
 boot();
