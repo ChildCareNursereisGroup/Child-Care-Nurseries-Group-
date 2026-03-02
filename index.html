@@ -376,7 +376,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <input type="text" id="rch-guest" placeholder="أدخل اسم الطفل..." style="font-family:'Tajawal',sans-serif">
     </div>
     <div class="fg"><label data-t="classNameLabel">Class Name</label><input type="text" id="rcls" placeholder="اختياري"></div>
-    <div class="fg"><label data-t="receiptNo">Receipt No. *</label><input type="text" id="rnum"></div>
+    <div class="fg"><label data-t="receiptNo">Receipt No. *</label><input type="text" id="rnum" readonly style="background:#f0f4ff;font-weight:800;color:#1e3a8a;cursor:not-allowed" title="Auto-generated"></div>
     <div class="fg"><label data-t="payDate">Payment Date *</label><input type="date" id="rdate"></div>
     <div class="fg"><label data-t="feesFrom">Fees From Date</label><input type="date" id="rfrom"></div>
     <div class="fg"><label data-t="feesTo">Fees To Date</label><input type="date" id="rto"></div>
@@ -441,7 +441,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <div class="card">
   <div class="ch">
-    <div class="ct">📋 Receipts Log — سجل الإيصالات</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="ct">📋 Receipts Log — سجل الإيصالات</div>
+      ${curRole==='admin'?'<button onclick="fixAllReceiptNumbers()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.72rem;font-weight:700;font-family:Tajawal,sans-serif">🔢 إصلاح الأرقام</button>':''}
+    </div>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
       <input type="month" id="rfmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderRecs()">
       <span id="rectot-wrap" style="font-weight:800;color:var(--ok);display:none">إجمالي: <span id="rectot">0</span> د.إ</span>
@@ -469,7 +472,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
       <input type="hidden" id="edit-rec-id">
       <div class="g3" style="gap:8px">
-        <div class="fg"><label>Receipt No.</label><input type="text" id="edit-rnum" style="font-family:'Tajawal',sans-serif"></div>
+        <div class="fg"><label>Receipt No. <span style="font-size:.68rem;color:#6b7280">(auto)</span></label><input type="text" id="edit-rnum" readonly style="font-family:'Tajawal',sans-serif;background:#f0f4ff;color:#1e3a8a;font-weight:800;cursor:not-allowed"></div>
         <div class="fg"><label>Date</label><input type="date" id="edit-rdate" style="font-family:'Tajawal',sans-serif"></div>
         <div class="fg"><label>Payment Method</label>
           <select id="edit-rpay" style="font-family:'Tajawal',sans-serif">
@@ -6748,6 +6751,49 @@ async function saveEditRec(){
   await loadFromSupa(curBid);
   renderRecs(); renderDashboard();
   showAlert('recalert','✅ تم التعديل بنجاح!',false);
+}
+
+// ─── Fix/Renumber All Receipts ──────────────────
+async function fixAllReceiptNumbers(){
+  if(!confirm('سيتم إعادة ترقيم كل الإيصالات تلقائياً حسب طريقة الدفع والتاريخ. متأكدة؟')) return;
+  
+  showLoad('🔄 جاري إعادة الترقيم...');
+  
+  // Sort all receipts by date then by id (insertion order)
+  const sorted = [...DB.receipts].sort((a,b)=>{
+    const dd = new Date(a.date||0) - new Date(b.date||0);
+    if(dd!==0) return dd;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  // Assign new numbers per pay method
+  const counters = {cash:0, bank:0, card:0};
+  const prefix   = {cash:'C', bank:'B', card:'K'};
+  const updates  = [];
+
+  sorted.forEach(r=>{
+    const pm = r.payMethod||'cash';
+    const p  = prefix[pm]||'C';
+    if(!counters[pm]) counters[pm]=0;
+    counters[pm]++;
+    const newNum = p+'-'+String(counters[pm]).padStart(4,'0');
+    if(r.receiptNum !== newNum){
+      updates.push({ id:r.id, receipt_num:newNum });
+    }
+  });
+
+  // Update in Supabase in batches
+  let done=0;
+  for(const u of updates){
+    await sb.from('receipts').update({receipt_num:u.receipt_num}).eq('id',u.id);
+    done++;
+  }
+
+  await loadFromSupa(curBid);
+  hideLoad();
+  renderRecs();
+  alert('✅ تم إعادة ترقيم '+done+' إيصال بنجاح!');
+  logActivity('edit','🔢 إعادة ترقيم كل الإيصالات — '+done+' إيصال');
 }
 
 boot();
