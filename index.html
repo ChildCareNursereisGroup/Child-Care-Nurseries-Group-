@@ -540,6 +540,11 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <span style="font-size:.8rem;color:#1e3a8a">VAT (5% on Uniforms+Stationary): <b id="edit-vat-show">0</b> AED</span>
         <span style="font-weight:900;color:#1e3a8a;font-size:1rem">Total: <b id="edit-total-show">0</b> AED</span>
       </div>
+      <div class="g3" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
+        <div class="fg"><label>🕐 Hourly From</label><input type="time" id="edit-rhour-in" style="font-family:'Tajawal',sans-serif;border-color:#d1fae5"></div>
+        <div class="fg"><label>🕐 Hourly To</label><input type="time" id="edit-rhour-out" style="font-family:'Tajawal',sans-serif;border-color:#fee2e2"></div>
+        <div class="fg"><label>🕐 Hourly Fee</label><input type="number" id="edit-rhour-fee" placeholder="0" oninput="calcEditTotal()" style="font-family:'Tajawal',sans-serif;border-color:#dbeafe"></div>
+      </div>
       <div class="g3" style="gap:8px;grid-template-columns:1fr 1fr">
         <div class="fg"><label>Fees From Date</label><input type="date" id="edit-rfrom" style="font-family:'Tajawal',sans-serif"></div>
         <div class="fg"><label>Fees To Date</label><input type="date" id="edit-rto" style="font-family:'Tajawal',sans-serif"></div>
@@ -7006,6 +7011,9 @@ function openEditRec(id){
   el('edit-rfri').value     = r.friFee||0;
   el('edit-rsat').value     = r.satFee||0;
   el('edit-rsun').value     = r.sunFee||0;
+  el('edit-rhour-in').value  = r.hourIn||'';
+  el('edit-rhour-out').value = r.hourOut||'';
+  if(el('edit-rhour-fee')) el('edit-rhour-fee').value = r.hourFee||0;
   el('edit-rfrom').value    = r.fromDate||'';
   el('edit-rto').value      = r.toDate||'';
   el('edit-rnotes').value   = r.notes||'';
@@ -7021,13 +7029,13 @@ function calcEditTotal(){
   const fee=n('edit-rfee'), reg=n('edit-rreg'), bus=n('edit-rbus');
   const clo=n('edit-rclo'), sup=n('edit-rsup');
   const fri=n('edit-rfri'), sat=n('edit-rsat'), sun=n('edit-rsun');
+  const hourF=n('edit-rhour-fee');
   const vat = Math.round((clo*0.05 + sup*0.05)*100)/100;
-  const tot = Math.round((fee+reg+bus+clo+sup+fri+sat+sun+vat)*100)/100;
+  const tot = Math.round((fee+reg+bus+clo+sup+fri+sat+sun+hourF+vat)*100)/100;
   if(el('edit-vat-show'))  el('edit-vat-show').textContent  = vat.toFixed(2);
   if(el('edit-total-show')) el('edit-total-show').textContent = tot.toFixed(2);
-  // Warn if total dropped to 0 unexpectedly
   const warn = el('edit-zero-warn');
-  if(warn) warn.style.display = (tot===0 && (fee+reg+bus+clo+sup+fri+sat+sun)===0) ? 'block' : 'none';
+  if(warn) warn.style.display = (tot===0 && (fee+reg+bus+clo+sup+fri+sat+sun+hourF)===0) ? 'block' : 'none';
 }
 
 async function saveEditRec(){
@@ -7039,8 +7047,9 @@ async function saveEditRec(){
   const fee=n('edit-rfee'), reg=n('edit-rreg'), bus=n('edit-rbus');
   const clo=n('edit-rclo'), sup=n('edit-rsup');
   const fri=n('edit-rfri'), sat=n('edit-rsat'), sun=n('edit-rsun');
+  const hourF=n('edit-rhour-fee');
   const vat = Math.round((clo*0.05 + sup*0.05)*100)/100;
-  const tot = Math.round((fee+reg+bus+clo+sup+fri+sat+sun+vat)*100)/100;
+  const tot = Math.round((fee+reg+bus+clo+sup+fri+sat+sun+hourF+vat)*100)/100;
   const vatType = (clo||sup) ? '5' : 'exempt';
 
   // Build old values string for audit log
@@ -7056,6 +7065,9 @@ async function saveEditRec(){
     pay_method:  el('edit-rpay').value,
     fee, reg, bus, clothes:clo, tools:sup,
     fri_fee:fri, sat_fee:sat, sun_fee:sun,
+    hour_in:el('edit-rhour-in')?.value||null,
+    hour_out:el('edit-rhour-out')?.value||null,
+    hour_fee:hourF,
     vat_type:vatType, vat_amount:vat,
     total:tot,
     notes: el('edit-rnotes').value
