@@ -2649,8 +2649,14 @@ function prevRec(id){
           const toolsVat=r.tools?Math.round(r.tools*0.05*100)/100:0;
           let rows='';
           // Monthly fees
+          const feeMonthName=(()=>{
+            const src=r.fromDate||r.date;
+            if(!src)return '—';
+            const d=new Date(src);
+            return d.toLocaleString('en',{month:'long',year:'numeric'});
+          })();
           rows+=`<tr>
-            ${tdL(`The Fees of the Month: (<b>${r.date?new Date(r.date).toLocaleString('en',{month:'long'}):'—'}</b>)<br>
+            ${tdL(`The Fees of the Month: (<b>${feeMonthName}</b>)<br>
               <span style="font-size:.68rem;color:#555">Date From: (${fmtDate(r.fromDate)}) &nbsp; Date To: (${fmtDate(r.toDate)})</span>`)}
             ${td(r.fee||'')} ${td('')} ${td('0 %')} ${td('')} ${td(r.fee||'')} ${td('')}
           </tr>`;
@@ -2661,7 +2667,10 @@ function prevRec(id){
           </tr>`;
           // Hourly session row
           if(r.hourFee){ rows+=`<tr style="background:#f0fdf4">
-            ${tdL('🕐 Hourly Session <span style="font-size:.7rem;color:#555">'+(r.hourIn&&r.hourOut?' From: <b>'+r.hourIn+'</b> To: <b>'+r.hourOut+'</b>':'')+'</span>')}
+            ${tdL('🕐 Hourly Session'+
+              (r.hourIn&&r.hourOut
+                ? ' &nbsp;<span style="font-size:.72rem;color:#059669;font-weight:800">From: '+r.hourIn+' &rarr; To: '+r.hourOut+'</span>'
+                : ''))}
             ${td(r.hourFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.hourFee)} ${td('')}
           </tr>`; }
           // Overtime row
@@ -2669,11 +2678,7 @@ function prevRec(id){
             ${tdL('Overtime: ('+r.overtimeDur+')')}
             ${td(r.overtimeFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.overtimeFee)} ${td('')}
           </tr>`; }
-          // Notes row
-          rows+=`<tr>
-            ${tdL('Notes: <i style="color:#555">'+(r.notes||'')+'</i>')}
-            ${td('')} ${td('')} ${td('')} ${td('')} ${td('')} ${td('')}
-          </tr>`;
+          // Notes row removed from table — shown below receipt instead
           // Transport
           rows+=`<tr>
             ${tdL('Transportation Fees')}
@@ -2726,6 +2731,10 @@ function prevRec(id){
         </table>
       </div>
     </div>
+    ${r.notes?`<div style="padding:8px 14px;border-top:1px solid #ddd;font-size:.76rem">
+      <span style="font-weight:800;color:#374151">Notes / ملاحظات: </span>
+      <span style="color:#555;font-style:italic">${r.notes}</span>
+    </div>`:''}
     ${signedLine}
   </div>`;
   el('pmodal').classList.add('on');
