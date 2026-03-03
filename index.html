@@ -2025,7 +2025,7 @@ function renderChildren(){
           if(c.friFee) parts.push('🟡Fri:'+fmtNum(c.friFee));
           if(c.satFee) parts.push('🟣Sat:'+fmtNum(c.satFee));
           if(c.sunFee) parts.push('🔵Sun:'+fmtNum(c.sunFee));
-          return `<span style="color:var(--ok);font-weight:700">${parts.join(' + ')} = <b>${fmtNum(total)}</b> AED</span>`;
+          return curRole==='admin'?`<span style="color:var(--ok);font-weight:700">${parts.join(' + ')} = <b>${fmtNum(total)}</b> AED</span>`:'';
         })()}
       </div>
     </div>`).join('');
@@ -2288,11 +2288,11 @@ function renderRecs(){
   const ar=lang==='ar';
   const PAY_EN={cash:'Cash 💵',bank:'Bank Transfer 🏦',card:'Card 💳'};
   el('reclist').innerHTML=`
-    <div style="background:#fef3c7;border-radius:9px;padding:9px 12px;margin-bottom:9px;display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem">
+    ${curRole==='admin'?`<div style="background:#fef3c7;border-radius:9px;padding:9px 12px;margin-bottom:9px;display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem">
       <span>💰 ${ar?'إجمالي المحصّل':'Total Collected'}: <b>${fmtNum(tot)} ${ar?'د.إ':'AED'}</b></span>
       <span>🧾 ${ar?'إجمالي الضريبة':'Total VAT'}: <b style="color:var(--warn)">${fmtNum(vatTot)} ${ar?'د.إ':'AED'}</b></span>
       <span>📄 ${ar?'عدد الإيصالات':'Receipts'}: <b>${list.length}</b></span>
-    </div>
+    </div>`:''}
   `+list.map(r=>`
     <div style="border-bottom:1px solid var(--border);padding:7px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <!-- Avatar -->
