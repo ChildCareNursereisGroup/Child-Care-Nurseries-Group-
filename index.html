@@ -606,7 +606,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
-      <button id="fee-remind-btn" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openFeeReminderModal()">💸 Fee Reminders</button>
+      <button id="fee-remind-btn" class="btn bsm" style="background:#be185d;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openAttExtras('bday')">🎂 Birthdays</button>
+      <button id="fee-remind-btn2" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openAttExtras('fee')">💸 Fee Reminders</button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
@@ -642,6 +643,35 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="attlist"></div>
   <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
 </div>
+</div>
+
+<!-- BIRTHDAY & FEE SECTION — inside attendance page -->
+<div class="card" id="att-extras-card" style="display:none">
+  <!-- Tabs -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1.5px solid var(--border);padding-bottom:8px">
+    <button id="bdaytab-btn" onclick="switchAttExtra('bday')" 
+      style="padding:7px 16px;border-radius:18px;border:none;background:#fdf2f8;color:#be185d;cursor:pointer;font-weight:800;font-size:.82rem;font-family:'Tajawal',sans-serif">
+      🎂 Birthdays
+    </button>
+    <button id="feertab-btn" onclick="switchAttExtra('fee')"
+      style="padding:7px 16px;border-radius:18px;border:none;background:#f9f9f9;color:#6b7280;cursor:pointer;font-weight:700;font-size:.82rem;font-family:'Tajawal',sans-serif">
+      💸 Fee Reminders
+    </button>
+  </div>
+  <!-- Birthday Panel -->
+  <div id="att-bday-panel">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input type="month" id="bday-month-picker" 
+        style="padding:5px 10px;border:1.5px solid #f9a8d4;border-radius:8px;font-family:'Tajawal',sans-serif"
+        onchange="renderBirthdayPanel()">
+      <span id="bday-count-badge" style="background:#fdf2f8;color:#be185d;padding:4px 10px;border-radius:10px;font-weight:800;font-size:.8rem"></span>
+    </div>
+    <div id="bday-list"></div>
+  </div>
+  <!-- Fee Panel -->
+  <div id="att-fee-panel" style="display:none">
+    <div id="fee-reminder-list"></div>
+  </div>
 </div>
 
 <div class="page" id="pg-expenses">
@@ -2735,7 +2765,8 @@ async function delRec(id){
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
 function renderAtt(){
-  const fbtn=el('fee-remind-btn'); if(fbtn) fbtn.style.display=curRole==='admin'?'inline-flex':'none';
+  const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display=curRole==='admin'?'inline-flex':'none';
+  const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display=curRole==='admin'?'inline-flex':'none';
   const date=el('attdate').value||today();
 
   // Get day name from date to filter children booked for this day
@@ -7822,54 +7853,176 @@ async function exportAllToExcel(type){
   XLSX.writeFile(wb2, fname);
 }
 
-// ─── Birthday Notifications ───────────────────
+// ─── Birthday & Attendance Extras ─────────────
 function checkBirthdays(){
-  const todayStr = today(); // YYYY-MM-DD
-  const tomorrowD = new Date(); tomorrowD.setDate(tomorrowD.getDate()+1);
-  const tomorrowStr = tomorrowD.toISOString().split('T')[0];
-  const todayMD    = todayStr.substring(5);     // MM-DD
-  const tomorrowMD = tomorrowStr.substring(5);  // MM-DD
-
-  const bdays = [];
-
-  // Check children
+  // Show toast only for TODAY + TOMORROW (quick notification)
+  const todayStr=today(), tm=new Date(); tm.setDate(tm.getDate()+1);
+  const tMD=todayStr.substring(5), tmMD=tm.toISOString().split('T')[0].substring(5);
+  const bdays=[];
   DB.children.filter(c=>!c.leaveDate&&c.dob).forEach(c=>{
-    const md = String(c.dob).substring(5);
-    if(md===todayMD)    bdays.push({name:c.name, type:'Child', when:'today', icon:'👶'});
-    else if(md===tomorrowMD) bdays.push({name:c.name, type:'Child', when:'tomorrow', icon:'👶'});
+    const md=String(c.dob).substring(5);
+    if(md===tMD) bdays.push({name:c.name,type:'Child',when:'today',icon:'👶'});
+    else if(md===tmMD) bdays.push({name:c.name,type:'Child',when:'tomorrow',icon:'👶'});
   });
-
-  // Check staff
   (DB.staff||[]).forEach(s=>{
-    if(!s.dob) return;
-    const md = String(s.dob).substring(5);
-    if(md===todayMD)    bdays.push({name:s.name, type:'Staff', when:'today', icon:'👩‍🏫'});
-    else if(md===tomorrowMD) bdays.push({name:s.name, type:'Staff', when:'tomorrow', icon:'👩‍🏫'});
+    if(!s.dob)return;
+    const md=String(s.dob).substring(5);
+    if(md===tMD) bdays.push({name:s.name,type:'Staff',when:'today',icon:'👩‍🏫'});
+    else if(md===tmMD) bdays.push({name:s.name,type:'Staff',when:'tomorrow',icon:'👩‍🏫'});
   });
-
   if(!bdays.length) return;
-
-  // Show birthday notification banner
-  const banner = document.createElement('div');
-  banner.id = 'bday-banner';
-  banner.style.cssText = 'position:fixed;top:60px;right:16px;z-index:9999;max-width:320px;display:flex;flex-direction:column;gap:6px';
-  bdays.forEach(b=>{
-    const div = document.createElement('div');
-    div.style.cssText = 'background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #f9a8d4;border-radius:12px;padding:10px 14px;box-shadow:0 4px 12px rgba(0,0,0,.1);animation:fadeIn .4s ease';
-    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:start">
-      <div>
-        <div style="font-size:1.1rem">${b.icon} ${b.when==='today'?'🎂 Happy Birthday!':'🎈 Birthday Tomorrow!'}</div>
-        <div style="font-weight:800;margin-top:2px">${b.name}</div>
-        <div style="font-size:.72rem;color:#9ca3af">${b.type} • ${b.when==='today'?'Today!':'Tomorrow'}</div>
-      </div>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1rem;color:#9ca3af;padding:0">✕</button>
-    </div>`;
-    banner.appendChild(div);
+  let old=el('bday-toast'); if(old) old.remove();
+  const toast=document.createElement('div');
+  toast.id='bday-toast';
+  toast.style.cssText='position:fixed;bottom:20px;right:16px;z-index:9999;max-width:300px;display:flex;flex-direction:column;gap:5px;cursor:pointer';
+  toast.onclick=()=>{toast.remove(); showPage('attendance'); setTimeout(()=>openAttExtras('bday'),400);};
+  bdays.slice(0,3).forEach(b=>{
+    const d=document.createElement('div');
+    d.style.cssText='background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #f9a8d4;border-radius:12px;padding:9px 13px;box-shadow:0 4px 12px rgba(0,0,0,.12)';
+    d.innerHTML=`<b>${b.icon} ${b.when==='today'?'🎂 Birthday Today!':'🎈 Birthday Tomorrow!'}</b><div style="font-size:.82rem;font-weight:700">${b.name}</div><div style="font-size:.7rem;color:#9ca3af">${b.type} — click to view all</div>`;
+    toast.appendChild(d);
   });
-  document.body.appendChild(banner);
-  // Auto remove after 12 seconds
-  setTimeout(()=>{ const b2=el('bday-banner'); if(b2)b2.remove(); }, 12000);
+  document.body.appendChild(toast);
+  setTimeout(()=>{if(el('bday-toast'))el('bday-toast').remove();},10000);
 }
+
+function openAttExtras(tab){
+  const card=el('att-extras-card');
+  if(card) card.style.display='block';
+  switchAttExtra(tab||'bday');
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function switchAttExtra(tab){
+  el('att-bday-panel').style.display=tab==='bday'?'block':'none';
+  el('att-fee-panel').style.display=tab==='fee'?'block':'none';
+  const bb=el('bdaytab-btn'), fb=el('feertab-btn');
+  if(bb){bb.style.background=tab==='bday'?'#fdf2f8':'#f9f9f9'; bb.style.color=tab==='bday'?'#be185d':'#6b7280'; bb.style.fontWeight=tab==='bday'?'800':'700';}
+  if(fb){fb.style.background=tab==='fee'?'#fff1f2':'#f9f9f9';  fb.style.color=tab==='fee'?'#e11d48':'#6b7280';  fb.style.fontWeight=tab==='fee'?'800':'700';}
+  if(tab==='bday') renderBirthdayPanel();
+  if(tab==='fee')  renderFeeReminderPanel();
+}
+
+function renderBirthdayPanel(){
+  const picker=el('bday-month-picker');
+  if(!picker.value) picker.value=monthOf(new Date());
+  const mon=picker.value; // YYYY-MM
+  const [yr,mo]=mon.split('-').map(Number);
+  const badge=el('bday-count-badge');
+  
+  // Collect all birthdays for this month (any year)
+  const entries=[];
+  DB.children.filter(c=>c.dob).forEach(c=>{
+    const d=new Date(c.dob);
+    if(d.getMonth()+1===mo){
+      entries.push({name:c.name,dob:c.dob,type:'Child',icon:'👶',phone:c.parentMom||c.parentDad||'',id:c.id,inactive:!!c.leaveDate});
+    }
+  });
+  (DB.staff||[]).forEach(s=>{
+    if(!s.dob)return;
+    const d=new Date(s.dob);
+    if(d.getMonth()+1===mo){
+      entries.push({name:s.name,dob:s.dob,type:'Staff',icon:'👩‍🏫',phone:s.phone||'',id:s.id,inactive:false});
+    }
+  });
+  // Sort by day
+  entries.sort((a,b)=>parseInt(a.dob.substring(8))-parseInt(b.dob.substring(8)));
+
+  const todayStr=today();
+  const todayMD=todayStr.substring(5);
+  badge.textContent=entries.length+' birthdays';
+
+  if(!entries.length){
+    el('bday-list').innerHTML=`<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.88rem">No birthdays in this month</div>`;
+    return;
+  }
+
+  let html='<div style="display:flex;flex-direction:column;gap:8px">';
+  entries.forEach(e=>{
+    const day=parseInt(e.dob.substring(8));
+    const md=e.dob.substring(5);
+    const isToday=md===todayMD;
+    const age=yr-parseInt(e.dob.substring(0,4));
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:${isToday?'linear-gradient(135deg,#fdf2f8,#fce7f3)':'#f9f9f9'};border:${isToday?'2px solid #f9a8d4':'1.5px solid var(--border)'}">
+      <div style="min-width:36px;height:36px;border-radius:50%;background:${isToday?'#be185d':'#e5e7eb'};color:${isToday?'#fff':'#374151'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem">${day}</div>
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:.88rem">${e.icon} ${e.name} ${isToday?'🎂':''} ${e.inactive?'<span style="color:#9ca3af;font-size:.7rem">(inactive)</span>':''}</div>
+        <div style="font-size:.72rem;color:#6b7280">${e.type} • Age ${age} • ${e.phone||'No phone'}</div>
+      </div>
+      ${e.phone&&isToday?`<button onclick="sendBirthdayWA('${e.id}','${e.type}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:.75rem;font-weight:800;white-space:nowrap">🎂 Send WA</button>`:''}
+      ${e.phone&&!isToday?`<button onclick="sendBirthdayWA('${e.id}','${e.type}')" style="background:#e5e7eb;color:#374151;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:.72rem;font-weight:700;white-space:nowrap">💬 WA</button>`:''}
+    </div>`;
+  });
+  html+='</div>';
+  el('bday-list').innerHTML=html;
+}
+
+function sendBirthdayWA(id, type){
+  let person, phone;
+  if(type==='Child'){
+    const c=DB.children.find(x=>String(x.id)===String(id));
+    if(!c)return;
+    person=c.name; phone=c.parentMom||c.parentDad||'';
+  } else {
+    const s=(DB.staff||[]).find(x=>String(x.id)===String(id));
+    if(!s)return;
+    person=s.name; phone=s.phone||'';
+  }
+  if(!phone){alert('No phone number found');return;}
+  let num=phone.replace(/[^0-9]/g,'');
+  if(num.startsWith('0')) num='971'+num.substring(1);
+  else if(!num.startsWith('971')) num='971'+num;
+  const b=CB();
+  const msg = type==='Child'
+    ? `🎂 *Happy Birthday ${person}!*
+
+Wishing our little star a wonderful birthday filled with joy and laughter!
+
+With love,
+${b.en||b.ar}
+Child Care Nurseries Group`
+    : `🎂 *Happy Birthday ${person}!*
+
+Wishing you a wonderful birthday and a fantastic year ahead!
+
+With warm regards,
+${b.en||b.ar}
+Child Care Nurseries Group`;
+  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function renderFeeReminderPanel(){
+  const mon=monthOf(new Date());
+  const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const paidIds=new Set(DB.receipts.filter(r=>(r.date||'').startsWith(mon)).map(r=>String(r.childId)));
+  const unpaid=DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0);
+
+  let html=`<div style="background:#fff1f2;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div><div style="font-weight:900;color:#e11d48">${unpaid.length} children unpaid — ${monLabel}</div>
+    <div style="font-size:.75rem;color:#6b7280">Children who have no receipt this month</div></div>
+    <button onclick="sendAllFeeReminders()" style="background:#e11d48;color:#fff;border:none;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">
+      💬 Send All (${unpaid.length})
+    </button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">`;
+
+  unpaid.forEach((c,i)=>{
+    const phone=c.parentMom||c.parentDad||'';
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:${i%2?'#fff':'#fff1f2'};border-radius:9px;border:1px solid #fecaca">
+      <div>
+        <div style="font-weight:700;font-size:.85rem">${c.name}</div>
+        <div style="font-size:.72rem;color:#6b7280">${c.className||'—'} | ${fmtNum(c.fee||0)} AED | ${phone||'No phone'}</div>
+      </div>
+      ${phone?`<button onclick="sendFeeReminderWA('${c.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.75rem;font-weight:800;white-space:nowrap">💬 Send</button>`:'<span style="font-size:.72rem;color:#9ca3af">No phone</span>'}
+    </div>`;
+  });
+  if(!unpaid.length) html+=`<div style="text-align:center;padding:20px;color:#059669;font-weight:800;font-size:.9rem">All children have paid this month!</div>`;
+  html+='</div>';
+  el('fee-reminder-list').innerHTML=html;
+}
+
+// Keep old openFeeReminderModal pointing to new system
+function openFeeReminderModal(){ openAttExtras('fee'); }
 
 boot();
 </script>
