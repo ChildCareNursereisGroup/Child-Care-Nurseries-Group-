@@ -975,7 +975,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="page" id="pg-visitors">
   <div class="card">
     <div class="ch">
-      <div class="ct">👶 الزوار — Visitors</div>
+      <div>
+        <div class="ct">👶 الزوار — Visitors</div>
+        <div id="vis-branch-name" style="font-size:.75rem;color:var(--muted);margin-top:2px"></div>
+      </div>
       <button onclick="openVisitorModal(null)" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.82rem">➕ زائر جديد</button>
     </div>
     <!-- Search -->
@@ -1144,6 +1147,7 @@ const BRANCHES = [
 ];
 const ROLES_PAGES = {
   admin:      ['dashboard','children','add','receipts','attendance','expenses','reports','staff','licenses','buses','visitors','admin'],
+  visitor_reg:['visitors'],
   receipts:   ['dashboard','children','add','receipts'],
   expenses:   ['expenses'],
   attendance: ['attendance'],
@@ -1252,7 +1256,7 @@ function hideLoad(){el('loading').style.display='none';}
 function setSyncing(yes){const s=el('sind');if(s)s.textContent=yes?'🔄 جاري الحفظ...':'☁️ محفوظ';}
 function showAlert(id,msg,err){const e=el(id);if(e){e.innerHTML=`<div class="alert ${err?'aerr':'aok'}">${msg}</div>`;setTimeout(()=>e.innerHTML='',4000);}}
 function getPW(bid,role){
-  if(role==='public_reg') return '__PUBLIC__'; // no password
+  if(role==='public_reg'||role==='visitor_reg') return '__PUBLIC__'; // no password
   return localStorage.getItem(`pw_${bid}_${role}`)||{
     admin:'admin123',
     receipts:'rec456',
@@ -1650,13 +1654,13 @@ function renderLoginBranches(){
     </div>`).join('');
 }
 function renderLoginRoles(){
-  const roles=['admin','receipts','expenses','attendance','cashier','public_reg'];
+  const roles=['admin','receipts','expenses','attendance','visitor_reg','public_reg'];
   const labels={
     admin:()=>t('roleAdmin'),
     receipts:()=>lang==='ar'?'🧾 إيصالات وأطفال':'🧾 Receipts & Children',
     expenses:()=>t('roleExpenses'),
     attendance:()=>t('roleAttendance'),
-    cashier:()=>lang==='ar'?'📸 كاشير إيصالات':'📸 Cashier',
+    visitor_reg:()=>lang==='ar'?'👶 تسجيل الزوار':'👶 Visitor Register',
     public_reg:()=>lang==='ar'?'➕ تسجيل (عام)':'➕ Registration (Public)',
   };
   el('rtabs').innerHTML=roles.map(r=>`<button class="rtab ${r===selRole?'on':''}" onclick="pickRole('${r}',this)">${labels[r]()}</button>`).join('');
@@ -1669,10 +1673,12 @@ function pickRole(r,btn){
   const pwRow=el('pwi');
   const pubNote=el('pub-reg-note');
   if(pwRow){
-    pwRow.style.display=r==='public_reg'?'none':'block';
+    pwRow.style.display=(r==='public_reg'||r==='visitor_reg')?'none':'block';
     el('loginbtn').textContent=r==='public_reg'
       ? (lang==='ar'?'➕ تسجيل طفل جديد':'➕ Register New Child')
-      : t('loginBtn');
+      : r==='visitor_reg'
+        ? (lang==='ar'?'👶 دخول الزوار':'👶 Enter Visitors')
+        : t('loginBtn');
   }
   if(pubNote){
     pubNote.style.display=r==='public_reg'?'block':'none';
@@ -1690,7 +1696,7 @@ function pickBranch(id){
 
 async function doLogin(){
   const pw=el('pwi').value;
-  const isPublic=selRole==='public_reg';
+  const isPublic=selRole==='public_reg'||selRole==='visitor_reg';
   if(!isPublic && pw!==getPW(selBid,selRole)){
     const e=el('lerr');e.textContent=t('wrongPass');e.style.display='block';el('pwi').value='';return;
   }
@@ -1707,12 +1713,13 @@ async function doLogin(){
     sbOK=false;el('cdot').style.background='#e02424';
     el('ctxt').textContent=t('serverError');
   }
-  // CASHIER special mode
-  if(selRole==='cashier'){
+  // VISITOR REGISTER mode — goes directly to visitors page
+  if(selRole==='visitor_reg'){
     await loadFromSupa(curBid);
     el('login').style.display='none';
-    el('cashier-app').style.display='flex';
-    initCashierMode();
+    el('app').style.display='block';
+    subscribeRealtime(curBid);
+    initApp();
     return;
   }
   await loadFromSupa(curBid);
@@ -1747,9 +1754,10 @@ function initApp(){
   el('abr').innerHTML='<option value="all">All Branches — كل الفروع</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
   renderNav();applyTranslations();
   // Go to role's natural home page
-  if(curRole==='attendance') showPage('attendance',null);
-  else if(curRole==='expenses') showPage('expenses',null);
-  else if(curRole==='receipts') showPage('receipts',null);
+  if(curRole==='attendance')   showPage('attendance',null);
+  else if(curRole==='expenses')    showPage('expenses',null);
+  else if(curRole==='receipts')    showPage('receipts',null);
+  else if(curRole==='visitor_reg') showPage('visitors',null);
   else showPage('dashboard',null);
   // Load staff, buses, licenses in background
   Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
@@ -3973,7 +3981,7 @@ function renderAdmin(){
     {k:'receipts',   icon:'🧾', label:'Receipts'},
     {k:'attendance', icon:'📋', label:'Attendance'},
     {k:'expenses',   icon:'💸', label:'Expenses'},
-    {k:'cashier',    icon:'💳', label:'Cashier'},
+    {k:'visitor_reg',icon:'👶', label:'Visitor Register'},
     {k:'public_reg', icon:'📝', label:'Public Reg'},
   ];
   el('pwlist').innerHTML=BRANCHES.map(b=>`
@@ -7100,6 +7108,9 @@ async function loadVisitors(){
 }
 
 function renderVisitors(){
+  // Show branch name
+  const _vbn=el('vis-branch-name');
+  if(_vbn){ const b=CB(); _vbn.textContent='📍 '+(b.ar||b.en||''); }
   if(!DB.visitors) DB.visitors=[];
   const q = (el('vis-search')?.value||'').toLowerCase().trim();
   let list = DB.visitors;
