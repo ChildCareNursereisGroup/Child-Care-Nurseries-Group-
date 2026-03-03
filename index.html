@@ -763,6 +763,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="imp-tab on" onclick="switchImpTab('children',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid #059669;background:#059669;color:#fff;cursor:pointer;font-weight:700;font-size:.79rem">👶 Children</button>
     <button class="imp-tab" onclick="switchImpTab('receipts',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-weight:700;font-size:.79rem">🧾 Receipts</button>
     <button class="imp-tab" onclick="switchImpTab('expenses',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-weight:700;font-size:.79rem">💸 Expenses</button>
+    <button class="imp-tab" onclick="switchImpTab('inactive',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid #fecaca;background:#fff;cursor:pointer;font-weight:700;font-size:.79rem;color:#c0392b">😴 Inactive Children</button>
   </div>
 
   <!-- Children Import -->
@@ -788,6 +789,33 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <input type="file" id="xlfile" accept=".xlsx,.xls,.csv" style="display:none" onchange="readExcel(this)">
     <div id="imp-preview" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Inactive Children Import -->
+  <div id="imp-tab-inactive" style="display:none">
+    <div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:10px;font-size:.8rem">
+      <div style="font-weight:800;color:#c0392b;margin-bottom:6px">😴 استيراد الأطفال المتوقفين — Inactive Children Import</div>
+      <div style="color:#555">الأعمدة المطلوبة: <b>Child Full Name, Class Name, Branch, Join Date, Leave Date, Leave Reason</b></div>
+      <div style="color:#888;margin-top:3px;font-size:.75rem">تأكد من استخدام Template المخصص لهذا الاستيراد</div>
+    </div>
+    <div class="fg" style="margin-bottom:10px">
+      <label>Select Branch for Import</label>
+      <select id="imp-inactive-branch"></select>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:9px">
+      <a id="dl-inactive-template" href="#" onclick="downloadInactiveTemplate()" style="background:#c0392b;color:#fff;border:none;border-radius:9px;padding:6px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem;text-decoration:none">📥 تحميل Template</a>
+    </div>
+    <div onclick="el('xl-inactive-file').click()"
+      style="border:2px dashed #fca5a5;border-radius:12px;padding:24px;text-align:center;cursor:pointer;background:#fff5f5;transition:all .2s"
+      ondragover="event.preventDefault();this.style.background='#fee2e2'"
+      ondragleave="this.style.background='#fff5f5'"
+      ondrop="handleInactiveDrop(event)">
+      <div style="font-size:2rem;margin-bottom:6px">😴</div>
+      <div style="font-weight:800;color:#c0392b">اسحب ملف Excel هنا أو اضغط للاختيار</div>
+      <div style="font-size:.76rem;color:var(--muted);margin-top:3px">xlsx / xls / csv</div>
+    </div>
+    <input type="file" id="xl-inactive-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importInactiveExcel(this.files[0])">
+    <div id="imp-inactive-preview" style="margin-top:10px"></div>
   </div>
 
   <!-- Receipts Import -->
@@ -7234,6 +7262,141 @@ function makeReceiptForVisitor(id){
 
 // Load visitors when needed
 const _origLoadSupa = loadFromSupa;
+
+// ─── Inactive Children Import ─────────────────
+function downloadInactiveTemplate(){
+  // Just redirect to the hosted template file
+  const link = document.createElement('a');
+  link.href = 'inactive_children_template.xlsx';
+  link.download = 'inactive_children_template.xlsx';
+  link.click();
+}
+
+function handleInactiveDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.background='#fff5f5';
+  const file = e.dataTransfer.files[0];
+  if(file) importInactiveExcel(file);
+}
+
+async function importInactiveExcel(file){
+  if(!file) return;
+  const prev = el('imp-inactive-preview');
+  prev.innerHTML = '<div style="color:#c0392b">⏳ جاري قراءة الملف...</div>';
+
+  const XLSX = await import('https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
+  const buf  = await file.arrayBuffer();
+  const wb2  = XLSX.read(buf, {type:'array', cellDates:true});
+  const sheet = wb2.Sheets[wb2.SheetNames[0]];
+  const rows  = XLSX.utils.sheet_to_json(sheet, {defval:''});
+
+  if(!rows.length){ prev.innerHTML='<div style="color:red">❌ الملف فارغ</div>'; return; }
+
+  const bid = el('imp-inactive-branch')?.value||curBid;
+
+  // Map column names (flexible)
+  const fld = (row, ...keys) => {
+    for(const k of keys){
+      const found = Object.keys(row).find(x=>x.toLowerCase().replace(/[^a-z]/g,'')=== k.toLowerCase().replace(/[^a-z]/g,''));
+      if(found && row[found]!==undefined && row[found]!=='') return String(row[found]).trim();
+    }
+    return '';
+  };
+
+  const parseDate = v => {
+    if(!v) return null;
+    if(v instanceof Date) return v.toISOString().split('T')[0];
+    const s = String(v).trim();
+    // DD/MM/YYYY
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    // YYYY-MM-DD
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  // Preview table
+  let html = `<div style="font-weight:800;color:#c0392b;margin-bottom:8px">📋 معاينة ${rows.length} صف — Preview</div>`;
+  html += `<div style="overflow-x:auto;max-height:250px;overflow-y:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.72rem">
+    <thead style="background:#c0392b;color:#fff;position:sticky;top:0">
+      <tr><th style="padding:5px">#</th><th>الاسم</th><th>الفصل</th><th>التسجيل</th><th>التوقف</th><th>السبب</th><th>الحالة</th></tr>
+    </thead><tbody>`;
+
+  const valid = [];
+  rows.forEach((row, i) => {
+    const name     = fld(row,'childfullname','childname','name','الاسم','kidsname');
+    const cls      = fld(row,'classname','class','الفصل');
+    const joinDate = parseDate(fld(row,'joindate','تاريخالتسجيل','joindate'));
+    const leaveDate= parseDate(fld(row,'leavedate','تاريخالتوقف','leavedate'));
+    const reason   = fld(row,'leavereason','reason','سببالتوقف','السبب');
+    const ok = name && leaveDate;
+    if(ok) valid.push({name,cls,joinDate,leaveDate,reason,row});
+    html += `<tr style="background:${i%2?'#fff5f5':'#fff'}">
+      <td style="padding:4px;text-align:center">${i+1}</td>
+      <td style="padding:4px;font-weight:700">${name||'<span style="color:red">❌ مطلوب</span>'}</td>
+      <td style="padding:4px">${cls||'—'}</td>
+      <td style="padding:4px">${joinDate||'—'}</td>
+      <td style="padding:4px;color:#c0392b">${leaveDate||'<span style="color:red">❌ مطلوب</span>'}</td>
+      <td style="padding:4px">${reason||'—'}</td>
+      <td style="padding:4px">${ok?'✅':'❌'}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  html += `<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <span style="font-size:.8rem;color:#555">✅ ${valid.length} صف صالح من ${rows.length}</span>
+    <button onclick="confirmInactiveImport()" style="background:#c0392b;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      💾 استيراد ${valid.length} طفل
+    </button>
+  </div>`;
+  prev.innerHTML = html;
+  prev._validRows = valid;
+  prev._bid = bid;
+}
+
+async function confirmInactiveImport(){
+  const prev = el('imp-inactive-preview');
+  const rows = prev._validRows;
+  const bid  = prev._bid || curBid;
+  if(!rows||!rows.length){ alert('لا توجد بيانات صالحة'); return; }
+
+  let ok=0, fail=0;
+  setSyncing(true);
+
+  for(const r of rows){
+    const fld=(row,...keys)=>{
+      for(const k of keys){
+        const found=Object.keys(row).find(x=>x.toLowerCase().replace(/[^a-z]/g,'')=== k.toLowerCase().replace(/[^a-z]/g,''));
+        if(found&&row[found]!==undefined&&row[found]!=='')return String(row[found]).trim();
+      }
+      return '';
+    };
+    const row = {
+      branch_id:  bid,
+      name:       r.name,
+      class_name: r.cls||'',
+      join_date:  r.joinDate||null,
+      leave_date: r.leaveDate,
+      notes:      r.reason||'',
+      fee:        parseFloat(fld(r.row,'monthlyfee','fee','الرسوم'))||0,
+      bus:        fld(r.row,'bus','باص').toLowerCase()==='yes'?'Yes':'No',
+      gender:     fld(r.row,'gender','الجنس')||'Female',
+      nationality:fld(r.row,'nationality','الجنسية')||'',
+      parent_mom: fld(r.row,'mothersphone','phonemom','رقمالأم')||'',
+      parent_dad: fld(r.row,'fathersphone','phonedad','رقمالأب')||'',
+    };
+    const {error} = await sb.from('children').insert(row);
+    if(error) fail++; else ok++;
+  }
+
+  setSyncing(false);
+  await loadFromSupa(bid);
+  prev.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:14px;text-align:center">
+    <div style="font-size:1.5rem;font-weight:900;color:#065f46">✅ ${ok} طفل تم استيراده</div>
+    ${fail?`<div style="color:#c0392b">❌ ${fail} فشل</div>`:''}
+  </div>`;
+}
 
 boot();
 </script>
