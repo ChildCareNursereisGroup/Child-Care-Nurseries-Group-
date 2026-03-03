@@ -41,7 +41,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--txt);min-
 .connrow{display:flex;align-items:center;gap:5px;justify-content:center;margin-top:9px;font-size:.74rem;color:var(--muted)}
 .cdot{width:7px;height:7px;border-radius:50%;background:#d97706;transition:background .3s}
 #app{display:none}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 14px;min-height:60px;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:5px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 14px;min-height:60px;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:5px;box-shadow:0 4px 18px rgba(0,0,0,.4);background:#1a1f3c!important}
 .hl{display:flex;align-items:center;gap:9px}
 .hlogo{height:42px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
 .htxt .ht{font-size:.94rem;font-weight:900;color:#fff}
@@ -52,7 +52,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .hstat .hl2{font-size:.6rem;color:rgba(255,255,255,.82)}
 .hbtn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:18px;padding:4px 10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.72rem;font-weight:700}
 .sind{font-size:.68rem;color:rgba(255,255,255,.85);padding:3px 8px;background:rgba(255,255,255,.15);border-radius:18px}
-nav{background:var(--nav-bg,#1e3a8a);border-bottom:none;display:flex;overflow-x:auto;padding:0 10px;gap:2px;position:sticky;top:60px;z-index:99;scrollbar-width:none;box-shadow:0 3px 10px rgba(0,0,0,.15)}
+nav{background:#1e2d5a!important;border-bottom:none;display:flex;overflow-x:auto;padding:0 10px;gap:2px;position:sticky;top:60px;z-index:99;scrollbar-width:none;box-shadow:0 3px 10px rgba(0,0,0,.25)}
 nav::-webkit-scrollbar{display:none}
 .ntab{padding:10px 14px;border:none;background:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:600;color:rgba(255,255,255,.75);border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s}
 .ntab:hover{color:#fff;background:rgba(255,255,255,.12);border-radius:8px 8px 0 0}
@@ -1818,12 +1818,9 @@ function doLogout(){
 function setBranchTheme(b){
   document.documentElement.style.setProperty('--bc',b.c);
   document.documentElement.style.setProperty('--bl',b.l);
-  // Deep dark version of branch color for header/nav
-  const darkHex=darkenColor(b.c,0.55);
-  document.documentElement.style.setProperty('--nav-bg',darkHex);
-  el('hdr').style.background=`linear-gradient(135deg,${darkHex},${darkenColor(b.c,0.4)})`;
-  const nav=el('nav');
-  if(nav) nav.style.background=`linear-gradient(135deg,${darkenColor(b.c,0.45)},${darkenColor(b.c,0.35)})`;
+  // Header & nav stay dark navy always — branch color only used as accent
+  el('hdr').style.cssText='background:#1a1f3c!important';
+  const nav=el('nav'); if(nav) nav.style.cssText='background:#1e2d5a!important';
 }
 function darkenColor(hex,factor){
   // factor 0=original, 1=black
@@ -2712,10 +2709,14 @@ function prevRec(id){
           let rows='';
           // Monthly fees
           const feeMonthName=(()=>{
-            const src=r.fromDate||r.date;
+            // fromDate has the actual payment period month — use it preferentially
+            const src=r.fromDate||r.toDate||r.date;
             if(!src)return '—';
-            const d=new Date(src);
-            return d.toLocaleString('en',{month:'long',year:'numeric'});
+            try{
+              const d=new Date(src);
+              if(isNaN(d.getTime())) return src;
+              return d.toLocaleString('en',{month:'long',year:'numeric'});
+            }catch(e){return String(src);}
           })();
           rows+=`<tr>
             ${tdL(`The Fees of the Month: (<b>${feeMonthName}</b>)<br>
@@ -5563,7 +5564,7 @@ function initCashierMode(){
   const nameEl = el('cashier-branch-name');
   if(nameEl) nameEl.textContent = b.icon+' '+tBN(b);
   const hdr = el('cashier-hdr');
-  if(hdr) hdr.style.background = b.c;
+  if(hdr) hdr.style.background = '#1a1f3c';
   
   // Set logo
   const logos = document.querySelectorAll('#cashier-logo, #ll, #hl');
