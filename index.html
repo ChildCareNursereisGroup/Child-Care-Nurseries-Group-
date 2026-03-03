@@ -1369,9 +1369,11 @@ async function loadFromSupa(bid) {
       receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
       fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
       reg:Number(x.reg||0), tools:Number(x.tools||0),
+      hourFee:Number(x.hour_fee||0), hourIn:x.hour_in||'', hourOut:x.hour_out||'',
+      overtimeFee:Number(x.overtime_fee||0), overtimeDur:x.overtime_dur||'',
       vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
       payMethod:x.pay_method||'cash',
-      total:Number(x.total||0), notes:x.notes||''
+      total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||''
     }));
     DB.attendance={};
     (a.data||[]).forEach(x=>{
@@ -1918,7 +1920,7 @@ function renderPV(){
   if(!active.length){el('pvcont').innerHTML=`<div class="empty"><div class="ei">👶</div><p>لا يوجد أطفال</p></div>`;return;}
   let ok=0,miss=0,part=0;
   const rows=active.map(c=>{
-    const paid=DB.receipts.filter(r=>r.childId===c.id&&monthOf(r.date)===month).reduce((s,r)=>s+r.total,0);
+    const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
     const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);const diff=exp-paid;
     let cls,txt;
     if(paid===0){cls='pmiss';txt=t('notPaid');miss++;}
@@ -2659,7 +2661,7 @@ function prevRec(id){
           </tr>`;
           // Hourly session row
           if(r.hourFee){ rows+=`<tr style="background:#f0fdf4">
-            ${tdL('Hourly Session: ('+r.hourIn+' - '+r.hourOut+')')}
+            ${tdL('🕐 Hourly Session <span style="font-size:.7rem;color:#555">'+(r.hourIn&&r.hourOut?' From: <b>'+r.hourIn+'</b> To: <b>'+r.hourOut+'</b>':'')+'</span>')}
             ${td(r.hourFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.hourFee)} ${td('')}
           </tr>`; }
           // Overtime row
@@ -2841,12 +2843,12 @@ function renderAtt(){
                   ${(()=>{
                     const attDate=el('attdate').value||today();
                     const month=monthOf(attDate);
-                    const paid=DB.receipts.filter(r=>r.childId===c.id&&monthOf(r.date)===month).reduce((s,r)=>s+r.total,0);
+                    const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
                     const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
                     if(!exp) return '';
                     if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">✅ Paid</span>';
-                    if(paid>0) return '<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">⚡ Partial</span>';
-                    return '<span style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">❌ Unpaid</span>';
+                    if(paid>0) return '<span style="background:#d97706;color:#fff;border-radius:6px;padding:2px 8px;font-size:.65rem;font-weight:800">⚡ Partial</span>';
+                    return '<span style="background:#dc2626;color:#fff;border-radius:6px;padding:2px 8px;font-size:.65rem;font-weight:800">❌ Unpaid</span>';
                   })()}
                 </div>
                 <div style="font-size:.68rem;color:var(--muted)">${phone||''}</div>
@@ -4025,7 +4027,7 @@ function getUnpaidThisMonth(){
   const month=monthOf(new Date());
   const active=DB.children.filter(c=>!c.leaveDate&&c.fee>0);
   return active.filter(c=>{
-    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&monthOf(r.date)===month).reduce((s,r)=>s+r.total,0);
+    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
     return paid<c.fee;
   });
 }
@@ -7994,7 +7996,7 @@ Child Care Nurseries Group`;
 function renderFeeReminderPanel(){
   const mon=monthOf(new Date());
   const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  const paidIds=new Set(DB.receipts.filter(r=>(r.date||'').startsWith(mon)).map(r=>String(r.childId)));
+  const paidIds=new Set(DB.receipts.filter(r=>recCoversMonth(r,mon)).map(r=>String(r.childId)));
   const unpaid=DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0);
 
   let html=`<div style="background:#fff1f2;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -8023,6 +8025,14 @@ function renderFeeReminderPanel(){
 
 // Keep old openFeeReminderModal pointing to new system
 function openFeeReminderModal(){ openAttExtras('fee'); }
+
+// ─── Check if receipt covers a specific month ─────
+// Uses fromDate first, falls back to date
+function recCoversMonth(r, month){
+  if(r.fromDate) return monthOf(r.fromDate)===month;
+  if(r.toDate)   return monthOf(r.toDate)===month;
+  return monthOf(r.date)===month;
+}
 
 boot();
 </script>
