@@ -540,7 +540,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <span style="font-size:.8rem;color:#1e3a8a">VAT (5% on Uniforms+Stationary): <b id="edit-vat-show">0</b> AED</span>
         <span style="font-weight:900;color:#1e3a8a;font-size:1rem">Total: <b id="edit-total-show">0</b> AED</span>
       </div>
+      <div class="g3" style="gap:8px;grid-template-columns:1fr 1fr">
+        <div class="fg"><label>Fees From Date</label><input type="date" id="edit-rfrom" style="font-family:'Tajawal',sans-serif"></div>
+        <div class="fg"><label>Fees To Date</label><input type="date" id="edit-rto" style="font-family:'Tajawal',sans-serif"></div>
+      </div>
       <div class="fg"><label>Notes</label><textarea id="edit-rnotes" rows="2" style="font-family:'Tajawal',sans-serif"></textarea></div>
+      <div id="edit-zero-warn" style="display:none;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#92400e;font-weight:700">⚠️ Total is 0 — please enter the fee amounts above before saving</div>
       <div id="edit-rec-alert"></div>
       <button onclick="saveEditRec()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">
         💾 حفظ التعديلات — Save Changes
@@ -7001,8 +7006,12 @@ function openEditRec(id){
   el('edit-rfri').value     = r.friFee||0;
   el('edit-rsat').value     = r.satFee||0;
   el('edit-rsun').value     = r.sunFee||0;
+  el('edit-rfrom').value    = r.fromDate||'';
+  el('edit-rto').value      = r.toDate||'';
   el('edit-rnotes').value   = r.notes||'';
   el('edit-rec-alert').innerHTML = '';
+  // Show existing total — don't recalculate if fields might be missing
+  if(el('edit-total-show')) el('edit-total-show').textContent = (r.total||0).toFixed(2);
   calcEditTotal();
   el('edit-rec-modal').classList.add('on');
 }
@@ -7016,6 +7025,9 @@ function calcEditTotal(){
   const tot = Math.round((fee+reg+bus+clo+sup+fri+sat+sun+vat)*100)/100;
   if(el('edit-vat-show'))  el('edit-vat-show').textContent  = vat.toFixed(2);
   if(el('edit-total-show')) el('edit-total-show').textContent = tot.toFixed(2);
+  // Warn if total dropped to 0 unexpectedly
+  const warn = el('edit-zero-warn');
+  if(warn) warn.style.display = (tot===0 && (fee+reg+bus+clo+sup+fri+sat+sun)===0) ? 'block' : 'none';
 }
 
 async function saveEditRec(){
@@ -7039,6 +7051,8 @@ async function saveEditRec(){
   const {error} = await sb.from('receipts').update({
     receipt_num: el('edit-rnum').value.trim(),
     date:        el('edit-rdate').value,
+    from_date:   el('edit-rfrom')?.value||null,
+    to_date:     el('edit-rto')?.value||null,
     pay_method:  el('edit-rpay').value,
     fee, reg, bus, clothes:clo, tools:sup,
     fri_fee:fri, sat_fee:sat, sun_fee:sun,
