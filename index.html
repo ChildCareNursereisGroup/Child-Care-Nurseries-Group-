@@ -8034,7 +8034,12 @@ function renderBirthdayPanel(){
     html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:${isToday?'linear-gradient(135deg,#fdf2f8,#fce7f3)':'#f9f9f9'};border:${isToday?'2px solid #f9a8d4':'1.5px solid var(--border)'}">
       <div style="min-width:36px;height:36px;border-radius:50%;background:${isToday?'#be185d':'#e5e7eb'};color:${isToday?'#fff':'#374151'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem">${day}</div>
       <div style="flex:1">
-        <div style="font-weight:800;font-size:.88rem">${e.icon} ${e.name} ${isToday?'🎂':''} ${e.inactive?'<span style="color:#9ca3af;font-size:.7rem">(inactive)</span>':''}</div>
+        <div style="font-weight:800;font-size:.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${e.icon} ${e.name}
+          <span style="background:${isToday?'#fbbf24':'#e5e7eb'};color:${isToday?'#78350f':'#6b7280'};font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:8px;white-space:nowrap">🎂 ${e.dob}</span>
+          ${isToday?'<span style="background:#fbbf24;color:#78350f;font-size:.7rem;font-weight:900;padding:2px 8px;border-radius:8px;animation:pulse 1s infinite">🎉 Today!</span>':''}
+          ${e.inactive?'<span style="color:#9ca3af;font-size:.7rem">(inactive)</span>':''}
+        </div>
         <div style="font-size:.72rem;color:#6b7280">${e.type} • Age ${age} • ${e.phone||'No phone'}</div>
       </div>
       ${e.phone&&isToday?`<button onclick="sendBirthdayWA('${e.id}','${e.type}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:.75rem;font-weight:800;white-space:nowrap">🎂 Send WA</button>`:''}
