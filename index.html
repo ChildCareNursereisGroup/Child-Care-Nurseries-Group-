@@ -1370,6 +1370,7 @@ async function loadFromSupa(bid) {
       receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
       fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
       reg:Number(x.reg||0), tools:Number(x.tools||0),
+      friFee:Number(x.fri_fee||0), satFee:Number(x.sat_fee||0), sunFee:Number(x.sun_fee||0),
       hourFee:Number(x.hour_fee||0), hourIn:x.hour_in||'', hourOut:x.hour_out||'',
       overtimeFee:Number(x.overtime_fee||0), overtimeDur:x.overtime_dur||'',
       vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
@@ -2632,7 +2633,7 @@ function prevRec(id){
   const b=BRANCHES.find(x=>x.id===r.branchId)||CB();
   const bx=getBranchExtra(b.id);
   const vatPct=r.vatType==='5'?'5%':r.vatType==='zero'?'0%':'Exempted';
-  const subTotal=(r.fee||0)+(r.reg||0)+(r.bus||0)+(r.clothes||0)+(r.tools||0);
+  const subTotal=(r.fee||0)+(r.reg||0)+(r.bus||0)+(r.clothes||0)+(r.tools||0)+(r.friFee||0)+(r.satFee||0)+(r.sunFee||0)+(r.hourFee||0)+(r.overtimeFee||0);
   const payLabel={'cash':'Cash 💵','bank':'Bank Transfer 🏦','card':'Card Machine 💳'}[r.payMethod]||'Cash';
   const logoHtml=bx.logo?`<img src="${bx.logo}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid ${b.c}">`:
     `<div style="background:${b.c};color:#fff;border-radius:50%;width:54px;height:54px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">${b.icon}</div>`;
@@ -2728,17 +2729,30 @@ function prevRec(id){
             ${tdL(`${r.reg?'☑':'☐'} Registration Fees &nbsp;&nbsp; ☐ Re-Registration Fees`)}
             ${td(r.reg||'')} ${td('')} ${td('0 %')} ${td('')} ${td(r.reg||'')} ${td('')}
           </tr>`;
+          // Weekend fees rows
+          if(r.friFee){ rows+=`<tr style="background:#fffbeb">
+            ${tdL('🟡 Friday Weekend Fee')}
+            ${td(r.friFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.friFee)} ${td('')}
+          </tr>`; }
+          if(r.satFee){ rows+=`<tr style="background:#f5f3ff">
+            ${tdL('🟣 Saturday Weekend Fee')}
+            ${td(r.satFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.satFee)} ${td('')}
+          </tr>`; }
+          if(r.sunFee){ rows+=`<tr style="background:#ecfeff">
+            ${tdL('🔵 Sunday Weekend Fee')}
+            ${td(r.sunFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.sunFee)} ${td('')}
+          </tr>`; }
           // Hourly session row
           if(r.hourFee){ rows+=`<tr style="background:#f0fdf4">
             ${tdL('🕐 Hourly Session'+
               (r.hourIn&&r.hourOut
                 ? ' &nbsp;<span style="font-size:.72rem;color:#059669;font-weight:800">From: '+r.hourIn+' &rarr; To: '+r.hourOut+'</span>'
-                : ''))}
+                : ' (see times below)'))}
             ${td(r.hourFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.hourFee)} ${td('')}
           </tr>`; }
           // Overtime row
           if(r.overtimeFee){ rows+=`<tr style="background:#fffbeb">
-            ${tdL('Overtime: ('+r.overtimeDur+')')}
+            ${tdL('⏰ Overtime'+(r.overtimeDur?' ('+r.overtimeDur+')':''))}
             ${td(r.overtimeFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.overtimeFee)} ${td('')}
           </tr>`; }
           // Notes row removed from table — shown below receipt instead
