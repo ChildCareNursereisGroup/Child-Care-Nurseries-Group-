@@ -1818,11 +1818,21 @@ function doLogout(){
 function setBranchTheme(b){
   document.documentElement.style.setProperty('--bc',b.c);
   document.documentElement.style.setProperty('--bl',b.l);
-  document.documentElement.style.setProperty('--nav-bg',b.c);
-  el('hdr').style.background=`linear-gradient(135deg,${b.c}ee,${b.c})`;
-  // Make nav slightly darker than header
+  // Deep dark version of branch color for header/nav
+  const darkHex=darkenColor(b.c,0.55);
+  document.documentElement.style.setProperty('--nav-bg',darkHex);
+  el('hdr').style.background=`linear-gradient(135deg,${darkHex},${darkenColor(b.c,0.4)})`;
   const nav=el('nav');
-  if(nav) nav.style.background=`linear-gradient(135deg,${b.c}dd,${b.c}bb)`;
+  if(nav) nav.style.background=`linear-gradient(135deg,${darkenColor(b.c,0.45)},${darkenColor(b.c,0.35)})`;
+}
+function darkenColor(hex,factor){
+  // factor 0=original, 1=black
+  let h=hex.replace('#','');
+  if(h.length===3) h=h.split('').map(x=>x+x).join('');
+  const r=Math.round(parseInt(h.slice(0,2),16)*(1-factor));
+  const g=Math.round(parseInt(h.slice(2,4),16)*(1-factor));
+  const b2=Math.round(parseInt(h.slice(4,6),16)*(1-factor));
+  return '#'+[r,g,b2].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 function initApp(){
   const b=CB();setBranchTheme(b);el('hbr').textContent=b.icon+' '+tBN(b);applyTranslations();
@@ -1978,7 +1988,7 @@ function renderChildren(){
   if(srchQ)list=list.filter(c=>c.name.includes(srchQ)||(c.className||'').includes(srchQ));
   if(chFilter==='active')list=list.filter(c=>!c.leaveDate);
   if(chFilter==='inactive')list=list.filter(c=>!!c.leaveDate);
-  if(chFilter==='bus')list=list.filter(c=>c.bus==='نعم');
+  if(chFilter==='bus')list=list.filter(c=>c.bus==='نعم'||c.bus==='Yes');
   if(!list.length){el('chlist').innerHTML=`<div class="empty"><div class="ei">👀</div><p>لا توجد نتائج</p></div>`;return;}
   const paid_map={};DB.receipts.forEach(r=>{paid_map[r.childId]=(paid_map[r.childId]||0)+r.total;});
   el('chlist').innerHTML=list.map(c=>`
@@ -2011,6 +2021,53 @@ function renderChildren(){
         })()}
       </div>
     </div>`).join('');
+
+  // If bus filter — add bus summary table ABOVE the cards
+  if(chFilter==='bus'){
+    const busList=list.filter(c=>c.bus==='Yes'||c.bus==='نعم');
+    if(busList.length){
+      const tbl=`<div style="margin-bottom:14px">
+        <div style="font-weight:900;font-size:.92rem;color:#1e3a8a;margin-bottom:8px;display:flex;align-items:center;gap:7px">
+          🚌 Bus Children — أطفال الباص
+          <span style="background:#1e3a8a;color:#fff;border-radius:18px;padding:2px 10px;font-size:.75rem">${busList.length}</span>
+        </div>
+        <div style="overflow-x:auto;border-radius:12px;border:1.5px solid #dbeafe">
+          <table style="width:100%;border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.82rem">
+            <thead>
+              <tr style="background:#1e3a8a;color:#fff">
+                <th style="padding:8px 10px;text-align:left;font-weight:800">#</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:800">Child Name — اسم الطفل</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:800">Class — الفصل</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:800">Bus Days — أيام الباص</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:800">Bus Fee — رسوم الباص</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:800">Phone — الهاتف</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${busList.map((ch,i)=>{
+                const days=(ch.dutyDays||'').split(',').map(d=>d.trim()).filter(Boolean);
+                const dayBadges=days.length
+                  ? days.map(d=>`<span style="display:inline-block;background:#dbeafe;color:#1e3a8a;border-radius:5px;padding:1px 6px;font-size:.7rem;font-weight:700;margin:1px">${d}</span>`).join('')
+                  : '<span style="color:#9ca3af;font-size:.72rem">All Days</span>';
+                return `<tr style="background:${i%2===0?'#f0f7ff':'#fff'};border-bottom:1px solid #e5e7eb">
+                  <td style="padding:7px 10px;color:#6b7280;font-weight:700">${i+1}</td>
+                  <td style="padding:7px 10px">
+                    <div style="font-weight:800">${ch.name}</div>
+                    <div style="font-size:.68rem;color:#6b7280">#${ch.regNum||'-'}</div>
+                  </td>
+                  <td style="padding:7px 10px;font-weight:700">${ch.className||'—'}</td>
+                  <td style="padding:7px 10px">${dayBadges}</td>
+                  <td style="padding:7px 10px;font-weight:800;color:#059669">${ch.busFee?fmtNum(ch.busFee)+' AED':'—'}</td>
+                  <td style="padding:7px 10px;color:#374151">${ch.parentMom||ch.parentDad||'—'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+      el('chlist').innerHTML = tbl + el('chlist').innerHTML;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════
