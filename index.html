@@ -617,8 +617,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
-      <button id="fee-remind-btn" class="btn bsm" style="background:#be185d;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openAttExtras('bday')">🎂 Birthdays</button>
-      <button id="fee-remind-btn2" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openAttExtras('fee')">💸 Fee Reminders</button>
+      <button id="fee-remind-btn" class="btn bsm" style="background:#be185d;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('bday')">
+        🎂 Birthdays <span id="bday-btn-badge" style="display:none;background:#fff;color:#be185d;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
+      </button>
+      <button id="fee-remind-btn2" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('fee')">
+        💸 Fee Reminders <span id="fee-btn-badge" style="display:none;background:#fff;color:#e11d48;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
+      </button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
@@ -2069,7 +2073,7 @@ function renderChildren(){
           </table>
         </div>
       </div>`;
-      el('chlist').innerHTML = tbl + el('chlist').innerHTML;
+      el('chlist').innerHTML = tbl;  // table only — no cards
     }
   }
 }
@@ -2859,8 +2863,12 @@ async function delRec(id){
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
 function renderAtt(){
-  const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display=curRole==='admin'?'inline-flex':'none';
-  const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display=curRole==='admin'?'inline-flex':'none';
+  const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display='inline-flex';
+  const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display='inline-flex';
+  // Update birthday count badge for today's month
+  _updateBdayBtnBadge();
+  // Update unpaid count badge
+  _updateFeeBtnBadge();
   const date=el('attdate').value||today();
 
   // Get day name from date to filter children booked for this day
@@ -7749,7 +7757,7 @@ function printBusReport(){
 // ─── Show fee reminder btn for admin ──────────
 function initApp(){
   const fbtn = el('fee-remind-btn');
-  if(fbtn) fbtn.style.display = curRole==='admin' ? 'inline-flex' : 'none';
+  if(fbtn) fbtn.style.display = 'inline-flex';
 }
 
 // ─── Fee Reminder Modal ───────────────────────
