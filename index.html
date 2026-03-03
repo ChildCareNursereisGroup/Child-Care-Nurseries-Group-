@@ -654,11 +654,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="attlist"></div>
   <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
 </div>
-</div>
-
 <!-- BIRTHDAY & FEE SECTION — inside attendance page -->
 <div class="card" id="att-extras-card" style="display:none">
-  <!-- Tabs -->
   <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1.5px solid var(--border);padding-bottom:8px">
     <button id="bdaytab-btn" onclick="switchAttExtra('bday')" 
       style="padding:7px 16px;border-radius:18px;border:none;background:#fdf2f8;color:#be185d;cursor:pointer;font-weight:800;font-size:.82rem;font-family:'Tajawal',sans-serif">
@@ -669,7 +666,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
       💸 Fee Reminders
     </button>
   </div>
-  <!-- Birthday Panel -->
   <div id="att-bday-panel">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <input type="month" id="bday-month-picker" 
@@ -679,10 +675,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div id="bday-list"></div>
   </div>
-  <!-- Fee Panel -->
   <div id="att-fee-panel" style="display:none">
     <div id="fee-reminder-list"></div>
   </div>
+</div>
 </div>
 
 <div class="page" id="pg-expenses">
