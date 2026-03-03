@@ -606,6 +606,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
+      <button id="fee-remind-btn" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openFeeReminderModal()">💸 Fee Reminders</button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
@@ -764,6 +765,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="imp-tab" onclick="switchImpTab('receipts',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-weight:700;font-size:.79rem">🧾 Receipts</button>
     <button class="imp-tab" onclick="switchImpTab('expenses',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-weight:700;font-size:.79rem">💸 Expenses</button>
     <button class="imp-tab" onclick="switchImpTab('inactive',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid #fecaca;background:#fff;cursor:pointer;font-weight:700;font-size:.79rem;color:#c0392b">😴 Inactive Children</button>
+    <button class="imp-tab" onclick="switchImpTab('export',this)" style="padding:7px 14px;border-radius:18px;border:1.5px solid #bae6fd;background:#fff;cursor:pointer;font-weight:700;font-size:.79rem;color:#0369a1">📤 Export Data</button>
   </div>
 
   <!-- Children Import -->
@@ -792,6 +794,19 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
 
   <!-- Inactive Children Import -->
+  <div id="imp-tab-export" style="display:none">
+    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-weight:900;color:#0369a1;font-size:.95rem;margin-bottom:6px">Export All Data</div>
+      <div style="font-size:.8rem;color:#555;margin-bottom:12px">Export current branch data as Excel file</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="exportAllToExcel('children')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export Children</button>
+        <button onclick="exportAllToExcel('receipts')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export Receipts</button>
+        <button onclick="exportAllToExcel('expenses')" style="background:#d97706;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export Expenses</button>
+        <button onclick="exportAllToExcel('all')" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export ALL</button>
+      </div>
+    </div>
+  </div>
+
   <div id="imp-tab-inactive" style="display:none">
     <div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:10px;font-size:.8rem">
       <div style="font-weight:800;color:#c0392b;margin-bottom:6px">😴 استيراد الأطفال المتوقفين — Inactive Children Import</div>
@@ -1096,9 +1111,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="pprev"></div>
   <div style="display:flex;gap:7px;margin-top:10px" class="np">
     <button class="btn bp" onclick="doPrint()">🖨️ طباعة</button>
-    <button class="btn" style="background:#25d366;color:#fff;border:none;padding:7px 14px;border-radius:9px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif" onclick="sendReceiptWhatsApp()">💬 WhatsApp</button>
+    <button class="btn" style="background:#25d366;color:#fff;border:none;padding:7px 14px;border-radius:9px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif" onclick="sendReceiptWhatsApp()">💬 WA Text</button>
+    <button class="btn" style="background:#128C7E;color:#fff;border:none;padding:7px 14px;border-radius:9px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif" onclick="shareReceiptImageWA()">🖼 WA Image</button>
     <button class="btn" style="background:#0ea5e9;color:#fff;border:none;padding:7px 14px;border-radius:9px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif" onclick="sendReceiptEmail()">📧 Email</button>
-    <button class="btn bg" onclick="el('pmodal').classList.remove('on')">إغلاق</button>
+    <button class="btn bg" onclick="el('pmodal').classList.remove('on')">اغلاق</button>
   </div>
 </div>
 </div>
@@ -2611,10 +2627,20 @@ function prevRec(id){
             ${tdL(`${r.reg?'☑':'☐'} Registration Fees &nbsp;&nbsp; ☐ Re-Registration Fees`)}
             ${td(r.reg||'')} ${td('')} ${td('0 %')} ${td('')} ${td(r.reg||'')} ${td('')}
           </tr>`;
-          // Others / notes
+          // Hourly session row
+          if(r.hourFee){ rows+=`<tr style="background:#f0fdf4">
+            ${tdL('Hourly Session: ('+r.hourIn+' - '+r.hourOut+')')}
+            ${td(r.hourFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.hourFee)} ${td('')}
+          </tr>`; }
+          // Overtime row
+          if(r.overtimeFee){ rows+=`<tr style="background:#fffbeb">
+            ${tdL('Overtime: ('+r.overtimeDur+')')}
+            ${td(r.overtimeFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.overtimeFee)} ${td('')}
+          </tr>`; }
+          // Notes row
           rows+=`<tr>
-            ${tdL(`Others: (${r.notes||'Extra Weekend, Hours ............'})`)}
-            ${td('')} ${td('')} ${td('0 %')} ${td('')} ${td('')} ${td('')}
+            ${tdL('Notes: <i style="color:#555">'+(r.notes||'')+'</i>')}
+            ${td('')} ${td('')} ${td('')} ${td('')} ${td('')} ${td('')}
           </tr>`;
           // Transport
           rows+=`<tr>
@@ -2645,10 +2671,16 @@ function prevRec(id){
       <div style="padding:9px 14px;border-right:1px solid #ddd;font-size:.78rem">
         <div style="font-weight:800;margin-bottom:5px">Total / المجموع</div>
         <div style="border:1px solid #ccc;border-radius:5px;padding:5px 8px;min-height:32px;font-size:.85rem">${r.total?numToWords(r.total)+' Dirhams Only':'……………………'}</div>
-        <div style="margin-top:9px;display:flex;gap:10px;font-size:.77rem">
-          <label><input type="checkbox" ${r.payMethod==='cash'?'checked':''} disabled> Cash</label>
-          <label><input type="checkbox" ${r.payMethod==='card'?'checked':''} disabled> Card Machine</label>
-          <label><input type="checkbox" ${r.payMethod==='bank'?'checked':''} disabled> Bank Transfer</label>
+        <div style="margin-top:9px;display:flex;gap:5px;flex-wrap:wrap">
+          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='cash'?'#059669':'#e5e7eb'};background:${r.payMethod==='cash'?'#d1fae5':'#f9f9f9'};color:${r.payMethod==='cash'?'#065f46':'#9ca3af'}">
+            ${r.payMethod==='cash'?'✅ ':''} Cash
+          </div>
+          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='card'?'#7c3aed':'#e5e7eb'};background:${r.payMethod==='card'?'#ede9fe':'#f9f9f9'};color:${r.payMethod==='card'?'#5b21b6':'#9ca3af'}">
+            ${r.payMethod==='card'?'✅ ':''} Card Machine
+          </div>
+          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='bank'?'#1e3a8a':'#e5e7eb'};background:${r.payMethod==='bank'?'#dbeafe':'#f9f9f9'};color:${r.payMethod==='bank'?'#1e3a8a':'#9ca3af'}">
+            ${r.payMethod==='bank'?'✅ ':''} Bank Transfer
+          </div>
         </div>
         <div style="font-size:.72rem;margin-top:4px;color:#555">Ref: ________________________</div>
         <div style="font-size:.7rem;color:#888;margin-top:6px">Notice: All fees is not Refundable</div>
@@ -2703,6 +2735,7 @@ async function delRec(id){
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
 function renderAtt(){
+  const fbtn=el('fee-remind-btn'); if(fbtn) fbtn.style.display=curRole==='admin'?'inline-flex':'none';
   const date=el('attdate').value||today();
 
   // Get day name from date to filter children booked for this day
@@ -3389,6 +3422,12 @@ function showDTab(tab,btn){
         <div class="fg"><label>Kids Name</label><input value="${c.name}" onchange="updateField('name',this.value)"></div>
         <div class="fg"><label data-t="classNameLabel">Class Name</label><input value="${c.className||''}" onchange="updateField('className',this.value)"></div>
         <div class="fg"><label data-t="idNumber">ID Number</label><input value="${c.idNumber||''}" onchange="updateField('idNumber',this.value)"></div>
+        <div class="fg"><label>Gender</label>
+          <select onchange="updateField('gender',this.value)">
+            <option value="Female" ${c.gender==='Female'||!c.gender?'selected':''}>Female</option>
+            <option value="Male" ${c.gender==='Male'?'selected':''}>Male</option>
+          </select>
+        </div>
         <div class="fg"><label data-t="regNo">Registration No <span style="font-size:.65rem;color:#6b7280">(auto)</span></label><input value="${c.regNum||''}" readonly style="background:#f0f4ff;font-weight:800;color:#1e3a8a;cursor:not-allowed"></div>
         <div class="fg"><label data-t="nationality">Nationality</label><input value="${c.nationality||''}" onchange="updateField('nationality',this.value)"></div>
         <div class="fg"><label data-t="religion">Religion</label>
@@ -3474,7 +3513,7 @@ function showDTab(tab,btn){
         </div>`;
       })()}
       <div class="fg" style="margin-bottom:9px"><label>Notes</label><textarea rows="2" onchange="updateField('notes',this.value)">${c.notes||''}</textarea></div>
-      <button class="btn bd bsm" onclick="deleteChild()">🗑 Delete Child</button>`;
+      ${curRole==='admin'?'<button class="btn bd bsm" onclick="deleteChild()">🗑 Delete Child</button>':''}`; 
   }
   if(tab==='recs'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
@@ -5097,7 +5136,7 @@ async function importBusesFromExcel(file){
 //  IMPORT TAB SWITCHER
 // ═══════════════════════════════════════════════
 function switchImpTab(tab, btn){
-  ['children','receipts','expenses','inactive'].forEach(t=>{
+  ['children','receipts','expenses','inactive','export'].forEach(t=>{
     const el2=document.getElementById('imp-tab-'+t);
     if(el2) el2.style.display=t===tab?'block':'none';
   });
@@ -7564,6 +7603,272 @@ function printBusReport(){
   w.document.write(html);
   w.document.close();
   setTimeout(()=>w.print(), 600);
+}
+
+// ─── Show fee reminder btn for admin ──────────
+function initApp(){
+  const fbtn = el('fee-remind-btn');
+  if(fbtn) fbtn.style.display = curRole==='admin' ? 'inline-flex' : 'none';
+}
+
+// ─── Fee Reminder Modal ───────────────────────
+function openFeeReminderModal(){
+  const mon = monthOf(new Date());
+  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  // Find children who have NO receipt this month
+  const paidIds = new Set(
+    DB.receipts
+      .filter(r=>(r.date||'').startsWith(mon))
+      .map(r=>String(r.childId))
+  );
+  const unpaid = DB.children.filter(c=>
+    !c.leaveDate &&
+    !paidIds.has(String(c.id)) &&
+    (c.fee||0) > 0
+  );
+
+  let html = `<div style="background:#fff1f2;border-radius:12px;padding:14px;margin-bottom:12px">
+    <div style="font-weight:900;color:#e11d48;font-size:1rem">💸 Fee Reminder — ${monLabel}</div>
+    <div style="font-size:.82rem;color:#555;margin-top:4px">${unpaid.length} children have not paid this month</div>
+  </div>
+  <div style="max-height:320px;overflow-y:auto;margin-bottom:12px">`;
+
+  unpaid.forEach((c,i)=>{
+    const phone = c.parentMom||c.parentDad||'';
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:${i%2?'#fff':'#fff1f2'};border-radius:8px;margin-bottom:4px;gap:8px">
+      <div>
+        <div style="font-weight:700;font-size:.85rem">${c.name}</div>
+        <div style="font-size:.72rem;color:#6b7280">${c.className||'—'} | ${fmtNum(c.fee||0)} AED | ${phone||'No phone'}</div>
+      </div>
+      ${phone?`<button onclick="sendFeeReminderWA('${c.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap">💬 Send</button>`:''}
+    </div>`;
+  });
+
+  if(!unpaid.length) html += `<div style="text-align:center;padding:20px;color:#059669;font-weight:800">All children have paid this month!</div>`;
+  html += `</div>
+  <button onclick="sendAllFeeReminders()" style="width:100%;background:#e11d48;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">
+    💬 Send Reminder to ALL (${unpaid.length})
+  </button>`;
+
+  // Show in a simple modal using showInfo
+  showModal('💸 Fee Reminders', html);
+}
+
+function sendFeeReminderWA(childId){
+  const c = DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return;
+  const phone = c.parentMom||c.parentDad||'';
+  if(!phone){ alert('No phone number'); return; }
+  let num = phone.replace(/[^0-9]/g,'');
+  if(num.startsWith('0')) num='971'+num.substring(1);
+  else if(!num.startsWith('971')) num='971'+num;
+  const b = CB();
+  const mon = new Date().toLocaleString('en',{month:'long',year:'numeric'});
+  const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\nAmount Due: *${fmtNum(c.fee||0)} AED*\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function sendAllFeeReminders(){
+  const mon = monthOf(new Date());
+  const paidIds = new Set(DB.receipts.filter(r=>(r.date||'').startsWith(mon)).map(r=>String(r.childId)));
+  const unpaid = DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0&&(c.parentMom||c.parentDad));
+  if(!unpaid.length){ alert('All paid!'); return; }
+  unpaid.forEach((c,i)=>{
+    setTimeout(()=>sendFeeReminderWA(c.id), i*800);
+  });
+}
+
+function showModal(title, bodyHtml){
+  let m = el('generic-modal');
+  if(!m){
+    m = document.createElement('div');
+    m.className = 'mover';
+    m.id = 'generic-modal';
+    m.innerHTML = `<div class="mbox" style="max-width:520px">
+      <div class="mh"><div class="mt" id="generic-modal-title"></div><button class="xb" onclick="el('generic-modal').classList.remove('on')">X</button></div>
+      <div id="generic-modal-body" style="padding:14px;max-height:70vh;overflow-y:auto"></div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  el('generic-modal-title').textContent = title;
+  el('generic-modal-body').innerHTML = bodyHtml;
+  m.classList.add('on');
+}
+
+// ─── Share Receipt as Image via WA ───────────
+async function shareReceiptImageWA(){
+  const id = _previewReceiptId;
+  if(!id) return;
+  const r = DB.receipts.find(x=>String(x.id)===String(id));
+  if(!r) return;
+  const c = DB.children.find(x=>String(x.id)===String(r.childId));
+  const phone = c?.parentMom||c?.parentDad||'';
+
+  const printDiv = el('inv-print');
+  if(!printDiv){ alert('Open receipt preview first'); return; }
+
+  try {
+    // Use html2canvas to capture receipt
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(script);
+    await new Promise(res=>{ script.onload=res; script.onerror=res; });
+
+    if(!window.html2canvas){ 
+      // Fallback: open WA with text
+      sendReceiptWhatsApp();
+      return; 
+    }
+
+    const canvas = await window.html2canvas(printDiv, {scale:2, useCORS:true, backgroundColor:'#fff'});
+    canvas.toBlob(async blob=>{
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],'receipt.png',{type:'image/png'})]})){
+        const file = new File([blob],'receipt_'+r.receiptNum+'.png',{type:'image/png'});
+        await navigator.share({
+          title: 'Receipt #'+r.receiptNum,
+          text: r.childName+' — '+fmtNum(r.total)+' AED',
+          files: [file]
+        });
+      } else {
+        // Download image + open WA
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url; a.download='receipt_'+r.receiptNum+'.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        // Open WA after short delay
+        setTimeout(()=>{
+          let num = phone.replace(/[^0-9]/g,'');
+          if(num.startsWith('0')) num='971'+num.substring(1);
+          else if(!num.startsWith('971')) num='971'+num;
+          if(num.length>8) window.open('https://wa.me/'+num,'_blank');
+          else alert('Image downloaded. Send it manually on WhatsApp.');
+        },1000);
+      }
+    },'image/png');
+  } catch(e){
+    console.error(e);
+    sendReceiptWhatsApp(); // fallback
+  }
+}
+
+// ─── Export All Data to Excel ─────────────────
+async function exportAllToExcel(type){
+  const XLSX = await import('https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
+  const wb2 = XLSX.utils.book_new();
+  const b = CB();
+  const bName = b.en||b.ar;
+
+  if(type==='children'||type==='all'){
+    const rows = DB.children.map(c=>({
+      'Name': c.name,
+      'Class': c.className||'',
+      'Gender': c.gender||'',
+      'DOB': c.dob||'',
+      'Nationality': c.nationality||'',
+      'Religion': c.religion||'',
+      'ID Number': c.idNumber||'',
+      'Reg No': c.regNum||'',
+      'Join Date': c.joinDate||'',
+      'Leave Date': c.leaveDate||'',
+      'Mother Phone': c.parentMom||'',
+      'Father Phone': c.parentDad||'',
+      'Email': c.email||'',
+      'Monthly Fee': c.fee||0,
+      'Bus Fee': c.busFee||0,
+      'Use Bus': c.bus||'No',
+      'Kids Time': c.kidsTime||'',
+      'Duty Days': c.dutyDays||'',
+      'Notes': c.notes||'',
+      'Status': c.leaveDate?'Inactive':'Active',
+    }));
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Children');
+  }
+  if(type==='receipts'||type==='all'){
+    const rows = DB.receipts.map(r=>({
+      'Receipt No': r.receiptNum||'',
+      'Child Name': r.childName||'',
+      'Class': r.className||'',
+      'Date': r.date||'',
+      'From Date': r.fromDate||'',
+      'To Date': r.toDate||'',
+      'Monthly Fee': r.fee||0,
+      'Registration': r.reg||0,
+      'Transport': r.bus||0,
+      'Uniforms': r.clothes||0,
+      'Stationary': r.tools||0,
+      'Hourly Fee': r.hourFee||0,
+      'Overtime Fee': r.overtimeFee||0,
+      'VAT Type': r.vatType||'exempt',
+      'VAT Amount': r.vatAmount||0,
+      'Total': r.total||0,
+      'Payment Method': r.payMethod||'cash',
+      'Notes': r.notes||'',
+    }));
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Receipts');
+  }
+  if(type==='expenses'||type==='all'){
+    const rows = DB.expenses.map(e=>({
+      'Date': e.date||'',
+      'Category': e.category||'',
+      'Amount': e.amount||0,
+      'Description': e.description||'',
+      'Paid By': e.paidBy||'',
+    }));
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Expenses');
+  }
+
+  const fname = bName.replace(/\s/g,'_')+'_export_'+today()+'.xlsx';
+  XLSX.writeFile(wb2, fname);
+}
+
+// ─── Birthday Notifications ───────────────────
+function checkBirthdays(){
+  const todayStr = today(); // YYYY-MM-DD
+  const tomorrowD = new Date(); tomorrowD.setDate(tomorrowD.getDate()+1);
+  const tomorrowStr = tomorrowD.toISOString().split('T')[0];
+  const todayMD    = todayStr.substring(5);     // MM-DD
+  const tomorrowMD = tomorrowStr.substring(5);  // MM-DD
+
+  const bdays = [];
+
+  // Check children
+  DB.children.filter(c=>!c.leaveDate&&c.dob).forEach(c=>{
+    const md = String(c.dob).substring(5);
+    if(md===todayMD)    bdays.push({name:c.name, type:'Child', when:'today', icon:'👶'});
+    else if(md===tomorrowMD) bdays.push({name:c.name, type:'Child', when:'tomorrow', icon:'👶'});
+  });
+
+  // Check staff
+  (DB.staff||[]).forEach(s=>{
+    if(!s.dob) return;
+    const md = String(s.dob).substring(5);
+    if(md===todayMD)    bdays.push({name:s.name, type:'Staff', when:'today', icon:'👩‍🏫'});
+    else if(md===tomorrowMD) bdays.push({name:s.name, type:'Staff', when:'tomorrow', icon:'👩‍🏫'});
+  });
+
+  if(!bdays.length) return;
+
+  // Show birthday notification banner
+  const banner = document.createElement('div');
+  banner.id = 'bday-banner';
+  banner.style.cssText = 'position:fixed;top:60px;right:16px;z-index:9999;max-width:320px;display:flex;flex-direction:column;gap:6px';
+  bdays.forEach(b=>{
+    const div = document.createElement('div');
+    div.style.cssText = 'background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #f9a8d4;border-radius:12px;padding:10px 14px;box-shadow:0 4px 12px rgba(0,0,0,.1);animation:fadeIn .4s ease';
+    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:start">
+      <div>
+        <div style="font-size:1.1rem">${b.icon} ${b.when==='today'?'🎂 Happy Birthday!':'🎈 Birthday Tomorrow!'}</div>
+        <div style="font-weight:800;margin-top:2px">${b.name}</div>
+        <div style="font-size:.72rem;color:#9ca3af">${b.type} • ${b.when==='today'?'Today!':'Tomorrow'}</div>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1rem;color:#9ca3af;padding:0">✕</button>
+    </div>`;
+    banner.appendChild(div);
+  });
+  document.body.appendChild(banner);
+  // Auto remove after 12 seconds
+  setTimeout(()=>{ const b2=el('bday-banner'); if(b2)b2.remove(); }, 12000);
 }
 
 boot();
