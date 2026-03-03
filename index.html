@@ -2865,6 +2865,8 @@ async function delRec(id){
 function renderAtt(){
   const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display='inline-flex';
   const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display='inline-flex';
+  // Always hide extras panel on page load — only show when button clicked
+  const xcard=el('att-extras-card'); if(xcard) xcard.style.display='none';
   // Update birthday count badge for today's month
   _updateBdayBtnBadge();
   // Update unpaid count badge
