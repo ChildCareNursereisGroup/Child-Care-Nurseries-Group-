@@ -5097,7 +5097,7 @@ async function importBusesFromExcel(file){
 //  IMPORT TAB SWITCHER
 // ═══════════════════════════════════════════════
 function switchImpTab(tab, btn){
-  ['children','receipts','expenses'].forEach(t=>{
+  ['children','receipts','expenses','inactive'].forEach(t=>{
     const el2=document.getElementById('imp-tab-'+t);
     if(el2) el2.style.display=t===tab?'block':'none';
   });
@@ -5105,7 +5105,8 @@ function switchImpTab(tab, btn){
     b.style.background='#fff'; b.style.color='#374151';
     b.style.borderColor='var(--border)';
   });
-  if(btn){ btn.style.background='#059669'; btn.style.color='#fff'; btn.style.borderColor='#059669'; }
+  const col = tab==='inactive'?'#c0392b':'#059669';
+  if(btn){ btn.style.background=col; btn.style.color='#fff'; btn.style.borderColor=col; }
 }
 
 // ═══════════════════════════════════════════════
