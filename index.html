@@ -7293,194 +7293,128 @@ function handleInactiveDrop(e){
 async function importInactiveExcel(file){
   if(!file) return;
   const prev = el('imp-inactive-preview');
-  prev.innerHTML = '<div style="color:#c0392b">⏳ جاري قراءة الملف...</div>';
+  prev.innerHTML = '<div style="color:#c0392b;padding:10px">⏳ جاري قراءة الملف...</div>';
 
   const XLSX = await import('https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
   const buf  = await file.arrayBuffer();
   const wb2  = XLSX.read(buf, {type:'array', cellDates:true});
   const sheet = wb2.Sheets[wb2.SheetNames[0]];
-  
-  // Get all rows as array
-  const allRows = XLSX.utils.sheet_to_json(sheet, {defval:'', header:1});
-  
-  // Find header row — look for row containing "Child Full Name" or "Name"
-  let headerIdx = -1;
-  for(let i=0; i<Math.min(allRows.length,10); i++){
+  const allRows = XLSX.utils.sheet_to_json(sheet, {defval:null, header:1});
+
+  // Find header row — look for row with 4+ filled cells containing name/child
+  let hIdx = 0;
+  for(let i=0; i<Math.min(allRows.length,8); i++){
     const r = allRows[i];
-    const rowStr = r.join(' ').toLowerCase();
-    if(rowStr.includes('child') || rowStr.includes('name') || rowStr.includes('اسم')){
-      // Check it has multiple filled cells (real header)
-      const filled = r.filter(c=>c!==null&&c!==undefined&&String(c).trim()!=='').length;
-      if(filled >= 3){ headerIdx = i; break; }
+    const txt = r.filter(Boolean).join(' ').toLowerCase();
+    if((txt.includes('child')||txt.includes('name')||txt.includes('اسم')) && r.filter(Boolean).length>=4){
+      hIdx=i; break;
     }
   }
-  if(headerIdx === -1) headerIdx = 0; // fallback
-  
-  // Build column map from header row
-  const headerRow = allRows[headerIdx];
-  const colMap = {};
-  headerRow.forEach((h,i)=>{
-    if(!h) return;
-    const k = String(h).toLowerCase().replace(/[^a-z؀-ۿ]/g,'');
-    colMap[k] = i;
-  });
-  
-  // Data rows start after header, skip example row if it looks like instruction
-  const dataRows = allRows.slice(headerIdx+1).filter(r=>{
-    const first = String(r[0]||'').trim();
-    // Skip empty rows, instruction rows, and example rows with non-real names
-    if(!first || first.startsWith('⬇') || first.startsWith('Note') || first.startsWith('مثال')) return false;
-    return true;
-  });
-  
-  // Helper to get value by flexible key matching
-  const getVal = (row, ...keys) => {
-    for(const k of keys){
-      // Try direct colMap lookup
-      const mapped = Object.keys(colMap).find(c => c.includes(k.toLowerCase().replace(/[^a-z؀-ۿ]/g,'')));
-      if(mapped !== undefined && colMap[mapped] !== undefined){
-        const v = row[colMap[mapped]];
-        if(v !== null && v !== undefined && String(v).trim() !== '') return String(v).trim();
-      }
-    }
-    // Fallback: scan all cells
-    for(const v of row){
-      if(v !== null && v !== undefined && String(v).trim() !== ''){
-        // only return if checking specific known positions
-      }
-    }
-    return '';
-  };
-  
-  // Map columns by position based on our template structure:
-  // A=Name, B=DOB, C=Gender, D=JoinDate, E=LeaveDate, F=Class, G=Branch, 
-  // H=MomPhone, I=DadPhone, J=Fee, K=Nationality, L=Bus, M=ID,
-  // N=Allergies, O=Medical, P=Emergency, Q=LeaveReason, R=LeaveType, S=ReturnDate, T=Notes
-  const getByPos = (row, pos) => {
-    const v = row[pos];
-    if(v === null || v === undefined) return '';
+
+  // Helper: get cell value as string, handle dates
+  const dVal = (r, pos) => {
+    const v = r[pos];
+    if(v===null||v===undefined) return '';
     if(v instanceof Date) return v.toISOString().split('T')[0];
-    return String(v).trim();
+    const s = String(v).trim();
+    return s==='-'||s.toLowerCase()==='none'||s.toLowerCase()==='null' ? '' : s;
   };
-  
-  const parseDate2 = v => {
+
+  // Helper: parse date from any format
+  const dDate = v => {
     if(!v) return null;
     if(v instanceof Date) return v.toISOString().split('T')[0];
     const s = String(v).trim();
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(m1) return m1[3]+'-'+m1[2].padStart(2,'0')+'-'+m1[1].padStart(2,'0');
     const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if(m2) return m2[1]+'-'+m2[2]+'-'+m2[3];
+    if(m2) return m2[0];
     return null;
   };
-  
-  // Detect if using our template (has 20 cols) or simple format
-  const isOurTemplate = headerRow.length >= 15;
-  
-  const rows = dataRows.map(r => {
-    if(isOurTemplate){
-      // Col positions: 0=Name,1=DOB,2=Gender,3=JoinDate,4=LeaveDate,
-      // 5=Class,6=Branch,7=MomPhone,8=DadPhone,9=Fee,10=Nationality,
-      // 11=Bus,12=ID,13=Allergies,14=Medical,15=Emergency,
-      // 16=LeaveReason,17=LeaveType,18=ReturnDate,19=Notes
-      const dVal = (pos) => {
-        const v=r[pos];
-        if(!v&&v!==0)return'';
-        if(v instanceof Date)return v.toISOString().split('T')[0];
-        return String(v).trim();
-      };
-      const dDate = (pos) => parseDate2(r[pos]);
-      return {
-        name:      dVal(0),
-        dob:       dDate(1),
-        gender:    dVal(2)||'Female',
-        joinDate:  dDate(3),
-        leaveDate: dDate(4),
-        cls:       dVal(5),
-        branch:    dVal(6),
-        momPhone:  dVal(7),
-        dadPhone:  dVal(8),
-        fee:       parseFloat(dVal(9))||0,
-        nat:       dVal(10),
-        bus:       dVal(11).toLowerCase()==='yes'?'Yes':'No',
-        idNum:     dVal(12),
-        reason:    dVal(16)||dVal(15),
-        leaveType: dVal(17),
-        notes:     dVal(19),
-      };
-    } else {
-      return {
-        name:      getVal(r,'name','childfullname','childname','الاسم'),
-        joinDate:  parseDate2(getVal(r,'joindate','تاريخالتسجيل')),
-        leaveDate: parseDate2(getVal(r,'leavedate','تاريخالتوقف')),
-        cls:       getVal(r,'class','classname','الفصل'),
-        reason:    getVal(r,'reason','leavereason','السبب'),
-      };
-    }
-  }).filter(r => r.name && r.name.length > 1);
 
-  if(!rows.length){ prev.innerHTML='<div style="color:red">❌ الملف فارغ</div>'; return; }
+  // Data rows start after header row, skip blanks/instruction rows
+  const dataRows = allRows.slice(hIdx+1).filter(r => {
+    const first = r[0];
+    if(!first) return false;
+    const s = String(first).trim();
+    return s.length > 1 && !s.startsWith('⬇') && !s.startsWith('Note');
+  });
+
+  // Template columns: 0=Name,1=DOB,2=Gender,3=JoinDate,4=LeaveDate,
+  // 5=Class,6=Branch,7=MomPhone,8=DadPhone,9=Fee,10=Nationality,
+  // 11=Bus,12=ID,13=Allergies,14=Medical,15=Emergency,
+  // 16=LeaveReason,17=LeaveType,18=ReturnDate,19=Notes
+  const parsed = dataRows.map(r => ({
+    name:     dVal(r,0),
+    dob:      dDate(r[1]),
+    gender:   dVal(r,2)||'Female',
+    joinDate: dDate(r[3]),
+    leaveDate:dDate(r[4]),
+    cls:      dVal(r,5),
+    momPhone: dVal(r,7),
+    dadPhone: dVal(r,8),
+    fee:      parseFloat(dVal(r,9))||0,
+    nat:      dVal(r,10),
+    bus:      dVal(r,11).toLowerCase()==='yes'?'Yes':'No',
+    idNum:    dVal(r,12),
+    reason:   dVal(r,16)||dVal(r,15),
+    notes:    dVal(r,19),
+  })).filter(r => r.name && r.name.length > 1);
+
+  if(!parsed.length){ prev.innerHTML='<div style="color:red;padding:10px">❌ لم يتم العثور على بيانات</div>'; return; }
 
   const bid = el('imp-inactive-branch')?.value||curBid;
+  const existingNames = DB.children.map(c=>c.name.trim().toLowerCase());
 
-  // Map column names (flexible)
-  const fld = (row, ...keys) => {
-    for(const k of keys){
-      const found = Object.keys(row).find(x=>x.toLowerCase().replace(/[^a-z]/g,'')=== k.toLowerCase().replace(/[^a-z]/g,''));
-      if(found && row[found]!==undefined && row[found]!=='') return String(row[found]).trim();
-    }
-    return '';
-  };
+  const valid   = parsed.filter(r => r.name && r.leaveDate);
+  const invalid = parsed.filter(r => !r.leaveDate);
+  const dupes   = valid.filter(r => existingNames.includes(r.name.trim().toLowerCase()));
+  const newOnes = valid.filter(r => !existingNames.includes(r.name.trim().toLowerCase()));
 
-  const parseDate = v => {
-    if(!v) return null;
-    if(v instanceof Date) return v.toISOString().split('T')[0];
-    const s = String(v).trim();
-    // DD/MM/YYYY
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    // YYYY-MM-DD
-    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    return null;
-  };
+  let html = `<div style="background:#fff5f5;border-radius:9px;padding:9px 12px;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap;font-size:.82rem;font-weight:700">
+    <span>📋 إجمالي: <b>${parsed.length}</b></span>
+    <span style="color:#059669">✅ جديد: <b>${newOnes.length}</b></span>
+    ${dupes.length?`<span style="color:#d97706">⚠️ مكرر: <b>${dupes.length}</b></span>`:''}
+    ${invalid.length?`<span style="color:#c0392b">❌ ناقص تاريخ التوقف: <b>${invalid.length}</b></span>`:''}
+  </div>
+  <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:.72rem">
+  <thead style="background:#c0392b;color:#fff;position:sticky;top:0">
+    <tr>
+      <th style="padding:5px">#</th>
+      <th>الاسم</th><th>الفصل</th><th>تاريخ التوقف</th>
+      <th>رقم الأم</th><th>رقم الأب</th><th>الجنسية</th><th>السبب</th><th>الحالة</th>
+    </tr>
+  </thead><tbody>`;
 
-  // Preview table
-  let html = `<div style="font-weight:800;color:#c0392b;margin-bottom:8px">📋 معاينة ${rows.length} صف — Preview</div>`;
-  html += `<div style="overflow-x:auto;max-height:250px;overflow-y:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:.72rem">
-    <thead style="background:#c0392b;color:#fff;position:sticky;top:0">
-      <tr><th style="padding:5px">#</th><th>الاسم</th><th>الفصل</th><th>التسجيل</th><th>التوقف</th><th>السبب</th><th>الحالة</th></tr>
-    </thead><tbody>`;
-
-  const valid = [];
-  rows.forEach((row, i) => {
-    const name     = fld(row,'childfullname','childname','name','الاسم','kidsname');
-    const cls      = fld(row,'classname','class','الفصل');
-    const joinDate = parseDate(fld(row,'joindate','تاريخالتسجيل','joindate'));
-    const leaveDate= parseDate(fld(row,'leavedate','تاريخالتوقف','leavedate'));
-    const reason   = fld(row,'leavereason','reason','سببالتوقف','السبب');
-    const ok = name && leaveDate;
-    if(ok) valid.push({name,cls,joinDate,leaveDate,reason,row});
-    html += `<tr style="background:${i%2?'#fff5f5':'#fff'}">
-      <td style="padding:4px;text-align:center">${i+1}</td>
-      <td style="padding:4px;font-weight:700">${name||'<span style="color:red">❌ مطلوب</span>'}</td>
-      <td style="padding:4px">${cls||'—'}</td>
-      <td style="padding:4px">${joinDate||'—'}</td>
-      <td style="padding:4px;color:#c0392b">${leaveDate||'<span style="color:red">❌ مطلوب</span>'}</td>
-      <td style="padding:4px">${reason||'—'}</td>
-      <td style="padding:4px">${ok?'✅':'❌'}</td>
+  parsed.forEach((r,i)=>{
+    const isDupe  = existingNames.includes(r.name.trim().toLowerCase());
+    const isValid = r.name && r.leaveDate;
+    const status  = !isValid?'❌ ناقص':isDupe?'⚠️ مكرر':'✅ جديد';
+    const bg      = !isValid?'#fee2e2':isDupe?'#fef3c7':(i%2===0?'#fff':'#f9f9f9');
+    html+=`<tr style="background:${bg}">
+      <td style="padding:4px;text-align:center;color:#9ca3af">${i+1}</td>
+      <td style="padding:4px;font-weight:700">${r.name}</td>
+      <td style="padding:4px">${r.cls||'—'}</td>
+      <td style="padding:4px;color:#c0392b">${r.leaveDate||'❌'}</td>
+      <td style="padding:4px">${r.momPhone||'—'}</td>
+      <td style="padding:4px">${r.dadPhone||'—'}</td>
+      <td style="padding:4px">${r.nat||'—'}</td>
+      <td style="padding:4px;font-size:.68rem;max-width:120px">${r.reason||'—'}</td>
+      <td style="padding:4px;text-align:center;white-space:nowrap">${status}</td>
     </tr>`;
   });
 
-  html += `</tbody></table></div>`;
-  html += `<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-    <span style="font-size:.8rem;color:#555">✅ ${valid.length} صف صالح من ${rows.length}</span>
-    <button onclick="confirmInactiveImport()" style="background:#c0392b;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
-      💾 استيراد ${valid.length} طفل
+  html+=`</tbody></table></div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <span style="font-size:.82rem;color:#555">سيتم استيراد <b style="color:#059669">${newOnes.length}</b> طفل جديد</span>
+    <button onclick="confirmInactiveImport()" style="background:#c0392b;color:#fff;border:none;border-radius:9px;padding:9px 22px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
+      💾 استيراد ${newOnes.length} طفل
     </button>
   </div>`;
+
   prev.innerHTML = html;
-  prev._validRows = valid;
+  prev._validRows = newOnes;
   prev._bid = bid;
 }
 
@@ -7488,27 +7422,25 @@ async function confirmInactiveImport(){
   const prev = el('imp-inactive-preview');
   const rows = prev._validRows;
   const bid  = prev._bid || curBid;
-  if(!rows||!rows.length){ alert('لا توجد بيانات صالحة'); return; }
+  if(!rows||!rows.length){ alert('لا توجد بيانات صالحة للاستيراد'); return; }
 
-  let ok=0, fail=0;
+  let ok=0, skip=0, fail=0;
   setSyncing(true);
 
+  const existingNames = DB.children.map(c=>c.name.trim().toLowerCase());
+
   for(const r of rows){
-    const fld=(row,...keys)=>{
-      for(const k of keys){
-        const found=Object.keys(row).find(x=>x.toLowerCase().replace(/[^a-z]/g,'')=== k.toLowerCase().replace(/[^a-z]/g,''));
-        if(found&&row[found]!==undefined&&row[found]!=='')return String(row[found]).trim();
-      }
-      return '';
-    };
+    // Double-check duplicate
+    if(existingNames.includes(r.name.trim().toLowerCase())){ skip++; continue; }
+
     const row = {
       branch_id:  bid,
       name:       r.name,
       class_name: r.cls||'',
       dob:        r.dob||null,
       join_date:  r.joinDate||null,
-      leave_date: r.leaveDate,
-      notes:      r.notes ? (r.reason ? r.reason+' | '+r.notes : r.notes) : (r.reason||''),
+      leave_date: r.leaveDate||null,
+      notes:      r.reason||(r.notes||''),
       fee:        r.fee||0,
       bus:        r.bus||'No',
       gender:     r.gender||'Female',
@@ -7517,15 +7449,18 @@ async function confirmInactiveImport(){
       parent_dad: r.dadPhone||'',
       id_number:  r.idNum||'',
     };
+
     const {error} = await sb.from('children').insert(row);
-    if(error) fail++; else ok++;
+    if(error){ console.error('Insert error:', r.name, error.message); fail++; }
+    else { ok++; existingNames.push(r.name.trim().toLowerCase()); }
   }
 
   setSyncing(false);
   await loadFromSupa(bid);
-  prev.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:14px;text-align:center">
-    <div style="font-size:1.5rem;font-weight:900;color:#065f46">✅ ${ok} طفل تم استيراده</div>
-    ${fail?`<div style="color:#c0392b">❌ ${fail} فشل</div>`:''}
+  prev.innerHTML = `<div style="border-radius:10px;padding:16px;text-align:center;background:#f0fdf4;border:1.5px solid #86efac">
+    <div style="font-size:1.5rem;font-weight:900;color:#065f46;margin-bottom:6px">✅ ${ok} طفل تم استيراده بنجاح</div>
+    ${skip?`<div style="color:#d97706;font-size:.88rem">⏭ ${skip} تم تخطيه (مكرر)</div>`:''}
+    ${fail?`<div style="color:#c0392b;font-size:.88rem">❌ ${fail} فشل — تحقق من Console</div>`:''}
   </div>`;
 }
 
