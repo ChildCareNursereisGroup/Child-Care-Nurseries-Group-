@@ -7379,24 +7379,36 @@ async function importInactiveExcel(file){
   
   const rows = dataRows.map(r => {
     if(isOurTemplate){
+      // Col positions: 0=Name,1=DOB,2=Gender,3=JoinDate,4=LeaveDate,
+      // 5=Class,6=Branch,7=MomPhone,8=DadPhone,9=Fee,10=Nationality,
+      // 11=Bus,12=ID,13=Allergies,14=Medical,15=Emergency,
+      // 16=LeaveReason,17=LeaveType,18=ReturnDate,19=Notes
+      const dVal = (pos) => {
+        const v=r[pos];
+        if(!v&&v!==0)return'';
+        if(v instanceof Date)return v.toISOString().split('T')[0];
+        return String(v).trim();
+      };
+      const dDate = (pos) => parseDate2(r[pos]);
       return {
-        name:      getByPos(r,0),
-        dob:       parseDate2(r[1]),
-        gender:    getByPos(r,2)||'Female',
-        joinDate:  parseDate2(r[3]),
-        leaveDate: parseDate2(r[4]),
-        cls:       getByPos(r,5),
-        branch:    getByPos(r,6),
-        momPhone:  getByPos(r,7),
-        dadPhone:  getByPos(r,8),
-        fee:       parseFloat(getByPos(r,9))||0,
-        nat:       getByPos(r,10),
-        bus:       getByPos(r,11).toLowerCase()==='yes'?'Yes':'No',
-        reason:    getByPos(r,16)||getByPos(r,15)||getByPos(r,18),
-        notes:     getByPos(r,19),
+        name:      dVal(0),
+        dob:       dDate(1),
+        gender:    dVal(2)||'Female',
+        joinDate:  dDate(3),
+        leaveDate: dDate(4),
+        cls:       dVal(5),
+        branch:    dVal(6),
+        momPhone:  dVal(7),
+        dadPhone:  dVal(8),
+        fee:       parseFloat(dVal(9))||0,
+        nat:       dVal(10),
+        bus:       dVal(11).toLowerCase()==='yes'?'Yes':'No',
+        idNum:     dVal(12),
+        reason:    dVal(16)||dVal(15),
+        leaveType: dVal(17),
+        notes:     dVal(19),
       };
     } else {
-      // Simple format fallback
       return {
         name:      getVal(r,'name','childfullname','childname','الاسم'),
         joinDate:  parseDate2(getVal(r,'joindate','تاريخالتسجيل')),
@@ -7493,15 +7505,17 @@ async function confirmInactiveImport(){
       branch_id:  bid,
       name:       r.name,
       class_name: r.cls||'',
+      dob:        r.dob||null,
       join_date:  r.joinDate||null,
       leave_date: r.leaveDate,
-      notes:      r.reason||'',
-      fee:        parseFloat(fld(r.row,'monthlyfee','fee','الرسوم'))||0,
-      bus:        fld(r.row,'bus','باص').toLowerCase()==='yes'?'Yes':'No',
-      gender:     fld(r.row,'gender','الجنس')||'Female',
-      nationality:fld(r.row,'nationality','الجنسية')||'',
-      parent_mom: fld(r.row,'mothersphone','phonemom','رقمالأم')||'',
-      parent_dad: fld(r.row,'fathersphone','phonedad','رقمالأب')||'',
+      notes:      r.notes ? (r.reason ? r.reason+' | '+r.notes : r.notes) : (r.reason||''),
+      fee:        r.fee||0,
+      bus:        r.bus||'No',
+      gender:     r.gender||'Female',
+      nationality:r.nat||'',
+      parent_mom: r.momPhone||'',
+      parent_dad: r.dadPhone||'',
+      id_number:  r.idNum||'',
     };
     const {error} = await sb.from('children').insert(row);
     if(error) fail++; else ok++;
