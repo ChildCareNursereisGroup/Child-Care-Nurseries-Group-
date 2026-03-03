@@ -52,10 +52,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .hstat .hl2{font-size:.6rem;color:rgba(255,255,255,.82)}
 .hbtn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:18px;padding:4px 10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.72rem;font-weight:700}
 .sind{font-size:.68rem;color:rgba(255,255,255,.85);padding:3px 8px;background:rgba(255,255,255,.15);border-radius:18px}
-nav{background:#fff;border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:0 10px;gap:2px;position:sticky;top:60px;z-index:99;scrollbar-width:none}
+nav{background:var(--nav-bg,#1e3a8a);border-bottom:none;display:flex;overflow-x:auto;padding:0 10px;gap:2px;position:sticky;top:60px;z-index:99;scrollbar-width:none;box-shadow:0 3px 10px rgba(0,0,0,.15)}
 nav::-webkit-scrollbar{display:none}
-.ntab{padding:9px 12px;border:none;background:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s}
-.ntab.on{border-bottom-color:var(--bc);font-weight:800;color:var(--txt)}
+.ntab{padding:10px 14px;border:none;background:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:600;color:rgba(255,255,255,.75);border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s}
+.ntab:hover{color:#fff;background:rgba(255,255,255,.12);border-radius:8px 8px 0 0}
+.ntab.on{border-bottom:3px solid #fff;font-weight:800;color:#fff;background:rgba(255,255,255,.18);border-radius:8px 8px 0 0}
 main{padding:12px;max-width:960px;margin:0 auto}
 .page{display:none}.page.on{display:block}
 .card{background:var(--card);border-radius:14px;padding:15px;box-shadow:var(--sh);margin-bottom:11px;border:1px solid var(--border)}
@@ -1817,7 +1818,11 @@ function doLogout(){
 function setBranchTheme(b){
   document.documentElement.style.setProperty('--bc',b.c);
   document.documentElement.style.setProperty('--bl',b.l);
+  document.documentElement.style.setProperty('--nav-bg',b.c);
   el('hdr').style.background=`linear-gradient(135deg,${b.c}ee,${b.c})`;
+  // Make nav slightly darker than header
+  const nav=el('nav');
+  if(nav) nav.style.background=`linear-gradient(135deg,${b.c}dd,${b.c}bb)`;
 }
 function initApp(){
   const b=CB();setBranchTheme(b);el('hbr').textContent=b.icon+' '+tBN(b);applyTranslations();
