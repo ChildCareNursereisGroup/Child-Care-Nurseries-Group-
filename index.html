@@ -7299,7 +7299,113 @@ async function importInactiveExcel(file){
   const buf  = await file.arrayBuffer();
   const wb2  = XLSX.read(buf, {type:'array', cellDates:true});
   const sheet = wb2.Sheets[wb2.SheetNames[0]];
-  const rows  = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  
+  // Get all rows as array
+  const allRows = XLSX.utils.sheet_to_json(sheet, {defval:'', header:1});
+  
+  // Find header row — look for row containing "Child Full Name" or "Name"
+  let headerIdx = -1;
+  for(let i=0; i<Math.min(allRows.length,10); i++){
+    const r = allRows[i];
+    const rowStr = r.join(' ').toLowerCase();
+    if(rowStr.includes('child') || rowStr.includes('name') || rowStr.includes('اسم')){
+      // Check it has multiple filled cells (real header)
+      const filled = r.filter(c=>c!==null&&c!==undefined&&String(c).trim()!=='').length;
+      if(filled >= 3){ headerIdx = i; break; }
+    }
+  }
+  if(headerIdx === -1) headerIdx = 0; // fallback
+  
+  // Build column map from header row
+  const headerRow = allRows[headerIdx];
+  const colMap = {};
+  headerRow.forEach((h,i)=>{
+    if(!h) return;
+    const k = String(h).toLowerCase().replace(/[^a-z؀-ۿ]/g,'');
+    colMap[k] = i;
+  });
+  
+  // Data rows start after header, skip example row if it looks like instruction
+  const dataRows = allRows.slice(headerIdx+1).filter(r=>{
+    const first = String(r[0]||'').trim();
+    // Skip empty rows, instruction rows, and example rows with non-real names
+    if(!first || first.startsWith('⬇') || first.startsWith('Note') || first.startsWith('مثال')) return false;
+    return true;
+  });
+  
+  // Helper to get value by flexible key matching
+  const getVal = (row, ...keys) => {
+    for(const k of keys){
+      // Try direct colMap lookup
+      const mapped = Object.keys(colMap).find(c => c.includes(k.toLowerCase().replace(/[^a-z؀-ۿ]/g,'')));
+      if(mapped !== undefined && colMap[mapped] !== undefined){
+        const v = row[colMap[mapped]];
+        if(v !== null && v !== undefined && String(v).trim() !== '') return String(v).trim();
+      }
+    }
+    // Fallback: scan all cells
+    for(const v of row){
+      if(v !== null && v !== undefined && String(v).trim() !== ''){
+        // only return if checking specific known positions
+      }
+    }
+    return '';
+  };
+  
+  // Map columns by position based on our template structure:
+  // A=Name, B=DOB, C=Gender, D=JoinDate, E=LeaveDate, F=Class, G=Branch, 
+  // H=MomPhone, I=DadPhone, J=Fee, K=Nationality, L=Bus, M=ID,
+  // N=Allergies, O=Medical, P=Emergency, Q=LeaveReason, R=LeaveType, S=ReturnDate, T=Notes
+  const getByPos = (row, pos) => {
+    const v = row[pos];
+    if(v === null || v === undefined) return '';
+    if(v instanceof Date) return v.toISOString().split('T')[0];
+    return String(v).trim();
+  };
+  
+  const parseDate2 = v => {
+    if(!v) return null;
+    if(v instanceof Date) return v.toISOString().split('T')[0];
+    const s = String(v).trim();
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m2) return m2[1]+'-'+m2[2]+'-'+m2[3];
+    return null;
+  };
+  
+  // Detect if using our template (has 20 cols) or simple format
+  const isOurTemplate = headerRow.length >= 15;
+  
+  const rows = dataRows.map(r => {
+    if(isOurTemplate){
+      return {
+        name:      getByPos(r,0),
+        dob:       parseDate2(r[1]),
+        gender:    getByPos(r,2)||'Female',
+        joinDate:  parseDate2(r[3]),
+        leaveDate: parseDate2(r[4]),
+        cls:       getByPos(r,5),
+        branch:    getByPos(r,6),
+        momPhone:  getByPos(r,7),
+        dadPhone:  getByPos(r,8),
+        fee:       parseFloat(getByPos(r,9))||0,
+        nat:       getByPos(r,10),
+        bus:       getByPos(r,11).toLowerCase()==='yes'?'Yes':'No',
+        reason:    getByPos(r,16)||getByPos(r,15)||getByPos(r,18),
+        notes:     getByPos(r,19),
+      };
+    } else {
+      // Simple format fallback
+      return {
+        name:      getVal(r,'name','childfullname','childname','الاسم'),
+        joinDate:  parseDate2(getVal(r,'joindate','تاريخالتسجيل')),
+        leaveDate: parseDate2(getVal(r,'leavedate','تاريخالتوقف')),
+        cls:       getVal(r,'class','classname','الفصل'),
+        reason:    getVal(r,'reason','leavereason','السبب'),
+      };
+    }
+  }).filter(r => r.name && r.name.length > 1);
 
   if(!rows.length){ prev.innerHTML='<div style="color:red">❌ الملف فارغ</div>'; return; }
 
