@@ -1991,7 +1991,7 @@ function renderChildren(){
   if(srchQ)list=list.filter(c=>c.name.includes(srchQ)||(c.className||'').includes(srchQ));
   if(chFilter==='active')list=list.filter(c=>!c.leaveDate);
   if(chFilter==='inactive')list=list.filter(c=>!!c.leaveDate);
-  if(chFilter==='bus')list=list.filter(c=>c.bus==='نعم'||c.bus==='Yes');
+  if(chFilter==='bus')list=list.filter(c=>(c.bus==='نعم'||c.bus==='Yes')&&!c.leaveDate);
   if(!list.length){el('chlist').innerHTML=`<div class="empty"><div class="ei">👀</div><p>لا توجد نتائج</p></div>`;return;}
   const paid_map={};DB.receipts.forEach(r=>{paid_map[r.childId]=(paid_map[r.childId]||0)+r.total;});
   el('chlist').innerHTML=list.map(c=>`
