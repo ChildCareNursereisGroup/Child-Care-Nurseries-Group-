@@ -2869,178 +2869,196 @@ function prevRec(id){
     return;
   }
   // ══════════════════════════════════════════════════════
-  // STANDARD receipt for all other branches
+  // AL FARHA STYLE — branches b1,b2,b3,b4 (matches paper receipt exactly)
   // ══════════════════════════════════════════════════════
+  const clothesVat2 = r.clothes ? Math.round(r.clothes*0.05*100)/100 : 0;
+  const toolsVat2   = r.tools   ? Math.round(r.tools*0.05*100)/100   : 0;
+  const wkFeeTotal  = (r.friFee||0)+(r.satFee||0)+(r.sunFee||0);
+  const wkFeeLabel  = [r.friFee?'Fri':'',r.satFee?'Sat':'',r.sunFee?'Sun':''].filter(Boolean).join('/');
+  const feeMonthName2=(()=>{
+    const src=r.fromDate||r.toDate||r.date; if(!src)return '—';
+    try{ const d=new Date(src); return d.toLocaleString('en',{month:'long'}); }catch(e){return String(src);}
+  })();
+  const fmtDD=(ds)=>{if(!ds)return '-';const d=new Date(ds);return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2);};
+  const chk=(v)=>v?'&#9746;':'&#9744;';
   el('pprev').innerHTML=`
-  <div id="inv-print" style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;border:1.5px solid #ccc;padding:0;direction:ltr">
-    <!-- HEADER: EN left | LOGO center | AR right -->
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:10px 14px;border-bottom:2.5px solid ${rcol}">
-      <!-- LEFT: English -->
-      <div style="font-size:.72rem;color:#333;direction:ltr;text-align:left">
-        <div style="font-size:1.05rem;font-weight:900;color:${rcol}">${b.en||b.ar}</div>
-        <div style="font-size:.68rem;font-weight:600">Sole Proprietorship LLC</div>
-        <div style="font-size:.62rem;color:#555;margin-top:2px">${bx.address||'Sharjah, UAE'}</div>
-        ${bx.phone?`<div style="font-size:.62rem;color:#555">📞 ${bx.phone}</div>`:''}
-        ${bx.email?`<div style="font-size:.62rem;color:#555">✉ ${bx.email}</div>`:''}
-        <div style="font-size:.62rem;color:#555">www.childcarenurseriesgroup.com</div>
+  <div id="inv-print" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1.5px solid #999;background:#fff;direction:ltr">
+    <!-- HEADER -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:8px 12px;border-bottom:2px solid ${rcol}">
+      <div style="font-size:.7rem;color:#222;line-height:1.7">
+        <div style="font-size:1.1rem;font-weight:900;color:${rcol};font-family:Georgia,serif">${b.en||b.ar}</div>
+        <div style="font-size:.65rem;font-style:italic;color:#444">LLC Sole Proprietorship</div>
+        <div style="font-size:.62rem">${bx.address||'Sharjah, UAE'}</div>
+        ${bx.phone?`<div style="font-size:.62rem">&#9990; ${bx.phone}</div>`:''}
+        ${bx.email?`<div style="font-size:.62rem">&#9993; ${bx.email}</div>`:''}
+        <div style="font-size:.6rem">www.childcarenurseriesgroup.com</div>
       </div>
-      <!-- CENTER: Logo -->
-      <div style="text-align:center;padding:0 10px">
-        <div style="margin:0 auto;width:58px;height:58px">${logoHtml}</div>
-      </div>
-      <!-- RIGHT: Arabic -->
-      <div style="font-size:.72rem;color:#333;direction:rtl;text-align:right">
-        <div style="font-size:1.05rem;font-weight:900;color:${rcol}">${b.ar}</div>
-        <div style="font-size:.68rem;font-weight:600">ذ.م.م شركة الشخص الواحد</div>
-        <div style="font-size:.62rem;color:#555;margin-top:2px">${bx.address||'الشارقة، الإمارات العربية المتحدة'}</div>
-        ${bx.phone?`<div style="font-size:.62rem;color:#555">${bx.phone} 📞</div>`:''}
-        ${bx.email?`<div style="font-size:.62rem;color:#555">${bx.email} ✉</div>`:''}
+      <div style="text-align:center;padding:0 8px">${logoHtml}</div>
+      <div style="font-size:.7rem;color:#222;direction:rtl;text-align:right;line-height:1.7">
+        <div style="font-size:1.1rem;font-weight:900;color:${rcol}">${b.ar}</div>
+        <div style="font-size:.65rem;color:#444">ذ.م.م شركة الشخص الواحد</div>
+        <div style="font-size:.62rem">${bx.address||'الشارقة'}</div>
+        ${bx.phone?`<div style="font-size:.62rem">${bx.phone} &#9990;</div>`:''}
+        ${bx.email?`<div style="font-size:.62rem">${bx.email}</div>`:''}
       </div>
     </div>
-    <!-- INVOICE TITLE + TRN -->
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:6px 14px;background:${rcol}15;border-bottom:1px solid #ddd">
-      <div style="direction:ltr">
-        <div style="font-size:1.05rem;font-weight:900;letter-spacing:.5px">No. ${String(r.receiptNum)}</div>
+    <!-- NO + TAX INVOICE + TRN + DATE -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;padding:5px 12px;border-bottom:1.5px solid #ccc">
+      <div style="font-size:1.1rem;font-weight:900;color:#cc0000">No. ${String(r.receiptNum).padStart(5,'0')}</div>
+      <div style="text-align:center">
+        <div style="font-size:.85rem;font-weight:900;color:#333">فاتورة ضريبية</div>
+        <div style="font-size:.85rem;font-weight:900;color:#333">TAX INVOICE</div>
       </div>
-      <div style="text-align:center;padding:0 8px">
-        <div style="font-weight:800;font-size:.82rem;color:${rcol}">فاتورة ضريبية</div>
-        <div style="font-weight:800;font-size:.82rem;color:${rcol}">TAX INVOICE</div>
-      </div>
-      <div style="text-align:right;font-size:.75rem;direction:rtl">
+      <div style="text-align:right;font-size:.72rem;line-height:1.7">
         <div><b>TRN : ${trn||'—'}</b></div>
-        <div>التاريخ / Date: <b>${(()=>{if(!r.date)return'—';const d=new Date(r.date);return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();})()}</b></div>
+        <div>التاريخ / Date : <b>${fmtDD(r.date)}</b></div>
       </div>
     </div>
     <!-- KID + CLASS -->
-    <div style="padding:6px 14px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;font-size:.82rem;flex-wrap:wrap;gap:6px">
-      <div>Kid's Name: <b>${r.childName}</b></div>
-      <div>Class Name: <b>(${r.className||'-'})</b></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px solid #ccc;font-size:.8rem">
+      <div>Kid's Name : <b>${r.childName||'—'}</b></div>
+      <div>Class Name: (<b>${r.className||'—'}</b>)</div>
       ${c?.regNum?`<div>Reg No: <b>#${c.regNum}</b></div>`:''}
     </div>
-    <!-- TABLE — matches paper receipt exactly -->
-    <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+    <!-- MAIN TABLE -->
+    <table style="width:100%;border-collapse:collapse;font-size:.75rem">
       <thead>
         <tr style="background:${rcol};color:#fff;text-align:center">
-          <th style="padding:4px 7px;border:1px solid #9ca3af;text-align:left" colspan="2">Description / التفاصيل</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:44px">Price<br>السعر<br>Dhs</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:28px">Fils</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:42px">Vat %</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:44px">VAT<br>Amount</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:44px">Total<br>المجموع<br>Dhs</th>
-          <th style="padding:4px 3px;border:1px solid #9ca3af;min-width:28px">Fils</th>
+          <th style="padding:5px 8px;border:1px solid #aaa;text-align:left">Description &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; التفاصيل</th>
+          <th style="padding:5px 4px;border:1px solid #aaa;min-width:42px">Price السعر<br>Dhs</th>
+          <th style="padding:5px 3px;border:1px solid #aaa;min-width:26px">Fils</th>
+          <th style="padding:5px 4px;border:1px solid #aaa;min-width:36px">Vat %</th>
+          <th style="padding:5px 4px;border:1px solid #aaa;min-width:42px">VAT<br>Amount</th>
+          <th style="padding:5px 4px;border:1px solid #aaa;min-width:44px">Total المجموع<br>Dhs</th>
+          <th style="padding:5px 3px;border:1px solid #aaa;min-width:26px">Fils</th>
         </tr>
       </thead>
       <tbody>
-        ${(()=>{
-          const td=(val,extra='')=>`<td style="padding:4px 5px;border:1px solid #e5e7eb;text-align:center${extra}">${val}</td>`;
-          const tdL=(val)=>`<td colspan="2" style="padding:4px 7px;border:1px solid #e5e7eb">${val}</td>`;
-          const clothesVat=r.clothes?Math.round(r.clothes*0.05*100)/100:0;
-          const toolsVat=r.tools?Math.round(r.tools*0.05*100)/100:0;
-          let rows='';
-          // Monthly fees
-          const feeMonthName=(()=>{
-            // fromDate has the actual payment period month — use it preferentially
-            const src=r.fromDate||r.toDate||r.date;
-            if(!src)return '—';
-            try{
-              const d=new Date(src);
-              if(isNaN(d.getTime())) return src;
-              return d.toLocaleString('en',{month:'long',year:'numeric'});
-            }catch(e){return String(src);}
-          })();
-          rows+=`<tr>
-            ${tdL(`The Fees of the Month: (<b>${feeMonthName}</b>)<br>
-              <span style="font-size:.68rem;color:#555">Date From: (${fmtDate(r.fromDate)}) &nbsp; Date To: (${fmtDate(r.toDate)})</span>`)}
-            ${td(r.fee||'')} ${td('')} ${td('0 %')} ${td('')} ${td(r.fee||'')} ${td('')}
-          </tr>`;
-          // Registration
-          rows+=`<tr>
-            ${tdL(`${r.reg?'☑':'☐'} Registration Fees &nbsp;&nbsp; ☐ Re-Registration Fees`)}
-            ${td(r.reg||'')} ${td('')} ${td('0 %')} ${td('')} ${td(r.reg||'')} ${td('')}
-          </tr>`;
-          // Weekend fees rows
-          if(r.friFee){ rows+=`<tr style="background:#fffbeb">
-            ${tdL('🟡 Friday Weekend Fee')}
-            ${td(r.friFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.friFee)} ${td('')}
-          </tr>`; }
-          if(r.satFee){ rows+=`<tr style="background:#f5f3ff">
-            ${tdL('🟣 Saturday Weekend Fee')}
-            ${td(r.satFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.satFee)} ${td('')}
-          </tr>`; }
-          if(r.sunFee){ rows+=`<tr style="background:#ecfeff">
-            ${tdL('🔵 Sunday Weekend Fee')}
-            ${td(r.sunFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.sunFee)} ${td('')}
-          </tr>`; }
-          // Hourly session row
-          if(r.hourFee){ rows+=`<tr style="background:#f0fdf4">
-            ${tdL('🕐 Hourly Session'+
-              (r.hourIn&&r.hourOut
-                ? ' &nbsp;<span style="font-size:.72rem;color:#059669;font-weight:800">From: '+r.hourIn+' &rarr; To: '+r.hourOut+'</span>'
-                : ' (see times below)'))}
-            ${td(r.hourFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.hourFee)} ${td('')}
-          </tr>`; }
-          // Overtime row
-          if(r.overtimeFee){ rows+=`<tr style="background:#fffbeb">
-            ${tdL('⏰ Overtime'+(r.overtimeDur?' ('+r.overtimeDur+')':''))}
-            ${td(r.overtimeFee)} ${td('')} ${td('0 %')} ${td('')} ${td(r.overtimeFee)} ${td('')}
-          </tr>`; }
-          // Notes row removed from table — shown below receipt instead
-          // Transport
-          rows+=`<tr>
-            ${tdL('Transportation Fees')}
-            ${td(r.bus||'')} ${td('')} ${td('Exempted')} ${td('')} ${td(r.bus||'')} ${td('')}
-          </tr>`;
-          // Uniforms — 5% VAT
-          rows+=`<tr style="${r.clothes?'background:#fffbeb':''}">
-            ${tdL('Uniforms Fees')}
-            ${td(r.clothes||'')} ${td('')} ${td(r.clothes?'5 %':'')} ${td(r.clothes?clothesVat:'')} ${td(r.clothes?Math.round((r.clothes+clothesVat)*100)/100:'')} ${td('')}
-          </tr>`;
-          // Stationary — 5% VAT
-          rows+=`<tr style="${r.tools?'background:#fffbeb':''}">
-            ${tdL('Stationary Fees')}
-            ${td(r.tools||'')} ${td('')} ${td(r.tools?'5 %':'')} ${td(r.tools?toolsVat:'')} ${td(r.tools?Math.round((r.tools+toolsVat)*100)/100:'')} ${td('')}
-          </tr>`;
-          // Others row for any extra vat
-          rows+=`<tr>
-            ${tdL('Others ............................................')}
-            ${td('')} ${td('')} ${td('......%')} ${td('')} ${td('')} ${td('')}
-          </tr>`;
-          return rows;
-        })()}
+        <!-- Row 1: Fees of the Month -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd">
+            The Fees of the Month : ( <b>${feeMonthName2}</b> )<br>
+            <span style="font-size:.68rem;color:#555">
+              Date From : ( ${fmtDD(r.fromDate)} ) &nbsp; Date To : ( ${fmtDD(r.toDate)} )
+            </span>
+          </td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.fee||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">0 %</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">—</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.fee||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 2: Registration -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd">
+            ${chk(r.reg)} Registration Fees: &nbsp; &#9744; Re-Registration Fees:
+          </td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.reg||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">0 %</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.reg?'—':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.reg||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 3: Others (Weekend + Hourly) -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd">
+            Others : (Extra Weekend, Hours${wkFeeTotal||r.hourFee?'':' ...............'})
+            ${wkFeeTotal?`<span style="font-size:.68rem;color:#059669;margin-left:5px">${wkFeeLabel}: ${wkFeeTotal} AED</span>`:''}
+            ${r.hourFee?`<span style="font-size:.68rem;color:#7c3aed;margin-left:5px">Hourly ${r.hourIn&&r.hourOut?r.hourIn+'→'+r.hourOut:''}: ${r.hourFee} AED</span>`:''}
+          </td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${(wkFeeTotal+(r.hourFee||0))||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${(wkFeeTotal||r.hourFee)?'0 %':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${(wkFeeTotal||r.hourFee)?'—':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${(wkFeeTotal+(r.hourFee||0))||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 4: Transportation -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd"><b>Transportation Fees :</b></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.bus||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">Exempted</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.bus?'—':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.bus||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 5: Uniforms 5% -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd"><b>Uniforms Fees :</b></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.clothes||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.clothes?'5 %':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.clothes?clothesVat2:''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.clothes?Math.round((r.clothes+clothesVat2)*100)/100:''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 6: Stationary 5% -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd"><b>Stationary Fees :</b></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.tools||''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.tools?'5 %':''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.tools?toolsVat2:''}</td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center">${r.tools?Math.round((r.tools+toolsVat2)*100)/100:''}</td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
+        <!-- Row 7: Others blank line -->
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd">Others ......................................................</td>
+          <td style="padding:5px;border:1px solid #ddd"></td><td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd;text-align:center;font-size:.68rem">........%</td>
+          <td style="padding:5px;border:1px solid #ddd"></td><td style="padding:5px;border:1px solid #ddd"></td>
+          <td style="padding:5px;border:1px solid #ddd"></td>
+        </tr>
       </tbody>
     </table>
-    <!-- TOTALS + PAYMENT -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;border-top:2px solid #1e3a8a">
-      <div style="padding:9px 14px;border-right:1px solid #ddd;font-size:.78rem">
-        <div style="font-weight:800;margin-bottom:5px">Total / المجموع</div>
-        <div style="border:1px solid #ccc;border-radius:5px;padding:5px 8px;min-height:32px;font-size:.85rem">${r.total?numToWords(r.total)+' Dirhams Only':'……………………'}</div>
-        <div style="margin-top:9px;display:flex;gap:5px;flex-wrap:wrap">
-          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='cash'?'#059669':'#e5e7eb'};background:${r.payMethod==='cash'?'#d1fae5':'#f9f9f9'};color:${r.payMethod==='cash'?'#065f46':'#9ca3af'}">
-            ${r.payMethod==='cash'?'✅ ':''} Cash
+    <!-- BOTTOM: Total words left | Amounts right -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-top:2px solid ${rcol}">
+      <!-- LEFT: words + payment method -->
+      <div style="padding:8px 10px;border-right:1px solid #ccc;font-size:.75rem">
+        <div style="font-weight:700">Total &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; المجموع</div>
+        <div style="border:1px solid #bbb;border-radius:4px;padding:4px 7px;min-height:28px;font-size:.78rem;font-style:italic;margin:4px 0">${r.total?numToWords(r.total)+' Dirhams Only':'…………………………………………'}</div>
+        <!-- Payment checkboxes -->
+        <div style="display:flex;gap:10px;align-items:center;margin-top:6px;font-size:.78rem">
+          <span>${chk(r.payMethod==='cash')} Cash</span>
+          <span>${chk(r.payMethod==='card')} Card Machine</span>
+          <span>${chk(r.payMethod==='bank')} Bank Transfer</span>
+        </div>
+        <div style="font-size:.7rem;color:#555;margin-top:5px">Ref ...................................................</div>
+        <div style="font-size:.68rem;color:#555;margin-top:8px"><b>Notice : All fees is not Refundable</b></div>
+        <div style="font-size:.68rem;color:#555;direction:rtl;text-align:right">ملاحظة : جميع الرسوم غير مستردة</div>
+        ${r.notes?`<div style="font-size:.68rem;color:#444;margin-top:4px;font-style:italic">Notes: ${r.notes}</div>`:''}
+      </div>
+      <!-- RIGHT: Total table -->
+      <div style="padding:8px 10px;font-size:.76rem">
+        <table style="width:100%;border-collapse:collapse">
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #ddd">Total Items Amount</td>
+            <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-weight:800">${fmtNum(subTotal)}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid #ddd">Total Vat Amount 5%</td>
+            <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-weight:800">${fmtNum(r.vatAmount||0)}</td>
+          </tr>
+          <tr style="background:${rcol};color:#fff">
+            <td style="padding:6px 8px;font-weight:900">Grand Total</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:900">${fmtNum(r.total)}</td>
+          </tr>
+        </table>
+        <!-- Signatures -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;font-size:.68rem">
+          <div style="border-top:1px solid #555;padding-top:4px;text-align:center">
+            عن الحضانة<br>For Nursery
           </div>
-          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='card'?'#7c3aed':'#e5e7eb'};background:${r.payMethod==='card'?'#ede9fe':'#f9f9f9'};color:${r.payMethod==='card'?'#5b21b6':'#9ca3af'}">
-            ${r.payMethod==='card'?'✅ ':''} Card Machine
-          </div>
-          <div style="padding:5px 12px;border-radius:8px;font-weight:800;font-size:.78rem;border:2.5px solid ${r.payMethod==='bank'?'#1e3a8a':'#e5e7eb'};background:${r.payMethod==='bank'?'#dbeafe':'#f9f9f9'};color:${r.payMethod==='bank'?'#1e3a8a':'#9ca3af'}">
-            ${r.payMethod==='bank'?'✅ ':''} Bank Transfer
+          <div style="border-top:1px solid #555;padding-top:4px;text-align:center;direction:rtl">
+            توقيع ولي الأمر<br>Parent's Signature
           </div>
         </div>
-        <div style="font-size:.72rem;margin-top:4px;color:#555">Ref: ________________________</div>
-        <div style="font-size:.7rem;color:#888;margin-top:6px">Notice: All fees is not Refundable</div>
-        <div style="font-size:.7rem;color:#888">ملاحظة: جميع الرسوم غير مستردة</div>
-      </div>
-      <div style="padding:9px 14px;font-size:.78rem">
-        <table style="width:100%;border-collapse:collapse">
-          <tr><td style="padding:4px 6px;border:1px solid #ddd">Total Items Amount</td><td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;text-align:center">${fmtNum(subTotal)}</td></tr>
-          <tr><td style="padding:4px 6px;border:1px solid #ddd">Total Vat Amount 5%</td><td style="padding:4px 6px;border:1px solid #ddd;font-weight:700;text-align:center">${fmtNum(r.vatAmount||0)}</td></tr>
-          <tr style="background:${rcol};color:#fff"><td style="padding:5px 6px;font-weight:800">Grand Total</td><td style="padding:5px 6px;font-weight:800;text-align:center">${fmtNum(r.total)}</td></tr>
-        </table>
       </div>
     </div>
-    ${r.notes?`<div style="padding:8px 14px;border-top:1px solid #ddd;font-size:.76rem">
-      <span style="font-weight:800;color:#374151">Notes / ملاحظات: </span>
-      <span style="color:#555;font-style:italic">${r.notes}</span>
-    </div>`:''}
     ${signedLine}
   </div>`;
   el('pmodal').classList.add('on');
@@ -3102,8 +3120,12 @@ function renderAtt(){
   const active=DB.children.filter(c=>{
     if(c.leaveDate) return false;
     if(!c.dutyDays||c.dutyDays.trim()==='') return true; // no schedule set = always show
-    const days=c.dutyDays.split(',').map(d=>{const t=d.trim();return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();});
-    return days.includes(todayDayName);
+    // Normalize both sides to lowercase 3-letter abbreviation for comparison
+    const dayFull=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const todayFull=dayFull[dateObj.getDay()].toLowerCase(); // e.g. 'tuesday'
+    const todayShort=todayDayName.toLowerCase(); // e.g. 'tue'
+    const days=c.dutyDays.split(',').map(d=>d.trim().toLowerCase());
+    return days.some(d=>d===todayShort||d===todayFull||d.startsWith(todayShort)||todayFull.startsWith(d));
   });
 
   const allActive=DB.children.filter(c=>!c.leaveDate);
