@@ -609,24 +609,62 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <div class="page" id="pg-attendance">
+
+<!-- ══ ATTENDANCE TOP TABS ══ -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+  <button onclick="switchAttTab('att')" id="atab-att"
+    style="padding:8px 18px;border-radius:20px;border:2px solid #1e3a8a;background:#1e3a8a;color:#fff;cursor:pointer;font-weight:800;font-size:.85rem;font-family:'Tajawal',sans-serif">
+    📋 Attendance
+  </button>
+  <button onclick="switchAttTab('bday')" id="atab-bday"
+    style="padding:8px 18px;border-radius:20px;border:2px solid #be185d;background:#fff;color:#be185d;cursor:pointer;font-weight:700;font-size:.85rem;font-family:'Tajawal',sans-serif">
+    🎂 Birthdays <span id="bday-btn-badge" style="display:none;background:#be185d;color:#fff;border-radius:10px;padding:0px 7px;font-size:.72rem;font-weight:900;margin-left:4px"></span>
+  </button>
+  <button onclick="switchAttTab('fee')" id="atab-fee"
+    style="padding:8px 18px;border-radius:20px;border:2px solid #e11d48;background:#fff;color:#e11d48;cursor:pointer;font-weight:700;font-size:.85rem;font-family:'Tajawal',sans-serif">
+    💸 Fee Reminders <span id="fee-btn-badge" style="display:none;background:#e11d48;color:#fff;border-radius:10px;padding:0px 7px;font-size:.72rem;font-weight:900;margin-left:4px"></span>
+  </button>
+</div>
+
+<!-- ══ TAB 1: ATTENDANCE ══ -->
+<div id="att-tab-att" style="display:block">
 <div class="card">
   <div class="ch">
-    <div class="ct" data-t="dailyAtt">📋 Daily Attendance — الحضور اليومي</div>
+    <div class="ct" data-t="dailyAtt">📋 Daily Attendance</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <input type="date" id="attdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderAtt()">
       <span id="att-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#e0e7ff;color:#3730a3"></span>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
-      <button id="fee-remind-btn" class="btn bsm" style="background:#be185d;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('bday')">
-        🎂 Birthdays <span id="bday-btn-badge" style="display:none;background:#fff;color:#be185d;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
-      </button>
-      <button id="fee-remind-btn2" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('fee')">
-        💸 Fee Reminders <span id="fee-btn-badge" style="display:none;background:#fff;color:#e11d48;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
-      </button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
+  </div>
+  <div id="attlist"></div>
+  <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
+</div>
+</div>
+
+<!-- ══ TAB 2: BIRTHDAYS ══ -->
+<div id="att-tab-bday" style="display:none">
+<div class="card">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <input type="month" id="bday-month-picker"
+      style="padding:5px 10px;border:1.5px solid #f9a8d4;border-radius:8px;font-family:'Tajawal',sans-serif"
+      onchange="renderBirthdayPanel()">
+    <span id="bday-count-badge" style="background:#fdf2f8;color:#be185d;padding:4px 10px;border-radius:10px;font-weight:800;font-size:.8rem"></span>
+  </div>
+  <div id="bday-list"></div>
+</div>
+</div>
+
+<!-- ══ TAB 3: FEE REMINDERS ══ -->
+<div id="att-tab-fee" style="display:none">
+<div class="card">
+  <div id="fee-reminder-list"></div>
+</div>
+</div>
 
 <!-- ATTENDANCE REPORT MODAL -->
 <div class="mover" id="att-report-modal">
@@ -634,54 +672,18 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="mh"><div class="mt">📊 تقرير الغياب الشهري</div><button class="xb" onclick="el('att-report-modal').classList.remove('on')">✕</button></div>
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
       <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label>من تاريخ / From</label>
-          <input type="date" id="att-rep-from" style="font-family:'Tajawal',sans-serif">
-        </div>
-        <div class="fg">
-          <label>إلى تاريخ / To</label>
-          <input type="date" id="att-rep-to" style="font-family:'Tajawal',sans-serif">
-        </div>
+        <div class="fg"><label>من تاريخ / From</label><input type="date" id="att-rep-from" style="font-family:'Tajawal',sans-serif"></div>
+        <div class="fg"><label>إلى تاريخ / To</label><input type="date" id="att-rep-to" style="font-family:'Tajawal',sans-serif"></div>
       </div>
       <div class="fg">
-        <label>الفصل / Class (اتركه فاضي للكل)</label>
-        <select id="att-rep-class" style="font-family:'Tajawal',sans-serif">
-          <option value="">كل الفصول / All Classes</option>
-        </select>
+        <label>الفصل / Class</label>
+        <select id="att-rep-class" style="font-family:'Tajawal',sans-serif"><option value="">كل الفصول / All Classes</option></select>
       </div>
-      <button onclick="printAttReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">
-        🖨️ طباعة التقرير
-      </button>
+      <button onclick="printAttReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">🖨️ طباعة التقرير</button>
     </div>
   </div>
 </div>
-  </div>
-  <div id="attlist"></div>
-  <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
-<div class="card" id="att-extras-card" style="margin-top:11px">
-  <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1.5px solid var(--border);padding-bottom:8px">
-    <button id="bdaytab-btn" onclick="switchAttExtra('bday')" 
-      style="padding:7px 16px;border-radius:18px;border:none;background:#fdf2f8;color:#be185d;cursor:pointer;font-weight:800;font-size:.82rem;font-family:'Tajawal',sans-serif">
-      🎂 Birthdays
-    </button>
-    <button id="feertab-btn" onclick="switchAttExtra('fee')"
-      style="padding:7px 16px;border-radius:18px;border:none;background:#f9f9f9;color:#6b7280;cursor:pointer;font-weight:700;font-size:.82rem;font-family:'Tajawal',sans-serif">
-      💸 Fee Reminders
-    </button>
-  </div>
-  <div id="att-bday-panel">
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <input type="month" id="bday-month-picker" 
-        style="padding:5px 10px;border:1.5px solid #f9a8d4;border-radius:8px;font-family:'Tajawal',sans-serif"
-        onchange="renderBirthdayPanel()">
-      <span id="bday-count-badge" style="background:#fdf2f8;color:#be185d;padding:4px 10px;border-radius:10px;font-weight:800;font-size:.8rem"></span>
-    </div>
-    <div id="bday-list"></div>
-  </div>
-  <div id="att-fee-panel" style="display:none">
-    <div id="fee-reminder-list"></div>
-  </div>
-</div>
+
 </div>
 
 <div class="page" id="pg-expenses">
@@ -3099,9 +3101,7 @@ async function delRec(id){
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
 function renderAtt(){
-  const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display='inline-flex';
-  const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display='inline-flex';
-  // Update badges
+  // Update badges on top tab buttons
   _updateBdayBtnBadge();
   _updateFeeBtnBadge();
   const date=el('attdate').value||today();
@@ -7978,11 +7978,6 @@ function printBusReport(){
 }
 
 // ─── Show fee reminder btn for admin ──────────
-function initApp(){
-  const fbtn = el('fee-remind-btn');
-  if(fbtn) fbtn.style.display = 'inline-flex';
-}
-
 // ─── Fee Reminder Modal ───────────────────────
 function openFeeReminderModal(){
   const mon = monthOf(new Date());
@@ -8227,21 +8222,31 @@ function checkBirthdays(){
   setTimeout(()=>{if(el('bday-toast'))el('bday-toast').remove();},10000);
 }
 
-function openAttExtras(tab){
-  switchAttExtra(tab||'bday');
-  const card=el('att-extras-card');
-  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-function switchAttExtra(tab){
-  el('att-bday-panel').style.display=tab==='bday'?'block':'none';
-  el('att-fee-panel').style.display=tab==='fee'?'block':'none';
-  const bb=el('bdaytab-btn'), fb=el('feertab-btn');
-  if(bb){bb.style.background=tab==='bday'?'#fdf2f8':'#f9f9f9'; bb.style.color=tab==='bday'?'#be185d':'#6b7280'; bb.style.fontWeight=tab==='bday'?'800':'700';}
-  if(fb){fb.style.background=tab==='fee'?'#fff1f2':'#f9f9f9';  fb.style.color=tab==='fee'?'#e11d48':'#6b7280';  fb.style.fontWeight=tab==='fee'?'800':'700';}
-  if(tab==='bday') renderBirthdayPanel();
+function switchAttTab(tab){
+  // Hide all tabs
+  ['att','bday','fee'].forEach(t=>{
+    const panel=el('att-tab-'+t); if(panel) panel.style.display='none';
+    const btn=el('atab-'+t);
+    if(btn){
+      if(t==='att'){btn.style.background=tab===t?'#1e3a8a':'#fff';btn.style.color=tab===t?'#fff':'#1e3a8a';}
+      else if(t==='bday'){btn.style.background=tab===t?'#be185d':'#fff';btn.style.color=tab===t?'#fff':'#be185d';}
+      else{btn.style.background=tab===t?'#e11d48':'#fff';btn.style.color=tab===t?'#fff':'#e11d48';}
+    }
+  });
+  // Show selected tab
+  const active=el('att-tab-'+tab); if(active) active.style.display='block';
+  // Render content
+  if(tab==='bday'){ const p=el('bday-month-picker'); if(p&&!p.value){p.value=today().slice(0,7);} renderBirthdayPanel(); }
   if(tab==='fee')  renderFeeReminderPanel();
 }
+
+function openAttExtras(tab){
+  switchAttTab(tab||'bday');
+  const panel=el('att-tab-'+(tab||'bday'));
+  if(panel) panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function switchAttExtra(tab){ switchAttTab(tab); }
 
 function renderBirthdayPanel(){
   const picker=el('bday-month-picker');
