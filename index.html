@@ -3115,27 +3115,11 @@ function renderAtt(){
   const dateObj=new Date(date+'T00:00:00');
   const todayDayName=dayNames[dateObj.getDay()]; // e.g. 'Fri'
 
-  // Filter: only children who have this day in their dutyDays
-  // If child has no dutyDays set → show them always (backwards compat)
-  const active=DB.children.filter(c=>{
-    if(c.leaveDate) return false;
-    if(!c.dutyDays||c.dutyDays.trim()==='') return true; // no schedule set = always show
-    // Normalize both sides to lowercase 3-letter abbreviation for comparison
-    const dayFull=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const todayFull=dayFull[dateObj.getDay()].toLowerCase(); // e.g. 'tuesday'
-    const todayShort=todayDayName.toLowerCase(); // e.g. 'tue'
-    const days=c.dutyDays.split(',').map(d=>d.trim().toLowerCase());
-    return days.some(d=>d===todayShort||d===todayFull||d.startsWith(todayShort)||todayFull.startsWith(d));
-  });
-
-  const allActive=DB.children.filter(c=>!c.leaveDate);
-  const filtered=allActive.length-active.length;
+  // Show ALL active children regardless of dutyDays
+  const active=DB.children.filter(c=>!c.leaveDate);
 
   if(!active.length){
-    el('attlist').innerHTML=`<div class="empty"><div class="ei">📅</div>
-      <p>${lang==='ar'?'لا يوجد أطفال مجدولون ليوم':'No children scheduled for'} ${todayDayName}</p>
-      <p style="font-size:.75rem;color:#9ca3af;margin-top:5px">${lang==='ar'?'كل الأطفال لديهم أيام مختلفة':'All children are on different days'}</p>
-    </div>`;
+    el('attlist').innerHTML=`<div class="empty"><div class="ei">👶</div><p>${lang==='ar'?'لا يوجد أطفال نشطين':'No active children'}</p></div>`;
     return;
   }
   if(!DB.attendance[date])DB.attendance[date]={};
