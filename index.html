@@ -609,24 +609,63 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <div class="page" id="pg-attendance">
+
+<!-- ══ ATTENDANCE TABS ══ -->
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <button onclick="switchAttTab('kids')" id="atab-kids"
+    style="padding:9px 22px;border-radius:22px;border:2px solid #1e3a8a;background:#1e3a8a;color:#fff;cursor:pointer;font-weight:800;font-size:.88rem;font-family:'Tajawal',sans-serif">
+    👧 Kids Attendance
+  </button>
+  <button onclick="switchAttTab('staff')" id="atab-staff"
+    style="padding:9px 22px;border-radius:22px;border:2px solid #7c3aed;background:#fff;color:#7c3aed;cursor:pointer;font-weight:700;font-size:.88rem;font-family:'Tajawal',sans-serif">
+    👷 Staff Attendance
+  </button>
+</div>
+
+<!-- ══ TAB: KIDS ATTENDANCE ══ -->
+<div id="att-tab-kids" style="display:block">
 <div class="card">
   <div class="ch">
-    <div class="ct" data-t="dailyAtt">📋 Daily Attendance — الحضور اليومي</div>
+    <div class="ct" data-t="dailyAtt">👧 Kids Daily Attendance</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <input type="date" id="attdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderAtt()">
       <span id="att-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#e0e7ff;color:#3730a3"></span>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
-      <button id="fee-remind-btn" class="btn bsm" style="background:#be185d;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('bday')">
-        🎂 Birthdays <span id="bday-btn-badge" style="display:none;background:#fff;color:#be185d;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
-      </button>
-      <button id="fee-remind-btn2" class="btn bsm" style="background:#e11d48;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none;gap:5px;align-items:center" onclick="openAttExtras('fee')">
-        💸 Fee Reminders <span id="fee-btn-badge" style="display:none;background:#fff;color:#e11d48;border-radius:10px;padding:0px 6px;font-size:.7rem;font-weight:900"></span>
-      </button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
+  </div>
+  <div id="attlist"></div>
+  <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
+</div>
+<!-- Active Kids List -->
+<div class="card" style="margin-top:10px">
+  <div class="ch"><div class="ct">👧 Active Kids — الأطفال النشطون</div><span id="active-kids-count" style="font-size:.78rem;font-weight:800;background:#dbeafe;color:#1e3a8a;padding:3px 10px;border-radius:10px"></span></div>
+  <div id="active-kids-list"></div>
+</div>
+</div>
+
+<!-- ══ TAB: STAFF ATTENDANCE ══ -->
+<div id="att-tab-staff" style="display:none">
+<div class="card">
+  <div class="ch">
+    <div class="ct">👷 Staff Daily Attendance</div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
+      <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
+    </div>
+  </div>
+  <div id="staffattlist"></div>
+  <div id="staffattsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:.8rem"></div>
+</div>
+<!-- Active Staff List -->
+<div class="card" style="margin-top:10px">
+  <div class="ch"><div class="ct">👷 Active Staff — الموظفون النشطون</div><span id="active-staff-count" style="font-size:.78rem;font-weight:800;background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:10px"></span></div>
+  <div id="active-staff-list"></div>
+</div>
+</div>
 
 <!-- ATTENDANCE REPORT MODAL -->
 <div class="mover" id="att-report-modal">
@@ -634,53 +673,47 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="mh"><div class="mt">📊 تقرير الغياب الشهري</div><button class="xb" onclick="el('att-report-modal').classList.remove('on')">✕</button></div>
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
       <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label>من تاريخ / From</label>
-          <input type="date" id="att-rep-from" style="font-family:'Tajawal',sans-serif">
-        </div>
-        <div class="fg">
-          <label>إلى تاريخ / To</label>
-          <input type="date" id="att-rep-to" style="font-family:'Tajawal',sans-serif">
-        </div>
+        <div class="fg"><label>من تاريخ / From</label><input type="date" id="att-rep-from" style="font-family:'Tajawal',sans-serif"></div>
+        <div class="fg"><label>إلى تاريخ / To</label><input type="date" id="att-rep-to" style="font-family:'Tajawal',sans-serif"></div>
       </div>
       <div class="fg">
-        <label>الفصل / Class (اتركه فاضي للكل)</label>
-        <select id="att-rep-class" style="font-family:'Tajawal',sans-serif">
-          <option value="">كل الفصول / All Classes</option>
-        </select>
+        <label>الفصل / Class</label>
+        <select id="att-rep-class" style="font-family:'Tajawal',sans-serif"><option value="">كل الفصول / All Classes</option></select>
       </div>
-      <button onclick="printAttReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">
-        🖨️ طباعة التقرير
-      </button>
+      <button onclick="printAttReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">🖨️ طباعة التقرير</button>
     </div>
   </div>
 </div>
-  </div>
-  <div id="attlist"></div>
-  <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
-<div class="card" id="att-extras-card" style="margin-top:11px">
-  <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1.5px solid var(--border);padding-bottom:8px">
-    <button id="bdaytab-btn" onclick="switchAttExtra('bday')" 
-      style="padding:7px 16px;border-radius:18px;border:none;background:#fdf2f8;color:#be185d;cursor:pointer;font-weight:800;font-size:.82rem;font-family:'Tajawal',sans-serif">
-      🎂 Birthdays
-    </button>
-    <button id="feertab-btn" onclick="switchAttExtra('fee')"
-      style="padding:7px 16px;border-radius:18px;border:none;background:#f9f9f9;color:#6b7280;cursor:pointer;font-weight:700;font-size:.82rem;font-family:'Tajawal',sans-serif">
-      💸 Fee Reminders
-    </button>
-  </div>
-  <div id="att-bday-panel">
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <input type="month" id="bday-month-picker" 
+
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- BIRTHDAYS PAGE                                 -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="page" id="pg-birthdays">
+<div class="card">
+  <div class="ch">
+    <div class="ct">🎂 Birthdays — أعياد الميلاد</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="month" id="bday-month-picker2"
         style="padding:5px 10px;border:1.5px solid #f9a8d4;border-radius:8px;font-family:'Tajawal',sans-serif"
         onchange="renderBirthdayPanel()">
       <span id="bday-count-badge" style="background:#fdf2f8;color:#be185d;padding:4px 10px;border-radius:10px;font-weight:800;font-size:.8rem"></span>
     </div>
-    <div id="bday-list"></div>
   </div>
-  <div id="att-fee-panel" style="display:none">
-    <div id="fee-reminder-list"></div>
+  <div id="bday-list"></div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEE REMINDERS PAGE                             -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="page" id="pg-reminders">
+<div class="card">
+  <div class="ch">
+    <div class="ct">💸 Fee Reminders — تذكير بالرسوم</div>
   </div>
+  <div id="fee-reminder-list"></div>
 </div>
 </div>
 
@@ -1230,11 +1263,11 @@ const BRANCHES = [
   {id:'b5', ar:'أبطال البراعم',   en:'Abtal Al Baraeim',  icon:'🦸', c:'#dc2626', l:'#fee2e2'},
 ];
 const ROLES_PAGES = {
-  admin:      ['dashboard','children','add','receipts','attendance','expenses','reports','staff','licenses','buses','visitors','admin'],
+  admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','admin'],
   visitor_reg:['visitors'],
-  receipts:   ['dashboard','children','add','receipts'],
+  receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
   expenses:   ['expenses'],
-  attendance: ['attendance'],
+  attendance: ['attendance','birthdays','reminders'],
   public_reg: ['add'],
   cashier:    ['cashier'],   // special: receipt scanner only
 };
@@ -1358,11 +1391,12 @@ async function loadFromSupa(bid) {
   bid=bid||curBid;
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e] = await Promise.all([
+    const [c,r,a,e,sa] = await Promise.all([
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
       sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('staff_attendance').select('*').eq('branch_id',bid).catch(()=>({data:[],error:null})),
     ]);
     if(c.error)throw c.error;
     DB.children = (c.data||[]).map(x=>({
@@ -1390,6 +1424,11 @@ async function loadFromSupa(bid) {
     (a.data||[]).forEach(x=>{
       const d=x.date;if(!DB.attendance[d])DB.attendance[d]={};
       DB.attendance[d][x.child_id]=x.status;
+    });
+    DB.staffAtt={};
+    (sa.data||[]).forEach(x=>{
+      const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
+      DB.staffAtt[d][x.staff_id]=x.status;
     });
     DB.expenses = (e.data||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
@@ -1852,7 +1891,10 @@ function initApp(){
   el('abr').innerHTML='<option value="all">All Branches — كل الفروع</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
   renderNav();applyTranslations();
   // Go to role's natural home page
-  if(curRole==='attendance')   showPage('attendance',null);
+  if(curRole==='attendance'){
+    ['att','bday','fee'].forEach(t=>{const p=el('att-tab-'+t);if(p)p.style.display=(t==='att'?'block':'none');});
+    showPage('attendance',null);
+  }
   else if(curRole==='expenses')    showPage('expenses',null);
   else if(curRole==='receipts')    showPage('receipts',null);
   else if(curRole==='visitor_reg') showPage('visitors',null);
@@ -1870,6 +1912,8 @@ function renderNav(){
     visitors:()=>lang==='ar'?'👶 الزوار':'👶 Visitors',
     licenses:()=>lang==='ar'?'🏢 الرخص':'🏢 Licenses',
     buses:()=>lang==='ar'?'🚌 الباصات':'🚌 Buses',
+    birthdays:()=>lang==='ar'?'🎂 أعياد الميلاد':'🎂 Birthdays',
+    reminders:()=>lang==='ar'?'💸 تذكير الرسوم':'💸 Fee Reminders',
   };
   el('nav').innerHTML=pages.map((p,i)=>`<button class="ntab${i===0?' on':''}" onclick="showPage('${p}',this)">${labels[p]()}</button>`).join('');
 }
@@ -1889,7 +1933,20 @@ async function showPage(page,btn){
     const tw=el('rectot-wrap'); if(tw) tw.style.display=curRole==='admin'?'':'none';
     const vb=el('vat-report-btn'); if(vb) vb.style.display=curRole==='admin'?'':'none';
   }
-  if(page==='attendance')renderAtt();
+  if(page==='attendance'){
+    if(!el('attdate').value) el('attdate').value=today();
+    if(!el('staffattdate').value) el('staffattdate').value=today();
+    renderAtt();
+    renderActiveKidsList();
+    renderStaffAtt();
+    renderActiveStaffList();
+  }
+  if(page==='birthdays'){
+    const p=el('bday-month-picker2'); if(p&&!p.value){p.value=today().slice(0,7);} renderBirthdayPanel();
+  }
+  if(page==='reminders'){
+    renderFeeReminderPanel();
+  }
   if(page==='expenses'){renderECats();renderExps();}
   if(page==='admin')renderAdmin();
   if(page==='staff'){populateStaffBranchFilter();renderStaff();renderStaffAlerts();}
@@ -3099,12 +3156,12 @@ async function delRec(id){
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
 function renderAtt(){
-  const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display='inline-flex';
-  const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display='inline-flex';
-  // Update badges
-  _updateBdayBtnBadge();
-  _updateFeeBtnBadge();
+  // Set default date if empty
+  if(!el('attdate').value) el('attdate').value=today();
   const date=el('attdate').value||today();
+  
+  // DEBUG: log children count
+  console.log('[renderAtt] DB.children:', DB.children.length, 'date:', date);
 
   // Get day name from date to filter children booked for this day
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -3236,6 +3293,172 @@ function toggleClassSection(id){
   const el2=document.getElementById(id);
   if(el2) el2.style.display=el2.style.display==='none'?'block':'none';
 }
+
+// ─── Active Kids List ─────────────────────────────
+function renderActiveKidsList(){
+  const active=DB.children.filter(c=>!c.leaveDate);
+  const cnt=el('active-kids-count');
+  if(cnt) cnt.textContent=active.length+' '+(lang==='ar'?'طفل نشط':'active kids');
+  const container=el('active-kids-list');
+  if(!container) return;
+  if(!active.length){container.innerHTML=`<div class="empty"><div class="ei">👶</div><p>No active kids</p></div>`;return;}
+  container.innerHTML=`<div style="display:flex;flex-direction:column;gap:5px">`+
+    active.map((c,i)=>{
+      const phone=c.parentMom||c.parentDad||'';
+      return`<div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:${i%2?'#fff':'#f0f9ff'};border-radius:9px">
+        <div class="av" style="background:${chCol(c.id)};width:30px;height:30px;font-size:.78rem;flex-shrink:0">${(c.name||'؟')[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.84rem">${c.name}</div>
+          <div style="font-size:.7rem;color:var(--muted)">${c.className||'—'} ${phone?'· '+phone:''}</div>
+        </div>
+        ${(c.bus==='Yes'||c.bus==='نعم')?'<span style="background:#dbeafe;color:#1e3a8a;font-size:.65rem;padding:2px 7px;border-radius:7px;font-weight:800">🚌</span>':''}
+      </div>`;
+    }).join('')+'</div>';
+}
+
+// ─── Active Staff List ───────────────────────────
+function renderActiveStaffList(){
+  const staff=DB.staff||[];
+  const cnt=el('active-staff-count');
+  if(cnt) cnt.textContent=staff.length+' '+(lang==='ar'?'موظف نشط':'active staff');
+  const container=el('active-staff-list');
+  if(!container) return;
+  if(!staff.length){container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>No staff found</p></div>`;return;}
+  container.innerHTML=`<div style="display:flex;flex-direction:column;gap:5px">`+
+    staff.map((s,i)=>{
+      const phone=s.contact||'';
+      return`<div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:${i%2?'#fff':'#f5f3ff'};border-radius:9px">
+        <div class="av" style="background:#7c3aed;color:#fff;width:30px;height:30px;font-size:.78rem;flex-shrink:0">${(s.name||'؟')[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.84rem">${s.name}</div>
+          <div style="font-size:.7rem;color:var(--muted)">${s.position||'—'} ${phone?'· '+phone:''}</div>
+        </div>
+      </div>`;
+    }).join('')+'</div>';
+}
+
+// ─── Staff Attendance ────────────────────────────
+// Staff attendance stored in DB.staffAtt[date][staffId] = 'حضور'|'غياب'
+
+function renderStaffAtt(){
+  const dateEl=el('staffattdate');
+  if(!dateEl) return;
+  if(!dateEl.value) dateEl.value=today();
+  const date=dateEl.value||today();
+  const staff=DB.staff||[];
+  const b=CB();
+
+  // Update day badge
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dayColors={Sun:'#ecfdf5',Mon:'#eff6ff',Tue:'#fdf4ff',Wed:'#fffbeb',Thu:'#f0f9ff',Fri:'#fef9c3',Sat:'#fdf2f8'};
+  const dayTxtColors={Sun:'#065f46',Mon:'#1e3a8a',Tue:'#7e22ce',Wed:'#92400e',Thu:'#0c4a6e',Fri:'#854d0e',Sat:'#9d174d'};
+  const dateObj=new Date(date+'T00:00:00');
+  const todayDayName=dayNames[dateObj.getDay()];
+  const badge=el('staff-day-badge');
+  if(badge){
+    badge.textContent=(lang==='ar'?dayAr[dateObj.getDay()]:todayDayName)+' 📅';
+    badge.style.background=dayColors[todayDayName]||'#f3f4f6';
+    badge.style.color=dayTxtColors[todayDayName]||'#374151';
+  }
+
+  const container=el('staffattlist');
+  if(!container) return;
+  if(!staff.length){
+    container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>${lang==='ar'?'لا يوجد موظفون':'No staff found'}</p></div>`;
+    return;
+  }
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+
+  let present=0, absent=0;
+  let html='<div style="display:flex;flex-direction:column;gap:0">';
+  staff.forEach((s,i)=>{
+    const st=DB.staffAtt[date][s.id]||DB.staffAtt[date][String(s.id)]||'غياب';
+    const isP=st==='حضور';
+    if(isP) present++; else absent++;
+    const phone=s.contact||'';
+    const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
+    const sentTime=localStorage.getItem(sentKey);
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f3f4f6;background:${isP?'#f0fdf4':'#fff9f9'}">
+      <div class="av" style="background:#7c3aed;color:#fff;width:32px;height:32px;font-size:.82rem;flex-shrink:0">${(s.name||'؟')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.86rem">${s.name}</div>
+        <div style="font-size:.7rem;color:var(--muted)">${s.position||'—'}${phone?' · '+phone:''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        ${!isP&&phone
+          ? sentTime
+            ? `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.7rem;font-weight:700">✅💬 ${sentTime}</button>`
+            : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.74rem;font-weight:700;animation:pulse 1.5s infinite">💬 واتساب</button>`
+          : ''}
+        <span onclick="toggleStaffAtt('${s.id}','${date}')" style="padding:5px 14px;border-radius:18px;cursor:pointer;font-weight:700;font-size:.77rem;min-width:65px;text-align:center;${isP?'background:#d1fae5;color:#065f46':'background:#fee2e2;color:#991b1b'}">
+          ${isP?'✅ '+(lang==='ar'?'حضور':'Present'):'❌ '+(lang==='ar'?'غياب':'Absent')}
+        </span>
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+
+  // Absent bar
+  const absentStaff=staff.filter(s=>(DB.staffAtt[date][s.id]||DB.staffAtt[date][String(s.id)]||'غياب')!=='حضور');
+  if(absentStaff.length){
+    const notSent=absentStaff.filter(s=>s.contact&&!localStorage.getItem('wa_staff_sent_'+curBid+'_'+date+'_'+s.id));
+    html+=`<div style="margin-top:8px;padding:9px 12px;background:#fef3c7;border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
+      <span style="font-size:.8rem;font-weight:700;color:#92400e">❌ ${absentStaff.length} ${lang==='ar'?'غائب':'absent'}</span>
+      ${notSent.length?`<button onclick="sendAllStaffAbsentWA('${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:800">💬 ${lang==='ar'?'واتساب للغائبين':'WhatsApp All Absent'} (${notSent.length})</button>`:''}
+    </div>`;
+  }
+
+  container.innerHTML=html;
+  el('staffattsum').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0">
+    <span style="color:var(--ok);font-weight:700">✅ ${lang==='ar'?'حضور':'Present'}: ${present}</span>
+    <span style="color:var(--err);font-weight:700">❌ ${lang==='ar'?'غياب':'Absent'}: ${absent}</span>
+    <span style="color:var(--muted)">👷 ${lang==='ar'?'إجمالي':'Total'}: ${staff.length}</span>
+  </div>`;
+}
+
+function toggleStaffAtt(staffId, date){
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  const cur=DB.staffAtt[date][staffId]||DB.staffAtt[date][String(staffId)]||'غياب';
+  const newSt=cur==='حضور'?'غياب':'حضور';
+  DB.staffAtt[date][staffId]=newSt;
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
+  renderStaffAtt();
+  // Save to supabase if table exists
+  sb.from('staff_attendance').upsert({branch_id:curBid,staff_id:staffId,date,status:newSt},{onConflict:'branch_id,staff_id,date'}).catch(()=>{});
+}
+
+function sendStaffAbsenceWA(staffId, date){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const phone=s.contact||'';
+  if(!phone) return alert(lang==='ar'?'لا يوجد رقم هاتف':'No phone number');
+  let num=phone.replace(/[^0-9]/g,'');
+  if(num.startsWith('0')) num='971'+num.substring(1);
+  else if(!num.startsWith('971')) num='971'+num;
+  const b=CB();
+  const dateStr=new Date(date).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{weekday:'long',day:'numeric',month:'long'});
+  const msg=lang==='ar'
+    ?`السلام عليكم ${s.name}،\n\nنتواصل معكم من ${b.ar}.\nلم يتم تسجيل حضوركم اليوم ${dateStr}.\nيرجى التواصل معنا لتوضيح السبب.\n\nشكراً 🌸`
+    :`Dear ${s.name},\n\nThis is ${b.en}.\nYour attendance was not recorded today ${dateStr}.\nPlease let us know if there is any issue.\n\nBest regards 🌸`;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+staffId;
+  localStorage.setItem(sentKey, new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+  logActivity('whatsapp', s.name+' (staff) — واتساب غياب أُرسل');
+  renderStaffAtt();
+}
+
+function sendAllStaffAbsentWA(date){
+  const staff=DB.staff||[];
+  const absent=staff.filter(s=>{
+    const st=DB.staffAtt[date]?.[s.id]||DB.staffAtt[date]?.[String(s.id)]||'غياب';
+    return st!=='حضور' && s.contact && !localStorage.getItem('wa_staff_sent_'+curBid+'_'+date+'_'+s.id);
+  });
+  if(!absent.length){alert(lang==='ar'?'لا يوجد غائبون':'No absent staff');return;}
+  absent.forEach((s,i)=>setTimeout(()=>sendStaffAbsenceWA(s.id,date),i*600));
+}
+
 
 async function markAllClass(cls, date, status){
   const kids=DB.children.filter(c=>!c.leaveDate&&(c.className||'—')===cls);
@@ -4701,6 +4924,7 @@ async function boot(){
 //  DB EXTENSIONS
 // ═══════════════════════════════════════════════
 DB.staff = [];
+DB.staffAtt = {};
 DB.buses = [];
 DB.licenses = {};
 
@@ -7978,11 +8202,6 @@ function printBusReport(){
 }
 
 // ─── Show fee reminder btn for admin ──────────
-function initApp(){
-  const fbtn = el('fee-remind-btn');
-  if(fbtn) fbtn.style.display = 'inline-flex';
-}
-
 // ─── Fee Reminder Modal ───────────────────────
 function openFeeReminderModal(){
   const mon = monthOf(new Date());
@@ -8216,7 +8435,7 @@ function checkBirthdays(){
   const toast=document.createElement('div');
   toast.id='bday-toast';
   toast.style.cssText='position:fixed;bottom:20px;right:16px;z-index:9999;max-width:300px;display:flex;flex-direction:column;gap:5px;cursor:pointer';
-  toast.onclick=()=>{toast.remove(); showPage('attendance'); setTimeout(()=>openAttExtras('bday'),400);};
+  toast.onclick=()=>{toast.remove(); showPage('birthdays',null);};
   bdays.slice(0,3).forEach(b=>{
     const d=document.createElement('div');
     d.style.cssText='background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #f9a8d4;border-radius:12px;padding:9px 13px;box-shadow:0 4px 12px rgba(0,0,0,.12)';
@@ -8227,24 +8446,29 @@ function checkBirthdays(){
   setTimeout(()=>{if(el('bday-toast'))el('bday-toast').remove();},10000);
 }
 
-function openAttExtras(tab){
-  switchAttExtra(tab||'bday');
-  const card=el('att-extras-card');
-  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+function switchAttTab(tab){
+  ['kids','staff'].forEach(t=>{
+    const panel=el('att-tab-'+t); if(panel) panel.style.display='none';
+    const btn=el('atab-'+t);
+    if(btn){
+      if(t==='kids'){btn.style.background=tab===t?'#1e3a8a':'#fff';btn.style.color=tab===t?'#fff':'#1e3a8a';btn.style.border='2px solid #1e3a8a';}
+      else{btn.style.background=tab===t?'#7c3aed':'#fff';btn.style.color=tab===t?'#fff':'#7c3aed';btn.style.border='2px solid #7c3aed';}
+    }
+  });
+  const active=el('att-tab-'+tab); if(active) active.style.display='block';
+  if(tab==='kids'){ renderAtt(); renderActiveKidsList(); }
+  if(tab==='staff'){ renderStaffAtt(); renderActiveStaffList(); }
 }
 
-function switchAttExtra(tab){
-  el('att-bday-panel').style.display=tab==='bday'?'block':'none';
-  el('att-fee-panel').style.display=tab==='fee'?'block':'none';
-  const bb=el('bdaytab-btn'), fb=el('feertab-btn');
-  if(bb){bb.style.background=tab==='bday'?'#fdf2f8':'#f9f9f9'; bb.style.color=tab==='bday'?'#be185d':'#6b7280'; bb.style.fontWeight=tab==='bday'?'800':'700';}
-  if(fb){fb.style.background=tab==='fee'?'#fff1f2':'#f9f9f9';  fb.style.color=tab==='fee'?'#e11d48':'#6b7280';  fb.style.fontWeight=tab==='fee'?'800':'700';}
-  if(tab==='bday') renderBirthdayPanel();
-  if(tab==='fee')  renderFeeReminderPanel();
+function openAttExtras(tab){
+  if(tab==='bday') showPage('birthdays',null);
+  else if(tab==='fee') showPage('reminders',null);
 }
+function switchAttExtra(tab){ switchAttTab(tab); }
 
 function renderBirthdayPanel(){
-  const picker=el('bday-month-picker');
+  const picker=el('bday-month-picker2')||el('bday-month-picker');
+  if(!picker) return;
   if(!picker.value) picker.value=monthOf(new Date());
   const mon=picker.value; // YYYY-MM
   const [yr,mo]=mon.split('-').map(Number);
@@ -8367,7 +8591,7 @@ function renderFeeReminderPanel(){
 }
 
 // Keep old openFeeReminderModal pointing to new system
-function openFeeReminderModal(){ openAttExtras('fee'); }
+function openFeeReminderModal(){ showPage('reminders',null); }
 
 // ─── Check if receipt covers a specific month ─────
 // Uses fromDate first, falls back to date
