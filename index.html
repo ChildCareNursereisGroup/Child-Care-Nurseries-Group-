@@ -8319,7 +8319,13 @@ function sendFeeReminderWA(childId){
   let num=formatWANum(phone);
   const b = CB();
   const mon = new Date().toLocaleString('en',{month:'long',year:'numeric'});
-  const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\nAmount Due: *${fmtNum(c.fee||0)} AED*\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
+  const tuition = c.fee||0;
+  const busFee  = c.busFee||0;
+  const total   = tuition + busFee;
+  let breakdown = `• Tuition Fee: *${fmtNum(tuition)} AED*`;
+  if(busFee>0) breakdown += `\n• Transportation Fee: *${fmtNum(busFee)} AED*`;
+  breakdown += `\n• *Total Due: ${fmtNum(total)} AED*`;
+  const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\n` + breakdown + `\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 
@@ -8637,10 +8643,14 @@ function renderFeeReminderPanel(){
 
   unpaid.forEach((c,i)=>{
     const phone=c.parentMom||c.parentDad||'';
+    const tuition=c.fee||0;
+    const busFee=c.busFee||0;
+    const total=tuition+busFee;
+    const feeLabel=busFee>0?`${fmtNum(tuition)} + 🚌${fmtNum(busFee)} = <b>${fmtNum(total)} AED</b>`:`<b>${fmtNum(total)} AED</b>`;
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:${i%2?'#fff':'#fff1f2'};border-radius:9px;border:1px solid #fecaca">
       <div>
         <div style="font-weight:700;font-size:.85rem">${c.name}</div>
-        <div style="font-size:.72rem;color:#6b7280">${c.className||'—'} | ${fmtNum(c.fee||0)} AED | ${phone||'No phone'}</div>
+        <div style="font-size:.72rem;color:#6b7280">${c.className||'—'} | ${feeLabel} | ${phone||'No phone'}</div>
       </div>
       ${phone?`<button onclick="sendFeeReminderWA('${c.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.75rem;font-weight:800;white-space:nowrap">💬 Send</button>`:'<span style="font-size:.72rem;color:#9ca3af">No phone</span>'}
     </div>`;
