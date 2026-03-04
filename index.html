@@ -1391,14 +1391,15 @@ async function loadFromSupa(bid) {
   bid=bid||curBid;
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e,sa] = await Promise.all([
+    const [c,r,a,e] = await Promise.all([
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
       sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
-      sb.from('staff_attendance').select('*').eq('branch_id',bid).catch(()=>({data:[],error:null})),
     ]);
     if(c.error)throw c.error;
+    if(r.error)throw r.error;
+    if(a.error)throw a.error;
     DB.children = (c.data||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
@@ -1425,11 +1426,6 @@ async function loadFromSupa(bid) {
       const d=x.date;if(!DB.attendance[d])DB.attendance[d]={};
       DB.attendance[d][x.child_id]=x.status;
     });
-    DB.staffAtt={};
-    (sa.data||[]).forEach(x=>{
-      const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
-      DB.staffAtt[d][x.staff_id]=x.status;
-    });
     DB.expenses = (e.data||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
       return{id:x.id,category:x.category||'',type:x.type||'',
@@ -1439,6 +1435,14 @@ async function loadFromSupa(bid) {
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',extra};
     });
     hideLoad();
+    // Load staff attendance separately — table may not exist yet, never block main load
+    sb.from('staff_attendance').select('*').eq('branch_id',bid).then(sa=>{
+      DB.staffAtt={};
+      (sa.data||[]).forEach(x=>{
+        const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
+        DB.staffAtt[d][x.staff_id]=x.status;
+      });
+    }).catch(()=>{ DB.staffAtt={}; });
     return true;
   } catch(err) {
     hideLoad();
