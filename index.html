@@ -1424,6 +1424,23 @@ const COLS=['#7c3aed','#e11d48','#0891b2','#059669','#d97706','#db2777','#6d28d9
 const n=id=>Number(document.getElementById(id)?.value||0);
 const v=id=>document.getElementById(id)?.value?.trim()||'';
 const el=id=>document.getElementById(id);
+
+// ── Smart WhatsApp number formatter ──────────────
+// Handles UAE (05x, 971), Egypt (+20), India (+91), Pakistan (+92), etc.
+function formatWANum(phone){
+  let num = phone.replace(/[^0-9+]/g,'').trim();
+  // Already has + prefix with country code → strip + only
+  if(num.startsWith('+')) return num.substring(1);
+  // Starts with 00 (international prefix) → strip 00
+  if(num.startsWith('00')) return num.substring(2);
+  // UAE local: 05x or 04x → add 971
+  if(num.startsWith('0')) return '971' + num.substring(1);
+  // Already has country code (7+ digits, starts with known code) → use as-is
+  // If no country code prefix and looks local UAE (8 digits starting with 5/4/2/3/6/7/9)
+  if(num.length === 9 && /^[5-9]/.test(num)) return '971' + num;
+  // Otherwise use as-is (already has country code)
+  return num;
+}
 const today=()=>new Date().toISOString().split('T')[0];
 const monthOf=d=>{if(!d)return'';const dt=new Date(d);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
 const fmtDate=d=>{
@@ -3442,9 +3459,7 @@ function sendStaffAbsenceWA(staffId, date){
   if(!s) return;
   const phone=s.contact||'';
   if(!phone) return alert(lang==='ar'?'لا يوجد رقم هاتف':'No phone number');
-  let num=phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0')) num='971'+num.substring(1);
-  else if(!num.startsWith('971')) num='971'+num;
+  let num=formatWANum(phone);
   const b=CB();
   const dateStr=new Date(date).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{weekday:'long',day:'numeric',month:'long'});
   const msg=lang==='ar'
@@ -3483,9 +3498,7 @@ function sendAbsenceWhatsApp(childId, date){
   if(!c)return;
   const phone=c.parentMom||c.parentDad||'';
   if(!phone)return alert(lang==='ar'?'لا يوجد رقم هاتف':'No phone number');
-  let num=phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0'))num='971'+num.substring(1);
-  else if(!num.startsWith('971'))num='971'+num;
+  let num=formatWANum(phone);
   const b=CB();
   const dateStr=new Date(date).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{weekday:'long',day:'numeric',month:'long'});
   const msg=lang==='ar'
@@ -3529,9 +3542,7 @@ function sendAllAbsentWhatsApp(cls, date){
   kids.forEach((c,i)=>{
     const phone=c.parentMom||c.parentDad||'';
     if(!phone)return;
-    let num=phone.replace(/[^0-9]/g,'');
-    if(num.startsWith('0'))num='971'+num.substring(1);
-    else if(!num.startsWith('971'))num='971'+num;
+    let num=formatWANum(phone);
     const b=CB();
     const dateStr=new Date(date).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{day:'numeric',month:'long'});
     const msg=lang==='ar'
@@ -4430,9 +4441,7 @@ function printProgress(){
 //  WHATSAPP
 // ═══════════════════════════════════════════════
 function sendWhatsApp(phone, childName, paid, balance){
-  let num=phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0'))num='971'+num.substring(1);
-  else if(!num.startsWith('971'))num='971'+num;
+  let num=formatWANum(phone);
   let msg='';
   if(balance>0){
     msg=`السلام عليكم ورحمة الله،
@@ -4456,10 +4465,9 @@ ${CB().ar}`;
 }
 
 function sendRenewalWhatsApp(c){
-  let num=(c.parentMom||c.parentDad||'').replace(/[^0-9]/g,'');
-  if(!num)return alert(lang==='ar'?'لا يوجد رقم هاتف!':'No phone number found!');
-  if(num.startsWith('0'))num='971'+num.substring(1);
-  else if(!num.startsWith('971'))num='971'+num;
+  const _rawNum=(c.parentMom||c.parentDad||'');
+  if(!_rawNum.replace(/[^0-9]/g,''))return alert(lang==='ar'?'لا يوجد رقم هاتف!':'No phone number found!');
+  let num=formatWANum(_rawNum);
   const msg=`السلام عليكم ورحمة الله،
 
 نودّ إعلامكم بأن تسجيل الطفل/ة *${c.name}* في ${CB().ar} سينتهي قريباً.
@@ -6625,9 +6633,7 @@ function sendReceiptWhatsApp(){
   const c=DB.children.find(x=>String(x.id)===String(r.childId));
   const phone=c?.parentMom||c?.parentDad||'';
   if(!phone){ alert(lang==='ar'?'لا يوجد رقم هاتف للأهل':'No parent phone number found'); return; }
-  let num=phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0')) num='971'+num.substring(1);
-  else if(!num.startsWith('971')) num='971'+num;
+  let num=formatWANum(phone);
   const b=BRANCHES.find(x=>x.id===r.branchId)||CB();
   const bx=getBranchExtra(b.id);
   const msg=`🧾 *${b.en||b.ar}*
@@ -7935,9 +7941,7 @@ function visWA(id){
   if(!v) return;
   const phone = v.phone_mom||v.phone_dad||'';
   if(!phone){ alert('لا يوجد رقم هاتف'); return; }
-  let num = phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0')) num='971'+num.substring(1);
-  else if(!num.startsWith('971')) num='971'+num;
+  let num=formatWANum(phone);
   const b=CB();
   const msg = 'السلام عليكم، من '+(b.ar||b.en)+'\nنرحب بزيارة *'+v.name+'* 🌸';
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
@@ -8312,9 +8316,7 @@ function sendFeeReminderWA(childId){
   if(!c) return;
   const phone = c.parentMom||c.parentDad||'';
   if(!phone){ alert('No phone number'); return; }
-  let num = phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0')) num='971'+num.substring(1);
-  else if(!num.startsWith('971')) num='971'+num;
+  let num=formatWANum(phone);
   const b = CB();
   const mon = new Date().toLocaleString('en',{month:'long',year:'numeric'});
   const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\nAmount Due: *${fmtNum(c.fee||0)} AED*\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
@@ -8391,9 +8393,7 @@ async function shareReceiptImageWA(){
         URL.revokeObjectURL(url);
         // Open WA after short delay
         setTimeout(()=>{
-          let num = phone.replace(/[^0-9]/g,'');
-          if(num.startsWith('0')) num='971'+num.substring(1);
-          else if(!num.startsWith('971')) num='971'+num;
+          let num=formatWANum(phone);
           if(num.length>8) window.open('https://wa.me/'+num,'_blank');
           else alert('Image downloaded. Send it manually on WhatsApp.');
         },1000);
@@ -8600,9 +8600,7 @@ function sendBirthdayWA(id, type){
     person=s.name; phone=s.phone||'';
   }
   if(!phone){alert('No phone number found');return;}
-  let num=phone.replace(/[^0-9]/g,'');
-  if(num.startsWith('0')) num='971'+num.substring(1);
-  else if(!num.startsWith('971')) num='971'+num;
+  let num=formatWANum(phone);
   const b=CB();
   const msg = type==='Child'
     ? `🎂 *Happy Birthday ${person}!*
