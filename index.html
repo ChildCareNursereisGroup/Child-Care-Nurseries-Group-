@@ -161,6 +161,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <div id="loading"><div class="spinner"></div><p id="lmsg">جاري الاتصال...</p></div>
 
+<!-- BUILD: 04/03/2026 02:17 v16.1 -->
 <div id="login">
 <div class="lbox">
   <div class="llogo-wrap">
@@ -657,9 +658,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="attlist"></div>
   <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
-</div>
-<!-- BIRTHDAY & FEE SECTION — inside attendance page -->
-<div class="card" id="att-extras-card" style="display:none">
+<div class="card" id="att-extras-card" style="margin-top:11px">
   <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1.5px solid var(--border);padding-bottom:8px">
     <button id="bdaytab-btn" onclick="switchAttExtra('bday')" 
       style="padding:7px 16px;border-radius:18px;border:none;background:#fdf2f8;color:#be185d;cursor:pointer;font-weight:800;font-size:.82rem;font-family:'Tajawal',sans-serif">
@@ -3102,11 +3101,8 @@ async function delRec(id){
 function renderAtt(){
   const fbtn=el('fee-remind-btn');  if(fbtn)  fbtn.style.display='inline-flex';
   const fbtn2=el('fee-remind-btn2'); if(fbtn2) fbtn2.style.display='inline-flex';
-  // Always hide extras panel on page load — only show when button clicked
-  const xcard=el('att-extras-card'); if(xcard) xcard.style.display='none';
-  // Update birthday count badge for today's month
+  // Update badges
   _updateBdayBtnBadge();
-  // Update unpaid count badge
   _updateFeeBtnBadge();
   const date=el('attdate').value||today();
 
@@ -8232,10 +8228,9 @@ function checkBirthdays(){
 }
 
 function openAttExtras(tab){
-  const card=el('att-extras-card');
-  if(card) card.style.display='block';
   switchAttExtra(tab||'bday');
-  card.scrollIntoView({behavior:'smooth',block:'start'});
+  const card=el('att-extras-card');
+  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function switchAttExtra(tab){
