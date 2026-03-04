@@ -982,6 +982,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <option value="expenses">💸 Expenses Staff</option>
   <option value="cashier">💳 Cashier</option>
   <option value="public_reg">📝 Public Registration</option>
+  <option value="inquiry">📋 Inquiry</option>
 </select></div>
     <div class="fg"><label data-t="newPass">الباسورد الجديد</label><input type="text" id="apw" placeholder="min 4 chars"></div>
   </div>
@@ -1092,12 +1093,11 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div class="card">
     <div class="ch">
       <div>
-        <div class="ct">👶 الزوار — Visitors</div>
+        <div class="ct">📋 Inquiries — الاستفسارات</div>
         <div id="vis-branch-name" style="font-size:.75rem;color:var(--muted);margin-top:2px"></div>
       </div>
-      <button onclick="openVisitorModal(null)" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.82rem">➕ زائر جديد</button>
+      <button onclick="openVisitorModal(null)" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.82rem">➕ استفسار جديد / New Inquiry</button>
     </div>
-    <!-- Search -->
     <div style="margin-bottom:10px">
       <input type="text" id="vis-search" placeholder="🔍 ابحث بالاسم أو رقم الهاتف..." oninput="renderVisitors()" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.85rem">
     </div>
@@ -1105,52 +1105,78 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
 </div>
 
-<!-- VISITOR MODAL -->
+<!-- INQUIRY MODAL -->
 <div class="mover" id="visitor-modal">
-  <div class="mbox" style="max-width:480px">
+  <div class="mbox" style="max-width:520px">
     <div class="mh">
-      <div class="mt" id="vis-modal-title">👶 إضافة زائر جديد</div>
+      <div class="mt" id="vis-modal-title">📋 استفسار جديد — New Inquiry</div>
       <button class="xb" onclick="el('visitor-modal').classList.remove('on')">✕</button>
     </div>
-    <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px;max-height:78vh;overflow-y:auto">
       <input type="hidden" id="vis-id">
+
+      <!-- Child Info -->
+      <div style="background:#eff6ff;border-radius:10px;padding:10px 12px;font-weight:800;color:#1e3a8a;font-size:.82rem">👶 بيانات الطفل — Child Information</div>
       <div class="g3" style="gap:8px">
         <div class="fg" style="grid-column:1/-1">
           <label style="font-weight:800">👶 اسم الطفل / Child Name *</label>
-          <input type="text" id="vis-name" placeholder="الاسم الكامل" style="font-family:'Tajawal',sans-serif">
+          <input type="text" id="vis-name" placeholder="الاسم الكامل / Full Name" style="font-family:'Tajawal',sans-serif">
         </div>
         <div class="fg">
-          <label>🎂 تاريخ الميلاد</label>
+          <label>🎂 تاريخ الميلاد / Date of Birth</label>
           <input type="date" id="vis-dob" style="font-family:'Tajawal',sans-serif">
         </div>
         <div class="fg">
-          <label>👧 الجنس</label>
-          <select id="vis-gender" style="font-family:'Tajawal',sans-serif">
-            <option value="Female">أنثى 👧</option>
-            <option value="Male">ذكر 👦</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>🌍 الجنسية</label>
+          <label>🌍 الجنسية / Nationality</label>
           <input type="text" id="vis-nat" placeholder="e.g. Emirati" style="font-family:'Tajawal',sans-serif">
         </div>
         <div class="fg">
-          <label>📱 رقم الأم / Mom</label>
-          <input type="tel" id="vis-mom" placeholder="+971..." style="font-family:'Tajawal',sans-serif">
+          <label>👧 الجنس / Gender</label>
+          <select id="vis-gender" style="font-family:'Tajawal',sans-serif">
+            <option value="Female">أنثى 👧 Female</option>
+            <option value="Male">ذكر 👦 Male</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Parent Contact -->
+      <div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;font-weight:800;color:#065f46;font-size:.82rem">📱 بيانات التواصل — Parent Contact</div>
+      <div class="g3" style="gap:8px">
+        <div class="fg">
+          <label>👩 رقم الأم / Mother Mobile *</label>
+          <input type="tel" id="vis-mom" placeholder="+971 50 000 0000" style="font-family:'Tajawal',sans-serif">
         </div>
         <div class="fg">
-          <label>📱 رقم الأب / Dad</label>
-          <input type="tel" id="vis-dad" placeholder="+971..." style="font-family:'Tajawal',sans-serif">
+          <label>👨 رقم الأب / Father Mobile</label>
+          <input type="tel" id="vis-dad" placeholder="+971 50 000 0000" style="font-family:'Tajawal',sans-serif">
+        </div>
+      </div>
+
+      <!-- Visit Info -->
+      <div style="background:#fdf4ff;border-radius:10px;padding:10px 12px;font-weight:800;color:#7e22ce;font-size:.82rem">🏫 بيانات الزيارة — Visit Information</div>
+      <div class="g3" style="gap:8px">
+        <div class="fg">
+          <label>🏫 اسم الفرع / Branch Name</label>
+          <input type="text" id="vis-branch" readonly style="font-family:'Tajawal',sans-serif;background:#f5f3ff;font-weight:700;color:#7c3aed">
+        </div>
+        <div class="fg">
+          <label>👔 اسم المدير / Manager Name</label>
+          <input type="text" id="vis-manager" placeholder="Manager / المدير" style="font-family:'Tajawal',sans-serif">
+        </div>
+        <div class="fg">
+          <label>📅 تاريخ الزيارة / Date of Visit</label>
+          <input type="date" id="vis-visit-date" style="font-family:'Tajawal',sans-serif">
         </div>
         <div class="fg" style="grid-column:1/-1">
           <label>📝 ملاحظات / Notes</label>
-          <textarea id="vis-notes" rows="2" style="font-family:'Tajawal',sans-serif"></textarea>
+          <textarea id="vis-notes" rows="2" style="font-family:'Tajawal',sans-serif" placeholder="Any additional notes..."></textarea>
         </div>
       </div>
+
       <div id="vis-alert"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button onclick="saveVisitor()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">💾 حفظ</button>
-        <button onclick="el('visitor-modal').classList.remove('on')" style="background:#f3f4f6;color:#374151;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">إلغاء</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <button onclick="saveVisitor()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ / Save</button>
+        <button onclick="el('visitor-modal').classList.remove('on')" style="background:#f3f4f6;color:#374151;border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">إلغاء / Cancel</button>
       </div>
     </div>
   </div>
@@ -1268,7 +1294,7 @@ const ROLES_PAGES = {
   receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
   expenses:   ['expenses'],
   attendance: ['attendance','birthdays','reminders'],
-  public_reg: ['add'],
+  inquiry:    ['visitors'],
   cashier:    ['cashier'],   // special: receipt scanner only
 };
 // Common tax & supplier fields added to every expense
@@ -1373,7 +1399,7 @@ function hideLoad(){el('loading').style.display='none';}
 function setSyncing(yes){const s=el('sind');if(s)s.textContent=yes?'🔄 جاري الحفظ...':'☁️ محفوظ';}
 function showAlert(id,msg,err){const e=el(id);if(e){e.innerHTML=`<div class="alert ${err?'aerr':'aok'}">${msg}</div>`;setTimeout(()=>e.innerHTML='',4000);}}
 function getPW(bid,role){
-  if(role==='public_reg'||role==='visitor_reg') return '__PUBLIC__'; // no password
+  if(role==='public_reg'||role==='visitor_reg'||role==='inquiry') return '__PUBLIC__'; // no password
   return localStorage.getItem(`pw_${bid}_${role}`)||{
     admin:'admin123',
     receipts:'rec456',
@@ -1784,14 +1810,14 @@ function renderLoginBranches(){
     </div>`).join('');
 }
 function renderLoginRoles(){
-  const roles=['admin','receipts','expenses','attendance','visitor_reg','public_reg'];
+  const roles=['admin','receipts','expenses','attendance','visitor_reg','inquiry'];
   const labels={
     admin:()=>t('roleAdmin'),
     receipts:()=>lang==='ar'?'🧾 إيصالات وأطفال':'🧾 Receipts & Children',
     expenses:()=>t('roleExpenses'),
     attendance:()=>t('roleAttendance'),
     visitor_reg:()=>lang==='ar'?'👶 تسجيل الزوار':'👶 Visitor Register',
-    public_reg:()=>lang==='ar'?'➕ تسجيل (عام)':'➕ Registration (Public)',
+    inquiry:()=>lang==='ar'?'📋 استفسار تسجيل':'📋 Inquiry',
   };
   el('rtabs').innerHTML=roles.map(r=>`<button class="rtab ${r===selRole?'on':''}" onclick="pickRole('${r}',this)">${labels[r]()}</button>`).join('');
 }
@@ -1803,19 +1829,19 @@ function pickRole(r,btn){
   const pwRow=el('pwi');
   const pubNote=el('pub-reg-note');
   if(pwRow){
-    pwRow.style.display=(r==='public_reg'||r==='visitor_reg')?'none':'block';
-    el('loginbtn').textContent=r==='public_reg'
-      ? (lang==='ar'?'➕ تسجيل طفل جديد':'➕ Register New Child')
+    pwRow.style.display=(r==='public_reg'||r==='visitor_reg'||r==='inquiry')?'none':'block';
+    el('loginbtn').textContent=r==='inquiry'
+      ? (lang==='ar'?'📋 دخول الاستفسار':'📋 Enter Inquiry')
       : r==='visitor_reg'
         ? (lang==='ar'?'👶 دخول الزوار':'👶 Enter Visitors')
         : t('loginBtn');
   }
   if(pubNote){
-    pubNote.style.display=r==='public_reg'?'block':'none';
+    pubNote.style.display=(r==='public_reg'||r==='inquiry')?'block':'none';
     const pt=el('pub-reg-txt');
     if(pt)pt.textContent=lang==='ar'
-      ?'✅ وضع التسجيل العام — يمكن لأي شخص التسجيل بدون باسورد'
-      :'✅ Public Registration Mode — anyone can register without a password';
+      ?'✅ وضع الاستفسار — يمكن لأي شخص تسجيل استفسار بدون باسورد'
+      :'✅ Inquiry Mode — anyone can submit an inquiry without a password';
   }
 }
 function pickBranch(id){
@@ -1826,7 +1852,7 @@ function pickBranch(id){
 
 async function doLogin(){
   const pw=el('pwi').value;
-  const isPublic=selRole==='public_reg'||selRole==='visitor_reg';
+  const isPublic=selRole==='public_reg'||selRole==='visitor_reg'||selRole==='inquiry';
   if(!isPublic && pw!==getPW(selBid,selRole)){
     const e=el('lerr');e.textContent=t('wrongPass');e.style.display='block';el('pwi').value='';return;
   }
@@ -1843,8 +1869,8 @@ async function doLogin(){
     sbOK=false;el('cdot').style.background='#e02424';
     el('ctxt').textContent=t('serverError');
   }
-  // VISITOR REGISTER mode — goes directly to visitors page
-  if(selRole==='visitor_reg'){
+  // VISITOR REGISTER / INQUIRY mode — goes directly to visitors page
+  if(selRole==='visitor_reg'||selRole==='inquiry'){
     await loadFromSupa(curBid);
     el('login').style.display='none';
     el('app').style.display='block';
@@ -1902,6 +1928,7 @@ function initApp(){
   else if(curRole==='expenses')    showPage('expenses',null);
   else if(curRole==='receipts')    showPage('receipts',null);
   else if(curRole==='visitor_reg') showPage('visitors',null);
+  else if(curRole==='inquiry')     showPage('visitors',null);
   else showPage('dashboard',null);
   // Load staff, buses, licenses in background
   Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
@@ -4633,7 +4660,7 @@ function renderAdmin(){
     {k:'attendance', icon:'📋', label:'Attendance'},
     {k:'expenses',   icon:'💸', label:'Expenses'},
     {k:'visitor_reg',icon:'👶', label:'Visitor Register'},
-    {k:'public_reg', icon:'📝', label:'Public Reg'},
+    {k:'inquiry',    icon:'📋', label:'Inquiry'},
   ];
   el('pwlist').innerHTML=BRANCHES.map(b=>`
     <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:8px">
@@ -7790,7 +7817,7 @@ function renderVisitors(){
   );
 
   if(!list.length){
-    el('vis-list').innerHTML = `<div class="empty"><div class="ei">👶</div><p>${q?'لا توجد نتائج':'لا يوجد زوار بعد — اضغط ➕ لإضافة زائر'}</p></div>`;
+    el('vis-list').innerHTML = `<div class="empty"><div class="ei">📋</div><p>${q?'لا توجد نتائج':'لا يوجد استفسارات بعد — اضغط ➕ لإضافة استفسار جديد'}</p></div>`;
     return;
   }
 
@@ -7799,23 +7826,38 @@ function renderVisitors(){
       const m = Math.floor((new Date()-new Date(v.dob))/(1000*60*60*24*30.5));
       return m>=12 ? Math.floor(m/12)+'y '+(m%12)+'m' : m+'m';
     })() : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border)">
-      <div class="av" style="background:${chCol(v.id||v.name)};width:38px;height:38px;font-size:.9rem;flex-shrink:0">${(v.name||'؟')[0]}</div>
-      <div style="flex:1">
-        <div style="font-weight:800;font-size:.88rem">${v.name} <span style="background:#f3e8ff;color:#7c3aed;font-size:.62rem;padding:1px 6px;border-radius:6px">👶 زائر</span></div>
-        <div style="font-size:.72rem;color:var(--muted)">
-          ${age?'🎂 '+age+' · ':''}${v.nationality?v.nationality+' · ':''}${v.gender==='Male'?'👦':'👧'}
+    return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <div class="av" style="background:${chCol(v.id||v.name)};width:40px;height:40px;font-size:.95rem;flex-shrink:0">${(v.name||'؟')[0]}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;font-size:.9rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${v.name}
+              <span style="background:#f3e8ff;color:#7c3aed;font-size:.62rem;padding:2px 7px;border-radius:6px;font-weight:700">📋 استفسار</span>
+              <span style="background:#e0f2fe;color:#0369a1;font-size:.62rem;padding:2px 7px;border-radius:6px">${v.gender==='Male'?'👦 Male':'👧 Female'}</span>
+            </div>
+            <div style="font-size:.73rem;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap">
+              ${age?'<span>🎂 '+age+'</span>':''}
+              ${v.nationality?'<span>🌍 '+v.nationality+'</span>':''}
+              ${v.visit_date?'<span>📅 '+v.visit_date+'</span>':''}
+            </div>
+            <div style="font-size:.73rem;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap">
+              ${v.phone_mom?'<span>👩 '+v.phone_mom+'</span>':''}
+              ${v.phone_dad?'<span>👨 '+v.phone_dad+'</span>':''}
+            </div>
+            <div style="font-size:.73rem;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap">
+              ${v.branch_name?'<span>🏫 '+v.branch_name+'</span>':''}
+              ${v.manager_name?'<span>👔 '+v.manager_name+'</span>':''}
+            </div>
+            ${v.notes?`<div style="font-size:.7rem;color:#9ca3af;margin-top:3px">📝 ${v.notes}</div>`:''}
+          </div>
         </div>
-        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">
-          ${v.phone_mom?'👩 '+v.phone_mom:''}${v.phone_dad?' · 👨 '+v.phone_dad:''}
+        <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap">
+          <button onclick="openVisitorModal('${v.id}')" style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem">✏️</button>
+          <button onclick="visWA('${v.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem" title="واتساب الأهل">💬</button>
+          <button onclick="makeReceiptForVisitor('${v.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem" title="إنشاء إيصال">🧾</button>
+          <button onclick="delVisitor('${v.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem">🗑</button>
         </div>
-        ${v.notes?`<div style="font-size:.7rem;color:#9ca3af;margin-top:2px">📝 ${v.notes}</div>`:''}
-      </div>
-      <div style="display:flex;gap:5px;flex-shrink:0">
-        <button onclick="openVisitorModal('${v.id}')" style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem">✏️</button>
-        <button onclick="visWA('${v.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem" title="واتساب الأهل">💬</button>
-        <button onclick="makeReceiptForVisitor('${v.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem" title="إنشاء إيصال">🧾</button>
-        <button onclick="delVisitor('${v.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.75rem">🗑</button>
       </div>
     </div>`;
   }).join('');
@@ -7823,15 +7865,21 @@ function renderVisitors(){
 
 function openVisitorModal(id){
   const v = id ? (DB.visitors||[]).find(x=>String(x.id)===String(id)) : null;
-  el('vis-id').value    = id||'';
-  el('vis-name').value  = v?.name||'';
-  el('vis-dob').value   = v?.dob||'';
-  el('vis-gender').value= v?.gender||'Female';
-  el('vis-nat').value   = v?.nationality||'';
-  el('vis-mom').value   = v?.phone_mom||'';
-  el('vis-dad').value   = v?.phone_dad||'';
-  el('vis-notes').value = v?.notes||'';
-  el('vis-modal-title').textContent = id?'✏️ تعديل بيانات الزائر':'👶 إضافة زائر جديد';
+  el('vis-id').value         = id||'';
+  el('vis-name').value       = v?.name||'';
+  el('vis-dob').value        = v?.dob||'';
+  el('vis-gender').value     = v?.gender||'Female';
+  el('vis-nat').value        = v?.nationality||'';
+  el('vis-mom').value        = v?.phone_mom||'';
+  el('vis-dad').value        = v?.phone_dad||'';
+  el('vis-notes').value      = v?.notes||'';
+  el('vis-manager').value    = v?.manager_name||'';
+  el('vis-visit-date').value = v?.visit_date||today();
+  // Auto-fill branch name
+  const b=CB();
+  const branchEl=el('vis-branch');
+  if(branchEl) branchEl.value=(lang==='ar'?b.ar:b.en)||b.ar||b.en||'';
+  el('vis-modal-title').textContent = id?'✏️ تعديل الاستفسار':'📋 استفسار جديد — New Inquiry';
   el('vis-alert').innerHTML='';
   el('visitor-modal').classList.add('on');
   setTimeout(()=>el('vis-name').focus(),100);
@@ -7841,15 +7889,19 @@ async function saveVisitor(){
   const name = el('vis-name')?.value?.trim();
   if(!name){ el('vis-alert').innerHTML='<span style="color:red">❌ أدخل اسم الطفل</span>'; return; }
   const id = el('vis-id').value;
+  const b=CB();
   const row = {
-    branch_id:  curBid,
+    branch_id:    curBid,
     name,
-    dob:        el('vis-dob')?.value||null,
-    gender:     el('vis-gender')?.value||'Female',
-    nationality:el('vis-nat')?.value||'',
-    phone_mom:  el('vis-mom')?.value||'',
-    phone_dad:  el('vis-dad')?.value||'',
-    notes:      el('vis-notes')?.value||''
+    dob:          el('vis-dob')?.value||null,
+    gender:       el('vis-gender')?.value||'Female',
+    nationality:  el('vis-nat')?.value||'',
+    phone_mom:    el('vis-mom')?.value||'',
+    phone_dad:    el('vis-dad')?.value||'',
+    notes:        el('vis-notes')?.value||'',
+    manager_name: el('vis-manager')?.value||'',
+    visit_date:   el('vis-visit-date')?.value||today(),
+    branch_name:  (lang==='ar'?b.ar:b.en)||b.ar||b.en||'',
   };
   setSyncing(true);
   let error;
