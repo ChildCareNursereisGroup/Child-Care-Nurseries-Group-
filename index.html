@@ -6006,25 +6006,57 @@ async function importStaffFromExcel(file){
   const wb = XLSX.read(ab);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-  
-  if(!rows.length){ showAlert('imp-alert','No data found in file',true); return; }
-  
-  const toDate=v=>{ if(!v) return null; if(typeof v==='number'){ const d=new Date((v-25569)*86400000); return d.toISOString().split('T')[0]; } return String(v)||null; };
-  
-  let ok=0, err=0;
+
+  if(!rows.length){ showAlert('staff-import-alert','No data found in file',true); return; }
+
+  // Convert Excel date serial or string to YYYY-MM-DD
+  const toDate=v=>{
+    if(!v) return null;
+    if(typeof v==='number'){ const d=new Date((v-25569)*86400000); return d.toISOString().split('T')[0]; }
+    if(v instanceof Date) return v.toISOString().split('T')[0];
+    const s=String(v).trim();
+    if(!s) return null;
+    // Try parse DD/MM/YYYY or MM/DD/YYYY
+    const parts=s.split(/[\/\-\.]/);
+    if(parts.length===3){
+      const [a,b,c]=parts.map(Number);
+      if(c>1900) return `${c}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`;
+      if(a>1900) return `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`;
+    }
+    return s||null;
+  };
+
+  // Map branch name → branch ID (fuzzy match)
+  const resolveBranch=nameRaw=>{
+    if(!nameRaw) return curBid;
+    const name=String(nameRaw).trim().toLowerCase();
+    const found=BRANCHES.find(b=>
+      b.en.toLowerCase().includes(name)||name.includes(b.en.toLowerCase())||
+      b.ar.includes(nameRaw.trim())||
+      b.id===name
+    );
+    return found?found.id:curBid;
+  };
+
+  let ok=0, skipped=0, errs=[];
+  showLoad('جاري استيراد الموظفين...');
+
   for(const row of rows){
+    const name=(row['Staff Name']||row['name']||'').trim();
+    if(!name){ skipped++; continue; }
     try{
+      const branchRaw=row['Branch ID']||row['Working Place']||'';
       const r={
-        branch_id: row['Branch ID']||row['branch_id']||curBid,
-        name:      row['Staff Name']||row['name']||'',
-        position:  row['Position']||'',
-        nationality: row['Nationality']||'',
-        dob:       toDate(row['Date of Birth']||row['DOB']),
-        contact:   String(row['Contact Number']||row['contact']||''),
-        email:     row['Email Address']||row['email']||'',
-        address:   row['Address']||'',
-        emergency_contact: row['Emergency Contact']||'',
-        working_place: row['Working Place']||'',
+        branch_id: resolveBranch(branchRaw),
+        name,
+        position:  String(row['Position']||'').trim(),
+        nationality: String(row['Nationality']||'').trim(),
+        dob:         toDate(row['Date of Birth']||row['DOB']),
+        contact:     String(row['Contact Number']||row['contact']||'').trim(),
+        email:       String(row['Email Address']||row['email']||'').trim(),
+        address:     String(row['Address']||'').trim(),
+        emergency_contact: String(row['Emergency Contact (Name + Relation)']||row['Emergency Contact']||'').trim(),
+        working_place: String(row['Working Place']||'').trim(),
         contract_start: toDate(row['Contract Start Date']),
         contract_end:   toDate(row['Contract End Date']),
         passport_expire:    toDate(row['Passport Expire Date']),
@@ -6032,15 +6064,24 @@ async function importStaffFromExcel(file){
         labour_expire:      toDate(row['Labour Card Expire Date']),
         spea_expire:        toDate(row['Spea Expire Date']||row['SPEA Expire']),
         health_card_expire: toDate(row['Health Card Expire Date']),
+        notes: String(row['Contract Type']||'').trim(),
       };
-      if(!r.name) continue;
       await sb.from('staff').insert(r);
       ok++;
-    } catch(e){ err++; }
+    } catch(e){
+      errs.push(name+': '+(e.message||'error'));
+    }
   }
+
+  hideLoad();
   await loadStaff();
   renderStaff(); renderStaffAlerts();
-  showAlert('staff-import-alert',`✅ Imported ${ok} staff members${err?' | ⚠️ '+err+' errors':''}`, err>0);
+
+  let msg=`✅ تم استيراد ${ok} موظف بنجاح`;
+  if(skipped) msg+=` | ⏭ تخطي ${skipped} صف فارغ`;
+  if(errs.length) msg+=` | ⚠️ ${errs.length} أخطاء`;
+  showAlert('staff-import-alert', msg, errs.length>0);
+  if(errs.length) console.warn('Import errors:', errs);
 }
 
 // Download staff template
