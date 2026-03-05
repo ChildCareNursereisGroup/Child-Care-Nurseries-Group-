@@ -133,6 +133,18 @@ main{padding:12px;max-width:960px;margin:0 auto}
 @media print{header,nav,.np{display:none!important}.card{box-shadow:none!important}body{background:#fff}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 .wa-summary{background:#d1fae5;border:1.5px solid #34d399;border-radius:10px;padding:7px 12px;margin-bottom:8px;font-size:.78rem;display:flex;align-items:center;gap:8px}
+
+/* HR Sub-tabs */
+.hr-tab{padding:8px 14px;border:1.5px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;white-space:nowrap;transition:all .2s;color:var(--txt)}
+.hr-tab.on{background:#1e3a8a;color:#fff;border-color:#1e3a8a}
+.hr-panel{display:none}.hr-panel.on{display:block}
+.pay-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:9px;border:1px solid var(--border);margin-bottom:6px;flex-wrap:wrap;gap:6px}
+.pay-row:hover{background:#f8fafc}
+.lv-badge{padding:2px 9px;border-radius:12px;font-size:.7rem;font-weight:700}
+.lv-annual{background:#dbeafe;color:#1e40af}
+.lv-sick{background:#fee2e2;color:#991b1b}
+.lv-unpaid{background:#f3f4f6;color:#374151}
+.lv-comp{background:#d1fae5;color:#065f46}
 </style>
 </head>
 <body>
@@ -637,6 +649,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
   </div>
+  <div id="att-day-label"></div>
   <div id="attlist"></div>
   <div id="attsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap"></div>
 </div>
@@ -994,6 +1007,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- STAFF PAGE -->
 <div class="page" id="pg-staff">
+<!-- HR Sub-tabs -->
+<div style="display:flex;gap:4px;overflow-x:auto;padding:0 2px 8px;scrollbar-width:none;flex-wrap:nowrap">
+  <button class="hr-tab on" onclick="showHRTab('hr-records',this)">👷 الموظفون</button>
+  <button class="hr-tab" onclick="showHRTab('hr-payroll',this)">💰 الرواتب</button>
+  <button class="hr-tab" onclick="showHRTab('hr-leaves',this)">🏖️ الإجازات</button>
+  <button class="hr-tab" onclick="showHRTab('hr-eog',this)">📋 نهاية الخدمة</button>
+  <button class="hr-tab" onclick="showHRTab('hr-reports',this)">📊 التقارير</button>
+</div>
+
+<!-- TAB: Staff Records -->
+<div class="hr-panel on" id="hr-records">
 <div class="card np">
   <div class="ch">
     <div class="ct">👷 Staff Records — ملفات العاملين</div>
@@ -1011,9 +1035,92 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <option value="all">All Branches</option>
     </select>
   </div>
-  <!-- Expiry alerts -->
   <div id="staff-alerts"></div>
   <div id="staff-list"></div>
+</div>
+</div>
+
+<!-- TAB: Payroll -->
+<div class="hr-panel" id="hr-payroll">
+<div class="card np">
+  <div class="ch">
+    <div class="ct">💰 حساب الرواتب الشهري — Monthly Payroll</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <input type="month" id="payroll-month" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="renderPayroll()">
+      <select id="payroll-branch" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="renderPayroll()">
+        <option value="all">All Branches</option>
+      </select>
+      <button class="btn bp bsm" onclick="exportPayrollExcel()">📊 Excel</button>
+      <button class="btn bg bsm" onclick="printPayroll()">🖨️ Print</button>
+    </div>
+  </div>
+  <div id="payroll-summary" style="margin-bottom:10px"></div>
+  <div id="payroll-list"></div>
+</div>
+</div>
+
+<!-- TAB: Leaves -->
+<div class="hr-panel" id="hr-leaves">
+<div class="card np">
+  <div class="ch">
+    <div class="ct">🏖️ طلبات الإجازة — Leave Requests</div>
+    <button class="btn bp bsm" onclick="openLeaveForm(null)">➕ طلب إجازة جديد</button>
+  </div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px">
+    <select id="leave-staff-filter" style="flex:1;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="renderLeaves()">
+      <option value="all">All Staff</option>
+    </select>
+    <select id="leave-type-filter" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="renderLeaves()">
+      <option value="all">All Types</option>
+      <option value="annual">Annual Leave</option>
+      <option value="sick">Sick Leave</option>
+      <option value="unpaid">Unpaid Leave</option>
+      <option value="compensation">Leave Compensation بدل إجازة</option>
+    </select>
+  </div>
+  <div id="leave-balance-summary" style="margin-bottom:10px"></div>
+  <div id="leave-list"></div>
+</div>
+</div>
+
+<!-- TAB: End of Service -->
+<div class="hr-panel" id="hr-eog">
+<div class="card np">
+  <div class="ch"><div class="ct">📋 نهاية الخدمة — End of Service (UAE Labour Law)</div></div>
+  <div style="background:#fef3c7;border-radius:11px;padding:12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
+    <b>⚖️ قانون العمل الإماراتي:</b> 21 يوم لكل سنة (أول 5 سنوات) | 30 يوم لكل سنة (بعد 5 سنوات) | تُحسب على آخر راتب أساسي
+  </div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px">
+    <select id="eog-staff-sel" style="flex:1;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
+      <option value="">-- اختر موظف --</option>
+    </select>
+    <select id="eog-reason" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
+      <option value="resignation">استقالة Resignation</option>
+      <option value="termination">إنهاء عقد Termination</option>
+      <option value="end_contract">انتهاء عقد End of Contract</option>
+    </select>
+    <input type="date" id="eog-end-date" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
+  </div>
+  <div id="eog-result"></div>
+</div>
+</div>
+
+<!-- TAB: Reports -->
+<div class="hr-panel" id="hr-reports">
+<div class="card np">
+  <div class="ch">
+    <div class="ct">📊 تقارير الموظفين — Staff Reports</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input type="month" id="rpt-month" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif">
+      <select id="rpt-staff-sel" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif">
+        <option value="all">All Staff</option>
+      </select>
+      <button class="btn bp bsm" onclick="generateStaffReport()">📊 Generate</button>
+      <button class="btn bg bsm" onclick="printStaffReport()">🖨️ Print</button>
+    </div>
+  </div>
+  <div id="staff-report-body"></div>
+</div>
 </div>
 </div>
 
@@ -1575,6 +1682,15 @@ function refreshCurrentPage(){
   if(pid==='children')renderChildren();
   if(pid==='receipts')renderRecs();
   if(pid==='attendance')renderAtt();
+  if(pid==='staff'){
+    // Hide payroll/reports/eog tabs from non-admin
+    ['hr-payroll','hr-eog','hr-reports'].forEach(tabId=>{
+      const btn=document.querySelector(`button[onclick*="${tabId}"]`);
+      const panel=el(tabId);
+      if(btn) btn.style.display=curRole==='admin'?'':'none';
+    });
+    loadHRData().then(()=>{ populateStaffBranchFilter(); renderStaff(); renderStaffAlerts(); });
+  }
   if(pid==='expenses')renderExps();
 }
 
@@ -2735,6 +2851,22 @@ function printVATReport(exportType='print'){
       ${T.grandTot}: ${fmt(grandTotal)} AED
     </div>
   </div>
+
+<!-- LEAVE REQUEST MODAL -->
+<div class="mover" id="leave-modal">
+<div class="modal" style="max-width:580px">
+  <div class="mh"><div class="mt" id="leave-modal-title">🏖️ طلب إجازة</div><button class="xb" onclick="el('leave-modal').classList.remove('on')">✕</button></div>
+  <div id="leave-form-body" style="padding:14px"></div>
+</div>
+</div>
+
+<!-- PAYROLL DETAIL MODAL -->
+<div class="mover" id="payroll-detail-modal">
+<div class="modal" style="max-width:620px">
+  <div class="mh"><div class="mt" id="payroll-detail-title">💰 تفاصيل الراتب</div><button class="xb" onclick="el('payroll-detail-modal').classList.remove('on')">✕</button></div>
+  <div id="payroll-detail-body" style="padding:14px"></div>
+</div>
+</div>
 </body></html>`;
 
   el('vat-report-modal').classList.remove('on');
@@ -3193,11 +3325,25 @@ function renderAtt(){
   const dateObj=new Date(date+'T00:00:00');
   const todayDayName=dayNames[dateObj.getDay()]; // e.g. 'Fri'
 
-  // Show ALL active children regardless of dutyDays
-  const active=DB.children.filter(c=>!c.leaveDate);
+  // Filter children scheduled for this day of week
+  const dayMap={'Sun':'Sunday','Mon':'Monday','Tue':'Tuesday','Wed':'Wednesday','Thu':'Thursday','Fri':'Friday','Sat':'Saturday'};
+  const fullDayName = dayMap[todayDayName]||todayDayName;
+  const active=DB.children.filter(c=>{
+    if(c.leaveDate) return false;
+    const duty=(c.dutyDays||'').split(',').map(d=>d.trim()).filter(Boolean);
+    // If no duty days set, show every day (backwards compat)
+    if(!duty.length) return true;
+    return duty.some(d=>d.toLowerCase()===fullDayName.toLowerCase()||d.toLowerCase()===todayDayName.toLowerCase());
+  });
+
+  // Show day label
+  const dayLabelEl=el('att-day-label');
+  if(dayLabelEl) dayLabelEl.innerHTML=`<div style="background:#dbeafe;color:#1e40af;border-radius:9px;padding:6px 12px;font-size:.78rem;font-weight:700;margin-bottom:8px;display:inline-block">
+    📅 ${fullDayName} — ${active.length} ${lang==='ar'?'طفل مجدول':'children scheduled'}
+  </div>`;
 
   if(!active.length){
-    el('attlist').innerHTML=`<div class="empty"><div class="ei">👶</div><p>${lang==='ar'?'لا يوجد أطفال نشطين':'No active children'}</p></div>`;
+    el('attlist').innerHTML=`<div class="empty"><div class="ei">🏖️</div><p>${lang==='ar'?'لا يوجد أطفال مجدولون هذا اليوم':'No children scheduled for '+fullDayName}</p></div>`;
     return;
   }
   if(!DB.attendance[date])DB.attendance[date]={};
@@ -3365,6 +3511,16 @@ function renderActiveStaffList(){
 // ─── Staff Attendance ────────────────────────────
 // Staff attendance stored in DB.staffAtt[date][staffId] = 'حضور'|'غياب'
 
+// ── Staff attendance notes/bonus/deductions per day (localStorage) ──────────
+function getStaffDayData(staffId, date){
+  const key = 'sd_'+curBid+'_'+staffId+'_'+date;
+  try{ return JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){ return {}; }
+}
+function setStaffDayData(staffId, date, data){
+  const key = 'sd_'+curBid+'_'+staffId+'_'+date;
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
 function renderStaffAtt(){
   const dateEl=el('staffattdate');
   if(!dateEl) return;
@@ -3373,7 +3529,6 @@ function renderStaffAtt(){
   const staff=DB.staff||[];
   const b=CB();
 
-  // Update day badge
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const dayColors={Sun:'#ecfdf5',Mon:'#eff6ff',Tue:'#fdf4ff',Wed:'#fffbeb',Thu:'#f0f9ff',Fri:'#fef9c3',Sat:'#fdf2f8'};
@@ -3395,8 +3550,9 @@ function renderStaffAtt(){
   }
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
 
-  let present=0, absent=0;
-  let html='<div style="display:flex;flex-direction:column;gap:0">';
+  let present=0, absent=0, totalBonus=0, totalDeduct=0;
+  let html='';
+
   staff.forEach((s,i)=>{
     const st=DB.staffAtt[date][s.id]||DB.staffAtt[date][String(s.id)]||'غياب';
     const isP=st==='حضور';
@@ -3404,42 +3560,230 @@ function renderStaffAtt(){
     const phone=s.contact||'';
     const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
     const sentTime=localStorage.getItem(sentKey);
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f3f4f6;background:${isP?'#f0fdf4':'#fff9f9'}">
-      <div class="av" style="background:#7c3aed;color:#fff;width:32px;height:32px;font-size:.82rem;flex-shrink:0">${(s.name||'؟')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:.86rem">${s.name}</div>
-        <div style="font-size:.7rem;color:var(--muted)">${s.position||'—'}${phone?' · '+phone:''}</div>
+    const basic=Number(s.basicSalary||0);
+    const dailyRate=basic>0?Math.round(basic/30*100)/100:0;
+    const dayData=getStaffDayData(s.id,date);
+    const bonus=Number(dayData.bonus||0);
+    const deduct=Number(dayData.deduct||0);
+    const absType=dayData.absType||'absent'; // absent|sick|excuse
+    const notes=dayData.notes||'';
+    totalBonus+=bonus; totalDeduct+=deduct;
+
+    // Net today impact
+    const todayDeduct=!isP&&basic>0?dailyRate:0;
+    const netImpact=bonus - deduct - (isP?0:todayDeduct);
+
+    html+=`<div style="border-bottom:1px solid #e5e7eb;background:${isP?'#f0fdf4':'#fff9f9'}">
+      <!-- Main row -->
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;">
+        <div class="av" style="background:#7c3aed;color:#fff;width:34px;height:34px;font-size:.85rem;flex-shrink:0">${(s.name||'؟')[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:.87rem">${s.name}</div>
+          <div style="font-size:.68rem;color:var(--muted)">${s.position||'—'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+          ${curRole==='admin'&&bonus>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 7px;font-size:.68rem;font-weight:800">+${fmtNum(bonus)}</span>`:''}
+          ${curRole==='admin'&&deduct>0?`<span style="background:#fee2e2;color:#dc2626;border-radius:7px;padding:2px 7px;font-size:.68rem;font-weight:800">-${fmtNum(deduct)}</span>`:''}
+          ${!isP&&phone
+            ? sentTime
+              ? `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.68rem;font-weight:700">✅💬</button>`
+              : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`
+            : ''}
+          <span onclick="toggleStaffAtt('${s.id}','${date}')" style="padding:5px 13px;border-radius:18px;cursor:pointer;font-weight:700;font-size:.76rem;min-width:68px;text-align:center;user-select:none;${isP?'background:#d1fae5;color:#065f46':'background:#fee2e2;color:#991b1b'}">
+            ${isP?'✅ حضور':'❌ غياب'}
+          </span>
+          <button onclick="toggleStaffExpand('${s.id}','${date}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.72rem;color:#6b7280">⚙️</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        ${!isP&&phone
-          ? sentTime
-            ? `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.7rem;font-weight:700">✅💬 ${sentTime}</button>`
-            : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:4px 9px;cursor:pointer;font-size:.74rem;font-weight:700;animation:pulse 1.5s infinite">💬 واتساب</button>`
-          : ''}
-        <span onclick="toggleStaffAtt('${s.id}','${date}')" style="padding:5px 14px;border-radius:18px;cursor:pointer;font-weight:700;font-size:.77rem;min-width:65px;text-align:center;${isP?'background:#d1fae5;color:#065f46':'background:#fee2e2;color:#991b1b'}">
-          ${isP?'✅ '+(lang==='ar'?'حضور':'Present'):'❌ '+(lang==='ar'?'غياب':'Absent')}
-        </span>
+      <!-- Expandable detail panel -->
+      <div id="sexp_${s.id}_${date.replace(/-/g,'')}" style="display:none;padding:10px 14px 12px;background:#fafafa;border-top:1px dashed #e5e7eb">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:.7rem;font-weight:700;color:#059669;margin-bottom:3px">🎁 مكافأة (AED)</div>
+            <input type="number" min="0" value="${bonus}"
+              onchange="saveStaffDayField('${s.id}','${date}','bonus',this.value)"
+              style="width:100%;padding:6px 9px;border:1.5px solid #d1fae5;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#f0fdf4">
+          </div>
+          <div>
+            <div style="font-size:.7rem;font-weight:700;color:#dc2626;margin-bottom:3px">✂️ خصم (AED)</div>
+            <input type="number" min="0" value="${deduct}"
+              onchange="saveStaffDayField('${s.id}','${date}','deduct',this.value)"
+              style="width:100%;padding:6px 9px;border:1.5px solid #fee2e2;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#fff9f9">
+          </div>
+          ${!isP?`<div>
+            <div style="font-size:.7rem;font-weight:700;color:#d97706;margin-bottom:3px">📋 نوع الغياب</div>
+            <select onchange="saveStaffDayField('${s.id}','${date}','absType',this.value)"
+              style="width:100%;padding:6px 9px;border:1.5px solid #fde68a;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;background:#fffbeb">
+              <option value="absent" ${absType==='absent'?'selected':''}>❌ غياب عادي</option>
+              <option value="sick" ${absType==='sick'?'selected':''}>🏥 إجازة مرضية</option>
+              <option value="excuse" ${absType==='excuse'?'selected':''}>📝 إذن / عذر</option>
+              <option value="unpaid" ${absType==='unpaid'?'selected':''}>⛔ إجازة بدون راتب</option>
+            </select>
+          </div>`:''}
+          <div>
+            <div style="font-size:.7rem;font-weight:700;color:#6b7280;margin-bottom:3px">📝 ملاحظات</div>
+            <input type="text" value="${notes}" placeholder="أي ملاحظات..."
+              onchange="saveStaffDayField('${s.id}','${date}','notes',this.value)"
+              style="width:100%;padding:6px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          </div>
+        </div>
+        ${basic>0&&curRole==='admin'?`<div style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px;font-size:.76rem">
+          <div style="font-weight:800;color:#1e3a8a;margin-bottom:5px">💰 تأثير اليوم على الراتب</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>الراتب اليومي</span><span>${fmtNum(dailyRate)} AED</span></div>
+          ${!isP?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>خصم غياب</span><span>- ${fmtNum(dailyRate)}</span></div>`:''}
+          ${bonus>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#059669"><span>مكافأة</span><span>+ ${fmtNum(bonus)}</span></div>`:''}
+          ${deduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>خصم إضافي</span><span>- ${fmtNum(deduct)}</span></div>`:''}
+          <div style="border-top:1px solid var(--border);margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;font-weight:800">
+            <span>صافي اليوم</span>
+            <span style="color:${netImpact>=0?'#059669':'#dc2626'}">${netImpact>=0?'+':''}${fmtNum(netImpact)} AED</span>
+          </div>
+        </div>`:''}
       </div>
     </div>`;
   });
-  html+='</div>';
 
   // Absent bar
   const absentStaff=staff.filter(s=>(DB.staffAtt[date][s.id]||DB.staffAtt[date][String(s.id)]||'غياب')!=='حضور');
   if(absentStaff.length){
     const notSent=absentStaff.filter(s=>s.contact&&!localStorage.getItem('wa_staff_sent_'+curBid+'_'+date+'_'+s.id));
     html+=`<div style="margin-top:8px;padding:9px 12px;background:#fef3c7;border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-      <span style="font-size:.8rem;font-weight:700;color:#92400e">❌ ${absentStaff.length} ${lang==='ar'?'غائب':'absent'}</span>
-      ${notSent.length?`<button onclick="sendAllStaffAbsentWA('${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:800">💬 ${lang==='ar'?'واتساب للغائبين':'WhatsApp All Absent'} (${notSent.length})</button>`:''}
+      <span style="font-size:.8rem;font-weight:700;color:#92400e">❌ ${absentStaff.length} غائب</span>
+      ${notSent.length?`<button onclick="sendAllStaffAbsentWA('${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:800">💬 واتساب للغائبين (${notSent.length})</button>`:''}
     </div>`;
   }
 
   container.innerHTML=html;
-  el('staffattsum').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0">
-    <span style="color:var(--ok);font-weight:700">✅ ${lang==='ar'?'حضور':'Present'}: ${present}</span>
-    <span style="color:var(--err);font-weight:700">❌ ${lang==='ar'?'غياب':'Absent'}: ${absent}</span>
-    <span style="color:var(--muted)">👷 ${lang==='ar'?'إجمالي':'Total'}: ${staff.length}</span>
+
+  // Monthly salary summary button
+  const mon=date.substring(0,7);
+  el('staffattsum').innerHTML=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:4px 0">
+      <span style="color:var(--ok);font-weight:700">✅ حضور: ${present}</span>
+      <span style="color:var(--err);font-weight:700">❌ غياب: ${absent}</span>
+      <span style="color:var(--muted)">👷 الإجمالي: ${staff.length}</span>
+      ${curRole==='admin'&&totalBonus>0?`<span style="color:#059669;font-weight:700">🎁 مكافآت: +${fmtNum(totalBonus)}</span>`:''}
+      ${curRole==='admin'&&totalDeduct>0?`<span style="color:#dc2626;font-weight:700">✂️ خصومات: -${fmtNum(totalDeduct)}</span>`:''}
+      ${curRole==='admin'?`<button onclick="showMonthlySalarySummary('${mon}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:5px 13px;cursor:pointer;font-size:.76rem;font-weight:800;margin-right:auto">💰 ملخص رواتب ${mon}</button>`:''}
+    </div>`;
+}
+
+function toggleStaffExpand(staffId, date){
+  const id='sexp_'+staffId+'_'+date.replace(/-/g,'');
+  const el2=el(id); if(!el2) return;
+  el2.style.display=el2.style.display==='none'?'block':'none';
+}
+
+function saveStaffDayField(staffId, date, field, value){
+  const data=getStaffDayData(staffId,date);
+  data[field]=field==='bonus'||field==='deduct'?Number(value):value;
+  setStaffDayData(staffId,date,data);
+  // Update bonus/deduction in staff record for payroll calc
+  if(field==='bonus'||field==='deduct'){
+    const mon=date.substring(0,7);
+    // Accumulate all bonuses/deductions for this month
+    const s=DB.staff.find(x=>String(x.id)===String(staffId));
+    if(s){
+      let totalBonus=0,totalDeduct=0;
+      const daysInMon=new Date(parseInt(mon.split('-')[0]),parseInt(mon.split('-')[1]),0).getDate();
+      for(let d=1;d<=daysInMon;d++){
+        const dd=mon+'-'+String(d).padStart(2,'0');
+        const dd2=getStaffDayData(staffId,dd);
+        totalBonus+=Number(dd2.bonus||0);
+        totalDeduct+=Number(dd2.deduct||0);
+      }
+      sb.from('staff').update({bonus:totalBonus,deductions:totalDeduct}).eq('id',staffId).catch(()=>{});
+      s.bonus=totalBonus; s.deductions=totalDeduct;
+    }
+  }
+  renderStaffAtt();
+}
+
+function showMonthlySalarySummary(mon){
+  const staff=DB.staff.filter(s=>Number(s.basicSalary)>0);
+  if(!staff.length){ alert('لا يوجد موظفون لديهم راتب محدد'); return; }
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  let html=`<div style="font-weight:900;color:#1e3a8a;font-size:.95rem;margin-bottom:12px">💰 ملخص رواتب شهر ${mon}</div>`;
+  let grandTotal=0;
+  html+=`<table style="width:100%;border-collapse:collapse;font-size:.78rem">
+    <thead><tr style="background:#1e3a8a;color:#fff">
+      <th style="padding:7px;text-align:right">الموظف</th>
+      <th style="padding:7px;text-align:center">كود التحويل</th>
+      <th style="padding:7px;text-align:center">الأساسي</th>
+      <th style="padding:7px;text-align:center">غياب</th>
+      <th style="padding:7px;text-align:center">مكافآت</th>
+      <th style="padding:7px;text-align:center">خصومات</th>
+      <th style="padding:7px;text-align:center;font-weight:900">الصافي</th>
+    </tr></thead><tbody>`;
+  staff.forEach((s,i)=>{
+    const basic=Number(s.basicSalary);
+    const dailyRate=basic/daysInMonth;
+    // Count absences + collect bonuses/deductions from daily data
+    let absCount=0, totalBonus=0, totalDeduct=0;
+    for(let d=1;d<=daysInMonth;d++){
+      const dd=mon+'-'+String(d).padStart(2,'0');
+      const attSt=DB.staffAtt[dd]?.[s.id]||DB.staffAtt[dd]?.[String(s.id)]||'';
+      if(attSt&&attSt!=='حضور') absCount++;
+      const dd2=getStaffDayData(s.id,dd);
+      totalBonus+=Number(dd2.bonus||0);
+      totalDeduct+=Number(dd2.deduct||0);
+    }
+    const sickDays=countSickLeave(s.id,mon);
+    let sickDed=0;
+    if(sickDays>15&&sickDays<=45) sickDed=dailyRate*(sickDays-15)*0.5;
+    else if(sickDays>45) sickDed=dailyRate*30*0.5+dailyRate*(sickDays-45);
+    const absDed=dailyRate*Math.max(0,absCount-sickDays);
+    const net=Math.max(0,basic-absDed-sickDed-totalDeduct+totalBonus);
+    grandTotal+=net;
+    html+=`<tr style="background:${i%2?'#fff':'#f8fafc'};border-bottom:1px solid var(--border)">
+      <td style="padding:7px"><div style="font-weight:700">${s.name}</div><div style="font-size:.65rem;color:#9ca3af">${s.position||''}</div></td>
+      <td style="padding:7px;text-align:center"><span style="background:#ede9fe;color:#5b21b6;border-radius:6px;padding:1px 7px;font-weight:800">${s.transferCode||'—'}</span></td>
+      <td style="padding:7px;text-align:center">${fmtNum(basic)}</td>
+      <td style="padding:7px;text-align:center">${absCount>0?`<span style="color:#dc2626;font-weight:700">${absCount}د ${absDed>0?'(-'+fmtNum(absDed)+')':''}</span>`:'<span style="color:#059669">0</span>'}</td>
+      <td style="padding:7px;text-align:center;color:#059669;font-weight:700">${totalBonus>0?'+'+fmtNum(totalBonus):'—'}</td>
+      <td style="padding:7px;text-align:center;color:#dc2626;font-weight:700">${totalDeduct>0?'-'+fmtNum(totalDeduct):'—'}</td>
+      <td style="padding:7px;text-align:center"><span style="background:#d1fae5;color:#065f46;border-radius:8px;padding:3px 10px;font-weight:900">${fmtNum(net)}</span></td>
+    </tr>`;
+  });
+  html+=`</tbody><tfoot><tr style="background:#1e3a8a;color:#fff;font-weight:900">
+    <td colspan="6" style="padding:9px;text-align:right">إجمالي الرواتب</td>
+    <td style="padding:9px;text-align:center;font-size:.9rem">${fmtNum(grandTotal)} AED</td>
+  </tr></tfoot></table>
+  <div style="margin-top:10px;display:flex;gap:7px">
+    <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:.82rem">🖨️ طباعة</button>
+    <button onclick="exportSalarySummary('${mon}')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:.82rem">📊 Excel</button>
   </div>`;
+  showModal('💰 ملخص رواتب '+mon, html);
+}
+
+function exportSalarySummary(mon){
+  const staff=DB.staff.filter(s=>Number(s.basicSalary)>0);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const rows=staff.map(s=>{
+    const basic=Number(s.basicSalary);
+    const dailyRate=basic/daysInMonth;
+    let absCount=0,totalBonus=0,totalDeduct=0;
+    for(let d=1;d<=daysInMonth;d++){
+      const dd=mon+'-'+String(d).padStart(2,'0');
+      const attSt=DB.staffAtt[dd]?.[s.id]||'';
+      if(attSt&&attSt!=='حضور') absCount++;
+      const dd2=getStaffDayData(s.id,dd);
+      totalBonus+=Number(dd2.bonus||0);
+      totalDeduct+=Number(dd2.deduct||0);
+    }
+    const absDed=dailyRate*absCount;
+    const net=Math.max(0,basic-absDed-totalDeduct+totalBonus);
+    return [s.name,s.position||'',s.transferCode||'',basic,absCount,
+      Math.round(absDed*100)/100,totalBonus,totalDeduct,Math.round(net*100)/100];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['الموظف','الوظيفة','كود التحويل','الراتب الأساسي','أيام الغياب','خصم الغياب','المكافآت','الخصومات','صافي الراتب'],
+    ...rows
+  ]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Salaries '+mon);
+  XLSX.writeFile(wb,'salaries_'+mon+'.xlsx');
 }
 
 function toggleStaffAtt(staffId, date){
@@ -3450,7 +3794,6 @@ function toggleStaffAtt(staffId, date){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
   renderStaffAtt();
-  // Save to supabase if table exists
   sb.from('staff_attendance').upsert({branch_id:curBid,staff_id:staffId,date,status:newSt},{onConflict:'branch_id,staff_id,date'}).catch(()=>{});
 }
 
@@ -3484,7 +3827,16 @@ function sendAllStaffAbsentWA(date){
 
 
 async function markAllClass(cls, date, status){
-  const kids=DB.children.filter(c=>!c.leaveDate&&(c.className||'—')===cls);
+  const _dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const _dayMap={'Sun':'Sunday','Mon':'Monday','Tue':'Tuesday','Wed':'Wednesday','Thu':'Thursday','Fri':'Friday','Sat':'Saturday'};
+  const _dn=_dayNames[new Date(date+'T00:00:00').getDay()];
+  const _full=_dayMap[_dn]||_dn;
+  const kids=DB.children.filter(c=>{
+    if(c.leaveDate||(c.className||'—')!==cls) return false;
+    const duty=(c.dutyDays||'').split(',').map(d=>d.trim()).filter(Boolean);
+    if(!duty.length) return true;
+    return duty.some(d=>d.toLowerCase()===_full.toLowerCase()||d.toLowerCase()===_dn.toLowerCase());
+  });
   if(!DB.attendance[date])DB.attendance[date]={};
   for(const c of kids){
     DB.attendance[date][c.id]=status;
@@ -4975,6 +5327,8 @@ async function loadStaff(){
     passportExpire:x.passport_expire||'', idExpire:x.id_expire||'',
     labourExpire:x.labour_expire||'', speaExpire:x.spea_expire||'',
     healthCardExpire:x.health_card_expire||'',
+    basicSalary:Number(x.basic_salary||0), transferCode:x.transfer_code||'',
+    bonus:Number(x.bonus||0), deductions:Number(x.deductions||0),
     notes:x.notes||''
   }));
 }
@@ -5051,6 +5405,8 @@ function renderStaff(){
         <div style="display:flex;gap:6px">
           <button class="btn bo bsm" onclick="openStaffForm('${s.id}')">✏️ Edit</button>
           <button class="btn bd bsm" onclick="deleteStaff('${s.id}')">🗑</button>
+          ${s.basicSalary>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">${fmtNum(s.basicSalary)} AED</span>`:''}
+          ${s.transferCode?`<span style="background:#ede9fe;color:#5b21b6;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">${s.transferCode}</span>`:''}
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px">
@@ -5078,6 +5434,15 @@ function openStaffForm(id){
       <div class="fg"><label>Address</label><input id="sf_addr" value="${s?.address||''}"></div>
       <div class="fg"><label>Emergency Contact (Name + Relation)</label><input id="sf_emname" value="${s?.emergencyContact||''}" placeholder="e.g. Ahmed - Brother"></div>
       <div class="fg"><label>Emergency Phone Number 🚨</label><input id="sf_emphone" type="tel" value="${s?.emergencyPhone||''}" placeholder="+971 50 000 0000"></div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:9px;padding:10px;margin-bottom:9px">
+      <div style="font-weight:800;color:#065f46;margin-bottom:8px;font-size:.82rem">💰 Salary & Payroll — الراتب</div>
+      <div class="g3">
+        <div class="fg"><label>Basic Salary الراتب الأساسي (AED)</label><input type="number" id="sf_basic" value="${s?.basicSalary||''}" placeholder="e.g. 3500" min="0"></div>
+        <div class="fg"><label>Transfer Code كود التحويل</label><input id="sf_tcode" value="${s?.transferCode||''}" placeholder="e.g. EMP001"></div>
+        <div class="fg"><label>Bonus هذا الشهر (AED)</label><input type="number" id="sf_bonus" value="${s?.bonus||0}" min="0"></div>
+        <div class="fg"><label>Deductions خصومات (AED)</label><input type="number" id="sf_ded" value="${s?.deductions||0}" min="0"></div>
+      </div>
     </div>
     <div style="background:#f0f4ff;border-radius:9px;padding:10px;margin-bottom:9px">
       <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">📅 Contract Dates — تواريخ العقد</div>
@@ -5128,6 +5493,10 @@ async function saveStaff(id){
     spea_expire: document.getElementById('sf_spea')?.value||null,
     health_card_expire: document.getElementById('sf_health')?.value||null,
     notes: document.getElementById('sf_notes')?.value||'',
+    basic_salary: Number(document.getElementById('sf_basic')?.value||0),
+    transfer_code: document.getElementById('sf_tcode')?.value||'',
+    bonus: Number(document.getElementById('sf_bonus')?.value||0),
+    deductions: Number(document.getElementById('sf_ded')?.value||0),
   };
   if(id){
     await sb.from('staff').update(row).eq('id',id);
@@ -8682,6 +9051,682 @@ function recCoversMonth(r, month){
   if(r.fromDate) return monthOf(r.fromDate)===month;
   if(r.toDate)   return monthOf(r.toDate)===month;
   return monthOf(r.date)===month;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HR SYSTEM — Attendance, Payroll, Leaves, End of Service
+// ═══════════════════════════════════════════════════════════
+
+DB.leaves    = [];
+DB.salaries  = []; // payroll records saved per month
+
+// ── HR Tab switcher ─────────────────────────────
+function showHRTab(id, btn){
+  document.querySelectorAll('.hr-panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.hr-tab').forEach(b=>b.classList.remove('on'));
+  const p=el(id); if(p) p.classList.add('on');
+  if(btn) btn.classList.add('on');
+  if(id==='hr-payroll')  { populatePayrollBranch(); renderPayroll(); }
+  if(id==='hr-leaves')   { populateLeaveStaffFilter(); renderLeaves(); }
+  if(id==='hr-eog')      { populateEOGSelect(); }
+  if(id==='hr-reports')  { populateRptSelects(); }
+}
+
+// ── Load HR data from Supabase ───────────────────
+async function loadHRData(){
+  try{
+    const [lv] = await Promise.all([
+      sb.from('staff_leaves').select('*').eq('branch_id',curBid).order('start_date',{ascending:false}),
+    ]);
+    DB.leaves = (lv.data||[]).map(x=>({
+      id:x.id, staffId:x.staff_id, branchId:x.branch_id,
+      type:x.type||'annual', startDate:x.start_date||'', endDate:x.end_date||'',
+      days:Number(x.days||0), paid:x.paid!==false,
+      sickCertificate:x.sick_certificate||false,
+      notes:x.notes||'', status:x.status||'approved',
+      createdAt:x.created_at||''
+    }));
+  }catch(e){ DB.leaves=[]; }
+}
+
+// ═══════════════════════════════════════════════
+//  PAYROLL
+// ═══════════════════════════════════════════════
+function populatePayrollBranch(){
+  const sel=el('payroll-branch'); if(!sel) return;
+  sel.innerHTML=`<option value="all">All Branches</option>`+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
+}
+
+function renderPayroll(){
+  const monthEl=el('payroll-month');
+  if(!monthEl) return;
+  if(!monthEl.value){ const n=new Date(); monthEl.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); }
+  const mon=monthEl.value;
+  const bf=el('payroll-branch')?.value||'all';
+  let staff=[...DB.staff];
+  if(bf!=='all') staff=staff.filter(s=>s.branchId===bf);
+  if(!staff.length){ el('payroll-list').innerHTML=`<div class="empty"><div class="ei">💰</div><p>No staff found</p></div>`; return; }
+
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+
+  let totalPayroll=0;
+  const rows=staff.map(s=>{
+    const basic=Number(s.basicSalary||0);
+    if(!basic) return null;
+    // Count absences this month
+    const absCount=countAbsences(s.id,mon);
+    const sickDays=countSickLeave(s.id,mon);
+    // UAE sick leave law: first 15 days full pay, next 30 days half pay, after 45 unpaid
+    let sickDeduction=0;
+    if(sickDays>15 && sickDays<=45) sickDeduction=(basic/daysInMonth)*(sickDays-15)*0.5;
+    else if(sickDays>45) sickDeduction=(basic/daysInMonth)*(sickDays-45)+(basic/daysInMonth)*(sickDays-45>30?30:sickDays-45)*0.5;
+    const absDeduction=(basic/daysInMonth)*Math.max(0,absCount-sickDays);
+    const bonus=Number(s.bonus||0);
+    const deductions=Number(s.deductions||0);
+    const netSalary=Math.max(0,basic - absDeduction - sickDeduction - deductions + bonus);
+    totalPayroll+=netSalary;
+    return {s, basic, absCount, sickDays, sickDeduction, absDeduction, bonus, deductions, netSalary, daysInMonth};
+  }).filter(Boolean);
+
+  // Summary boxes
+  el('payroll-summary').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+      <div class="sc"><div class="si">👷</div><div class="sv">${rows.length}</div><div class="sk">Staff on Payroll</div></div>
+      <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(totalPayroll)}</div><div class="sk">Total Payroll (AED)</div></div>
+      <div class="sc"><div class="si">🏦</div><div class="sv">ednered</div><div class="sk">Transfer via</div></div>
+    </div>`;
+
+  el('payroll-list').innerHTML=`
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+      <thead><tr style="background:#1e3a8a;color:#fff">
+        <th style="padding:8px;text-align:right;border-radius:8px 0 0 0">الموظف</th>
+        <th style="padding:8px;text-align:center">كود التحويل</th>
+        <th style="padding:8px;text-align:center">الراتب الأساسي</th>
+        <th style="padding:8px;text-align:center">غياب</th>
+        <th style="padding:8px;text-align:center">خصم غياب</th>
+        <th style="padding:8px;text-align:center">مرضى</th>
+        <th style="padding:8px;text-align:center">بونص</th>
+        <th style="padding:8px;text-align:center">خصومات</th>
+        <th style="padding:8px;text-align:center;font-weight:900;border-radius:0 8px 0 0">صافي الراتب</th>
+        <th style="padding:8px;text-align:center"></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r,i)=>`
+          <tr style="background:${i%2?'#fff':'#f8fafc'};border-bottom:1px solid var(--border)">
+            <td style="padding:8px">
+              <div style="font-weight:700">${r.s.name}</div>
+              <div style="font-size:.68rem;color:var(--muted)">${r.s.position||'—'}</div>
+            </td>
+            <td style="padding:8px;text-align:center">
+              <span style="background:#ede9fe;color:#5b21b6;border-radius:7px;padding:2px 8px;font-weight:800;font-size:.75rem">${r.s.transferCode||'—'}</span>
+            </td>
+            <td style="padding:8px;text-align:center;font-weight:700">${fmtNum(r.basic)}</td>
+            <td style="padding:8px;text-align:center">
+              ${r.absCount>0?`<span style="color:#dc2626;font-weight:800">${r.absCount}d</span>`:'<span style="color:#059669">0</span>'}
+            </td>
+            <td style="padding:8px;text-align:center;color:${r.absDeduction>0?'#dc2626':'#059669'}">
+              ${r.absDeduction>0?'-'+fmtNum(r.absDeduction):'0'}
+            </td>
+            <td style="padding:8px;text-align:center">
+              ${r.sickDays>0?`<span style="color:#d97706;font-weight:700">${r.sickDays}d${r.sickDeduction>0?' (-'+fmtNum(r.sickDeduction)+')':''}</span>`:'0'}
+            </td>
+            <td style="padding:8px;text-align:center;color:#059669;font-weight:700">
+              ${r.bonus>0?'+'+fmtNum(r.bonus):'—'}
+            </td>
+            <td style="padding:8px;text-align:center;color:#dc2626;font-weight:700">
+              ${r.deductions>0?'-'+fmtNum(r.deductions):'—'}
+            </td>
+            <td style="padding:8px;text-align:center">
+              <span style="background:#d1fae5;color:#065f46;border-radius:8px;padding:3px 10px;font-weight:900;font-size:.82rem">${fmtNum(r.netSalary)}</span>
+            </td>
+            <td style="padding:8px;text-align:center">
+              <button onclick="openPayrollDetail('${r.s.id}','${mon}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:7px;padding:3px 9px;cursor:pointer;font-size:.72rem">✏️ تعديل</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="background:#1e3a8a;color:#fff;font-weight:900">
+        <td colspan="8" style="padding:10px;text-align:right">إجمالي الرواتب — Total Payroll</td>
+        <td style="padding:10px;text-align:center;font-size:.95rem">${fmtNum(totalPayroll)} AED</td>
+        <td></td>
+      </tr></tfoot>
+    </table>`;
+}
+
+function countAbsences(staffId, mon){
+  let count=0;
+  Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+    if(date.startsWith(mon)){
+      const st=map[staffId]||map[String(staffId)];
+      if(st&&st!=='حضور'&&st!=='present') count++;
+    }
+  });
+  return count;
+}
+
+function countSickLeave(staffId, mon){
+  return (DB.leaves||[]).filter(l=>
+    String(l.staffId)===String(staffId)&&
+    l.type==='sick'&&
+    (l.startDate||'').startsWith(mon)
+  ).reduce((s,l)=>s+(l.days||0),0);
+}
+
+function openPayrollDetail(staffId, mon){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const basic=Number(s.basicSalary||0);
+  const absCount=countAbsences(s.id,mon);
+  const sickDays=countSickLeave(s.id,mon);
+  const bonus=Number(s.bonus||0);
+  const deductions=Number(s.deductions||0);
+  el('payroll-detail-title').textContent=`💰 راتب ${s.name} — ${mon}`;
+  el('payroll-detail-body').innerHTML=`
+    <div class="g2" style="margin-bottom:12px">
+      <div class="fg"><label>الراتب الأساسي (AED)</label><input type="number" id="pd_basic" value="${basic}" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>كود التحويل</label><input id="pd_code" value="${s.transferCode||''}" placeholder="EDNEREF Code"></div>
+      <div class="fg"><label>بونص (AED) ➕</label><input type="number" id="pd_bonus" value="${bonus}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>خصومات (AED) ➖</label><input type="number" id="pd_ded" value="${deductions}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>أيام غياب</label><input type="number" id="pd_abs" value="${absCount}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>أيام إجازة مرضية 🏥</label><input type="number" id="pd_sick" value="${sickDays}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+    </div>
+    <div id="pd_result" style="background:#f0fdf4;border-radius:10px;padding:12px;margin-bottom:12px;font-size:.85rem"></div>
+    <div class="fg" style="margin-bottom:10px"><label>ملاحظات</label><textarea id="pd_notes" rows="2"></textarea></div>
+    <div style="display:flex;gap:7px">
+      <button class="btn bp" onclick="savePayrollDetail('${staffId}','${mon}')">💾 حفظ</button>
+      <button class="btn bg" onclick="el('payroll-detail-modal').classList.remove('on')">إلغاء</button>
+    </div>
+    <div id="pd-alert"></div>
+  `;
+  recalcPayDetail(daysInMonth);
+  el('payroll-detail-modal').classList.add('on');
+}
+
+function recalcPayDetail(daysInMonth){
+  const basic=Number(el('pd_basic')?.value||0);
+  const bonus=Number(el('pd_bonus')?.value||0);
+  const ded=Number(el('pd_ded')?.value||0);
+  const abs=Number(el('pd_abs')?.value||0);
+  const sick=Number(el('pd_sick')?.value||0);
+  const dailyRate=daysInMonth>0?basic/daysInMonth:0;
+  const absDeduct=dailyRate*Math.max(0,abs-sick);
+  let sickDeduct=0;
+  if(sick>15&&sick<=45) sickDeduct=dailyRate*(sick-15)*0.5;
+  else if(sick>45) sickDeduct=dailyRate*30*0.5+dailyRate*(sick-45);
+  const net=Math.max(0,basic-absDeduct-sickDeduct-ded+bonus);
+  const res=el('pd_result');
+  if(res) res.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>الراتب الأساسي</span><span><b>${fmtNum(basic)} AED</b></span></div>
+    ${absDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>خصم غياب (${Math.max(0,abs-sick)} يوم)</span><span>- ${fmtNum(absDeduct)}</span></div>`:''}
+    ${sickDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#d97706"><span>خصم إجازة مرضية (${sick} يوم)</span><span>- ${fmtNum(sickDeduct)}</span></div>`:''}
+    ${bonus>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#059669"><span>بونص</span><span>+ ${fmtNum(bonus)}</span></div>`:''}
+    ${ded>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>خصومات أخرى</span><span>- ${fmtNum(ded)}</span></div>`:''}
+    <div style="border-top:2px solid #059669;margin-top:7px;padding-top:7px;display:flex;justify-content:space-between;font-weight:900;font-size:.95rem">
+      <span>صافي الراتب</span><span style="color:#059669">${fmtNum(net)} AED</span>
+    </div>`;
+}
+
+async function savePayrollDetail(staffId, mon){
+  const basic=Number(el('pd_basic')?.value||0);
+  const code=el('pd_code')?.value||'';
+  const bonus=Number(el('pd_bonus')?.value||0);
+  const ded=Number(el('pd_ded')?.value||0);
+  // Update staff record with bonus/deductions/code for this calc
+  await sb.from('staff').update({
+    basic_salary: basic,
+    transfer_code: code,
+    bonus: bonus,
+    deductions: ded,
+  }).eq('id',staffId);
+  await loadStaff();
+  showAlert('pd-alert','✅ تم الحفظ!',false);
+  setTimeout(()=>{ el('payroll-detail-modal').classList.remove('on'); renderPayroll(); },700);
+}
+
+function exportPayrollExcel(){
+  const mon=el('payroll-month')?.value||'';
+  const bf=el('payroll-branch')?.value||'all';
+  let staff=[...DB.staff];
+  if(bf!=='all') staff=staff.filter(s=>s.branchId===bf);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const rows=staff.filter(s=>s.basicSalary>0).map(s=>{
+    const basic=Number(s.basicSalary||0);
+    const absCount=countAbsences(s.id,mon);
+    const sickDays=countSickLeave(s.id,mon);
+    let sickDed=0;
+    if(sickDays>15&&sickDays<=45) sickDed=(basic/daysInMonth)*(sickDays-15)*0.5;
+    else if(sickDays>45) sickDed=(basic/daysInMonth)*30*0.5+(basic/daysInMonth)*(sickDays-45);
+    const absDeduct=(basic/daysInMonth)*Math.max(0,absCount-sickDays);
+    const net=Math.max(0,basic-absDeduct-sickDed-(s.deductions||0)+(s.bonus||0));
+    return [s.name,s.position||'',s.transferCode||'',basic,absCount,sickDays,
+      Math.round(absDeduct*100)/100,Math.round(sickDed*100)/100,s.bonus||0,s.deductions||0,Math.round(net*100)/100];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['Staff Name','Position','Transfer Code','Basic Salary','Absence Days','Sick Days',
+     'Absence Deduct','Sick Deduct','Bonus','Other Deductions','Net Salary'],
+    ...rows
+  ]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,`Payroll ${mon}`);
+  XLSX.writeFile(wb,`payroll_${mon}.xlsx`);
+}
+
+function printPayroll(){
+  const mon=el('payroll-month')?.value||'';
+  const table=el('payroll-list')?.innerHTML||'';
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>Payroll ${mon}</title>
+    <style>body{font-family:'Tajawal',sans-serif;direction:rtl;padding:20px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;font-size:.8rem}
+    th{background:#1e3a8a;color:#fff}@media print{button{display:none}}</style></head>
+    <body><h2>كشف الرواتب — ${mon}</h2>${table}<br>
+    <button onclick="window.print()">🖨️ Print</button></body></html>`);
+}
+
+// ═══════════════════════════════════════════════
+//  LEAVE MANAGEMENT
+// ═══════════════════════════════════════════════
+function populateLeaveStaffFilter(){
+  const sel=el('leave-staff-filter'); if(!sel) return;
+  sel.innerHTML=`<option value="all">All Staff</option>`+
+    DB.staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function calcLeaveBalance(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0};
+  const start=new Date(s.contractStart);
+  const now=new Date();
+  const months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+  const yearsWorked=months/12;
+  // UAE: 30 days annual leave after 1 year, pro-rated before
+  const entitled=Math.floor(Math.min(yearsWorked,1)*30+(Math.max(0,yearsWorked-1)*30));
+  const taken=(DB.leaves||[]).filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected').reduce((s,l)=>s+(l.days||0),0);
+  const remaining=Math.max(0,entitled-taken);
+  const basic=Number(s.basicSalary||0);
+  const dailyRate=basic/30;
+  const compensation=Math.round(remaining*dailyRate*100)/100;
+  return {entitled,taken,remaining,compensation,dailyRate,yearsWorked:Math.round(yearsWorked*10)/10};
+}
+
+function renderLeaves(){
+  const sf=el('leave-staff-filter')?.value||'all';
+  const tf=el('leave-type-filter')?.value||'all';
+  let leaves=[...(DB.leaves||[])];
+  if(sf!=='all') leaves=leaves.filter(l=>String(l.staffId)===sf);
+  if(tf!=='all') leaves=leaves.filter(l=>l.type===tf);
+
+  // Balance summary
+  if(sf!=='all'){
+    const bal=calcLeaveBalance(sf);
+    const s=DB.staff.find(x=>String(x.id)===sf);
+    el('leave-balance-summary').innerHTML=`
+      <div style="background:#f0f9ff;border-radius:11px;padding:12px;margin-bottom:10px">
+        <div style="font-weight:800;color:#0369a1;margin-bottom:8px">📊 رصيد الإجازة — ${s?.name||''}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="sc"><div class="si">📅</div><div class="sv">${bal.entitled}</div><div class="sk">إجمالي المستحق (يوم)</div></div>
+          <div class="sc"><div class="si">✅</div><div class="sv">${bal.taken}</div><div class="sk">تم استخدامه</div></div>
+          <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining}</div><div class="sk">الرصيد المتبقي</div></div>
+        </div>
+        ${bal.remaining>0?`<div style="margin-top:8px;background:#d1fae5;border-radius:8px;padding:8px;font-size:.8rem;font-weight:700;color:#065f46">
+          💰 بدل الإجازة إذا لم تُستخدم: <b>${fmtNum(bal.compensation)} AED</b> (${bal.remaining} يوم × ${fmtNum(bal.dailyRate)} AED/يوم)
+        </div>`:''}
+        ${bal.remaining>5?`<div style="margin-top:6px">
+          <button onclick="openLeaveForm(null,'${sf}','compensation')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.76rem;font-weight:700">💰 طلب بدل إجازة</button>
+          <button onclick="openLeaveForm(null,'${sf}','annual')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.76rem;font-weight:700;margin-right:6px">🏖️ طلب إجازة سنوية</button>
+        </div>`:''}
+      </div>`;
+  } else {
+    el('leave-balance-summary').innerHTML='';
+  }
+
+  if(!leaves.length){
+    el('leave-list').innerHTML=`<div class="empty"><div class="ei">🏖️</div><p>No leave records</p></div>`;
+    return;
+  }
+  const typeLabel={annual:'🏖️ Annual',sick:'🏥 Sick',unpaid:'⛔ Unpaid',compensation:'💰 Compensation'};
+  const typeCls={annual:'lv-annual',sick:'lv-sick',unpaid:'lv-unpaid',compensation:'lv-comp'};
+  el('leave-list').innerHTML=leaves.map(l=>{
+    const s=DB.staff.find(x=>String(x.id)===String(l.staffId));
+    return `<div class="pay-row">
+      <div>
+        <div style="font-weight:700;font-size:.85rem">${s?.name||'Unknown'}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${l.startDate||''} → ${l.endDate||''} | ${l.days} يوم</div>
+        ${l.notes?`<div style="font-size:.7rem;color:#6b7280;font-style:italic">${l.notes}</div>`:''}
+        ${l.sickCertificate?'<span style="background:#fef3c7;color:#d97706;font-size:.68rem;padding:1px 6px;border-radius:6px;font-weight:700">📄 شهادة طبية</span>':''}
+      </div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span class="lv-badge ${typeCls[l.type]||'lv-unpaid'}">${typeLabel[l.type]||l.type}</span>
+        <button onclick="deleteLeave('${l.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:7px;padding:3px 8px;cursor:pointer;font-size:.72rem">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openLeaveForm(id, preStaff, preType){
+  const l=id ? (DB.leaves||[]).find(x=>String(x.id)===String(id)) : null;
+  const staffOpts=DB.staff.map(s=>`<option value="${s.id}" ${(preStaff&&String(preStaff)===String(s.id))||String(l?.staffId)===String(s.id)?'selected':''}>${s.name}</option>`).join('');
+  el('leave-modal-title').textContent=l?'✏️ تعديل إجازة':'🏖️ طلب إجازة جديد';
+  el('leave-form-body').innerHTML=`
+    <div class="g2" style="margin-bottom:10px">
+      <div class="fg"><label>الموظف *</label><select id="lf_staff">${staffOpts}</select></div>
+      <div class="fg"><label>نوع الإجازة</label>
+        <select id="lf_type" onchange="calcLeaveDays()">
+          <option value="annual" ${(preType==='annual'||l?.type==='annual')?'selected':''}>🏖️ سنوية Annual</option>
+          <option value="sick" ${(preType==='sick'||l?.type==='sick')?'selected':''}>🏥 مرضية Sick</option>
+          <option value="unpaid" ${(preType==='unpaid'||l?.type==='unpaid')?'selected':''}>⛔ بدون راتب Unpaid</option>
+          <option value="compensation" ${(preType==='compensation'||l?.type==='compensation')?'selected':''}>💰 بدل إجازة Compensation</option>
+        </select>
+      </div>
+      <div class="fg"><label>من تاريخ</label><input type="date" id="lf_start" value="${l?.startDate||''}" onchange="calcLeaveDays()"></div>
+      <div class="fg"><label>إلى تاريخ</label><input type="date" id="lf_end" value="${l?.endDate||''}" onchange="calcLeaveDays()"></div>
+      <div class="fg"><label>عدد الأيام</label><input type="number" id="lf_days" value="${l?.days||''}" min="1"></div>
+      <div class="fg"><label>شهادة طبية؟</label>
+        <select id="lf_cert">
+          <option value="0" ${!l?.sickCertificate?'selected':''}>لا</option>
+          <option value="1" ${l?.sickCertificate?'selected':''}>نعم ✅</option>
+        </select>
+      </div>
+    </div>
+    <div id="lf_balance_info" style="margin-bottom:10px"></div>
+    <div class="fg" style="margin-bottom:10px"><label>ملاحظات</label><textarea id="lf_notes" rows="2">${l?.notes||''}</textarea></div>
+    <div style="display:flex;gap:7px">
+      <button class="btn bp" onclick="saveLeave('${id||''}')">💾 حفظ</button>
+      <button class="btn bg" onclick="el('leave-modal').classList.remove('on')">إلغاء</button>
+    </div>
+    <div id="lf-alert"></div>
+  `;
+  el('leave-modal').classList.add('on');
+  calcLeaveDays();
+}
+
+function calcLeaveDays(){
+  const s=el('lf_start')?.value;
+  const e=el('lf_end')?.value;
+  if(s&&e){
+    const diff=Math.round((new Date(e)-new Date(s))/(1000*60*60*24))+1;
+    if(diff>0&&el('lf_days')) el('lf_days').value=diff;
+  }
+  // Show balance info
+  const staffId=el('lf_staff')?.value;
+  const type=el('lf_type')?.value;
+  const days=Number(el('lf_days')?.value||0);
+  const info=el('lf_balance_info');
+  if(!info||!staffId) return;
+  const bal=calcLeaveBalance(staffId);
+  const s2=DB.staff.find(x=>String(x.id)===staffId);
+  const basic=Number(s2?.basicSalary||0);
+  const dailyRate=basic/30;
+  if(type==='annual'){
+    const afterBalance=bal.remaining-days;
+    info.innerHTML=`<div style="background:${afterBalance<0?'#fee2e2':'#f0fdf4'};border-radius:8px;padding:8px;font-size:.78rem">
+      رصيد الإجازة المتبقي: <b>${bal.remaining} يوم</b> → بعد الطلب: <b style="color:${afterBalance<0?'#dc2626':'#059669'}">${afterBalance} يوم</b>
+      ${afterBalance<0?'<br>⚠️ تجاوز الرصيد المتاح':''}
+    </div>`;
+  } else if(type==='sick'){
+    const cert=el('lf_cert')?.value==='1';
+    info.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px;font-size:.78rem;color:#92400e">
+      <b>قانون الإجازة المرضية الإمارات:</b><br>
+      • أول 15 يوم: راتب كامل ✅<br>
+      • 16-45 يوم: نصف الراتب ⚡<br>
+      • بعد 45 يوم: بدون راتب ❌<br>
+      ${!cert?'<b style="color:#dc2626">⚠️ يلزم شهادة طبية للغياب المرضي</b>':''}
+      ${days>0?`<br>تأثير على الراتب: ${calcSickImpact(days,dailyRate)}`:''}
+    </div>`;
+  } else if(type==='compensation'){
+    info.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px;font-size:.78rem;color:#065f46">
+      💰 بدل الإجازة المستحق: <b>${fmtNum(bal.remaining*dailyRate)} AED</b> (${bal.remaining} يوم × ${fmtNum(dailyRate)} AED)
+    </div>`;
+  }
+}
+
+function calcSickImpact(days, dailyRate){
+  if(days<=15) return `<b style="color:#059669">راتب كامل (${days} يوم مدفوع)</b>`;
+  if(days<=45){
+    const halfDays=days-15;
+    const deduct=dailyRate*halfDays*0.5;
+    return `خصم نصف راتب: <b style="color:#d97706">- ${fmtNum(deduct)} AED</b>`;
+  }
+  const deduct=dailyRate*30*0.5+dailyRate*(days-45);
+  return `خصم كبير: <b style="color:#dc2626">- ${fmtNum(deduct)} AED</b>`;
+}
+
+async function saveLeave(id){
+  const staffId=el('lf_staff')?.value;
+  if(!staffId){ showAlert('lf-alert','⚠️ اختر موظف',true); return; }
+  const s=DB.staff.find(x=>String(x.id)===staffId);
+  const row={
+    branch_id: s?.branchId||curBid,
+    staff_id: staffId,
+    type: el('lf_type')?.value||'annual',
+    start_date: el('lf_start')?.value||null,
+    end_date: el('lf_end')?.value||null,
+    days: Number(el('lf_days')?.value||0),
+    sick_certificate: el('lf_cert')?.value==='1',
+    notes: el('lf_notes')?.value||'',
+    status: 'approved',
+  };
+  if(id){ await sb.from('staff_leaves').update(row).eq('id',id); }
+  else   { await sb.from('staff_leaves').insert(row); }
+  showAlert('lf-alert','✅ تم الحفظ!',false);
+  await loadHRData();
+  setTimeout(()=>{ el('leave-modal').classList.remove('on'); renderLeaves(); },600);
+}
+
+async function deleteLeave(id){
+  if(!confirm('حذف سجل الإجازة؟')) return;
+  await sb.from('staff_leaves').delete().eq('id',id);
+  await loadHRData(); renderLeaves();
+}
+
+// ═══════════════════════════════════════════════
+//  END OF SERVICE — UAE Labour Law
+// ═══════════════════════════════════════════════
+function populateEOGSelect(){
+  const sel=el('eog-staff-sel'); if(!sel) return;
+  sel.innerHTML=`<option value="">-- اختر موظف --</option>`+
+    DB.staff.map(s=>`<option value="${s.id}">${s.name} ${s.position?'('+s.position+')':''}</option>`).join('');
+  // Default end date = today
+  const ed=el('eog-end-date');
+  if(ed&&!ed.value) ed.value=today();
+}
+
+function calcEOG(){
+  const staffId=el('eog-staff-sel')?.value;
+  const reason=el('eog-reason')?.value||'resignation';
+  const endDate=el('eog-end-date')?.value||today();
+  const res=el('eog-result');
+  if(!staffId||!res){ if(res) res.innerHTML=''; return; }
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s||!s.contractStart){ res.innerHTML=`<div class="alert aerr">⚠️ لا يوجد تاريخ بداية العقد للموظف</div>`; return; }
+
+  const start=new Date(s.contractStart);
+  const end=new Date(endDate);
+  const diffMs=end-start;
+  if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
+
+  const totalDays=Math.floor(diffMs/(1000*60*60*24));
+  const years=totalDays/365;
+  const basic=Number(s.basicSalary||0);
+  const dailyRate=basic/30;
+
+  // UAE Gratuity calculation
+  // Resignation: less than 1yr = 0, 1-3yr = 1/3, 3-5yr = 2/3, 5+ = full
+  // Termination/End of Contract: full entitlement
+  let gratuity=0;
+  let gratuityNote='';
+  if(years<1){
+    gratuity=0;
+    gratuityNote='أقل من سنة — لا يستحق مكافأة نهاية خدمة';
+  } else {
+    // Calculate: first 5 years = 21 days/year, after 5 years = 30 days/year
+    let days5=Math.min(years,5)*21;
+    let daysAfter5=Math.max(0,years-5)*30;
+    let fullGratuity=(days5+daysAfter5)*dailyRate;
+    if(reason==='resignation'){
+      if(years>=1&&years<3)      { gratuity=fullGratuity*(1/3); gratuityNote='استقالة (1-3 سنوات): ثلث المكافأة'; }
+      else if(years>=3&&years<5) { gratuity=fullGratuity*(2/3); gratuityNote='استقالة (3-5 سنوات): ثلثا المكافأة'; }
+      else                       { gratuity=fullGratuity;        gratuityNote='استقالة (أكثر من 5 سنوات): مكافأة كاملة'; }
+    } else {
+      gratuity=fullGratuity;
+      gratuityNote=reason==='termination'?'إنهاء عقد: مكافأة كاملة':'انتهاء عقد: مكافأة كاملة';
+    }
+  }
+
+  // Leave balance compensation
+  const bal=calcLeaveBalance(s.id);
+  const leaveComp=bal.remaining*dailyRate;
+  const total=gratuity+leaveComp;
+
+  // Notice period (UAE: 1 month standard)
+  const noticePay=basic;
+
+  res.innerHTML=`
+    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:16px">
+      <div style="font-weight:900;color:#065f46;font-size:1rem;margin-bottom:12px">📋 حساب نهاية الخدمة — ${s.name}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} سنة ${Math.floor((years%1)*12)} شهر</div><div class="sk">مدة الخدمة</div></div>
+        <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(basic)}</div><div class="sk">الراتب الأساسي (AED)</div></div>
+        <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining} يوم</div><div class="sk">رصيد الإجازة المتبقي</div></div>
+        <div class="sc"><div class="si">📆</div><div class="sv">${fmtNum(dailyRate)}</div><div class="sk">الراتب اليومي (AED)</div></div>
+      </div>
+      <div style="border-top:1px dashed #86efac;padding-top:12px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
+          <span>مكافأة نهاية الخدمة</span>
+          <span style="font-weight:700">${fmtNum(gratuity)} AED</span>
+        </div>
+        <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px;font-style:italic">${gratuityNote}</div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
+          <span>بدل الإجازة (${bal.remaining} يوم)</span>
+          <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
+          <span>بدل الإشعار (شهر)</span>
+          <span style="font-weight:700">${fmtNum(noticePay)} AED</span>
+        </div>
+        <div style="border-top:2px solid #059669;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem">
+          <span>الإجمالي المستحق</span>
+          <span style="color:#059669">${fmtNum(total+noticePay)} AED</span>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+        <button onclick="printEOG('${s.id}','${endDate}','${reason}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:.82rem">🖨️ طباعة الحساب</button>
+      </div>
+    </div>`;
+}
+
+function printEOG(staffId, endDate, reason){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const content=el('eog-result')?.innerHTML||'';
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>End of Service - ${s?.name}</title>
+    <style>body{font-family:'Tajawal',sans-serif;direction:rtl;padding:30px;max-width:700px;margin:0 auto}
+    .sc{background:#f8fafc;border-radius:10px;padding:12px;text-align:center;border:1px solid #e5e7eb}
+    .sv{font-size:1.2rem;font-weight:800;color:#1e3a8a}.sk{font-size:.7rem;color:#6b7280;margin-top:4px}
+    @media print{button{display:none}}</style></head>
+    <body>
+    <h2 style="color:#1e3a8a;border-bottom:3px solid #1e3a8a;padding-bottom:10px">
+      مجموعة رعاية الطفل للحضانات<br>
+      <span style="font-size:.85rem;font-weight:400">حساب نهاية الخدمة — End of Service Calculation</span>
+    </h2>
+    ${content}
+    <div style="margin-top:30px;font-size:.75rem;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:12px">
+      تاريخ الإصدار: ${new Date().toLocaleDateString('ar-AE')} | وفقاً لقانون العمل الإماراتي رقم 33 لسنة 2021
+    </div>
+    <br><button onclick="window.print()">🖨️ طباعة</button>
+    </body></html>`);
+}
+
+// ═══════════════════════════════════════════════
+//  STAFF REPORTS
+// ═══════════════════════════════════════════════
+function populateRptSelects(){
+  const sel=el('rpt-staff-sel'); if(!sel) return;
+  sel.innerHTML=`<option value="all">All Staff</option>`+
+    DB.staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  const m=el('rpt-month');
+  if(m&&!m.value){ const n=new Date(); m.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); }
+}
+
+function generateStaffReport(){
+  const mon=el('rpt-month')?.value||'';
+  const sf=el('rpt-staff-sel')?.value||'all';
+  let staff=sf==='all'?[...DB.staff]:DB.staff.filter(s=>String(s.id)===sf);
+  if(!staff.length){ el('staff-report-body').innerHTML=`<div class="empty"><p>No data</p></div>`; return; }
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+
+  el('staff-report-body').innerHTML=staff.map(s=>{
+    const basic=Number(s.basicSalary||0);
+    const absCount=countAbsences(s.id,mon);
+    const sickDays=countSickLeave(s.id,mon);
+    const bal=calcLeaveBalance(s.id);
+    const leaves=(DB.leaves||[]).filter(l=>String(l.staffId)===String(s.id)&&(l.startDate||'').startsWith(mon));
+    const dailyRate=daysInMonth>0?basic/daysInMonth:0;
+    let sickDed=0;
+    if(sickDays>15&&sickDays<=45) sickDed=dailyRate*(sickDays-15)*0.5;
+    else if(sickDays>45) sickDed=dailyRate*30*0.5+dailyRate*(sickDays-45);
+    const absDed=dailyRate*Math.max(0,absCount-sickDays);
+    const net=Math.max(0,basic-absDed-sickDed-(s.deductions||0)+(s.bonus||0));
+
+    // Attendance summary for this month
+    let attDays=0,attPresent=0,attAbsent=0;
+    Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+      if(!date.startsWith(mon)) return;
+      attDays++;
+      const st=map[s.id]||map[String(s.id)];
+      if(st==='حضور'||st==='present') attPresent++;
+      else if(st) attAbsent++;
+    });
+
+    return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;border-right:5px solid #1e3a8a">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-weight:900;font-size:1rem">${s.name}</div>
+          <div style="font-size:.75rem;color:var(--muted)">${s.position||'—'} | ${s.transferCode?'كود: '+s.transferCode:''} | ${s.contact||''}</div>
+          <div style="font-size:.72rem;color:var(--muted)">العقد: ${s.contractStart||'—'} → ${s.contractEnd||'—'}</div>
+        </div>
+        <div style="text-align:center;background:#f0f4ff;border-radius:10px;padding:8px 14px">
+          <div style="font-size:.7rem;color:var(--muted)">صافي الراتب</div>
+          <div style="font-size:1.1rem;font-weight:900;color:#1e3a8a">${fmtNum(net)} AED</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
+        <div class="sc"><div class="si">✅</div><div class="sv">${attPresent}</div><div class="sk">حضور</div></div>
+        <div class="sc"><div class="si">❌</div><div class="sv" style="color:#dc2626">${attAbsent}</div><div class="sk">غياب</div></div>
+        <div class="sc"><div class="si">🏥</div><div class="sv" style="color:#d97706">${sickDays}</div><div class="sk">إجازة مرضية</div></div>
+        <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining}</div><div class="sk">رصيد الإجازة</div></div>
+      </div>
+      ${basic>0?`<div style="background:#f8fafc;border-radius:9px;padding:9px;font-size:.78rem">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>الراتب الأساسي</span><span><b>${fmtNum(basic)} AED</b></span></div>
+        ${absDed>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>خصم غياب</span><span>- ${fmtNum(absDed)}</span></div>`:''}
+        ${sickDed>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#d97706"><span>خصم مرضي</span><span>- ${fmtNum(sickDed)}</span></div>`:''}
+        ${(s.bonus||0)>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#059669"><span>بونص</span><span>+ ${fmtNum(s.bonus)}</span></div>`:''}
+        ${(s.deductions||0)>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>خصومات</span><span>- ${fmtNum(s.deductions)}</span></div>`:''}
+        <div style="border-top:1px solid #e5e7eb;margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;font-weight:800;color:#059669"><span>الصافي</span><span>${fmtNum(net)} AED</span></div>
+      </div>`:'<div style="color:#9ca3af;font-size:.75rem">لم يُحدد الراتب الأساسي</div>'}
+      ${leaves.length?`<div style="margin-top:8px;font-size:.75rem;color:#6b7280">
+        <b>الإجازات هذا الشهر:</b> ${leaves.map(l=>`${l.type} (${l.days} يوم)`).join(', ')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function printStaffReport(){
+  const content=el('staff-report-body')?.innerHTML||'';
+  const mon=el('rpt-month')?.value||'';
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>Staff Report ${mon}</title>
+    <style>body{font-family:'Tajawal',sans-serif;direction:rtl;padding:20px}
+    .sc{background:#f8fafc;border-radius:8px;padding:10px;text-align:center;border:1px solid #e5e7eb;display:inline-block;margin:4px;min-width:80px}
+    .sv{font-size:1rem;font-weight:800;color:#1e3a8a}.sk{font-size:.68rem;color:#6b7280;margin-top:3px}
+    @media print{button{display:none}}</style></head>
+    <body><h2 style="color:#1e3a8a">تقرير الموظفين — ${mon}</h2>
+    ${content}
+    <br><button onclick="window.print()">🖨️ طباعة</button></body></html>`);
 }
 
 boot();
