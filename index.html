@@ -8321,10 +8321,19 @@ function sendFeeReminderWA(childId){
   const mon = new Date().toLocaleString('en',{month:'long',year:'numeric'});
   const tuition = c.fee||0;
   const busFee  = c.busFee||0;
-  const total   = tuition + busFee;
-  let breakdown = `• Tuition Fee: *${fmtNum(tuition)} AED*`;
-  if(busFee>0) breakdown += `\n• Transportation Fee: *${fmtNum(busFee)} AED*`;
-  breakdown += `\n• *Total Due: ${fmtNum(total)} AED*`;
+  const friFee  = c.friFee||0;
+  const satFee  = c.satFee||0;
+  const sunFee  = c.sunFee||0;
+  const weekendFee = friFee + satFee + sunFee;
+  const total = tuition + busFee + weekendFee;
+  let lines = [];
+  if(tuition>0)    lines.push(`• Monthly Tuition: *${fmtNum(tuition)} AED*`);
+  if(busFee>0)     lines.push(`• Transportation: *${fmtNum(busFee)} AED*`);
+  if(friFee>0)     lines.push(`• Friday Fee: *${fmtNum(friFee)} AED*`);
+  if(satFee>0)     lines.push(`• Saturday Fee: *${fmtNum(satFee)} AED*`);
+  if(sunFee>0)     lines.push(`• Sunday Fee: *${fmtNum(sunFee)} AED*`);
+  lines.push(`\n❗ *Total Due: ${fmtNum(total)} AED*`);
+  const breakdown = lines.join('\n');
   const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\n` + breakdown + `\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
 }
@@ -8645,8 +8654,12 @@ function renderFeeReminderPanel(){
     const phone=c.parentMom||c.parentDad||'';
     const tuition=c.fee||0;
     const busFee=c.busFee||0;
-    const total=tuition+busFee;
-    const feeLabel=busFee>0?`${fmtNum(tuition)} + 🚌${fmtNum(busFee)} = <b>${fmtNum(total)} AED</b>`:`<b>${fmtNum(total)} AED</b>`;
+    const weekendFee=(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+    const total=tuition+busFee+weekendFee;
+    let feeParts=[`${fmtNum(tuition)}`];
+    if(busFee>0) feeParts.push(`🚌${fmtNum(busFee)}`);
+    if(weekendFee>0) feeParts.push(`🎉${fmtNum(weekendFee)}`);
+    const feeLabel=feeParts.join(' + ')+` = <b>${fmtNum(total)} AED</b>`;
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:${i%2?'#fff':'#fff1f2'};border-radius:9px;border:1px solid #fecaca">
       <div>
         <div style="font-weight:700;font-size:.85rem">${c.name}</div>
