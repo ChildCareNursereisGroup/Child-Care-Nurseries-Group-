@@ -6026,15 +6026,28 @@ async function importStaffFromExcel(file){
     return s||null;
   };
 
-  // Map branch name → branch ID (fuzzy match)
+  // Map branch name → branch ID (explicit + fuzzy match)
   const resolveBranch=nameRaw=>{
     if(!nameRaw) return curBid;
-    const name=String(nameRaw).trim().toLowerCase();
-    const found=BRANCHES.find(b=>
-      b.en.toLowerCase().includes(name)||name.includes(b.en.toLowerCase())||
-      b.ar.includes(nameRaw.trim())||
-      b.id===name
-    );
+    const norm=s=>s.toLowerCase().replace(/\s+/g,' ').trim()
+      .replace(/nursey/g,'nursery')
+      .replace(/alsaada/g,'al saada')
+      .replace(/[^a-z0-9 ]/g,'');
+    const name=norm(String(nameRaw));
+    // Explicit map for known values in file
+    const explicit={
+      'al saada nursery':'b2','alsaada nursery':'b2',
+      'al saada for kids':'b4','alsaada for kids':'b4',
+      'abtal al baraeim':'b5',
+      'dolphin nursery':'b3',
+      'al farha nursery':'b1',
+    };
+    if(explicit[name]) return explicit[name];
+    // Fuzzy fallback
+    const found=BRANCHES.find(b=>{
+      const en=norm(b.en);
+      return en===name||en.includes(name)||name.includes(en)||b.id===name;
+    });
     return found?found.id:curBid;
   };
 
@@ -6046,6 +6059,8 @@ async function importStaffFromExcel(file){
     if(!name){ skipped++; continue; }
     try{
       const branchRaw=row['Branch ID']||row['Working Place']||'';
+      // Skip rows where branch is "Bus Assistant" (not a real branch)
+      if(String(branchRaw).trim().toLowerCase().includes('bus assistant')){ skipped++; continue; }
       const r={
         branch_id: resolveBranch(branchRaw),
         name,
