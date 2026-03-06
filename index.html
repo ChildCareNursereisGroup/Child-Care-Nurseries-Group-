@@ -1649,11 +1649,12 @@ async function loadFromSupa(bid) {
   bid=bid||curBid;
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e] = await Promise.all([
+    const [c,r,a,e,sa] = await Promise.all([
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
       sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('staff_attendance').select('*').eq('branch_id',bid),
     ]);
     if(c.error)throw c.error;
     if(r.error)throw r.error;
@@ -1692,15 +1693,14 @@ async function loadFromSupa(bid) {
         date:x.date||null,note:x.note||'',subType:x.sub_type||'',
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',extra};
     });
+    DB.staffAtt={};
+    (sa.data||[]).forEach(x=>{
+      const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
+      DB.staffAtt[d][String(x.staff_id)]=x.status;
+    });
     hideLoad();
     // Load staff attendance separately — table may not exist yet, never block main load
-    sb.from('staff_attendance').select('*').eq('branch_id',bid).then(sa=>{
-      DB.staffAtt={};
-      (sa.data||[]).forEach(x=>{
-        const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
-        DB.staffAtt[d][String(x.staff_id)]=x.status; // always string key
-      });
-    }).catch(()=>{ DB.staffAtt={}; });
+    // staff_attendance loaded in Promise.all above (sa variable)
     return true;
   } catch(err) {
     hideLoad();
@@ -2340,6 +2340,15 @@ function renderChildren(){
           </div>
         </div>
         <span class="bdg ${c.leaveDate?'derr':'dok'}">${c.leaveDate?t('left'):t('present')}</span>
+        ${(()=>{
+          if(c.leaveDate||!(c.fee>0)) return '';
+          const curMon=monthOf(new Date());
+          const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,curMon)).reduce((s,r)=>s+r.total,0);
+          const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
+          if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">✅ Paid</span>';
+          if(paid>0)    return '<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">⚡ Partial</span>';
+          return '<span style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">❌ Unpaid</span>';
+        })()}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.74rem;color:var(--muted)">
         <span>📞 ${c.parentMom||'-'}</span>
@@ -3589,7 +3598,7 @@ function renderStaffAtt(){
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
-  const staff=DB.staff||[];
+  const staff=(DB.staff||[]).filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=date);
   const b=CB();
 
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -3992,7 +4001,7 @@ function toggleStaffAtt(staffId, date){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
   renderStaffAtt();
-  sb.from('staff_attendance').upsert({branch_id:curBid,staff_id:staffId,date,status:newSt},{onConflict:'branch_id,staff_id,date'}).catch(()=>{});
+  sb.from('staff_attendance').upsert({branch_id:curBid,staff_id:staffId,date,status:newSt},{onConflict:'branch_id,staff_id,date'}).then(()=>{}).catch(e=>console.error('StaffAtt save error:',e));
 }
 
 function sendStaffAbsenceWA(staffId, date){
@@ -5548,6 +5557,7 @@ async function loadStaff(){
     labourExpire:x.labour_expire||'', speaExpire:x.spea_expire||'',
     healthCardExpire:x.health_card_expire||'',
     basicSalary:Number(x.basic_salary||0), grossSalary:Number(x.gross_salary||0), transferCode:x.transfer_code||'',
+    lastWorkingDay:x.last_working_day||'',
     notes:x.notes||''
   }));
 }
@@ -5679,6 +5689,11 @@ function openStaffForm(id){
       <div class="g3">
         <div class="fg"><label>Contract Start Date</label><input type="date" id="sf_cstart" value="${s?.contractStart||''}"></div>
         <div class="fg"><label>Contract End Date</label><input type="date" id="sf_cend" value="${s?.contractEnd||''}"></div>
+        <div class="fg">
+          <label style="color:#dc2626;font-weight:800">🚪 Last Working Day</label>
+          <input type="date" id="sf_lastday" value="${s?.lastWorkingDay||''}">
+          <div style="font-size:.68rem;color:#dc2626;margin-top:2px">Set this date to remove staff from attendance after this day</div>
+        </div>
       </div>
     </div>
     <div style="background:#fef3c7;border-radius:9px;padding:10px;margin-bottom:9px">
@@ -5726,6 +5741,7 @@ async function saveStaff(id){
     basic_salary: Number(document.getElementById('sf_basic')?.value||0),
     gross_salary: Number(document.getElementById('sf_gross')?.value||0),
     transfer_code: document.getElementById('sf_tcode')?.value||'',
+    last_working_day: document.getElementById('sf_lastday')?.value||null,
   };
   if(id){
     await sb.from('staff').update(row).eq('id',id);
@@ -9270,12 +9286,19 @@ function renderBirthdayPanel(){
           Age ${age} ${e.phone?'· '+e.phone:'· No phone'}
         </div>
       </div>
-      ${e.phone?`<button onclick="sendBirthdayWA('${e.id}','${e.type}')"
+      ${(()=>{
+        if(!e.phone) return '';
+        const sentKey='bday_wa_'+curBid+'_'+e.id+'_'+new Date().getFullYear();
+        const sentTime=localStorage.getItem(sentKey);
+        if(sentTime) return `<button onclick="sendBirthdayWA('${e.id}','${e.type}')"
+          style="background:#128c7e;color:#fff;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:.7rem;font-weight:700;white-space:nowrap;flex-shrink:0">
+          ✅ Sent ${sentTime}</button>`;
+        return `<button onclick="sendBirthdayWA('${e.id}','${e.type}')"
           style="background:${isToday?'#25d366':'#f3f4f6'};color:${isToday?'#fff':'#374151'};
           border:none;border-radius:8px;padding:6px 11px;cursor:pointer;
           font-size:.73rem;font-weight:700;white-space:nowrap;flex-shrink:0">
-          ${isToday?'🎂 Send WA':'💬 WA'}
-        </button>`:''}
+          ${isToday?'🎂 Send WA':'💬 WA'}</button>`;
+      })()}
     </div>`;
   };
 
@@ -9336,6 +9359,9 @@ Child Care Nurseries Group`;
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
   logActivity('whatsapp', `🎂 Birthday WA → ${person} (${type}) — ${phone}`);
   addWALog('birthday', person, phone, `${type} birthday`);
+  const _bkey='bday_wa_'+curBid+'_'+id+'_'+new Date().getFullYear();
+  localStorage.setItem(_bkey, new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+  renderBirthdayPanel();
 }
 
 function renderFeeReminderPanel(){
