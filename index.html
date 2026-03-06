@@ -5544,6 +5544,9 @@ function expiryBadge(dateStr, label){
 // ═══════════════════════════════════════════════
 //  STAFF FUNCTIONS
 // ═══════════════════════════════════════════════
+function getStaffSalaryLocal(id){ try{return JSON.parse(localStorage.getItem('staff_sal_'+id)||'{}');}catch(e){return {};} }
+function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.stringify(d)); }
+
 async function loadStaff(){
   const {data} = await sb.from('staff').select('*').eq('branch_id', curBid);
   DB.staff = (data||[]).map(x=>({
@@ -5556,8 +5559,10 @@ async function loadStaff(){
     passportExpire:x.passport_expire||'', idExpire:x.id_expire||'',
     labourExpire:x.labour_expire||'', speaExpire:x.spea_expire||'',
     healthCardExpire:x.health_card_expire||'',
-    basicSalary:Number(x.basic_salary||0), grossSalary:Number(x.gross_salary||0), transferCode:x.transfer_code||'',
-    lastWorkingDay:x.last_working_day||'',
+    basicSalary:Number(x.basic_salary||0)||Number(getStaffSalaryLocal(x.id).basic||0),
+    grossSalary:Number(x.gross_salary||0)||Number(getStaffSalaryLocal(x.id).gross||0),
+    transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
+    lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
     notes:x.notes||''
   }));
 }
@@ -5743,10 +5748,41 @@ async function saveStaff(id){
     transfer_code: document.getElementById('sf_tcode')?.value||'',
     last_working_day: document.getElementById('sf_lastday')?.value||null,
   };
+  // Always save salary fields to localStorage as backup (in case Supabase columns missing)
   if(id){
-    await sb.from('staff').update(row).eq('id',id);
+    setStaffSalaryLocal(id,{
+      basic:row.basic_salary, gross:row.gross_salary,
+      tcode:row.transfer_code, lastDay:row.last_working_day||''
+    });
+  }
+  if(id){
+    const {error:uerr} = await sb.from('staff').update(row).eq('id',id);
+    if(uerr){
+      // Some columns may not exist yet — retry with safe subset
+      const safeRow={branch_id:row.branch_id,name:row.name,position:row.position,
+        nationality:row.nationality,dob:row.dob,contact:row.contact,email:row.email,
+        address:row.address,emergency_contact:row.emergency_contact,emergency_phone:row.emergency_phone,
+        contract_start:row.contract_start,contract_end:row.contract_end,
+        passport_expire:row.passport_expire,id_expire:row.id_expire,
+        labour_expire:row.labour_expire,spea_expire:row.spea_expire,
+        health_card_expire:row.health_card_expire,notes:row.notes};
+      // Try adding salary fields one by one
+      if(row.basic_salary!==undefined) safeRow.basic_salary=row.basic_salary;
+      if(row.gross_salary!==undefined) safeRow.gross_salary=row.gross_salary;
+      if(row.transfer_code!==undefined) safeRow.transfer_code=row.transfer_code;
+      if(row.last_working_day!==undefined) safeRow.last_working_day=row.last_working_day;
+      const {error:uerr2} = await sb.from('staff').update(safeRow).eq('id',id);
+      if(uerr2){ showAlert('staff-save-alert','❌ Error: '+uerr2.message,true); return; }
+    }
   } else {
-    await sb.from('staff').insert(row);
+    const {error:ierr} = await sb.from('staff').insert(row);
+    if(ierr){
+      const safeRow={branch_id:row.branch_id,name:row.name,position:row.position,
+        nationality:row.nationality,dob:row.dob,contact:row.contact,email:row.email,
+        address:row.address,notes:row.notes};
+      const {error:ierr2} = await sb.from('staff').insert(safeRow);
+      if(ierr2){ showAlert('staff-save-alert','❌ Error: '+ierr2.message,true); return; }
+    }
   }
   showAlert('staff-save-alert','✅ Saved!',false);
   await loadStaff();
