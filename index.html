@@ -231,7 +231,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div id="today-summary-body"></div>
   </div>
 
-  <div class="card" id="bovcard">
+  <div class="card" id="bovcard" style="display:none">
     <div class="ch"><div class="ct">🏢 نظرة عامة على المجموعة</div></div>
     <div class="bovgrid" id="bovgrid"></div>
   </div>
@@ -244,7 +244,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div id="expiry-alerts-body"></div>
   </div>
 
-  <div class="card" id="pvcard">
+  <div class="card" id="pvcard" style="display:none">
     <div class="ch">
       <div class="ct">✅ مطابقة المدفوعات</div>
       <input type="month" id="pvmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderPV()">
@@ -2238,9 +2238,8 @@ function renderDashboard(){
     <div class="sc"><div class="si">✅</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
     ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
     <div class="sc"><div class="si">🚌</div><div class="sv">${bus}</div><div class="sk">${t('busUsers')}</div></div>`;
-  if(curRole==='admin'||curRole==='manager'){
+  if(curRole==='admin'){
     el('bovcard').style.display='block';
-    renderExpiryAlerts(curBid); // pass current branch
     el('bovgrid').innerHTML=BRANCHES.map(b=>`
       <div class="bovc" style="background:${b.c};user-select:none"
            data-bid="${b.id}"
@@ -2252,11 +2251,13 @@ function renderDashboard(){
           :'<div style="font-size:.72rem;opacity:.85;margin-top:3px;pointer-events:none">👆 اضغط للتبديل</div>'}
         <div class="bg2" style="pointer-events:none">${b.icon}</div>
       </div>`).join('');
-    // Attach click via addEventListener to avoid any inline handler issues
     el('bovgrid').querySelectorAll('[data-bid]').forEach(card=>{
       card.addEventListener('click', ()=>{ switchBranch(card.dataset.bid); });
     });
   } else { el('bovcard').style.display='none'; }
+  if(curRole==='admin'||curRole==='manager'){
+    renderExpiryAlerts(curBid);
+  }
   renderPV();
   renderTodaySummary();
   // Set default month if not set, then render
@@ -2265,7 +2266,7 @@ function renderDashboard(){
   renderRecentByMonth();
 }
 function renderPV(){
-  if(curRole!=='admin'&&curRole!=='manager'){el('pvcard').style.display='none';return;}
+  if(curRole!=='admin'){el('pvcard').style.display='none';return;}
   el('pvcard').style.display='block';
   const month=el('pvmon')?.value||monthOf(new Date());
   const active=DB.children.filter(c=>!c.leaveDate&&c.fee>0);
