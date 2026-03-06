@@ -2236,7 +2236,7 @@ function renderDashboard(){
   el('dstats').innerHTML=`
     <div class="sc"><div class="si">👧</div><div class="sv">${tot}</div><div class="sk">${t('totalChildren')}</div></div>
     <div class="sc"><div class="si">✅</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
-    ${(curRole==='admin'||curRole==='manager')?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
+    ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
     <div class="sc"><div class="si">🚌</div><div class="sv">${bus}</div><div class="sk">${t('busUsers')}</div></div>`;
   if(curRole==='admin'||curRole==='manager'){
     el('bovcard').style.display='block';
