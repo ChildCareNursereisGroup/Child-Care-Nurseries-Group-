@@ -9715,21 +9715,40 @@ function populateLeaveStaffFilter(){
     DB.staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
 }
 
+function getActualWorkDaysCount(staffId){
+  // Total actual working days from salary history + live attendance
+  const history=getSalaryHistory(staffId);
+  const histDays=history.reduce((s,r)=>s+(r.presentDays||0),0);
+  let liveDays=0;
+  Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+    if(map[String(staffId)]==='حضور') liveDays++;
+  });
+  return histDays+liveDays;
+}
+
 function calcLeaveBalance(staffId){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
-  if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0};
-  const start=new Date(s.contractStart);
-  const now=new Date();
-  const months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
-  const yearsWorked=months/12;
-  // UAE: 30 days annual leave after 1 year, pro-rated before
-  const entitled=Math.floor(Math.min(yearsWorked,1)*30+(Math.max(0,yearsWorked-1)*30));
+  if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0,actualDays:0};
+  // Use actual work days if available, otherwise fall back to contract dates
+  const actualDays=getActualWorkDaysCount(staffId);
+  let yearsWorked;
+  if(actualDays>0){
+    // 365 actual work days = 1 full year of entitlement
+    yearsWorked=actualDays/365;
+  } else {
+    const start=new Date(s.contractStart);
+    const now=new Date();
+    const months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+    yearsWorked=months/12;
+  }
+  // UAE: 30 days annual leave per year (pro-rated)
+  const entitled=Math.floor(yearsWorked*30);
   const taken=(DB.leaves||[]).filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected').reduce((s,l)=>s+(l.days||0),0);
   const remaining=Math.max(0,entitled-taken);
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
   const compensation=Math.round(remaining*dailyRate*100)/100;
-  return {entitled,taken,remaining,compensation,dailyRate,yearsWorked:Math.round(yearsWorked*10)/10};
+  return {entitled,taken,remaining,compensation,dailyRate,yearsWorked:Math.round(yearsWorked*10)/10,actualDays};
 }
 
 function renderLeaves(){
@@ -9928,8 +9947,11 @@ function calcEOG(){
   const diffMs=end-start;
   if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
 
-  const totalDays=Math.floor(diffMs/(1000*60*60*24));
+  // Use actual work days if available
+  const actualDays=getActualWorkDaysCount(s.id);
+  const totalDays=actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24));
   const years=totalDays/365;
+  const usingActual=actualDays>0;
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
 
@@ -9968,7 +9990,8 @@ function calcEOG(){
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:16px">
       <div style="font-weight:900;color:#065f46;font-size:1rem;margin-bottom:12px">📋 حساب نهاية الخدمة — ${s.name}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} سنة ${Math.floor((years%1)*12)} شهر</div><div class="sk">مدة الخدمة</div></div>
+        <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} سنة ${Math.floor((years%1)*12)} شهر</div><div class="sk">مدة الخدمة ${usingActual?'(فعلية)':'(عقد)'}</div></div>
+        <div class="sc"><div class="si">🗓️</div><div class="sv">${totalDays}</div><div class="sk">إجمالي أيام العمل الفعلية</div></div>
         <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(basic)}</div><div class="sk">الراتب الأساسي (AED)</div></div>
         <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining} يوم</div><div class="sk">رصيد الإجازة المتبقي</div></div>
         <div class="sc"><div class="si">📆</div><div class="sv">${fmtNum(dailyRate)}</div><div class="sk">Daily Rate (AED)</div></div>
@@ -10185,13 +10208,17 @@ function openSalaryHistory(staffId){
       <button onclick="downloadSalaryHistoryTemplate()" style="background:#f0fdf4;color:#059669;border:1.5px solid #d1fae5;border-radius:9px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:.8rem">⬇️ Download Template</button>
     </div>
     <div id="sh-panel-manual">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:7px;margin-bottom:10px;align-items:end">
-        <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px">Month</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:7px;margin-bottom:10px;align-items:end">
+        <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px">Month — الشهر</label>
           <input type="month" id="sh_month" style="width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box"></div>
         <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px">Basic (AED)</label>
           <input type="number" id="sh_basic" min="0" placeholder="e.g. 3000" style="width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box"></div>
         <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px">Gross / Net Paid (AED)</label>
           <input type="number" id="sh_amount" min="0" placeholder="e.g. 4200" style="width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box"></div>
+        <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px;color:#059669">✅ أيام حضور</label>
+          <input type="number" id="sh_present" min="0" max="31" placeholder="e.g. 26" style="width:100%;padding:7px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box"></div>
+        <div><label style="font-size:.73rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">❌ أيام غياب</label>
+          <input type="number" id="sh_absent" min="0" max="31" placeholder="e.g. 0" style="width:100%;padding:7px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box"></div>
         <button onclick="addSalaryHistoryEntry('${staffId}')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:800;white-space:nowrap;height:36px;margin-top:18px">➕ Add</button>
       </div>
     </div>
@@ -10220,19 +10247,50 @@ function showSHTab(tab, staffId, btn){
   if(btn){btn.style.background='#1e3a8a';btn.style.color='#fff';}
 }
 
+function getTotalWorkDays(staffId){
+  // Sum present days from salary history + count from DB.staffAtt
+  const history=getSalaryHistory(staffId);
+  const historyDays=history.reduce((s,r)=>s+(r.presentDays||0),0);
+  // Also count from live attendance records
+  let liveDays=0;
+  Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+    if(map[String(staffId)]==='حضور') liveDays++;
+  });
+  return {historyDays, liveDays, total:historyDays+liveDays};
+}
+
 function renderSalaryHistoryList(staffId){
   const history=getSalaryHistory(staffId);
   if(!history.length) return '<div style="color:#9ca3af;font-size:.8rem;text-align:center;padding:16px">No salary history yet — add manually or import from Excel</div>';
   const sorted=[...history].sort((a,b)=>b.month.localeCompare(a.month));
-  const total=sorted.reduce((s,r)=>s+(r.amount||0),0);
+  const totalPaid=sorted.reduce((s,r)=>s+(r.amount||0),0);
+  const totalPresent=sorted.reduce((s,r)=>s+(r.presentDays||0),0);
+  const totalAbsent=sorted.reduce((s,r)=>s+(r.absentDays||0),0);
+  const wd=getTotalWorkDays(staffId);
   return `
-    <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px">${sorted.length} records — Avg: ${fmtNum(Math.round(total/sorted.length))} AED/month</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:#f0fdf4;border-radius:9px;padding:8px;text-align:center">
+        <div style="font-size:1.1rem;font-weight:900;color:#059669">${totalPresent+wd.liveDays}</div>
+        <div style="font-size:.68rem;color:#6b7280">إجمالي أيام الحضور</div>
+      </div>
+      <div style="background:#fef2f2;border-radius:9px;padding:8px;text-align:center">
+        <div style="font-size:1.1rem;font-weight:900;color:#dc2626">${totalAbsent}</div>
+        <div style="font-size:.68rem;color:#6b7280">إجمالي أيام الغياب</div>
+      </div>
+      <div style="background:#eff6ff;border-radius:9px;padding:8px;text-align:center">
+        <div style="font-size:1.1rem;font-weight:900;color:#1e3a8a">${Math.floor((totalPresent+wd.liveDays)/26)} سنة ${Math.floor(((totalPresent+wd.liveDays)%26)/2.2)} شهر</div>
+        <div style="font-size:.68rem;color:#6b7280">مدة الخدمة الفعلية (تقريباً)</div>
+      </div>
+    </div>
+    <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px">${sorted.length} سجل — Avg: ${fmtNum(Math.round(totalPaid/sorted.length))} AED/شهر</div>
     <div style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto">
       ${sorted.map((r,i)=>`
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 11px;background:${i%2?'#fff':'#f8fafc'};border-radius:8px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;padding:7px 11px;background:${i%2?'#fff':'#f8fafc'};border-radius:8px;border:1px solid var(--border);flex-wrap:wrap">
           <span style="font-weight:800;color:#1e3a8a;min-width:78px">${r.month}</span>
-          ${r.basic?`<span style="font-size:.72rem;color:#6b7280;min-width:90px">Basic: ${fmtNum(r.basic)}</span>`:''}
+          ${r.basic?`<span style="font-size:.72rem;color:#6b7280">Basic: ${fmtNum(r.basic)}</span>`:''}
           <span style="flex:1;font-weight:800;color:#065f46">${fmtNum(r.amount)} AED</span>
+          ${r.presentDays!==undefined?`<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700">✅ ${r.presentDays}د</span>`:''}
+          ${r.absentDays!==undefined?`<span style="background:#fee2e2;color:#dc2626;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700">❌ ${r.absentDays}غ</span>`:''}
           <button onclick="deleteSalaryHistoryEntry('${staffId}','${r.month}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.7rem">✕</button>
         </div>`).join('')}
     </div>`;
@@ -10242,15 +10300,22 @@ function addSalaryHistoryEntry(staffId){
   const month=el('sh_month')?.value;
   const amount=Number(el('sh_amount')?.value||0);
   const basic=Number(el('sh_basic')?.value||0);
+  const presentDays=el('sh_present')?.value!==''?Number(el('sh_present').value):undefined;
+  const absentDays=el('sh_absent')?.value!==''?Number(el('sh_absent').value):undefined;
   if(!month||!amount){alert('Please enter month and amount paid');return;}
   const history=getSalaryHistory(staffId);
   const idx=history.findIndex(r=>r.month===month);
-  if(idx>=0){history[idx].amount=amount;if(basic)history[idx].basic=basic;}
-  else history.push({month,amount,basic:basic||undefined,addedAt:new Date().toISOString()});
+  const entry={month,amount,basic:basic||undefined,
+    presentDays,absentDays,
+    addedAt:new Date().toISOString()};
+  if(idx>=0) history[idx]=Object.assign(history[idx],entry);
+  else history.push(entry);
   saveSalaryHistory(staffId,history);
   el('sh_list').innerHTML=renderSalaryHistoryList(staffId);
   if(el('sh_amount')) el('sh_amount').value='';
   if(el('sh_basic'))  el('sh_basic').value='';
+  if(el('sh_present')) el('sh_present').value='';
+  if(el('sh_absent'))  el('sh_absent').value='';
 }
 
 function deleteSalaryHistoryEntry(staffId, month){
