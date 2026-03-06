@@ -3992,16 +3992,26 @@ function saveSickDaysTotal(staffId, date, value){
   renderStaffAtt();
 }
 
-function toggleStaffAtt(staffId, date){
+async function toggleStaffAtt(staffId, date){
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
-  const sid=String(staffId); // always string
+  const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'غياب';
   const newSt=cur==='حضور'?'غياب':'حضور';
   DB.staffAtt[date][sid]=newSt;
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
   renderStaffAtt();
-  sb.from('staff_attendance').upsert({branch_id:curBid,staff_id:staffId,date,status:newSt},{onConflict:'branch_id,staff_id,date'}).then(()=>{}).catch(e=>console.error('StaffAtt save error:',e));
+  const {error:sErr}=await sb.from('staff_attendance').upsert(
+    {branch_id:curBid,staff_id:staffId,date,status:newSt},
+    {onConflict:'branch_id,staff_id,date'}
+  );
+  if(sErr){
+    console.error('StaffAtt save error:',sErr);
+    const {error:sErr2}=await sb.from('staff_attendance').upsert(
+      {branch_id:curBid,staff_id:staffId,date,status:newSt}
+    );
+    if(sErr2) console.error('StaffAtt retry error:',sErr2);
+  }
 }
 
 function sendStaffAbsenceWA(staffId, date){
@@ -4127,9 +4137,20 @@ async function toggleAtt(childId,date){
   const _attChild=DB.children.find(c=>String(c.id)===String(childId));
   if(_attChild) logActivity('attendance', _attChild.name+' → '+newSt);
   if(!DB.attendance[date])DB.attendance[date]={};
-  DB.attendance[date][childId]=newSt;
+  DB.attendance[date][String(childId)]=newSt;
   renderAtt();
-  await sb.from('attendance').upsert({branch_id:curBid,child_id:childId,date,status:newSt},{onConflict:'branch_id,child_id,date'});
+  const {error:attErr}=await sb.from('attendance').upsert(
+    {branch_id:curBid,child_id:childId,date,status:newSt},
+    {onConflict:'branch_id,child_id,date'}
+  );
+  if(attErr){
+    console.error('Attendance save error:',attErr);
+    // Retry with explicit select after upsert
+    const {error:attErr2}=await sb.from('attendance').upsert(
+      {branch_id:curBid,child_id:childId,date,status:newSt}
+    );
+    if(attErr2) console.error('Attendance retry error:',attErr2);
+  }
 }
 function printAtt(){
   const date=el('attdate').value||today();const active=DB.children.filter(c=>!c.leaveDate);const b=CB();
