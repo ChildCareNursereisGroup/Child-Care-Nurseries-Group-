@@ -9875,31 +9875,46 @@ function getActualWorkDaysCount(staffId){
   return histDays+liveDays;
 }
 
-function calcLeaveBalance(staffId){
+function calcLeaveBalance(staffId, endDateStr){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0,actualDays:0};
-  // UAE Labour Law: leave entitlement based on CALENDAR months from contract start
-  // (work days / actual attendance is for gratuity only, not leave)
-  const start=new Date(s.contractStart);
-  const now=new Date();
-  const totalMonths=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
-  const yearsWorked=totalMonths/12;
-  // UAE: 30 days annual leave per year (2.5 days/month), pro-rated
+
+  const basic=Number(s.basicSalary||0);
+  const dailyRate=basic/30;
+  const actualDays=getActualWorkDaysCount(staffId);
+
+  let yearsWorked=0;
+  let calcMethod='';
+
+  if(actualDays>0){
+    // Use actual work days recorded in system (most accurate)
+    yearsWorked=actualDays/365;
+    calcMethod='أيام فعلية';
+  } else {
+    // Fall back to calendar months
+    const start=new Date(s.contractStart);
+    const refDate=endDateStr?new Date(endDateStr):new Date();
+    const totalMonths=(refDate.getFullYear()-start.getFullYear())*12+(refDate.getMonth()-start.getMonth());
+    yearsWorked=totalMonths/12;
+    calcMethod='تواريخ عقد';
+  }
+
+  // UAE: 30 days annual leave per year, pro-rated
   const entitled=Math.floor(yearsWorked*30);
-  // Leave taken = recorded in system leaves
+
+  // Leave taken in system
   const takenInSystem=(DB.leaves||[])
     .filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected')
-    .reduce((s,l)=>s+(l.days||0),0);
-  // Leave taken before system (entered manually on staff form)
+    .reduce((acc,l)=>acc+(l.days||0),0);
+
+  // Leave taken before system (manual entry on staff form)
   const takenBefore=Number(s.leavesTakenBefore||0);
   const taken=takenInSystem+takenBefore;
   const remaining=Math.max(0,entitled-taken);
-  const basic=Number(s.basicSalary||0);
-  const dailyRate=basic/30;
   const compensation=Math.round(remaining*dailyRate*100)/100;
-  const actualDays=getActualWorkDaysCount(staffId);
+
   return {entitled,taken,takenInSystem,takenBefore,remaining,compensation,dailyRate,
-    yearsWorked:Math.round(yearsWorked*10)/10,actualDays,totalMonths};
+    yearsWorked:Math.round(yearsWorked*100)/100,actualDays,calcMethod};
 }
 
 function renderLeaves(){
@@ -10140,7 +10155,7 @@ function calcEOG(){
   }
 
   // ── Leave balance compensation ──
-  const bal=calcLeaveBalance(s.id);
+  const bal=calcLeaveBalance(s.id, endDate);
   const leaveComp=bal.remaining*(basic/30);
   const total=gratuity+leaveComp;
 
@@ -10219,7 +10234,7 @@ function calcEOG(){
           <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
         </div>
         <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">
-          مستحق: ${bal.entitled} يوم (${bal.yearsWorked} سنة × 30) | 
+          📊 ${bal.calcMethod} | مستحق: ${bal.entitled} يوم (${bal.yearsWorked} سنة × 30) | 
           مأخوذ في السيستم: ${bal.takenInSystem} يوم | 
           مأخوذ قبل السيستم: ${bal.takenBefore} يوم | 
           <b style="color:#059669">متبقي: ${bal.remaining} يوم</b>
