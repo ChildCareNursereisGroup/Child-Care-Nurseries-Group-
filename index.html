@@ -1168,12 +1168,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- SALARY HISTORY MODAL -->
 <div class="mover" id="salary-history-modal">
-  <div class="mbox" style="max-width:600px">
+  <div class="mbox" style="max-width:820px;width:95vw">
     <div class="mh">
       <div class="mt">📋 Salary History — سجل الرواتب</div>
       <button class="xb" onclick="el('salary-history-modal').classList.remove('on')">✕</button>
     </div>
-    <div style="padding:16px">
+    <div style="padding:16px;max-height:82vh;overflow-y:auto">
       <div id="salary-history-body"></div>
     </div>
   </div>
@@ -10483,11 +10483,11 @@ function downloadSalaryHistoryTemplate(){
   const XLSX=window.XLSX;
   if(!XLSX){alert('Excel library not loaded');return;}
   const ws=XLSX.utils.aoa_to_sheet([
-    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Gross / Net Paid (AED)'],
-    ['John Smith','2025-01','3000','3500'],
-    ['John Smith','2025-02','3000','3200'],
-    ['Sara Ahmed','2025-01','2500','2900'],
-    ['Sara Ahmed','2025-02','2500','2750'],
+    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Gross / Net Paid (AED)','Days Present (أيام الحضور)','Days Absent (أيام الغياب)'],
+    ['John Smith','2025-01','3000','3500','26','0'],
+    ['John Smith','2025-02','3000','3200','24','2'],
+    ['Sara Ahmed','2025-01','2500','2900','26','0'],
+    ['Sara Ahmed','2025-02','2500','2750','23','3'],
   ]);
   ws['!cols']=[{wch:22},{wch:16},{wch:20},{wch:22}];
   const wb=XLSX.utils.book_new();
@@ -10529,10 +10529,12 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     return null;
   };
-  const nameCol =col(['name','staff','employee']);
-  const monthCol=col(['month','date','period','شهر']);
-  const basicCol=col(['basic','أساسي','اساسي']);
-  const grossCol=col(['gross','net','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const nameCol   =col(['name','staff','employee']);
+  const monthCol  =col(['month','date','period','شهر']);
+  const basicCol  =col(['basic','أساسي','اساسي']);
+  const grossCol  =col(['gross','net','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const presentCol=col(['present','حضور','attendance','attend']);
+  const absentCol =col(['absent','غياب','absence']);
 
   let ok=0, skipped=0;
   for(const row of rows){
@@ -10547,10 +10549,13 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     if(!staffId){skipped++;continue;}
     const basic=basicCol?Number(row[basicCol])||0:0;
+    const presentDays=presentCol&&row[presentCol]!==''?Number(row[presentCol]):undefined;
+    const absentDays=absentCol&&row[absentCol]!==''?Number(row[absentCol]):undefined;
     const history=getSalaryHistory(staffId);
     const idx=history.findIndex(r=>r.month===month);
-    if(idx>=0){history[idx].amount=amount;if(basic)history[idx].basic=basic;}
-    else history.push({month,amount,basic:basic||undefined,addedAt:new Date().toISOString()});
+    const entry={month,amount,basic:basic||undefined,presentDays,absentDays,addedAt:new Date().toISOString()};
+    if(idx>=0) history[idx]=Object.assign(history[idx],entry);
+    else history.push(entry);
     saveSalaryHistory(staffId,history);
     ok++;
   }
