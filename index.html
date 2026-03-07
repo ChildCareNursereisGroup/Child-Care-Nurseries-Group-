@@ -1649,17 +1649,19 @@ async function loadFromSupa(bid) {
   bid=bid||curBid;
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e,sa,sh] = await Promise.all([
+    const [c,r,a,e,sa] = await Promise.all([
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
       sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('staff_attendance').select('*').eq('branch_id',bid),
-      sb.from('staff_salary_history').select('*').eq('branch_id',bid).catch(()=>({data:[],error:null})),
     ]);
     if(c.error)throw c.error;
     if(r.error)throw r.error;
     if(a.error)throw a.error;
+    // Load salary history separately — never block main load if table missing
+    const sh = await sb.from('staff_salary_history').select('*').eq('branch_id',bid)
+      .then(res=>res).catch(()=>({data:[],error:null}));
     DB.children = (c.data||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
