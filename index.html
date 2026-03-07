@@ -1114,16 +1114,54 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div style="background:#fef3c7;border-radius:11px;padding:12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
     <b>⚖️ قانون العمل الإماراتي:</b> 21 يوم لكل سنة (أول 5 سنوات) | 30 يوم لكل سنة (بعد 5 سنوات) | تُحسب على آخر راتب أساسي
   </div>
-  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px">
-    <select id="eog-staff-sel" style="flex:1;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
-      <option value="">-- اختر موظف --</option>
-    </select>
-    <select id="eog-reason" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
-      <option value="resignation">استقالة Resignation</option>
-      <option value="termination">إنهاء عقد Termination</option>
-      <option value="end_contract">انتهاء عقد End of Contract</option>
-    </select>
-    <input type="date" id="eog-end-date" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="calcEOG()">
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:10px">
+    <div>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">👤 الموظف / Staff</label>
+      <select id="eog-staff-sel" style="width:100%;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
+        <option value="">-- اختر موظف --</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📋 سبب الإنهاء</label>
+      <select id="eog-reason" style="width:100%;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
+        <option value="resignation">🚪 استقالة — Resignation</option>
+        <option value="termination">⛔ إنهاء / رفد — Termination</option>
+        <option value="end_contract">📄 انتهاء عقد — End of Contract</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📅 تاريخ آخر يوم عمل</label>
+      <input type="date" id="eog-end-date" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
+    </div>
+  </div>
+
+  <!-- Notice period section — shown only for termination -->
+  <div id="eog-notice-section" style="display:none;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-weight:800;color:#1e3a8a;font-size:.8rem;margin-bottom:8px">📢 تفاصيل الإشعار — Notice Period Details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">📅 تاريخ إشعار الموظفة</label>
+        <input type="date" id="eog-notice-date" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">تاريخ ما أُبلغت الموظفة بالإنهاء</div>
+      </div>
+      <div>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">⏱️ فترة الإشعار المطلوبة</label>
+        <select id="eog-notice-months" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
+          <option value="1">شهر واحد (1 month)</option>
+          <option value="2">شهرين (2 months)</option>
+          <option value="3" selected>3 أشهر (3 months) — الافتراضي</option>
+        </select>
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">حسب عقد الحضانة: 3 أشهر</div>
+      </div>
+      <div>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">✅ هل اشتغلت فترة الإشعار؟</label>
+        <select id="eog-notice-worked" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
+          <option value="yes">✅ نعم — اشتغلت وأخذت راتبها</option>
+          <option value="no">❌ لا — لم تشتغل</option>
+          <option value="partial">⚡ جزئي — اشتغلت جزء منها</option>
+        </select>
+      </div>
+    </div>
   </div>
   <div id="eog-result"></div>
 </div>
@@ -9539,7 +9577,7 @@ function showHRTab(id, btn){
   if(btn) btn.classList.add('on');
   if(id==='hr-payroll')  { populatePayrollBranch(); renderPayroll(); }
   if(id==='hr-leaves')   { populateLeaveStaffFilter(); renderLeaves(); }
-  if(id==='hr-eog')      { populateEOGSelect(); }
+  if(id==='hr-eog')      { loadHRData().then(()=>populateEOGSelect()); }
   if(id==='hr-reports')  { populateRptSelects(); }
 }
 
@@ -10106,8 +10144,58 @@ function calcEOG(){
   const leaveComp=bal.remaining*(basic/30);
   const total=gratuity+leaveComp;
 
-  // ── Notice period (1 month basic) ──
-  const noticePay=basic;
+  // ── Notice period ──
+  let noticePay=0;
+  let noticeNote='';
+  const noticeSection=el('eog-notice-section');
+
+  if(reason==='resignation'){
+    noticePay=0;
+    noticeNote='استقالة — لا يوجد بدل إشعار (الموظفة هي من تعطي إشعار)';
+    if(noticeSection) noticeSection.style.display='none';
+  } else if(reason==='end_contract'){
+    noticePay=0;
+    noticeNote='انتهاء عقد — لا يوجد بدل إشعار';
+    if(noticeSection) noticeSection.style.display='none';
+  } else {
+    // termination — show notice section
+    if(noticeSection) noticeSection.style.display='';
+    const noticeMons=Number(el('eog-notice-months')?.value||3);
+    const noticeWorked=el('eog-notice-worked')?.value||'yes';
+    const noticeDate=el('eog-notice-date')?.value;
+
+    // Check if employee worked through notice period
+    let workedFullNotice=false;
+    if(noticeDate && endDate){
+      const nDate=new Date(noticeDate);
+      const eDate=new Date(endDate);
+      const diffDays=Math.floor((eDate-nDate)/(1000*60*60*24));
+      const requiredDays=noticeMons*30;
+      workedFullNotice = diffDays >= requiredDays;
+    }
+
+    if(noticeWorked==='yes' || workedFullNotice){
+      noticePay=0;
+      noticeNote=`✅ اشتغلت فترة الإشعار كاملة (${noticeMons} أشهر) وأخذت راتبها — لا يوجد بدل إشعار إضافي`;
+    } else if(noticeWorked==='partial'){
+      // Calculate remaining days not worked
+      const noticeDate2=el('eog-notice-date')?.value;
+      let remainDays=0;
+      if(noticeDate2 && endDate){
+        const worked=Math.floor((new Date(endDate)-new Date(noticeDate2))/(1000*60*60*24));
+        const required=noticeMons*30;
+        remainDays=Math.max(0, required-worked);
+      } else {
+        remainDays=noticeMons*15; // assume half
+      }
+      noticePay=(basic/30)*remainDays;
+      noticeNote=`⚡ اشتغلت جزء من فترة الإشعار — بدل الأيام المتبقية (${remainDays} يوم)`;
+    } else {
+      // Did not work notice period — company pays notice
+      noticePay=basic*noticeMons;
+      noticeNote=`❌ لم تشتغل فترة الإشعار — بدل إشعار ${noticeMons} أشهر`;
+    }
+  }
 
   res.innerHTML=`
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:16px">
@@ -10130,14 +10218,20 @@ function calcEOG(){
           <span>بدل الإجازة (${bal.remaining} يوم × ${fmtNum(Math.round(basic/30*100)/100)} AED)</span>
           <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
         </div>
-        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">مستحق: ${bal.entitled} يوم | مأخوذ: ${bal.taken} يوم | متبقي: ${bal.remaining} يوم</div>
-        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>بدل الإشعار (شهر)</span>
-          <span style="font-weight:700">${fmtNum(noticePay)} AED</span>
+        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">
+          مستحق: ${bal.entitled} يوم (${bal.yearsWorked} سنة × 30) | 
+          مأخوذ في السيستم: ${bal.takenInSystem} يوم | 
+          مأخوذ قبل السيستم: ${bal.takenBefore} يوم | 
+          <b style="color:#059669">متبقي: ${bal.remaining} يوم</b>
         </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
+          <span>بدل الإشعار</span>
+          <span style="font-weight:700;color:${noticePay>0?'#dc2626':'#6b7280'}">${noticePay>0?fmtNum(noticePay)+' AED':'لا يوجد'}</span>
+        </div>
+        <div style="font-size:.7rem;color:#6b7280;margin-bottom:6px;font-style:italic">${noticeNote}</div>
         <div style="border-top:2px solid #059669;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem">
           <span>الإجمالي المستحق</span>
-          <span style="color:#059669">${fmtNum(total+noticePay)} AED</span>
+          <span style="color:#059669">${fmtNum(Math.round((total+noticePay)*100)/100)} AED</span>
         </div>
       </div>
       <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
