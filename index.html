@@ -869,6 +869,245 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <div class="page" id="pg-admin">
 
+<!-- ═══════════════════════════════════════════════ -->
+<!-- CHILDREN EXPENSES SECTION — Admin Only         -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="card" style="border:2px solid #7c3aed">
+  <div class="ch">
+    <div class="ct" style="color:#7c3aed;font-size:1rem">🧒 مصاريف الأطفال — Children Expenses</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button onclick="switchChildExpYear('2025',this)" id="chexp-btn-2025" style="padding:5px 14px;border-radius:18px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.79rem">📅 2025</button>
+      <button onclick="switchChildExpYear('2026',this)" id="chexp-btn-2026" style="padding:5px 14px;border-radius:18px;border:2px solid #7c3aed;background:#fff;color:#7c3aed;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.79rem">📋 2026</button>
+    </div>
+  </div>
+
+  <!-- ── 2025 Panel ─────────────────────────── -->
+  <div id="chexp-panel-2025">
+    <div style="background:#f5f3ff;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:.81rem;color:#5b21b6">
+      📌 <b>2025 — ملخص شهري للمصاريف بدون اسم طفل</b> | يمكن استيراد من Excel
+    </div>
+
+    <!-- Import Excel 2025 -->
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
+      <button onclick="el('xl-chexp2025-file').click()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">📥 Import Excel 2025</button>
+      <button onclick="downloadChildExp2025Template()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">📋 Template 2025</button>
+    </div>
+    <input type="file" id="xl-chexp2025-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importChildExp2025(this.files[0])">
+    <div id="chexp2025-imp-preview" style="margin-bottom:8px"></div>
+
+    <!-- Manual Entry Form 2025 -->
+    <div style="background:#fff;border:1.5px solid #ddd6fe;border-radius:11px;padding:12px;margin-bottom:10px">
+      <div style="font-weight:800;color:#7c3aed;font-size:.84rem;margin-bottom:8px">➕ إضافة مصروف يدوي — 2025</div>
+      <div class="g3" style="margin-bottom:8px">
+        <div class="fg">
+          <label>الشهر — Month</label>
+          <select id="ce25_month">
+            <option value="2025-01">يناير — January 2025</option>
+            <option value="2025-02">فبراير — February 2025</option>
+            <option value="2025-03">مارس — March 2025</option>
+            <option value="2025-04">أبريل — April 2025</option>
+            <option value="2025-05">مايو — May 2025</option>
+            <option value="2025-06">يونيو — June 2025</option>
+            <option value="2025-07">يوليو — July 2025</option>
+            <option value="2025-08">أغسطس — August 2025</option>
+            <option value="2025-09">سبتمبر — September 2025</option>
+            <option value="2025-10">أكتوبر — October 2025</option>
+            <option value="2025-11">نوفمبر — November 2025</option>
+            <option value="2025-12">ديسمبر — December 2025</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>البند — Category</label>
+          <select id="ce25_cat">
+            <option value="food">🍽️ طعام وشراب</option>
+            <option value="supplies">📦 مستلزمات</option>
+            <option value="activities">🎨 أنشطة وفعاليات</option>
+            <option value="health">💊 صحة ورعاية</option>
+            <option value="uniform">👕 زي مدرسي</option>
+            <option value="transport">🚌 مواصلات</option>
+            <option value="other">📝 أخرى</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>المبلغ — Amount (AED)</label>
+          <input type="number" id="ce25_amount" placeholder="0.00">
+        </div>
+        <div class="fg">
+          <label>طريقة الدفع — Pay Method</label>
+          <select id="ce25_pay">
+            <option value="cash">💵 كاش</option>
+            <option value="card">💳 بطاقة</option>
+            <option value="bank">🏦 تحويل بنكي</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>التاريخ — Date</label>
+          <input type="date" id="ce25_date">
+        </div>
+        <div class="fg">
+          <label>ملاحظات — Notes</label>
+          <input type="text" id="ce25_notes" placeholder="وصف المصروف...">
+        </div>
+      </div>
+      <button onclick="saveChildExp2025()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">💾 حفظ</button>
+      <div id="ce25-alert" style="margin-top:6px"></div>
+    </div>
+
+    <!-- Filter by month -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <label style="font-size:.8rem;font-weight:700;color:#6b7280">فلتر الشهر:</label>
+      <select id="ce25_filt_month" onchange="renderChildExp2025()" style="padding:5px 9px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
+        <option value="">كل الأشهر</option>
+        <option value="2025-01">يناير 2025</option>
+        <option value="2025-02">فبراير 2025</option>
+        <option value="2025-03">مارس 2025</option>
+        <option value="2025-04">أبريل 2025</option>
+        <option value="2025-05">مايو 2025</option>
+        <option value="2025-06">يونيو 2025</option>
+        <option value="2025-07">يوليو 2025</option>
+        <option value="2025-08">أغسطس 2025</option>
+        <option value="2025-09">سبتمبر 2025</option>
+        <option value="2025-10">أكتوبر 2025</option>
+        <option value="2025-11">نوفمبر 2025</option>
+        <option value="2025-12">ديسمبر 2025</option>
+      </select>
+      <span id="ce25-total-badge" style="background:#f5f3ff;color:#7c3aed;border-radius:18px;padding:3px 12px;font-weight:800;font-size:.8rem"></span>
+    </div>
+
+    <!-- 2025 list -->
+    <div id="chexp2025-list"></div>
+  </div>
+
+  <!-- ── 2026 Panel ─────────────────────────── -->
+  <div id="chexp-panel-2026" style="display:none">
+    <div style="background:#eff6ff;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:.81rem;color:#1e40af">
+      📌 <b>2026 — تفصيل كل فاتورة بالكامل مع شكل الإيصال</b>
+    </div>
+
+    <!-- Import Excel 2026 -->
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
+      <button onclick="el('xl-chexp2026-file').click()" style="background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">📥 Import Excel 2026</button>
+      <button onclick="downloadChildExp2026Template()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">📋 Template 2026</button>
+    </div>
+    <input type="file" id="xl-chexp2026-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importChildExp2026(this.files[0])">
+    <div id="chexp2026-imp-preview" style="margin-bottom:8px"></div>
+
+    <!-- Manual Entry Form 2026 -->
+    <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:11px;padding:12px;margin-bottom:10px">
+      <div style="font-weight:800;color:#1d4ed8;font-size:.84rem;margin-bottom:8px">➕ إضافة فاتورة — 2026</div>
+      <div class="g3" style="margin-bottom:8px">
+        <div class="fg">
+          <label>رقم الفاتورة — Invoice No</label>
+          <input type="text" id="ce26_invno" placeholder="INV-2026-001">
+        </div>
+        <div class="fg">
+          <label>التاريخ — Date</label>
+          <input type="date" id="ce26_date">
+        </div>
+        <div class="fg">
+          <label>البند — Category</label>
+          <select id="ce26_cat">
+            <option value="food">🍽️ طعام وشراب</option>
+            <option value="supplies">📦 مستلزمات</option>
+            <option value="activities">🎨 أنشطة وفعاليات</option>
+            <option value="health">💊 صحة ورعاية</option>
+            <option value="uniform">👕 زي مدرسي</option>
+            <option value="transport">🚌 مواصلات</option>
+            <option value="other">📝 أخرى</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>المورد — Supplier</label>
+          <input type="text" id="ce26_supplier" placeholder="اسم المورد">
+        </div>
+        <div class="fg">
+          <label>المبلغ قبل الضريبة — Amount</label>
+          <input type="number" id="ce26_amount" placeholder="0.00" oninput="calcCE26Vat()">
+        </div>
+        <div class="fg">
+          <label>الضريبة — VAT</label>
+          <select id="ce26_vat" onchange="calcCE26Vat()">
+            <option value="0">معفى 0%</option>
+            <option value="5">5% ضريبة</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>مبلغ الضريبة — VAT Amt</label>
+          <input type="number" id="ce26_vatamt" readonly style="background:#f9fafb">
+        </div>
+        <div class="fg">
+          <label>الإجمالي — Total</label>
+          <input type="number" id="ce26_total" readonly style="background:#f0f9ff;font-weight:800">
+        </div>
+        <div class="fg">
+          <label>طريقة الدفع — Pay Method</label>
+          <select id="ce26_pay">
+            <option value="cash">💵 كاش</option>
+            <option value="card">💳 بطاقة</option>
+            <option value="bank">🏦 تحويل بنكي</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>رقم المرجع — Ref No (bank/card)</label>
+          <input type="text" id="ce26_ref" placeholder="رقم التحويل أو البطاقة">
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>الوصف — Description</label>
+          <input type="text" id="ce26_desc" placeholder="وصف الفاتورة...">
+        </div>
+      </div>
+      <button onclick="saveChildExp2026()" style="background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">💾 حفظ الفاتورة</button>
+      <button onclick="previewCE26Invoice()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;margin-right:7px">👁️ معاينة الفاتورة</button>
+      <div id="ce26-alert" style="margin-top:6px"></div>
+    </div>
+
+    <!-- Filter -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <label style="font-size:.8rem;font-weight:700;color:#6b7280">فلتر الشهر:</label>
+      <select id="ce26_filt_month" onchange="renderChildExp2026()" style="padding:5px 9px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
+        <option value="">كل الأشهر</option>
+        <option value="2026-01">يناير 2026</option>
+        <option value="2026-02">فبراير 2026</option>
+        <option value="2026-03">مارس 2026</option>
+        <option value="2026-04">أبريل 2026</option>
+        <option value="2026-05">مايو 2026</option>
+        <option value="2026-06">يونيو 2026</option>
+        <option value="2026-07">يوليو 2026</option>
+        <option value="2026-08">أغسطس 2026</option>
+        <option value="2026-09">سبتمبر 2026</option>
+        <option value="2026-10">أكتوبر 2026</option>
+        <option value="2026-11">نوفمبر 2026</option>
+        <option value="2026-12">ديسمبر 2026</option>
+      </select>
+      <select id="ce26_filt_pay" onchange="renderChildExp2026()" style="padding:5px 9px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
+        <option value="">كل طرق الدفع</option>
+        <option value="cash">💵 كاش</option>
+        <option value="card">💳 بطاقة</option>
+        <option value="bank">🏦 تحويل بنكي</option>
+      </select>
+      <span id="ce26-total-badge" style="background:#eff6ff;color:#1d4ed8;border-radius:18px;padding:3px 12px;font-weight:800;font-size:.8rem"></span>
+    </div>
+
+    <!-- 2026 list -->
+    <div id="chexp2026-list"></div>
+  </div>
+</div>
+
+<!-- INVOICE PREVIEW MODAL 2026 -->
+<div class="mover" id="ce26-inv-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="mh">
+      <div class="mt">🧾 معاينة الفاتورة — Invoice Preview</div>
+      <button class="xb" onclick="el('ce26-inv-modal').classList.remove('on')">✕</button>
+    </div>
+    <div id="ce26-inv-body" style="padding:4px"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="window.print()" style="flex:1;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">🖨️ طباعة</button>
+      <button onclick="el('ce26-inv-modal').classList.remove('on')" style="padding:10px 16px;background:#f3f4f6;border:none;border-radius:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <!-- EXCEL IMPORT HUB -->
 <div class="card" style="border:2px dashed var(--ok)">
   <div class="ch"><div class="ct" style="color:var(--ok)">📥 Import from Excel — استيراد من Excel</div></div>
@@ -4280,7 +4519,7 @@ function setEF(f){expFilt=f;renderExps();}
 function renderExps(){
   renderExpPills();
   const fm=el('efmon')?.value||'';
-  let list=[...DB.expenses];
+  let list=[...DB.expenses].filter(e=>e.category!=='chexp2025'&&e.category!=='chexp2026');
   if(fm)list=list.filter(e=>monthOf(e.date)===fm);
   if(expFilt!=='all')list=list.filter(e=>e.category===expFilt);
   const tot=list.reduce((s,e)=>s+(e.totalAmount||e.amount),0);
@@ -5302,6 +5541,8 @@ async function transferChild(){
 function renderAdmin(){
   renderApiKeySettings();
   renderBranchSettings();
+  renderChildExp2025();
+  renderChildExp2026();
   // Populate import branch selector
   const impBr = el('imp-branch');
   if(impBr) {
@@ -6637,6 +6878,484 @@ function downloadReceiptsTemplate(){
   ws['!cols']=[{wch:18},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:20}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Receipts');
   XLSX.writeFile(wb,'receipts_import_template.xlsx');
+}
+
+// ═══════════════════════════════════════════════
+//  CHILDREN EXPENSES 2025 / 2026
+// ═══════════════════════════════════════════════
+
+// In-memory stores (synced to Supabase via expenses table with category prefix)
+// We use category = 'chexp2025' or 'chexp2026' to distinguish
+
+const CE_CATS = {
+  food:       {ic:'🍽️', ar:'طعام وشراب',      en:'Food & Drinks'},
+  supplies:   {ic:'📦', ar:'مستلزمات',         en:'Supplies'},
+  activities: {ic:'🎨', ar:'أنشطة وفعاليات',   en:'Activities'},
+  health:     {ic:'💊', ar:'صحة ورعاية',       en:'Health & Care'},
+  uniform:    {ic:'👕', ar:'زي مدرسي',         en:'Uniforms'},
+  transport:  {ic:'🚌', ar:'مواصلات',          en:'Transport'},
+  other:      {ic:'📝', ar:'أخرى',             en:'Other'},
+};
+const CE_PAY_LABELS = {cash:'💵 كاش', card:'💳 بطاقة', bank:'🏦 تحويل بنكي'};
+const MONTHS_AR = {
+  '01':'يناير','02':'فبراير','03':'مارس','04':'أبريل','05':'مايو','06':'يونيو',
+  '07':'يوليو','08':'أغسطس','09':'سبتمبر','10':'أكتوبر','11':'نوفمبر','12':'ديسمبر'
+};
+
+function switchChildExpYear(yr, btn){
+  ['2025','2026'].forEach(y=>{
+    el('chexp-panel-'+y).style.display = y===yr ? '' : 'none';
+    const b = el('chexp-btn-'+y);
+    if(b){ b.style.background = y===yr ? (y==='2025'?'#7c3aed':'#1d4ed8') : '#fff';
+           b.style.color = y===yr ? '#fff' : (y==='2025'?'#7c3aed':'#1d4ed8'); }
+  });
+}
+
+// ── helpers ──────────────────────────────────
+function getChildExpenses(yr){
+  return (DB.expenses||[]).filter(e=>e.category==='chexp'+yr);
+}
+function ceMonthLabel(ym){
+  if(!ym) return '';
+  const [y,m]=ym.split('-');
+  return (MONTHS_AR[m]||m)+' '+y;
+}
+
+// ── 2025 ─────────────────────────────────────
+function renderChildExp2025(){
+  const filt = el('ce25_filt_month')?.value||'';
+  let list = getChildExpenses('2025');
+  if(filt) list = list.filter(e=> (e.note2||'').startsWith(filt) || monthOf(e.date)===filt);
+  const tot = list.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+  const badge = el('ce25-total-badge');
+  if(badge) badge.textContent = 'الإجمالي: '+fmtNum(tot)+' د.إ';
+
+  const cont = el('chexp2025-list');
+  if(!cont) return;
+  if(!list.length){
+    cont.innerHTML=`<div class="empty"><div class="ei">🧒</div><p>لا توجد مصاريف أطفال لعام 2025</p></div>`;
+    return;
+  }
+
+  // Group by month
+  const byMonth={};
+  list.forEach(e=>{
+    const ym = monthOf(e.date);
+    if(!byMonth[ym]) byMonth[ym]=[];
+    byMonth[ym].push(e);
+  });
+
+  let html='';
+  Object.keys(byMonth).sort().forEach(ym=>{
+    const rows=byMonth[ym];
+    const mTot=rows.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+    html+=`<div style="border:1.5px solid #ddd6fe;border-radius:11px;margin-bottom:8px;overflow:hidden">
+      <div style="background:#f5f3ff;padding:8px 13px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:800;color:#7c3aed">📅 ${ceMonthLabel(ym)}</span>
+        <span style="font-weight:800;color:#dc2626">${fmtNum(mTot)} د.إ</span>
+      </div>
+      <div style="padding:6px 13px">`;
+    rows.forEach(e=>{
+      const cat = CE_CATS[e.subType]||CE_CATS.other;
+      const pay = CE_PAY_LABELS[e.extra?.payMethod||e.payMethod||e.note3]||e.payMethod||'—';
+      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f3f4f6;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:7px;min-width:0">
+          <span style="font-size:1.1rem">${cat.ic}</span>
+          <div>
+            <div style="font-weight:700;font-size:.82rem">${cat.ar}</div>
+            <div style="font-size:.7rem;color:#6b7280">${fmtDate(e.date)}${e.note?' | '+e.note:''}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+          <span style="background:#f5f3ff;color:#7c3aed;border-radius:12px;padding:2px 9px;font-size:.71rem;font-weight:700">${pay}</span>
+          <span style="font-weight:800;color:#dc2626;font-size:.85rem">${fmtNum(e.totalAmount||e.amount||0)} د.إ</span>
+          <button onclick="delChildExp('${e.id}')" style="background:#fee2e2;border:none;border-radius:7px;padding:3px 8px;cursor:pointer;font-size:.75rem;color:#dc2626">🗑</button>
+        </div>
+      </div>`;
+    });
+    html+='</div></div>';
+  });
+  cont.innerHTML=html;
+}
+
+async function saveChildExp2025(){
+  const month=v('ce25_month');
+  const cat=v('ce25_cat');
+  const amount=n('ce25_amount');
+  const pay=v('ce25_pay');
+  const date=v('ce25_date')||month+'-01';
+  const notes=v('ce25_notes');
+  if(!amount){showAlert('ce25-alert','❌ أدخل المبلغ',true);return;}
+  setSyncing(true);
+  const row={
+    branch_id:curBid, category:'chexp2025',
+    type:'مصاريف أطفال 2025',
+    amount, vat_type:'معفى (0%)', vat_amount:0, total_amount:amount,
+    date, note:notes, sub_type:cat,
+    supplier_name:'', tax_number:'',
+    extra:{payMethod:pay, month}
+  };
+  const {error}=await sb.from('expenses').insert(row);
+  setSyncing(false);
+  if(error){showAlert('ce25-alert','❌ خطأ: '+error.message,true);return;}
+  showAlert('ce25-alert','✅ تم الحفظ!',false);
+  ['ce25_amount','ce25_notes'].forEach(id=>{const el2=el(id);if(el2)el2.value='';});
+  await loadFromSupa(curBid); renderChildExp2025();
+}
+
+async function delChildExp(id){
+  if(!confirm('حذف هذا المصروف؟'))return;
+  await sb.from('expenses').delete().eq('id',id);
+  await loadFromSupa(curBid); renderChildExp2025(); renderChildExp2026();
+}
+
+// ── 2026 ─────────────────────────────────────
+function calcCE26Vat(){
+  const amt=n('ce26_amount');
+  const pct=Number(el('ce26_vat')?.value||0);
+  const vatAmt=Math.round(amt*pct/100*100)/100;
+  if(el('ce26_vatamt'))el('ce26_vatamt').value=vatAmt||'';
+  if(el('ce26_total'))el('ce26_total').value=Math.round((amt+vatAmt)*100)/100||'';
+}
+
+function renderChildExp2026(){
+  const filt = el('ce26_filt_month')?.value||'';
+  const filtPay = el('ce26_filt_pay')?.value||'';
+  let list = getChildExpenses('2026');
+  if(filt) list = list.filter(e=>monthOf(e.date)===filt);
+  if(filtPay) list = list.filter(e=>(e.extra?.payMethod||'cash')===filtPay);
+
+  const tot=list.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+  const vatTot=list.reduce((s,e)=>s+(e.vatAmount||e.vat_amount||0),0);
+  const badge=el('ce26-total-badge');
+  if(badge) badge.textContent='الإجمالي: '+fmtNum(tot)+' د.إ';
+
+  const cont=el('chexp2026-list');
+  if(!cont)return;
+  if(!list.length){
+    cont.innerHTML=`<div class="empty"><div class="ei">🧾</div><p>لا توجد فواتير أطفال لعام 2026</p></div>`;
+    return;
+  }
+
+  // Summary by pay method
+  const paySum={cash:0,card:0,bank:0};
+  list.forEach(e=>{ const p=e.extra?.payMethod||'cash'; paySum[p]=(paySum[p]||0)+(e.totalAmount||e.amount||0); });
+
+  let html=`<div style="background:#eff6ff;border-radius:9px;padding:9px 12px;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem">
+    <span>📊 إجمالي: <b>${fmtNum(tot)} د.إ</b></span>
+    <span>🧾 ضريبة: <b style="color:#dc2626">${fmtNum(vatTot)} د.إ</b></span>
+    ${Object.entries(paySum).filter(([,v])=>v>0).map(([k,v2])=>`<span>${CE_PAY_LABELS[k]}: <b>${fmtNum(v2)}</b></span>`).join('')}
+  </div>`;
+
+  list.forEach((e,i)=>{
+    const cat=CE_CATS[e.subType]||CE_CATS.other;
+    const pay=CE_PAY_LABELS[e.extra?.payMethod||'cash']||'—';
+    const invNo=e.extra?.invNo||('INV-'+String(i+1).padStart(4,'0'));
+    const ref=e.extra?.ref||'';
+    html+=`<div style="border:1.5px solid #bfdbfe;border-radius:11px;margin-bottom:9px;overflow:hidden">
+      <!-- Invoice header -->
+      <div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:9px 13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+        <div>
+          <div style="font-weight:900;color:#fff;font-size:.88rem">🧾 فاتورة — ${invNo}</div>
+          <div style="font-size:.7rem;color:rgba(255,255,255,.85)">📅 ${fmtDate(e.date)}</div>
+        </div>
+        <span style="background:rgba(255,255,255,.25);color:#fff;border-radius:12px;padding:3px 11px;font-size:.75rem;font-weight:800">${pay}</span>
+      </div>
+      <!-- Invoice body -->
+      <div style="padding:10px 13px;background:#fff">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">
+          <span style="background:#eff6ff;color:#1d4ed8;border-radius:9px;padding:3px 10px;font-size:.75rem;font-weight:700">${cat.ic} ${cat.ar}</span>
+          ${e.supplierName?`<span style="background:#f0fdf4;color:#059669;border-radius:9px;padding:3px 10px;font-size:.75rem;font-weight:700">🏢 ${e.supplierName}</span>`:''}
+        </div>
+        ${e.note?`<div style="font-size:.78rem;color:#374151;margin-bottom:6px">📝 ${e.note}</div>`:''}
+        ${ref?`<div style="font-size:.72rem;color:#6b7280;margin-bottom:5px">🔑 مرجع: ${ref}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #e5e7eb;padding-top:7px;margin-top:5px;flex-wrap:wrap;gap:5px">
+          <div style="font-size:.76rem;color:#6b7280">
+            ${e.vatAmount?`ضريبة: ${fmtNum(e.vatAmount)} د.إ | `:''}
+            ${e.amount!==e.totalAmount?`قبل الضريبة: ${fmtNum(e.amount)} د.إ`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-weight:900;color:#1d4ed8;font-size:1rem">${fmtNum(e.totalAmount||e.amount||0)} د.إ</span>
+            <button onclick="viewCE26Invoice('${e.id}')" style="background:#dbeafe;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.75rem;color:#1d4ed8;font-weight:700">👁️</button>
+            <button onclick="delChildExp('${e.id}')" style="background:#fee2e2;border:none;border-radius:7px;padding:4px 8px;cursor:pointer;font-size:.75rem;color:#dc2626">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  cont.innerHTML=html;
+}
+
+async function saveChildExp2026(){
+  const amount=n('ce26_amount');
+  if(!amount){showAlert('ce26-alert','❌ أدخل المبلغ',true);return;}
+  const date=v('ce26_date')||today();
+  const cat=v('ce26_cat');
+  const vatPct=Number(el('ce26_vat')?.value||0);
+  const vatAmt=Math.round(amount*vatPct/100*100)/100;
+  const total=Math.round((amount+vatAmt)*100)/100;
+  const supplier=v('ce26_supplier');
+  const pay=v('ce26_pay');
+  const ref=v('ce26_ref');
+  const desc=v('ce26_desc');
+  const invNo=v('ce26_invno')||('INV-2026-'+Date.now().toString().slice(-4));
+  setSyncing(true);
+  const row={
+    branch_id:curBid, category:'chexp2026',
+    type:'مصاريف أطفال 2026',
+    amount, vat_type:vatPct>0?'5% ضريبة':'معفى (0%)', vat_amount:vatAmt, total_amount:total,
+    date, note:desc, sub_type:cat,
+    supplier_name:supplier, tax_number:'',
+    extra:{payMethod:pay, invNo, ref}
+  };
+  const {error}=await sb.from('expenses').insert(row);
+  setSyncing(false);
+  if(error){showAlert('ce26-alert','❌ خطأ: '+error.message,true);return;}
+  showAlert('ce26-alert','✅ تم حفظ الفاتورة!',false);
+  ['ce26_amount','ce26_vatamt','ce26_total','ce26_supplier','ce26_ref','ce26_desc','ce26_invno'].forEach(id=>{const el2=el(id);if(el2)el2.value='';});
+  await loadFromSupa(curBid); renderChildExp2026();
+}
+
+function previewCE26Invoice(){
+  const amount=n('ce26_amount');
+  if(!amount){showAlert('ce26-alert','❌ أدخل البيانات أولاً',true);return;}
+  const vatPct=Number(el('ce26_vat')?.value||0);
+  const vatAmt=Math.round(amount*vatPct/100*100)/100;
+  const total=amount+vatAmt;
+  const cat=CE_CATS[v('ce26_cat')]||CE_CATS.other;
+  const pay=CE_PAY_LABELS[v('ce26_pay')]||'—';
+  const inv={invNo:v('ce26_invno')||'DRAFT',date:v('ce26_date')||today(),
+             supplier:v('ce26_supplier'),ref:v('ce26_ref'),desc:v('ce26_desc'),
+             amount,vatAmt,total,cat,pay};
+  renderCE26InvoiceHTML(inv);
+  el('ce26-inv-modal').classList.add('on');
+}
+
+function viewCE26Invoice(id){
+  const e=(DB.expenses||[]).find(x=>x.id===id);
+  if(!e)return;
+  const cat=CE_CATS[e.subType]||CE_CATS.other;
+  const pay=CE_PAY_LABELS[e.extra?.payMethod||'cash']||'—';
+  renderCE26InvoiceHTML({
+    invNo:e.extra?.invNo||id,date:e.date,supplier:e.supplierName,
+    ref:e.extra?.ref,desc:e.note,amount:e.amount,
+    vatAmt:e.vatAmount||e.vat_amount||0,total:e.totalAmount||e.amount,
+    cat,pay
+  });
+  el('ce26-inv-modal').classList.add('on');
+}
+
+function renderCE26InvoiceHTML(inv){
+  const branch=CB()||{ar:'الحضانة',icon:'🏫'};
+  el('ce26-inv-body').innerHTML=`
+  <div style="font-family:'Tajawal',sans-serif;padding:8px" dir="rtl">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);border-radius:14px;padding:18px 16px;color:#fff;margin-bottom:14px;text-align:center">
+      <div style="font-size:1.6rem;margin-bottom:4px">${branch.icon||'🏫'}</div>
+      <div style="font-weight:900;font-size:1.05rem">${branch.ar||'Child Care Nurseries'}</div>
+      <div style="font-size:.78rem;opacity:.88;margin-top:2px">مصاريف الأطفال — Children Expenses</div>
+    </div>
+    <!-- Invoice info -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px">
+      <div style="background:#f8faff;border-radius:9px;padding:9px 11px;border:1px solid #dbeafe">
+        <div style="font-size:.68rem;color:#6b7280">رقم الفاتورة</div>
+        <div style="font-weight:900;color:#1d4ed8">${inv.invNo}</div>
+      </div>
+      <div style="background:#f8faff;border-radius:9px;padding:9px 11px;border:1px solid #dbeafe">
+        <div style="font-size:.68rem;color:#6b7280">التاريخ</div>
+        <div style="font-weight:900;color:#1d4ed8">${fmtDate(inv.date)}</div>
+      </div>
+    </div>
+    <!-- Details -->
+    <div style="border:1.5px solid #e5e7eb;border-radius:11px;overflow:hidden;margin-bottom:12px">
+      <div style="background:#f9fafb;padding:7px 13px;font-weight:800;color:#374151;font-size:.82rem">📋 تفاصيل الفاتورة</div>
+      <table style="width:100%;font-size:.8rem;border-collapse:collapse">
+        <tr><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;color:#6b7280;width:45%">البند</td><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;font-weight:700">${inv.cat.ic} ${inv.cat.ar}</td></tr>
+        ${inv.supplier?`<tr><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;color:#6b7280">المورد</td><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;font-weight:700">${inv.supplier}</td></tr>`:''}
+        ${inv.desc?`<tr><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;color:#6b7280">الوصف</td><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6">${inv.desc}</td></tr>`:''}
+        <tr><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;color:#6b7280">طريقة الدفع</td><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;font-weight:700">${inv.pay}</td></tr>
+        ${inv.ref?`<tr><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6;color:#6b7280">رقم المرجع</td><td style="padding:6px 13px;border-bottom:1px solid #f3f4f6">${inv.ref}</td></tr>`:''}
+      </table>
+    </div>
+    <!-- Totals -->
+    <div style="border:1.5px solid #bfdbfe;border-radius:11px;overflow:hidden">
+      <div style="background:#eff6ff;padding:7px 13px;font-weight:800;color:#1d4ed8;font-size:.82rem">💰 الملخص المالي</div>
+      <div style="padding:10px 13px">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.82rem;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">المبلغ قبل الضريبة</span><span>${fmtNum(inv.amount)} د.إ</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.82rem;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">الضريبة</span><span style="color:#dc2626">${fmtNum(inv.vatAmt)} د.إ</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:900;font-size:1rem;border-top:2px solid #1d4ed8;margin-top:5px"><span style="color:#1d4ed8">الإجمالي</span><span style="color:#1d4ed8">${fmtNum(inv.total)} د.إ</span></div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:.72rem;color:#9ca3af;margin-top:10px">Child Care Nurseries Group — مجموعة رعاية الطفل للحضانات</div>
+  </div>`;
+}
+
+// ── Import 2025 from Excel ───────────────────
+async function importChildExp2025(file){
+  const XLSX=window.XLSX; if(!XLSX){alert('Excel not loaded');return;}
+  const prev=el('chexp2025-imp-preview');
+  prev.innerHTML=`<div style="color:#7c3aed;padding:8px">⏳ جاري القراءة...</div>`;
+  try{
+    const ab=await file.arrayBuffer();
+    const wb=XLSX.read(ab);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){prev.innerHTML='<div class="alert aerr">❌ لا توجد بيانات</div>';return;}
+    window._pendingCE2025=rows;
+    prev.innerHTML=`
+      <div style="background:#f5f3ff;border-radius:9px;padding:9px;margin-bottom:8px;font-size:.8rem">
+        <b>${rows.length} صف</b> — معاينة أول ${Math.min(3,rows.length)} صفوف:
+      </div>
+      <div style="overflow-x:auto;margin-bottom:8px">
+        <table style="width:100%;font-size:.74rem;border-collapse:collapse">
+          <tr style="background:#7c3aed;color:#fff">${Object.keys(rows[0]).slice(0,6).map(h=>`<th style="padding:4px 7px">${h}</th>`).join('')}</tr>
+          ${rows.slice(0,3).map(r=>`<tr>${Object.values(r).slice(0,6).map(v2=>`<td style="padding:3px 7px;border-bottom:1px solid #e5e7eb">${v2}</td>`).join('')}</tr>`).join('')}
+        </table>
+      </div>
+      <div style="display:flex;gap:7px">
+        <button onclick="confirmImportCE2025(window._pendingCE2025)" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">✅ استيراد ${rows.length}</button>
+        <button onclick="el('chexp2025-imp-preview').innerHTML=''" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
+      </div>
+      <div id="ce2025-imp-alert"></div>`;
+  }catch(err){ prev.innerHTML=`<div class="alert aerr">❌ ${err.message}</div>`; }
+}
+
+async function confirmImportCE2025(rows){
+  if(!rows||!rows.length)return;
+  const toDate=v2=>{
+    if(!v2)return null;
+    if(typeof v2==='number'){const d=new Date((v2-25569)*86400000);return d.toISOString().split('T')[0];}
+    const s=String(v2).trim();
+    const dm=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(dm)return `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+    return s||null;
+  };
+  let ok=0,err=0;
+  showAlert('ce2025-imp-alert','⏳ جاري الاستيراد...',false);
+  for(const row of rows){
+    try{
+      const amt=parseFloat(row['Amount']||row['المبلغ']||row['amount']||0);
+      if(!amt)continue;
+      const cat=String(row['Category']||row['البند']||row['category']||'other').toLowerCase();
+      const pay=String(row['Pay Method']||row['طريقة الدفع']||row['pay_method']||'cash').toLowerCase();
+      const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
+      const date=toDate(row['Date']||row['التاريخ']||row['date'])||'2025-01-01';
+      const notes=String(row['Notes']||row['ملاحظات']||row['notes']||'');
+      const month=row['Month']||row['الشهر']||monthOf(date);
+      const r={
+        branch_id:curBid,category:'chexp2025',type:'مصاريف أطفال 2025',
+        amount:amt,vat_type:'معفى (0%)',vat_amount:0,total_amount:amt,
+        date,note:notes,sub_type:cat,supplier_name:'',tax_number:'',
+        extra:{payMethod:payClean,month}
+      };
+      await sb.from('expenses').insert(r); ok++;
+    }catch(e){err++;}
+  }
+  await loadFromSupa(curBid);renderChildExp2025();
+  const msg=`✅ تم استيراد ${ok} مصروف${err?' | ⚠️ '+err+' أخطاء':''}`;
+  el('chexp2025-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:10px;color:#059669;font-weight:700">${msg}</div>`;
+}
+
+// ── Import 2026 from Excel ───────────────────
+async function importChildExp2026(file){
+  const XLSX=window.XLSX; if(!XLSX){alert('Excel not loaded');return;}
+  const prev=el('chexp2026-imp-preview');
+  prev.innerHTML=`<div style="color:#1d4ed8;padding:8px">⏳ جاري القراءة...</div>`;
+  try{
+    const ab=await file.arrayBuffer();
+    const wb=XLSX.read(ab);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){prev.innerHTML='<div class="alert aerr">❌ لا توجد بيانات</div>';return;}
+    window._pendingCE2026=rows;
+    prev.innerHTML=`
+      <div style="background:#eff6ff;border-radius:9px;padding:9px;margin-bottom:8px;font-size:.8rem">
+        <b>${rows.length} فاتورة</b> — معاينة:
+      </div>
+      <div style="overflow-x:auto;margin-bottom:8px">
+        <table style="width:100%;font-size:.74rem;border-collapse:collapse">
+          <tr style="background:#1d4ed8;color:#fff">${Object.keys(rows[0]).slice(0,7).map(h=>`<th style="padding:4px 7px">${h}</th>`).join('')}</tr>
+          ${rows.slice(0,3).map(r=>`<tr>${Object.values(r).slice(0,7).map(v2=>`<td style="padding:3px 7px;border-bottom:1px solid #e5e7eb">${v2}</td>`).join('')}</tr>`).join('')}
+        </table>
+      </div>
+      <div style="display:flex;gap:7px">
+        <button onclick="confirmImportCE2026(window._pendingCE2026)" style="background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">✅ استيراد ${rows.length}</button>
+        <button onclick="el('chexp2026-imp-preview').innerHTML=''" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
+      </div>
+      <div id="ce2026-imp-alert"></div>`;
+  }catch(err){ prev.innerHTML=`<div class="alert aerr">❌ ${err.message}</div>`; }
+}
+
+async function confirmImportCE2026(rows){
+  if(!rows||!rows.length)return;
+  const toDate=v2=>{
+    if(!v2)return null;
+    if(typeof v2==='number'){const d=new Date((v2-25569)*86400000);return d.toISOString().split('T')[0];}
+    const s=String(v2).trim();
+    const dm=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(dm)return `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+    return s||null;
+  };
+  let ok=0,err=0;
+  showAlert('ce2026-imp-alert','⏳ جاري الاستيراد...',false);
+  for(const row of rows){
+    try{
+      const amt=parseFloat(row['Amount']||row['المبلغ']||0);
+      if(!amt)continue;
+      const vatPct=parseFloat(row['VAT %']||row['الضريبة %']||0);
+      const vatAmt=parseFloat(row['VAT Amount']||row['مبلغ الضريبة']||Math.round(amt*vatPct/100*100)/100);
+      const total=parseFloat(row['Total']||row['الإجمالي']||amt+vatAmt);
+      const cat=String(row['Category']||row['البند']||'other').toLowerCase();
+      const pay=String(row['Pay Method']||row['طريقة الدفع']||'cash').toLowerCase();
+      const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
+      const date=toDate(row['Date']||row['التاريخ'])||'2026-01-01';
+      const invNo=String(row['Invoice No']||row['رقم الفاتورة']||'');
+      const ref=String(row['Ref No']||row['المرجع']||'');
+      const r={
+        branch_id:curBid,category:'chexp2026',type:'مصاريف أطفال 2026',
+        amount:amt,vat_type:vatPct>0?'5% ضريبة':'معفى (0%)',vat_amount:vatAmt,total_amount:total,
+        date,
+        note:String(row['Description']||row['الوصف']||''),
+        sub_type:cat,
+        supplier_name:String(row['Supplier']||row['المورد']||''),
+        tax_number:'',
+        extra:{payMethod:payClean,invNo,ref}
+      };
+      await sb.from('expenses').insert(r); ok++;
+    }catch(e){err++;}
+  }
+  await loadFromSupa(curBid);renderChildExp2026();
+  const msg=`✅ تم استيراد ${ok} فاتورة${err?' | ⚠️ '+err+' أخطاء':''}`;
+  el('chexp2026-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:10px;color:#059669;font-weight:700">${msg}</div>`;
+}
+
+// ── Templates download ───────────────────────
+function downloadChildExp2025Template(){
+  const XLSX=window.XLSX; if(!XLSX)return;
+  const data=[
+    ['Month','Date','Category','Amount','Pay Method','Notes'],
+    ['2025-01','2025-01-15','food','450','cash','وجبات الأطفال يناير'],
+    ['2025-01','2025-01-20','supplies','200','card','مستلزمات فصل KG1'],
+    ['2025-02','2025-02-10','activities','300','bank','رحلة ترفيهية'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:10},{wch:12},{wch:12},{wch:10},{wch:14},{wch:25}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Children Expenses 2025');
+  XLSX.writeFile(wb,'children_expenses_2025_template.xlsx');
+}
+
+function downloadChildExp2026Template(){
+  const XLSX=window.XLSX; if(!XLSX)return;
+  const data=[
+    ['Invoice No','Date','Category','Supplier','Amount','VAT %','VAT Amount','Total','Pay Method','Ref No','Description'],
+    ['INV-2026-001','2026-01-10','food','Al Noor Catering','500','5','25','525','bank','TRF-00123','وجبات الأطفال يناير 2026'],
+    ['INV-2026-002','2026-01-15','supplies','ADNOC','150','0','0','150','cash','','مستلزمات'],
+    ['INV-2026-003','2026-02-05','activities','Fun Land','800','5','40','840','card','CARD-9999','رحلة ترفيهية'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:14},{wch:12},{wch:12},{wch:20},{wch:10},{wch:8},{wch:12},{wch:10},{wch:14},{wch:14},{wch:28}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Children Expenses 2026');
+  XLSX.writeFile(wb,'children_expenses_2026_template.xlsx');
 }
 
 function downloadExpensesTemplate(){
