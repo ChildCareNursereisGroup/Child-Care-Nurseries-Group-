@@ -10288,42 +10288,101 @@ function openSalaryHistory(staffId){
         <div>• <b>Days Absent / أيام الغياب:</b> How many days she was absent — عدد أيام الغياب في الشهر</div>
       </div>
 
-      <!-- Form grid — 2 rows for clarity -->
-      <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:10px">
-        <div style="font-weight:800;color:#1e3a8a;margin-bottom:10px;font-size:.82rem">➕ Add New Month Record — إضافة شهر جديد</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <!-- ─── FORM ─── -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:10px">
+        <div style="font-weight:900;color:#1e3a8a;margin-bottom:14px;font-size:.88rem;border-bottom:1.5px solid #e2e8f0;padding-bottom:8px">
+          ➕ Add Month Record — إضافة سجل شهري
+        </div>
+
+        <!-- Row 1: Month + Basic + Gross -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
           <div>
-            <label style="font-size:.75rem;font-weight:800;display:block;margin-bottom:4px;color:#374151">📅 Month / الشهر *</label>
-            <input type="month" id="sh_month" style="width:100%;padding:8px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.85rem">
+            <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#1e3a8a">📅 Month / الشهر *</label>
+            <input type="month" id="sh_month" style="width:100%;padding:8px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
           </div>
           <div>
-            <label style="font-size:.75rem;font-weight:800;display:block;margin-bottom:4px;color:#374151">💵 Basic Salary / الأساسي (AED)</label>
-            <input type="number" id="sh_basic" min="0" placeholder="e.g. 3,000" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.85rem">
+            <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">💵 Basic Salary / الأساسي (AED)</label>
+            <input type="number" id="sh_basic" min="0" placeholder="3,000" style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
           </div>
           <div>
-            <label style="font-size:.75rem;font-weight:800;display:block;margin-bottom:4px;color:#059669">💰 Gross Paid / الإجمالي المدفوع (AED) *</label>
-            <input type="number" id="sh_amount" min="0" placeholder="e.g. 4,200" style="width:100%;padding:8px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.85rem">
+            <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#059669">💰 Net Paid / المدفوع فعلاً (AED) *</label>
+            <input type="number" id="sh_amount" min="0" placeholder="4,200" style="width:100%;padding:8px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#f0fdf4">
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
-          <div>
-            <label style="font-size:.75rem;font-weight:800;display:block;margin-bottom:4px;color:#059669">✅ Days Present / أيام الحضور</label>
-            <input type="number" id="sh_present" min="0" max="31" placeholder="e.g. 26 days"
-              style="width:100%;padding:8px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.85rem;background:#f0fdf4">
-            <div style="font-size:.68rem;color:#6b7280;margin-top:3px">Used to calculate annual leave & gratuity</div>
+
+        <!-- Row 2: Attendance -->
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <div style="font-size:.72rem;font-weight:800;color:#065f46;margin-bottom:8px">📅 Attendance / الحضور والغياب</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#059669">✅ Days Present / أيام الحضور</label>
+              <input type="number" id="sh_present" min="0" max="31" placeholder="e.g. 26"
+                style="width:100%;padding:7px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">يُحسب في الإجازة ونهاية الخدمة</div>
+            </div>
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">❌ Unpaid Absent / غياب بخصم</label>
+              <input type="number" id="sh_absent" min="0" max="31" placeholder="e.g. 0"
+                style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fef2f2">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">غياب بدون عذر — بخصم من الراتب</div>
+            </div>
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#d97706">🤒 Sick Days / أيام مرضية</label>
+              <input type="number" id="sh_sick" min="0" max="31" placeholder="e.g. 0"
+                style="width:100%;padding:7px 10px;border:1.5px solid #fde68a;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fffbeb">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">1-15: كاملة · 16-45: نصف · +45: بلا راتب</div>
+            </div>
           </div>
-          <div>
-            <label style="font-size:.75rem;font-weight:800;display:block;margin-bottom:4px;color:#dc2626">❌ Days Absent / أيام الغياب</label>
-            <input type="number" id="sh_absent" min="0" max="31" placeholder="e.g. 0 days"
-              style="width:100%;padding:8px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.85rem;background:#fef2f2">
-            <div style="font-size:.68rem;color:#6b7280;margin-top:3px">Affects salary deduction calculation</div>
+        </div>
+
+        <!-- Row 3: Deductions -->
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <div style="font-size:.72rem;font-weight:800;color:#991b1b;margin-bottom:8px">➖ Deductions / الخصومات</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">📅 Deduct Days / خصم بعدد أيام</label>
+              <input type="number" id="sh_deduct_days" min="0" max="31" placeholder="e.g. 2"
+                style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fef2f2">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">الراتب الإجمالي ÷ أيام الشهر × عدد الأيام</div>
+            </div>
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">🏦 Loan Deduction / خصم قرض (AED)</label>
+              <input type="number" id="sh_deduct_loan" min="0" placeholder="e.g. 500"
+                style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">قسط القرض أو السلفة المخصوم</div>
+            </div>
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">⚠️ Other Deduction / خصم آخر (AED)</label>
+              <input type="number" id="sh_deduct_other" min="0" placeholder="e.g. 0"
+                style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
+              <div style="font-size:.65rem;color:#6b7280;margin-top:2px">أي خصم إضافي آخر</div>
+            </div>
           </div>
-          <div>
-            <button onclick="addSalaryHistoryEntry('${staffId}')"
-              style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-weight:800;font-size:.85rem;white-space:nowrap;font-family:'Tajawal',sans-serif">
-              ➕ Save Record<br><span style="font-size:.7rem;opacity:.85">حفظ السجل</span>
-            </button>
+        </div>
+
+        <!-- Row 4: Bonus -->
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+          <div style="font-size:.72rem;font-weight:800;color:#0369a1;margin-bottom:8px">⭐ Bonus / المكافأة والإضافات</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">💎 Bonus Amount / مبلغ المكافأة (AED)</label>
+              <input type="number" id="sh_bonus" min="0" placeholder="e.g. 300"
+                style="width:100%;padding:7px 10px;border:1.5px solid #7dd3fc;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#e0f2fe">
+            </div>
+            <div>
+              <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">📝 Bonus Reason / سبب المكافأة</label>
+              <input type="text" id="sh_bonus_reason" placeholder="e.g. Ramadan bonus, Performance..."
+                style="width:100%;padding:7px 10px;border:1.5px solid #7dd3fc;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#e0f2fe">
+            </div>
           </div>
+        </div>
+
+        <!-- Save button -->
+        <div style="display:flex;justify-content:flex-end">
+          <button onclick="addSalaryHistoryEntry('${staffId}')"
+            style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px 28px;cursor:pointer;font-weight:800;font-size:.88rem;font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:8px">
+            💾 Save Month Record — حفظ سجل الشهر
+          </button>
         </div>
       </div>
     </div>
@@ -10416,36 +10475,58 @@ function renderSalaryHistoryList(staffId){
     <div style="border-radius:10px;overflow:hidden;border:1.5px solid #e5e7eb">
       <table style="width:100%;border-collapse:collapse;font-size:.78rem">
         <thead>
-          <tr style="background:#f1f5f9">
-            <th style="padding:9px 12px;text-align:left;font-weight:800;color:#374151;border-bottom:1.5px solid #e5e7eb">📅 Month<br><span style="font-weight:400;font-size:.68rem;color:#9ca3af">الشهر</span></th>
-            <th style="padding:9px 12px;text-align:right;font-weight:800;color:#374151;border-bottom:1.5px solid #e5e7eb">💵 Basic<br><span style="font-weight:400;font-size:.68rem;color:#9ca3af">الأساسي</span></th>
-            <th style="padding:9px 12px;text-align:right;font-weight:800;color:#059669;border-bottom:1.5px solid #e5e7eb">💰 Paid<br><span style="font-weight:400;font-size:.68rem;color:#9ca3af">المدفوع</span></th>
-            <th style="padding:9px 12px;text-align:center;font-weight:800;color:#059669;border-bottom:1.5px solid #e5e7eb">✅ Present<br><span style="font-weight:400;font-size:.68rem;color:#9ca3af">حضور</span></th>
-            <th style="padding:9px 12px;text-align:center;font-weight:800;color:#dc2626;border-bottom:1.5px solid #e5e7eb">❌ Absent<br><span style="font-weight:400;font-size:.68rem;color:#9ca3af">غياب</span></th>
-            <th style="padding:9px 6px;border-bottom:1.5px solid #e5e7eb"></th>
+          <tr style="background:#1e3a8a;color:#fff;font-size:.72rem">
+            <th style="padding:8px 10px;text-align:left;font-weight:800">📅 Month<br><span style="font-weight:400;opacity:.7">الشهر</span></th>
+            <th style="padding:8px 10px;text-align:right;font-weight:800">💵 Basic<br><span style="font-weight:400;opacity:.7">الأساسي</span></th>
+            <th style="padding:8px 10px;text-align:right;font-weight:800">💰 Net Paid<br><span style="font-weight:400;opacity:.7">المدفوع</span></th>
+            <th style="padding:8px 10px;text-align:center;font-weight:800">✅ Present<br><span style="font-weight:400;opacity:.7">حضور</span></th>
+            <th style="padding:8px 10px;text-align:center;font-weight:800">❌ Absent<br><span style="font-weight:400;opacity:.7">غياب بخصم</span></th>
+            <th style="padding:8px 10px;text-align:center;font-weight:800">🤒 Sick<br><span style="font-weight:400;opacity:.7">مرضية</span></th>
+            <th style="padding:8px 10px;text-align:right;font-weight:800">➖ Deductions<br><span style="font-weight:400;opacity:.7">الخصومات</span></th>
+            <th style="padding:8px 10px;text-align:right;font-weight:800">⭐ Bonus<br><span style="font-weight:400;opacity:.7">مكافأة</span></th>
+            <th style="padding:8px 6px"></th>
           </tr>
         </thead>
         <tbody>
-          ${sorted.map((r,i)=>`
-            <tr style="background:${i%2?'#fff':'#f9fafb'};border-bottom:1px solid #f3f4f6">
-              <td style="padding:9px 12px;font-weight:800;color:#1e3a8a">${r.month}</td>
-              <td style="padding:9px 12px;text-align:right;color:#6b7280">${r.basic?fmtNum(r.basic)+' AED':'—'}</td>
-              <td style="padding:9px 12px;text-align:right;font-weight:800;color:#059669">${fmtNum(r.amount)} AED</td>
-              <td style="padding:9px 12px;text-align:center">
-                ${r.presentDays!==undefined
-                  ?`<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:2px 10px;font-weight:700">${r.presentDays} days</span>`
-                  :'<span style="color:#d1d5db">—</span>'}
+          ${sorted.map((r,i)=>{
+            const [_yr,_mo]=r.month?r.month.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
+            const daysInMon=new Date(_yr,_mo,0).getDate();
+            const grossSal=r.amount||r.basic||0;
+            const dailyRate=daysInMon>0?(grossSal/daysInMon):0;
+            const deductDaysAED=(r.deductDays||0)*dailyRate;
+            const totalDeduct=deductDaysAED+(r.deductLoan||0)+(r.deductOther||0);
+            return `
+            <tr style="background:${i%2?'#fff':'#f9fafb'};border-bottom:1px solid #f3f4f6;font-size:.77rem">
+              <td style="padding:8px 10px;font-weight:800;color:#1e3a8a;white-space:nowrap">${r.month}</td>
+              <td style="padding:8px 10px;text-align:right;color:#6b7280">${r.basic?fmtNum(r.basic):'—'}</td>
+              <td style="padding:8px 10px;text-align:right;font-weight:800;color:#059669">${fmtNum(r.amount)} AED</td>
+              <td style="padding:8px 10px;text-align:center">
+                ${r.presentDays!==undefined?`<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:1px 8px;font-weight:700">${r.presentDays}d</span>`:'<span style="color:#d1d5db">—</span>'}
               </td>
-              <td style="padding:9px 12px;text-align:center">
-                ${r.absentDays!==undefined
-                  ?`<span style="background:${r.absentDays>0?'#fee2e2':'#f0fdf4'};color:${r.absentDays>0?'#dc2626':'#059669'};border-radius:6px;padding:2px 10px;font-weight:700">${r.absentDays} days</span>`
-                  :'<span style="color:#d1d5db">—</span>'}
+              <td style="padding:8px 10px;text-align:center">
+                ${r.absentDays!==undefined?`<span style="background:${r.absentDays>0?'#fee2e2':'#f0fdf4'};color:${r.absentDays>0?'#dc2626':'#059669'};border-radius:5px;padding:1px 8px;font-weight:700">${r.absentDays}d</span>`:'<span style="color:#d1d5db">—</span>'}
               </td>
-              <td style="padding:9px 6px;text-align:center">
+              <td style="padding:8px 10px;text-align:center">
+                ${r.sickDays!==undefined?`<span style="background:#fef3c7;color:#d97706;border-radius:5px;padding:1px 8px;font-weight:700">${r.sickDays}d</span>`:'<span style="color:#d1d5db">—</span>'}
+              </td>
+              <td style="padding:8px 10px;text-align:right">
+                ${totalDeduct>0?`<div style="color:#dc2626;font-weight:700">-${fmtNum(totalDeduct)} AED</div>
+                  <div style="font-size:.65rem;color:#9ca3af">
+                    ${r.deductAbsent?'Absent: '+fmtNum(r.deductAbsent)+' ':''}
+                    ${r.deductLoan?'Loan: '+fmtNum(r.deductLoan)+' ':''}
+                    ${r.deductOther?'Other: '+fmtNum(r.deductOther):''}
+                  </div>`:'<span style="color:#d1d5db">—</span>'}
+              </td>
+              <td style="padding:8px 10px;text-align:right">
+                ${r.bonus?`<div style="color:#0369a1;font-weight:700">+${fmtNum(r.bonus)} AED</div>
+                  ${r.bonusReason?`<div style="font-size:.65rem;color:#9ca3af">${r.bonusReason}</div>`:''}`
+                :'<span style="color:#d1d5db">—</span>'}
+              </td>
+              <td style="padding:8px 6px;text-align:center">
                 <button onclick="deleteSalaryHistoryEntry('${staffId}','${r.month}')"
-                  style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:.72rem;font-weight:700">✕</button>
+                  style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">✕</button>
               </td>
-            </tr>`).join('')}
+            </tr>`}).join('')}
         </tbody>
       </table>
     </div>`;
@@ -10455,22 +10536,32 @@ function addSalaryHistoryEntry(staffId){
   const month=el('sh_month')?.value;
   const amount=Number(el('sh_amount')?.value||0);
   const basic=Number(el('sh_basic')?.value||0);
-  const presentDays=el('sh_present')?.value!==''?Number(el('sh_present').value):undefined;
-  const absentDays=el('sh_absent')?.value!==''?Number(el('sh_absent').value):undefined;
-  if(!month||!amount){alert('Please enter month and amount paid');return;}
+  const n=v=>{ const el2=document.getElementById(v); return el2&&el2.value!==''?Number(el2.value):undefined; };
+  const s=v=>{ const el2=document.getElementById(v); return el2&&el2.value.trim()?el2.value.trim():undefined; };
+  const presentDays=n('sh_present');
+  const absentDays=n('sh_absent');
+  const sickDays=n('sh_sick');
+  const deductDays=n('sh_deduct_days');
+  const deductLoan=n('sh_deduct_loan');
+  const deductOther=n('sh_deduct_other');
+  const bonus=n('sh_bonus');
+  const bonusReason=s('sh_bonus_reason');
+  if(!month||!amount){alert('Please enter month and net paid amount — أدخلي الشهر والمبلغ المدفوع');return;}
   const history=getSalaryHistory(staffId);
   const idx=history.findIndex(r=>r.month===month);
   const entry={month,amount,basic:basic||undefined,
-    presentDays,absentDays,
+    presentDays,absentDays,sickDays,
+    deductAbsent,deductLoan,deductOther,
+    bonus,bonusReason,
     addedAt:new Date().toISOString()};
   if(idx>=0) history[idx]=Object.assign(history[idx],entry);
   else history.push(entry);
   saveSalaryHistory(staffId,history);
   el('sh_list').innerHTML=renderSalaryHistoryList(staffId);
-  if(el('sh_amount')) el('sh_amount').value='';
-  if(el('sh_basic'))  el('sh_basic').value='';
-  if(el('sh_present')) el('sh_present').value='';
-  if(el('sh_absent'))  el('sh_absent').value='';
+  // Clear all fields
+  ['sh_amount','sh_basic','sh_present','sh_absent','sh_sick',
+   'sh_deduct_days','sh_deduct_loan','sh_deduct_other','sh_bonus','sh_bonus_reason']
+  .forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
 }
 
 function deleteSalaryHistoryEntry(staffId, month){
@@ -10483,11 +10574,11 @@ function downloadSalaryHistoryTemplate(){
   const XLSX=window.XLSX;
   if(!XLSX){alert('Excel library not loaded');return;}
   const ws=XLSX.utils.aoa_to_sheet([
-    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Gross / Net Paid (AED)','Days Present (أيام الحضور)','Days Absent (أيام الغياب)'],
-    ['John Smith','2025-01','3000','3500','26','0'],
-    ['John Smith','2025-02','3000','3200','24','2'],
-    ['Sara Ahmed','2025-01','2500','2900','26','0'],
-    ['Sara Ahmed','2025-02','2500','2750','23','3'],
+    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Net Paid (AED)','Days Present','Days Absent (Unpaid)','Sick Days','Deduct Days (عدد أيام الخصم)','Deduct Loan (AED)','Deduct Other (AED)','Bonus (AED)','Bonus Reason'],
+    ['John Smith','2025-01','3000','3500','26','0','0','0','0','0','0',''],
+    ['John Smith','2025-02','3000','3200','24','2','0','200','300','0','0',''],
+    ['Sara Ahmed','2025-01','2500','2900','26','0','0','0','0','0','300','Performance bonus'],
+    ['Sara Ahmed','2025-02','2500','2500','23','1','2','0','500','0','0',''],
   ]);
   ws['!cols']=[{wch:22},{wch:16},{wch:20},{wch:22}];
   const wb=XLSX.utils.book_new();
@@ -10529,12 +10620,18 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     return null;
   };
-  const nameCol   =col(['name','staff','employee']);
-  const monthCol  =col(['month','date','period','شهر']);
-  const basicCol  =col(['basic','أساسي','اساسي']);
-  const grossCol  =col(['gross','net','paid','total','amount','إجمالي','صافي','اجمالي']);
-  const presentCol=col(['present','حضور','attendance','attend']);
-  const absentCol =col(['absent','غياب','absence']);
+  const nameCol      =col(['name','staff','employee']);
+  const monthCol     =col(['month','date','period','شهر']);
+  const basicCol     =col(['basic','أساسي','اساسي']);
+  const grossCol     =col(['gross','net paid','net','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const presentCol   =col(['present','حضور','attendance','attend']);
+  const absentCol    =col(['absent','غياب','absence','unpaid']);
+  const sickCol      =col(['sick','مرضية','مرض']);
+  const dDaysCol     =col(['deduct days','deduct day','خصم يوم','عدد أيام الخصم']);
+  const dLoanCol     =col(['deduct loan','loan deduct','deduction loan','خصم قرض']);
+  const dOtherCol    =col(['deduct other','other deduct','خصم آخر','خصم اخر']);
+  const bonusCol     =col(['bonus','مكافأة','مكافاة']);
+  const bonusReasonCol=col(['bonus reason','reason','سبب']);
 
   let ok=0, skipped=0;
   for(const row of rows){
@@ -10549,11 +10646,636 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     if(!staffId){skipped++;continue;}
     const basic=basicCol?Number(row[basicCol])||0:0;
-    const presentDays=presentCol&&row[presentCol]!==''?Number(row[presentCol]):undefined;
-    const absentDays=absentCol&&row[absentCol]!==''?Number(row[absentCol]):undefined;
+    const nv=c=>c&&row[c]!==''?Number(row[c]):undefined;
+    const sv=c=>c&&row[c]?String(row[c]).trim():undefined;
+    const presentDays=nv(presentCol);
+    const absentDays=nv(absentCol);
+    const sickDays=nv(sickCol);
+    const deductDays=nv(dDaysCol);
+    const deductLoan=nv(dLoanCol);
+    const deductOther=nv(dOtherCol);
+    const bonus=nv(bonusCol);
+    const bonusReason=sv(bonusReasonCol);
     const history=getSalaryHistory(staffId);
     const idx=history.findIndex(r=>r.month===month);
-    const entry={month,amount,basic:basic||undefined,presentDays,absentDays,addedAt:new Date().toISOString()};
+    const entry={month,amount,basic:basic||undefined,presentDays,absentDays,sickDays,
+      deductDays,deductLoan,deductOther,bonus,bonusReason,addedAt:new Date().toISOString()};
+    if(idx>=0) history[idx]=Object.assign(history[idx],entry);
+    else history.push(entry);
+    saveSalaryHistory(staffId,history);
+    ok++;
+  }
+
+  if(statusEl) statusEl.innerHTML=`<span style="color:#059669;font-weight:700;font-size:.82rem">✅ Imported ${ok} records${skipped?` · ⏭ ${skipped} skipped`:''}</span>`;
+  const listEl=el('sh_list');
+  if(listEl) listEl.innerHTML=renderSalaryHistoryList(targetStaffId);
+}
+
+// ═══════════════════════════════════════════════════
+//  STAFF LOANS & SALARY ADVANCES — نظام السلف
+// ═══════════════════════════════════════════════════
+function getLoans(staffId){
+  try{ return JSON.parse(localStorage.getItem('loans_'+curBid+'_'+staffId)||'[]'); }
+  catch(e){ return []; }
+}
+function saveLoans(staffId, loans){
+  localStorage.setItem('loans_'+curBid+'_'+staffId, JSON.stringify(loans));
+}
+
+function openLoanModal(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  el('loan-modal-title').textContent='💳 Loans & Advances — '+(s.name||'');
+  renderLoanModal(staffId);
+  el('loan-modal').classList.add('on');
+}
+
+function renderLoanModal(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const loans=getLoans(staffId);
+  const active=loans.filter(l=>l.remaining>0);
+  const totalOwed=active.reduce((t,l)=>t+l.remaining,0);
+  const thisMonthDeduct=active.reduce((t,l)=>t+Math.min(l.remaining,l.installment),0);
+
+  el('loan-modal-body').innerHTML=`
+    ${active.length?`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.1rem">💳</div>
+        <div style="font-weight:900;color:#92400e;font-size:.95rem">${fmtNum(totalOwed)}</div>
+        <div style="font-size:.68rem;color:#92400e">Total Outstanding (AED)</div>
+      </div>
+      <div style="background:#fee2e2;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.1rem">📅</div>
+        <div style="font-weight:900;color:#dc2626;font-size:.95rem">${fmtNum(thisMonthDeduct)}</div>
+        <div style="font-size:.68rem;color:#dc2626">This Month Deduction</div>
+      </div>
+      <div style="background:#f0fdf4;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.1rem">📋</div>
+        <div style="font-weight:900;color:#065f46;font-size:.95rem">${active.length}</div>
+        <div style="font-size:.68rem;color:#065f46">Active Loans</div>
+      </div>
+    </div>`:''}
+
+    <div style="background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:14px;border:1.5px solid var(--border)">
+      <div style="font-weight:800;color:#1e3a8a;margin-bottom:10px;font-size:.85rem">➕ New Loan / Salary Advance</div>
+
+      <!-- Repayment type toggle -->
+      <div style="display:flex;gap:7px;margin-bottom:10px">
+        <button id="ln_type_fixed" onclick="setLoanType('fixed')"
+          style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:700">
+          📅 Fixed Installment
+        </button>
+        <button id="ln_type_count" onclick="setLoanType('count')"
+          style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:700">
+          🔢 Number of Months
+        </button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:.72rem;font-weight:700;display:block;margin-bottom:3px">Loan Amount (AED) *</label>
+          <input type="number" id="ln_amount" min="1" placeholder="e.g. 3000"
+            oninput="previewLoanCalc()"
+            style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+
+        <!-- Fixed: enter installment -->
+        <div id="ln_field_install">
+          <label style="font-size:.72rem;font-weight:700;display:block;margin-bottom:3px">Monthly Installment (AED) *</label>
+          <input type="number" id="ln_install" min="1" placeholder="e.g. 500"
+            oninput="previewLoanCalc()"
+            style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+
+        <!-- Count: enter number of months -->
+        <div id="ln_field_count" style="display:none">
+          <label style="font-size:.72rem;font-weight:700;display:block;margin-bottom:3px">Number of Months *</label>
+          <input type="number" id="ln_months" min="1" placeholder="e.g. 6"
+            oninput="previewLoanCalc()"
+            style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+
+        <div>
+          <label style="font-size:.72rem;font-weight:700;display:block;margin-bottom:3px">Start Month</label>
+          <input type="month" id="ln_start" value="${new Date().toISOString().slice(0,7)}"
+            style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.72rem;font-weight:700;display:block;margin-bottom:3px">Reason / Note</label>
+          <input type="text" id="ln_reason" placeholder="e.g. Medical, Emergency, Personal..."
+            style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+      </div>
+
+      <div id="ln_preview" style="font-size:.75rem;color:#1e3a8a;background:#eff6ff;border-radius:7px;padding:8px 12px;margin-bottom:10px;display:none"></div>
+
+      <button onclick="addLoan('${staffId}')"
+        style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 20px;cursor:pointer;font-weight:800;font-size:.82rem">
+        💾 Save Loan
+      </button>
+    </div>
+
+    <div id="ln_list">${renderLoanList(staffId)}</div>
+  `;
+}
+
+function setLoanType(type){
+  const isFixed=(type==='fixed');
+  el('ln_field_install').style.display=isFixed?'':'none';
+  el('ln_field_count').style.display=isFixed?'none':'';
+  el('ln_type_fixed').style.background=isFixed?'#1e3a8a':'#f3f4f6';
+  el('ln_type_fixed').style.color=isFixed?'#fff':'#374151';
+  el('ln_type_count').style.background=isFixed?'#f3f4f6':'#1e3a8a';
+  el('ln_type_count').style.color=isFixed?'#374151':'#fff';
+  previewLoanCalc();
+}
+
+function previewLoanCalc(){
+  const amt=Number(el('ln_amount')?.value||0);
+  const isFixed=el('ln_field_install')?.style.display!=='none';
+  const inst=isFixed?Number(el('ln_install')?.value||0):0;
+  const months=isFixed?0:Number(el('ln_months')?.value||0);
+  const prev=el('ln_preview');
+  if(!prev) return;
+  if(amt>0){
+    if(isFixed&&inst>0){
+      const m=Math.ceil(amt/inst);
+      const last=amt%inst||inst;
+      prev.style.display='block';
+      prev.innerHTML=`📊 <b>${fmtNum(amt)} AED</b> ÷ <b>${fmtNum(inst)} AED/month</b> = <b style="color:#059669">${m} month${m>1?'s':''}</b> &nbsp;·&nbsp; Last installment: ${fmtNum(last)} AED`;
+    } else if(!isFixed&&months>0){
+      const i=Math.ceil(amt/months);
+      const last=amt%i||i;
+      prev.style.display='block';
+      prev.innerHTML=`📊 <b>${fmtNum(amt)} AED</b> ÷ <b>${months} months</b> = <b style="color:#059669">${fmtNum(i)} AED/month</b> &nbsp;·&nbsp; Last installment: ${fmtNum(last)} AED`;
+    } else { prev.style.display='none'; }
+  } else { prev.style.display='none'; }
+}
+
+function renderLoanList(staffId){
+  const loans=getLoans(staffId);
+  if(!loans.length) return '<div style="color:#9ca3af;font-size:.8rem;text-align:center;padding:16px">No loans recorded yet</div>';
+  const sorted=[...loans].sort((a,b)=>b.date.localeCompare(a.date));
+  return `<div style="font-weight:800;font-size:.8rem;color:#374151;margin-bottom:8px">📋 Loan History</div>
+  <div style="display:flex;flex-direction:column;gap:9px">
+    ${sorted.map(l=>{
+      const paid=l.amount-l.remaining;
+      const pct=Math.round(paid/l.amount*100);
+      const isActive=l.remaining>0;
+      const estMonths=isActive?Math.ceil(l.remaining/l.installment):0;
+      return `<div style="border:1.5px solid ${isActive?'#fde68a':'#d1fae5'};border-radius:11px;padding:12px;background:${isActive?'#fffbeb':'#f0fdf4'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <div>
+            <span style="font-weight:900;font-size:.9rem">${fmtNum(l.amount)} AED</span>
+            <span style="font-size:.72rem;color:#6b7280"> · ${l.reason||'Loan'} · Started ${l.startMonth}</span>
+            <span style="background:${isActive?'#fef3c7':'#d1fae5'};color:${isActive?'#92400e':'#065f46'};border-radius:6px;padding:1px 9px;font-size:.68rem;font-weight:800;margin-right:5px">${isActive?'🔄 Active':'✅ Fully Paid'}</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${isActive?`
+              <button onclick="recordLoanPayment('${staffId}','${l.id}')"
+                style="background:#059669;color:#fff;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.73rem;font-weight:700">
+                💰 Pay Installment
+              </button>
+              <button onclick="settleFullLoan('${staffId}','${l.id}')"
+                style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.73rem;font-weight:700"
+                title="Settle full remaining balance (e.g. on termination)">
+                ⚡ Settle All
+              </button>`:''}
+            <button onclick="deleteLoan('${staffId}','${l.id}')"
+              style="background:#f3f4f6;color:#6b7280;border:none;border-radius:7px;padding:4px 8px;cursor:pointer;font-size:.7rem">✕</button>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div style="background:#e5e7eb;border-radius:5px;height:8px;margin-bottom:7px;overflow:hidden">
+          <div style="background:${isActive?'#f59e0b':'#059669'};height:100%;width:${pct}%;transition:width .4s;border-radius:5px"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr${isActive?' 1fr':''};gap:6px;font-size:.72rem;color:#6b7280">
+          <div><span style="display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px">Paid</span><b style="color:#059669">${fmtNum(paid)} AED (${pct}%)</b></div>
+          <div><span style="display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px">Remaining</span><b style="color:${isActive?'#dc2626':'#059669'}">${fmtNum(l.remaining)} AED</b></div>
+          <div><span style="display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px">Installment</span><b>${fmtNum(l.installment)} AED/mo</b></div>
+          ${isActive?`<div><span style="display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px">Est. Finish</span><b style="color:#d97706">~${estMonths} month${estMonths>1?'s':''}</b></div>`:''}
+        </div>
+        ${l.payments?.length?`
+          <div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;font-size:.69rem;color:#9ca3af;line-height:1.7">
+            <span style="font-weight:700;color:#6b7280">Payments: </span>${l.payments.map(p=>`<span style="background:#f3f4f6;border-radius:4px;padding:1px 5px">${p.month}: ${fmtNum(p.amount)}</span>`).join(' ')}
+          </div>`:''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function addLoan(staffId){
+  const amount=Number(el('ln_amount')?.value||0);
+  const startMonth=el('ln_start')?.value||new Date().toISOString().slice(0,7);
+  const reason=el('ln_reason')?.value?.trim()||'';
+  const isFixed=el('ln_field_install')?.style.display!=='none';
+  let installment=0;
+  if(isFixed){
+    installment=Number(el('ln_install')?.value||0);
+    if(!installment){ alert('Please enter monthly installment amount'); return; }
+  } else {
+    const months=Number(el('ln_months')?.value||0);
+    if(!months){ alert('Please enter number of months'); return; }
+    installment=Math.ceil(amount/months);
+  }
+  if(!amount||amount<1){ alert('Please enter loan amount'); return; }
+  if(installment>amount){ alert('Installment cannot exceed loan amount'); return; }
+  const loans=getLoans(staffId);
+  loans.push({
+    id:Date.now().toString(),
+    amount, installment, remaining:amount,
+    startMonth, reason,
+    date:new Date().toISOString(),
+    payments:[]
+  });
+  saveLoans(staffId,loans);
+  renderLoanModal(staffId);
+}
+
+function recordLoanPayment(staffId, loanId){
+  const loans=getLoans(staffId);
+  const loan=loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  const mon=new Date().toISOString().slice(0,7);
+  const payAmt=Math.min(loan.remaining, loan.installment);
+  if(!confirm(`Record installment of ${fmtNum(payAmt)} AED for ${mon}?\n\nRemaining after payment: ${fmtNum(Math.max(0,loan.remaining-payAmt))} AED`)) return;
+  loan.remaining=Math.max(0, loan.remaining-payAmt);
+  if(!loan.payments) loan.payments=[];
+  loan.payments.push({month:mon, amount:payAmt});
+  saveLoans(staffId,loans);
+  renderLoanModal(staffId);
+}
+
+function settleFullLoan(staffId, loanId){
+  const loans=getLoans(staffId);
+  const loan=loans.find(l=>l.id===loanId);
+  if(!loan) return;
+  const mon=new Date().toISOString().slice(0,7);
+  if(!confirm(`Settle FULL remaining balance of ${fmtNum(loan.remaining)} AED?\n\nThis is typically used when deducting from final settlement on termination/resignation.`)) return;
+  if(!loan.payments) loan.payments=[];
+  loan.payments.push({month:mon, amount:loan.remaining, note:'Full settlement'});
+  loan.remaining=0;
+  saveLoans(staffId,loans);
+  renderLoanModal(staffId);
+}
+
+function deleteLoan(staffId, loanId){
+  if(!confirm('Delete this loan record?')) return;
+  const loans=getLoans(staffId).filter(l=>l.id!==loanId);
+  saveLoans(staffId,loans);
+  renderLoanModal(staffId);
+}
+
+function getLoanDeductionForMonth(staffId, mon){
+  const loans=getLoans(staffId);
+  let total=0;
+  loans.forEach(l=>{
+    if(l.remaining<=0) return;
+    if(l.startMonth>mon) return;
+    const alreadyPaid=l.payments?.find(p=>p.month===mon);
+    if(!alreadyPaid) total+=Math.min(l.remaining, l.installment);
+  });
+  return total;
+}
+
+// ═══════════════════════════════════════════════════
+//  TODAY'S QUICK SUMMARY — ملخص اليوم
+// ═══════════════════════════════════════════════════
+function renderTodaySummary(){
+  const card = el('today-summary-body');
+  if(!card) return;
+
+  const todayStr = today(); // YYYY-MM-DD
+  const todayMD  = todayStr.substring(5); // MM-DD
+  const mon      = todayStr.substring(0,7); // YYYY-MM
+
+  const active = DB.children.filter(c => !c.leaveDate);
+
+  // ── 1. Attendance by class ──────────────────────
+  const attMap = DB.att?.[todayStr] || {};
+  const classMap = {}; // className → {present, total}
+  active.forEach(c => {
+    const cls = (c.className||'No Class').trim();
+    if(!classMap[cls]) classMap[cls] = {present:0, total:0};
+    classMap[cls].total++;
+    const st = attMap[c.id]||attMap[String(c.id)]||'';
+    if(st === 'حضور' || st === 'present') classMap[cls].present++;
+  });
+  const classNames = Object.keys(classMap).sort();
+  const totalPresent = classNames.reduce((s,k)=>s+classMap[k].present, 0);
+  const totalActive  = active.length;
+  const attRecorded  = Object.keys(attMap).length > 0;
+
+  // ── 2. Today's birthdays ────────────────────────
+  const bdayKids  = active.filter(c => c.dob && c.dob.substring(5) === todayMD);
+  const bdayStaff = (DB.staff||[]).filter(s => s.dob && s.dob.substring(5) === todayMD);
+
+  // ── 3. Unpaid this month (no receipt covering month) ──
+  const unpaidByClass = {}; // className → [{name}]
+  active.filter(c => c.fee > 0).forEach(c => {
+    const paid = DB.receipts.filter(r =>
+      (r.childId===c.id||r.childId===String(c.id)) && recCoversMonth(r, mon)
+    ).reduce((s,r)=>s+r.total, 0);
+    if(paid === 0){
+      const cls = (c.className||'No Class').trim();
+      if(!unpaidByClass[cls]) unpaidByClass[cls] = [];
+      unpaidByClass[cls].push(c.name);
+    }
+  });
+  const unpaidClasses = Object.keys(unpaidByClass).sort();
+  const totalUnpaid   = unpaidClasses.reduce((s,k)=>s+unpaidByClass[k].length, 0);
+
+  // ── Date label ─────────────────────────────────
+  const dateLabel = new Date(todayStr+'T12:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dateEl = el('today-summary-date');
+  if(dateEl) dateEl.textContent = dateLabel;
+
+  // ── Build HTML ──────────────────────────────────
+  let html = '<div style="display:flex;flex-direction:column;gap:10px">';
+
+  // Section: Attendance
+  html += `<div style="background:#f0fdf4;border-radius:10px;padding:11px 13px;border:1px solid #bbf7d0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${classNames.length?'8px':'0'}">
+      <span style="font-weight:800;font-size:.82rem;color:#065f46">✅ Children Present Today</span>
+      <span style="font-weight:900;font-size:.95rem;color:#059669">${attRecorded?totalPresent+' / '+totalActive:totalActive+' total'}</span>
+    </div>`;
+  if(classNames.length){
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    classNames.forEach(cls=>{
+      const {present,total}=classMap[cls];
+      html+=`<span style="background:#fff;border:1px solid #bbf7d0;border-radius:7px;padding:3px 10px;font-size:.75rem;font-weight:700;color:#065f46;white-space:nowrap">
+        ${cls}: <b>${attRecorded?present:total}</b>${attRecorded?' / '+total:''}
+      </span>`;
+    });
+    html += '</div>';
+    if(!attRecorded) html += '<div style="font-size:.69rem;color:#6b7280;margin-top:5px">⚠️ Attendance not recorded yet today</div>';
+  }
+  html += '</div>';
+
+  // Section: Birthdays
+  if(bdayKids.length || bdayStaff.length){
+    html += `<div style="background:linear-gradient(135deg,#fdf2f8,#fce7f3);border-radius:10px;padding:11px 13px;border:1px solid #f9a8d4">
+      <div style="font-weight:800;font-size:.82rem;color:#be185d;margin-bottom:6px">🎂 Birthdays Today!</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">`;
+    bdayKids.forEach(c=>{
+      const age = new Date().getFullYear() - parseInt(c.dob.substring(0,4));
+      html+=`<span style="background:#fff;border:1px solid #f9a8d4;border-radius:7px;padding:3px 10px;font-size:.76rem;font-weight:700;color:#be185d;animation:pulse 2s infinite">
+        🎂 ${c.name} <span style="font-weight:400;color:#9d174d">${age}y · ${c.className||''}</span>
+      </span>`;
+    });
+    bdayStaff.forEach(s=>{
+      const age = new Date().getFullYear() - parseInt(s.dob.substring(0,4));
+      html+=`<span style="background:#ede9fe;border:1px solid #a5b4fc;border-radius:7px;padding:3px 10px;font-size:.76rem;font-weight:700;color:#4338ca">
+        🎂 ${s.name} <span style="font-weight:400;color:#4338ca">Staff · ${age}y</span>
+      </span>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Section: Unpaid
+  if(totalUnpaid > 0){
+    html += `<div style="background:#fff9f9;border-radius:10px;padding:11px 13px;border:1px solid #fca5a5">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+        <span style="font-weight:800;font-size:.82rem;color:#991b1b">💰 Not Paid This Month</span>
+        <span style="font-weight:900;font-size:.95rem;color:#dc2626">${totalUnpaid} kids</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">`;
+    unpaidClasses.forEach(cls=>{
+      const names = unpaidByClass[cls];
+      html+=`<div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <span style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:2px 9px;font-size:.72rem;font-weight:800;white-space:nowrap;flex-shrink:0">${cls} (${names.length})</span>
+        <span style="font-size:.73rem;color:#6b7280">${names.join(', ')}</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  } else if(active.filter(c=>c.fee>0).length > 0){
+    html += `<div style="background:#f0fdf4;border-radius:10px;padding:9px 13px;border:1px solid #bbf7d0;display:flex;align-items:center;gap:7px">
+      <span style="font-size:1.1rem">✅</span>
+      <span style="font-weight:700;font-size:.8rem;color:#065f46">All children paid for this month!</span>
+    </div>`;
+  }
+
+  html += '</div>';
+  card.innerHTML = html;
+}
+
+boot();
+</script>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- CASHIER APP — Receipt Scanner Only              -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="cashier-app" style="display:none;flex-direction:column;min-height:100vh;background:#f5f3ff;font-family:'Tajawal',sans-serif">
+
+  <!-- Header -->
+  <div id="cashier-hdr" style="background:#6366f1;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 10px rgba(99,102,241,.3)">
+    <div style="display:flex;align-items:center;gap:11px">
+      <img id="cashier-logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.4)" src="" alt="">
+      <div>
+        <div style="font-weight:900;font-size:1rem">📸 Receipt Scanner</div>
+        <div id="cashier-branch-name" style="font-size:.76rem;opacity:.85"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="background:rgba(255,255,255,.15);border-radius:20px;padding:5px 13px;font-size:.78rem;font-weight:700" id="cashier-today-total">Today: 0 AED</div>
+      <button onclick="cashierLogout()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:18px;padding:6px 13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem">🚪 Logout</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div style="flex:1;padding:18px;max-width:600px;margin:0 auto;width:100%;box-sizing:border-box">
+
+    <!-- Upload Zone -->
+    <div id="cashier-drop" onclick="el('cashier-file').click()"
+      style="border:3px dashed #a5b4fc;border-radius:18px;padding:36px 20px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;margin-bottom:14px;box-shadow:0 2px 12px rgba(99,102,241,.08)"
+      ondragover="event.preventDefault();this.style.background='#ede9fe'"
+      ondragleave="this.style.background='#fff'"
+      ondrop="handleCashierDrop(event)">
+      <div style="font-size:3.5rem;margin-bottom:10px">📸</div>
+      <div style="font-weight:900;color:#6366f1;font-size:1.1rem;margin-bottom:5px">صوّري الإيصال أو ارفعي الصورة</div>
+      <div style="font-size:.8rem;color:#9ca3af">Take a photo or drag image here — AI reads it automatically</div>
+    </div>
+    <input type="file" id="cashier-file" accept="image/*" capture="environment" style="display:none" onchange="processCashierReceipt(this)">
+
+    <!-- Processing status -->
+    <div id="cashier-status" style="display:none;background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+      <div style="font-size:2rem;margin-bottom:8px">🤖</div>
+      <div style="font-weight:800;color:#6366f1">AI is reading the receipt...</div>
+      <div style="font-size:.78rem;color:#9ca3af;margin-top:4px">Please wait</div>
+    </div>
+
+    <!-- Extracted data confirm -->
+    <div id="cashier-confirm" style="display:none;background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+      <div style="font-weight:900;color:#059669;font-size:.95rem;margin-bottom:12px">✅ Receipt data extracted — please verify</div>
+      <div id="cashier-form-fields"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="confirmCashierReceipt()" style="flex:1;padding:11px;background:#059669;color:#fff;border:none;border-radius:11px;font-weight:900;font-size:.95rem;cursor:pointer;font-family:'Tajawal',sans-serif">💾 Save Receipt</button>
+        <button onclick="resetCashier()" style="padding:11px 16px;background:#f3f4f6;border:none;border-radius:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">↩️ Retry</button>
+      </div>
+      <div id="cashier-save-msg"></div>
+    </div>
+
+    <!-- Today's receipts list -->
+    <div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+      <div style="font-weight:900;color:#6366f1;margin-bottom:10px;font-size:.9rem">📋 Today's Uploaded Receipts</div>
+      <div id="cashier-today-list">
+        <div style="text-align:center;color:#9ca3af;padding:20px;font-size:.85rem">No receipts uploaded today yet</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>${r.deductDays?r.deductDays+'d = '+fmtNum(deductDaysAED)+' AED ':''} ${r.deductLoan?'Loan: '+fmtNum(r.deductLoan)+' AED ':''} ${r.deductOther?'Other: '+fmtNum(r.deductOther)+' AED':''}
+                    ${r.deductLoan?'Loan: '+fmtNum(r.deductLoan)+' ':''}
+                    ${r.deductOther?'Other: '+fmtNum(r.deductOther):''}
+                  </div>`:'<span style="color:#d1d5db">—</span>'}
+              </td>
+              <td style="padding:8px 10px;text-align:right">
+                ${r.bonus?`<div style="color:#0369a1;font-weight:700">+${fmtNum(r.bonus)} AED</div>
+                  ${r.bonusReason?`<div style="font-size:.65rem;color:#9ca3af">${r.bonusReason}</div>`:''}`
+                :'<span style="color:#d1d5db">—</span>'}
+              </td>
+              <td style="padding:8px 6px;text-align:center">
+                <button onclick="deleteSalaryHistoryEntry('${staffId}','${r.month}')"
+                  style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">✕</button>
+              </td>
+            </tr>`}).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function addSalaryHistoryEntry(staffId){
+  const month=el('sh_month')?.value;
+  const amount=Number(el('sh_amount')?.value||0);
+  const basic=Number(el('sh_basic')?.value||0);
+  const n=v=>{ const el2=document.getElementById(v); return el2&&el2.value!==''?Number(el2.value):undefined; };
+  const s=v=>{ const el2=document.getElementById(v); return el2&&el2.value.trim()?el2.value.trim():undefined; };
+  const presentDays=n('sh_present');
+  const absentDays=n('sh_absent');
+  const sickDays=n('sh_sick');
+  const deductDays=n('sh_deduct_days');
+  const deductLoan=n('sh_deduct_loan');
+  const deductOther=n('sh_deduct_other');
+  const bonus=n('sh_bonus');
+  const bonusReason=s('sh_bonus_reason');
+  if(!month||!amount){alert('Please enter month and net paid amount — أدخلي الشهر والمبلغ المدفوع');return;}
+  const history=getSalaryHistory(staffId);
+  const idx=history.findIndex(r=>r.month===month);
+  const entry={month,amount,basic:basic||undefined,
+    presentDays,absentDays,sickDays,
+    deductAbsent,deductLoan,deductOther,
+    bonus,bonusReason,
+    addedAt:new Date().toISOString()};
+  if(idx>=0) history[idx]=Object.assign(history[idx],entry);
+  else history.push(entry);
+  saveSalaryHistory(staffId,history);
+  el('sh_list').innerHTML=renderSalaryHistoryList(staffId);
+  // Clear all fields
+  ['sh_amount','sh_basic','sh_present','sh_absent','sh_sick',
+   'sh_deduct_days','sh_deduct_loan','sh_deduct_other','sh_bonus','sh_bonus_reason']
+  .forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+}
+
+function deleteSalaryHistoryEntry(staffId, month){
+  const history=getSalaryHistory(staffId).filter(r=>r.month!==month);
+  saveSalaryHistory(staffId,history);
+  el('sh_list').innerHTML=renderSalaryHistoryList(staffId);
+}
+
+function downloadSalaryHistoryTemplate(){
+  const XLSX=window.XLSX;
+  if(!XLSX){alert('Excel library not loaded');return;}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Net Paid (AED)','Days Present','Days Absent (Unpaid)','Sick Days','Deduct Absent (AED)','Deduct Loan (AED)','Deduct Other (AED)','Bonus (AED)','Bonus Reason'],
+    ['John Smith','2025-01','3000','3500','26','0','0','0','0','0','0',''],
+    ['John Smith','2025-02','3000','3200','24','2','0','200','300','0','0',''],
+    ['Sara Ahmed','2025-01','2500','2900','26','0','0','0','0','0','300','Performance bonus'],
+    ['Sara Ahmed','2025-02','2500','2500','23','1','2','0','500','0','0',''],
+  ]);
+  ws['!cols']=[{wch:22},{wch:16},{wch:20},{wch:22}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Salary History');
+  XLSX.writeFile(wb,'salary_history_template.xlsx');
+}
+
+async function importSalaryHistoryExcel(file, targetStaffId){
+  const XLSX=window.XLSX;
+  if(!XLSX||!file) return;
+  const statusEl=el('sh-xl-status');
+  if(statusEl) statusEl.innerHTML='<span style="color:#6b7280;font-size:.8rem">⏳ Reading file...</span>';
+  const ab=await file.arrayBuffer();
+  const wb=XLSX.read(ab);
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  if(!rows.length){if(statusEl)statusEl.innerHTML='<span style="color:#dc2626">No data found</span>';return;}
+
+  // Normalise month → YYYY-MM
+  const toMonth=v=>{
+    if(!v) return null;
+    const s=String(v).trim();
+    if(/^\d{4}-\d{2}$/.test(s)) return s;
+    const m1=s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+    if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
+    const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const m2=s.toLowerCase().match(/([a-z]{3})\D*(\d{4})/);
+    if(m2&&months[m2[1]]) return m2[2]+'-'+months[m2[1]];
+    // Try direct date parse
+    const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return null;
+  };
+
+  // Detect column names flexibly
+  const col=(keys)=>{
+    for(const k of keys){
+      const found=Object.keys(rows[0]).find(h=>h.toLowerCase().includes(k));
+      if(found) return found;
+    }
+    return null;
+  };
+  const nameCol      =col(['name','staff','employee']);
+  const monthCol     =col(['month','date','period','شهر']);
+  const basicCol     =col(['basic','أساسي','اساسي']);
+  const grossCol     =col(['gross','net paid','net','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const presentCol   =col(['present','حضور','attendance','attend']);
+  const absentCol    =col(['absent','غياب','absence','unpaid']);
+  const sickCol      =col(['sick','مرضية','مرض']);
+  const dAbsentCol   =col(['deduct absent','deduction absent','خصم غياب']);
+  const dLoanCol     =col(['deduct loan','loan deduct','deduction loan','خصم قرض']);
+  const dOtherCol    =col(['deduct other','other deduct','خصم آخر','خصم اخر']);
+  const bonusCol     =col(['bonus','مكافأة','مكافاة']);
+  const bonusReasonCol=col(['bonus reason','reason','سبب']);
+
+  let ok=0, skipped=0;
+  for(const row of rows){
+    const month=toMonth(monthCol?row[monthCol]:'');
+    const amount=Number((grossCol?row[grossCol]:0)||0);
+    if(!month||!amount){skipped++;continue;}
+    let staffId=targetStaffId;
+    if(nameCol&&row[nameCol]){
+      const nm=String(row[nameCol]).trim().toLowerCase();
+      const found=DB.staff.find(s=>s.name.toLowerCase().includes(nm)||nm.includes(s.name.toLowerCase().split(' ')[0]));
+      if(found) staffId=String(found.id);
+    }
+    if(!staffId){skipped++;continue;}
+    const basic=basicCol?Number(row[basicCol])||0:0;
+    const nv=c=>c&&row[c]!==''?Number(row[c]):undefined;
+    const sv=c=>c&&row[c]?String(row[c]).trim():undefined;
+    const presentDays=nv(presentCol);
+    const absentDays=nv(absentCol);
+    const sickDays=nv(sickCol);
+    const deductAbsent=nv(dAbsentCol);
+    const deductLoan=nv(dLoanCol);
+    const deductOther=nv(dOtherCol);
+    const bonus=nv(bonusCol);
+    const bonusReason=sv(bonusReasonCol);
+    const history=getSalaryHistory(staffId);
+    const idx=history.findIndex(r=>r.month===month);
+    const entry={month,amount,basic:basic||undefined,presentDays,absentDays,sickDays,
+      deductDays,deductLoan,deductOther,bonus,bonusReason,addedAt:new Date().toISOString()};
     if(idx>=0) history[idx]=Object.assign(history[idx],entry);
     else history.push(entry);
     saveSalaryHistory(staffId,history);
