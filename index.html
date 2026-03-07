@@ -5626,6 +5626,7 @@ async function loadStaff(){
     grossSalary:Number(x.gross_salary||0)||Number(getStaffSalaryLocal(x.id).gross||0),
     transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
     lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
+      leavesTakenBefore:Number(x.leaves_taken_before||0),
     notes:x.notes||''
   }));
 }
@@ -5763,6 +5764,16 @@ function openStaffForm(id){
           <div style="font-size:.68rem;color:#dc2626;margin-top:2px">Set this date to remove staff from attendance after this day</div>
         </div>
       </div>
+      <div style="margin-top:10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:9px;padding:10px">
+        <div style="font-weight:800;color:#065f46;margin-bottom:6px;font-size:.8rem">🏖️ Annual Leave Taken Before System — إجازات مأخوذة قبل السيستم</div>
+        <div class="g3">
+          <div class="fg">
+            <label style="color:#059669">Days Taken Before / أيام الإجازة قبل السيستم</label>
+            <input type="number" id="sf_leaves_before" min="0" placeholder="e.g. 30" value="${s?.leavesTakenBefore||''}">
+            <div style="font-size:.68rem;color:#6b7280;margin-top:2px">أدخلي عدد أيام الإجازة اللي اخذتها الموظفة قبل ما تسجليها في السيستم — بيتخصم من رصيد الإجازة تلقائياً</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div style="background:#fef3c7;border-radius:9px;padding:10px;margin-bottom:9px">
       <div style="font-weight:800;color:#d97706;margin-bottom:8px;font-size:.82rem">⚠️ Document Expiry Dates — تواريخ انتهاء الوثائق</div>
@@ -5810,6 +5821,7 @@ async function saveStaff(id){
     gross_salary: Number(document.getElementById('sf_gross')?.value||0),
     transfer_code: document.getElementById('sf_tcode')?.value||'',
     last_working_day: document.getElementById('sf_lastday')?.value||null,
+    leaves_taken_before: Number(document.getElementById('sf_leaves_before')?.value||0),
   };
   // Always save salary fields to localStorage as backup (in case Supabase columns missing)
   if(id){
@@ -9828,26 +9840,28 @@ function getActualWorkDaysCount(staffId){
 function calcLeaveBalance(staffId){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0,actualDays:0};
-  // Use actual work days if available, otherwise fall back to contract dates
-  const actualDays=getActualWorkDaysCount(staffId);
-  let yearsWorked;
-  if(actualDays>0){
-    // 365 actual work days = 1 full year of entitlement
-    yearsWorked=actualDays/365;
-  } else {
-    const start=new Date(s.contractStart);
-    const now=new Date();
-    const months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
-    yearsWorked=months/12;
-  }
-  // UAE: 30 days annual leave per year (pro-rated)
+  // UAE Labour Law: leave entitlement based on CALENDAR months from contract start
+  // (work days / actual attendance is for gratuity only, not leave)
+  const start=new Date(s.contractStart);
+  const now=new Date();
+  const totalMonths=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+  const yearsWorked=totalMonths/12;
+  // UAE: 30 days annual leave per year (2.5 days/month), pro-rated
   const entitled=Math.floor(yearsWorked*30);
-  const taken=(DB.leaves||[]).filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected').reduce((s,l)=>s+(l.days||0),0);
+  // Leave taken = recorded in system leaves
+  const takenInSystem=(DB.leaves||[])
+    .filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected')
+    .reduce((s,l)=>s+(l.days||0),0);
+  // Leave taken before system (entered manually on staff form)
+  const takenBefore=Number(s.leavesTakenBefore||0);
+  const taken=takenInSystem+takenBefore;
   const remaining=Math.max(0,entitled-taken);
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
   const compensation=Math.round(remaining*dailyRate*100)/100;
-  return {entitled,taken,remaining,compensation,dailyRate,yearsWorked:Math.round(yearsWorked*10)/10,actualDays};
+  const actualDays=getActualWorkDaysCount(staffId);
+  return {entitled,taken,takenInSystem,takenBefore,remaining,compensation,dailyRate,
+    yearsWorked:Math.round(yearsWorked*10)/10,actualDays,totalMonths};
 }
 
 function renderLeaves(){
@@ -10054,35 +10068,45 @@ function calcEOG(){
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
 
-  // UAE Gratuity calculation
-  // Resignation: less than 1yr = 0, 1-3yr = 1/3, 3-5yr = 2/3, 5+ = full
-  // Termination/End of Contract: full entitlement
+  // ── UAE Gratuity (قانون العمل الإماراتي) ──
+  // Formula: (Basic ÷ 30) × 21 days × years  [first 5 yrs]
+  //          (Basic ÷ 30) × 30 days × years  [after 5 yrs]
+  // Resignation penalty: <1yr=0, 1-3yr=1/3, 3-5yr=2/3, 5+yr=full
+  // Termination/End of contract: always full
   let gratuity=0;
   let gratuityNote='';
+  let gratuityBreakdown='';
+
   if(years<1){
     gratuity=0;
-    gratuityNote='أقل من سنة — لا يستحق Bonus نهاية خدمة';
+    gratuityNote='أقل من سنة — لا يستحق مكافأة نهاية خدمة';
   } else {
-    // Calculate: first 5 years = 21 days/year, after 5 years = 30 days/year
-    let days5=Math.min(years,5)*21;
-    let daysAfter5=Math.max(0,years-5)*30;
-    let fullGratuity=(days5+daysAfter5)*dailyRate;
+    // Calculate full entitlement
+    const yrs1to5 = Math.min(years, 5);
+    const yrsAfter5 = Math.max(0, years - 5);
+    const gratuity1to5  = (basic/30) * 21 * yrs1to5;
+    const gratuityAfter5= (basic/30) * 30 * yrsAfter5;
+    const fullGratuity  = gratuity1to5 + gratuityAfter5;
+    gratuityBreakdown = yrsAfter5>0
+      ? `(${yrs1to5.toFixed(2)} سنة × 21 يوم) + (${yrsAfter5.toFixed(2)} سنة × 30 يوم)`
+      : `${yrs1to5.toFixed(2)} سنة × 21 يوم`;
+
     if(reason==='resignation'){
-      if(years>=1&&years<3)      { gratuity=fullGratuity*(1/3); gratuityNote='استقالة (1-3 سنوات): ثلث الBonus'; }
-      else if(years>=3&&years<5) { gratuity=fullGratuity*(2/3); gratuityNote='استقالة (3-5 سنوات): ثلثا الBonus'; }
-      else                       { gratuity=fullGratuity;        gratuityNote='استقالة (أكثر من 5 سنوات): Bonus كاملة'; }
+      if(years<3)       { gratuity=fullGratuity*(1/3); gratuityNote='استقالة (1-3 سنوات): ثلث المكافأة'; }
+      else if(years<5)  { gratuity=fullGratuity*(2/3); gratuityNote='استقالة (3-5 سنوات): ثلثا المكافأة'; }
+      else              { gratuity=fullGratuity;        gratuityNote='استقالة (أكثر من 5 سنوات): مكافأة كاملة'; }
     } else {
       gratuity=fullGratuity;
-      gratuityNote=reason==='termination'?'إنهاء عقد: Bonus كاملة':'انتهاء عقد: Bonus كاملة';
+      gratuityNote=reason==='termination'?'إنهاء من صاحب العمل: مكافأة كاملة':'انتهاء عقد: مكافأة كاملة';
     }
   }
 
-  // Leave balance compensation
+  // ── Leave balance compensation ──
   const bal=calcLeaveBalance(s.id);
-  const leaveComp=bal.remaining*dailyRate;
+  const leaveComp=bal.remaining*(basic/30);
   const total=gratuity+leaveComp;
 
-  // Notice period (UAE: 1 month standard)
+  // ── Notice period (1 month basic) ──
   const noticePay=basic;
 
   res.innerHTML=`
@@ -10097,14 +10121,16 @@ function calcEOG(){
       </div>
       <div style="border-top:1px dashed #86efac;padding-top:12px">
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>Bonus نهاية الخدمة</span>
+          <span>مكافأة نهاية الخدمة</span>
           <span style="font-weight:700">${fmtNum(gratuity)} AED</span>
         </div>
-        <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px;font-style:italic">${gratuityNote}</div>
+        <div style="font-size:.72rem;color:#6b7280;margin-bottom:2px;font-style:italic">${gratuityNote}</div>
+        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:6px">${gratuityBreakdown} × (${fmtNum(basic)}/30 = ${fmtNum(Math.round(basic/30*100)/100)} AED/يوم)</div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>بدل الإجازة (${bal.remaining} يوم)</span>
+          <span>بدل الإجازة (${bal.remaining} يوم × ${fmtNum(Math.round(basic/30*100)/100)} AED)</span>
           <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
         </div>
+        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">مستحق: ${bal.entitled} يوم | مأخوذ: ${bal.taken} يوم | متبقي: ${bal.remaining} يوم</div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
           <span>بدل الإشعار (شهر)</span>
           <span style="font-weight:700">${fmtNum(noticePay)} AED</span>
