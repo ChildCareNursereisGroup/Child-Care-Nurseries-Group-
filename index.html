@@ -1697,10 +1697,15 @@ async function loadFromSupa(bid) {
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',extra};
     });
     DB.staffAtt={};
-    (sa.data||[]).forEach(x=>{
-      const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
-      DB.staffAtt[d][String(x.staff_id)]=x.status;
-    });
+    if(sa.error){
+      console.error('staff_attendance load error:',sa.error);
+    } else {
+      (sa.data||[]).forEach(x=>{
+        const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
+        DB.staffAtt[d][String(x.staff_id)]=x.status;
+      });
+      console.log('staff_attendance loaded:',sa.data?.length,'records');
+    }
     // Load salary history from Supabase
     DB.salaryHistory={};
     (sh.data||[]).forEach(x=>{
@@ -4024,16 +4029,30 @@ async function toggleStaffAtt(staffId, date){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
   renderStaffAtt();
-  const {error:sErr}=await sb.from('staff_attendance').upsert(
-    {branch_id:curBid,staff_id:staffId,date,status:newSt},
-    {onConflict:'branch_id,staff_id,date'}
-  );
+  // Save to Supabase — staffId must be uuid string, date must be YYYY-MM-DD
+  const payload={branch_id:String(curBid), staff_id:String(staffId), date:String(date), status:newSt};
+  console.log('Saving staff att:', payload);
+  const {data:saved, error:sErr}=await sb.from('staff_attendance')
+    .upsert(payload, {onConflict:'branch_id,staff_id,date'})
+    .select();
   if(sErr){
-    console.error('StaffAtt save error:',sErr);
-    const {error:sErr2}=await sb.from('staff_attendance').upsert(
-      {branch_id:curBid,staff_id:staffId,date,status:newSt}
-    );
-    if(sErr2) console.error('StaffAtt retry error:',sErr2);
+    console.error('StaffAtt upsert error:',sErr);
+    // Try insert/update separately
+    const {error:insErr}=await sb.from('staff_attendance').insert(payload);
+    if(insErr){
+      // Record exists, try update
+      const {error:updErr}=await sb.from('staff_attendance')
+        .update({status:newSt})
+        .eq('branch_id',String(curBid))
+        .eq('staff_id',String(staffId))
+        .eq('date',String(date));
+      if(updErr) console.error('StaffAtt update error:',updErr);
+      else console.log('StaffAtt updated via update()');
+    } else {
+      console.log('StaffAtt saved via insert()');
+    }
+  } else {
+    console.log('StaffAtt saved OK:', saved);
   }
 }
 
