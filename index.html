@@ -3467,7 +3467,8 @@ function prevRec(id){
           <td style="padding:5px 6px"></td><td style="padding:5px 6px"></td><td style="padding:5px 6px"></td>
         </tr>`}
         <tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:5px 10px">Others / Extra ${wkFeeTotal5||r.hourFee?`<span style="color:#7c3aed;font-size:.63rem">${wkFeeLabel5?wkFeeLabel5+' ':''} ${r.hourFee?'Hourly ':''}</span>`:''}</td>
+          <td style="padding:5px 10px">Others / Extra ${wkFeeTotal5||r.hourFee?`<span style="color:#7c3aed;font-size:.63rem">${wkFeeLabel5?wkFeeLabel5+' ':''} ${r.hourFee?'Hourly ':''}</span>`:''} ${r.hourFee&&(r.hourIn||r.hourOut)?`<span style="color:#0891b2;font-size:.62rem;display:block;margin-top:1px">🕐 ${r.hourIn||'--:--'} → ${r.hourOut||'--:--'}</span>`:''}
+          </td>
           <td style="padding:5px 6px;text-align:center;font-weight:600">${(wkFeeTotal5+(r.hourFee||0))||''}</td>
           <td style="padding:5px 6px"></td>
           <td style="padding:5px 6px;text-align:center;color:${(wkFeeTotal5||r.hourFee)?'#059669':'#cbd5e1'}">${(wkFeeTotal5||r.hourFee)?'0%':''}</td>
@@ -3637,7 +3638,8 @@ function prevRec(id){
           <td style="padding:5px 6px"></td><td style="padding:5px 6px"></td><td style="padding:5px 6px"></td>
         </tr>`}
         <tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:5px 10px">Others / Extra ${wkFeeTotal||r.hourFee?`<span style="color:#7c3aed;font-size:.63rem">${wkFeeLabel?wkFeeLabel+' ':''} ${r.hourFee?'Hourly ':''}</span>`:''}</td>
+          <td style="padding:5px 10px">Others / Extra ${wkFeeTotal||r.hourFee?`<span style="color:#7c3aed;font-size:.63rem">${wkFeeLabel?wkFeeLabel+' ':''} ${r.hourFee?'Hourly ':''}</span>`:''} ${r.hourFee&&(r.hourIn||r.hourOut)?`<span style="color:#0891b2;font-size:.62rem;display:block;margin-top:1px">🕐 ${r.hourIn||'--:--'} → ${r.hourOut||'--:--'}</span>`:''}
+          </td>
           <td style="padding:5px 6px;text-align:center;font-weight:600">${(wkFeeTotal+(r.hourFee||0))||''}</td>
           <td style="padding:5px 6px"></td>
           <td style="padding:5px 6px;text-align:center;color:${(wkFeeTotal||r.hourFee)?'#059669':'#cbd5e1'}">${(wkFeeTotal||r.hourFee)?'0%':''}</td>
