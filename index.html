@@ -1977,9 +1977,19 @@ async function loadFromSupa(bid) {
     if(sa.error){
       console.error('staff_attendance load error:',sa.error);
     } else {
-      (sa.data||[]).forEach(x=>{
-        const d=x.date;if(!DB.staffAtt[d])DB.staffAtt[d]={};
-        DB.staffAtt[d][String(x.staff_id)]=x.status;
+      // Sort by id ascending so the LATEST record (highest id) wins when there are duplicates
+      const sorted=(sa.data||[]).slice().sort((a,b)=>{
+        if(a.id < b.id) return -1;
+        if(a.id > b.id) return 1;
+        return 0;
+      });
+      sorted.forEach(x=>{
+        const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
+        // Only overwrite if status is حضور, or if no record yet — never let a duplicate غياب overwrite a حضور
+        const existing=DB.staffAtt[d][String(x.staff_id)];
+        if(!existing || x.status==='حضور' || existing==='غياب'){
+          DB.staffAtt[d][String(x.staff_id)]=x.status;
+        }
       });
       console.log('staff_attendance loaded:',sa.data?.length,'records');
     }
@@ -3931,7 +3941,7 @@ function renderStaffAtt(){
   let html='';
 
   staff.forEach((s,i)=>{
-    const st=DB.staffAtt[date][String(s.id)]||'غياب'; // consistent string key
+    const st=DB.staffAtt[date][String(s.id)]||'حضور'; // default حضور — absence must be explicitly recorded
     const isP=st==='حضور';
     if(isP) present++; else absent++;
     const phone=s.contact||'';
@@ -4300,36 +4310,35 @@ function saveSickDaysTotal(staffId, date, value){
 async function toggleStaffAtt(staffId, date){
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
-  const cur=DB.staffAtt[date][sid]||'غياب';
+  const cur=DB.staffAtt[date][sid]||'حضور';
   const newSt=cur==='حضور'?'غياب':'حضور';
   DB.staffAtt[date][sid]=newSt;
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
   renderStaffAtt();
-  // Save to Supabase — staffId must be uuid string, date must be YYYY-MM-DD
+
   const payload={branch_id:String(curBid), staff_id:String(staffId), date:String(date), status:newSt};
   console.log('Saving staff att:', payload);
-  const {data:saved, error:sErr}=await sb.from('staff_attendance')
-    .upsert(payload, {onConflict:'branch_id,staff_id,date'})
-    .select();
-  if(sErr){
-    console.error('StaffAtt upsert error:',sErr);
-    // Try insert/update separately
-    const {error:insErr}=await sb.from('staff_attendance').insert(payload);
-    if(insErr){
-      // Record exists, try update
-      const {error:updErr}=await sb.from('staff_attendance')
-        .update({status:newSt})
-        .eq('branch_id',String(curBid))
-        .eq('staff_id',String(staffId))
-        .eq('date',String(date));
-      if(updErr) console.error('StaffAtt update error:',updErr);
-      else console.log('StaffAtt updated via update()');
-    } else {
-      console.log('StaffAtt saved via insert()');
-    }
+
+  // Step 1: Delete ALL existing records for this staff+date+branch to avoid duplicates
+  const {error:delErr}=await sb.from('staff_attendance')
+    .delete()
+    .eq('branch_id', String(curBid))
+    .eq('staff_id',  String(staffId))
+    .eq('date',      String(date));
+  if(delErr) console.warn('StaffAtt delete error (non-fatal):', delErr);
+
+  // Step 2: Insert fresh single record
+  const {error:insErr}=await sb.from('staff_attendance').insert(payload);
+  if(insErr){
+    console.error('StaffAtt insert error:', insErr);
+    // Last resort: try upsert
+    const {error:upErr}=await sb.from('staff_attendance')
+      .upsert(payload, {onConflict:'branch_id,staff_id,date'});
+    if(upErr) console.error('StaffAtt upsert error:', upErr);
+    else console.log('StaffAtt saved via upsert fallback');
   } else {
-    console.log('StaffAtt saved OK:', saved);
+    console.log('StaffAtt saved OK → '+newSt);
   }
 }
 
@@ -4503,14 +4512,21 @@ function renderEForm(){
     '<div class="g3" style="margin-bottom:8px">'+cat.fields.map(mkField).join('')+'</div>'+
     '<hr class="sep"><div class="slbl" style="font-size:.78rem">🧾 بيانات الضريبة والمورد</div>'+
     '<div class="g3">'+TAX_SUPPLIER_FIELDS.map(mkField).join('')+'</div>';
-  // auto-calc vat on expense
-  const vatSel=el('ex_vat');
-  if(vatSel) vatSel.onchange=function(){
-    const cat2=EXP_CATS.find(c=>c.k===expCat);if(!cat2)return;
+
+  // auto-calc vat — runs on VAT select change OR amount field change
+  function calcExpVat(){
+    const cat2=EXP_CATS.find(c=>c.k===expCat); if(!cat2) return;
     const base=cat2.getAmt();
-    const pct=this.value==='5% ضريبة'?0.05:0;
-    if(el('ex_vatamt'))el('ex_vatamt').value=pct?Math.round(base*pct*100)/100:'';
-  };
+    const vatVal=(el('ex_vat')?.value||'').toLowerCase();
+    const pct=(vatVal.includes('5')||vatVal==='5')?0.05:0;
+    if(el('ex_vatamt')) el('ex_vatamt').value=pct&&base?Math.round(base*pct*100)/100:'';
+  }
+  const vatSel=el('ex_vat');
+  if(vatSel) vatSel.onchange=calcExpVat;
+  // Also recalc when any amount field changes
+  cat.fields.filter(f=>f.t==='number').forEach(f=>{
+    const inp=el(f.id); if(inp) inp.oninput=calcExpVat;
+  });
 }
 function renderExpPills(){
   const pills=[{k:'all',ar:lang==='ar'?'الكل':'All'},...EXP_CATS.map(c=>({k:c.k,ar:c.ic+' '+(typeof c.ar==='function'?c.ar():c.ar)}))];  el('epills').innerHTML=pills.map(p=>`<button class="btn bsm ${p.k===expFilt?'bp':'bg'}" onclick="setEF('${p.k}')">${p.ar}</button>`).join('');
@@ -4571,9 +4587,11 @@ async function saveExp(){
   const subType=selField?el(selField.id)?.value||'':'';
   const extra={};
   cat.fields.filter(f=>f.t==='text').forEach(f=>{if(v(f.id))extra[f.ar]=v(f.id);});
-  // Tax & supplier
+  // Tax & supplier — recalc VAT in case user entered amount after selecting VAT
   const vatType=el('ex_vat')?.value||'معفى (0%)';
-  const vatAmt=n('ex_vatamt');
+  const vatVal=vatType.toLowerCase();
+  const vatPct=(vatVal.includes('5')||vatVal==='5')?0.05:0;
+  const vatAmt=vatPct?Math.round(amount*vatPct*100)/100:(n('ex_vatamt')||0);
   const supplier=v('ex_supplier');
   const taxNum=v('ex_tax_num');
   const reason=v('ex_reason');
