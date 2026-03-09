@@ -4974,7 +4974,13 @@ function renderModalTabs(){
     {tab:'card',   key:'tabCard'},
   ];
   document.querySelectorAll('#child-modal-tabs .dtab').forEach((btn,i)=>{
-    if(tabDefs[i]) btn.textContent = t(tabDefs[i].key);
+    if(tabDefs[i]){
+      btn.textContent = t(tabDefs[i].key);
+      // Hide account statement tab from manager — Admin only
+      if(tabDefs[i].tab==='account'){
+        btn.style.display = curRole==='admin' ? '' : 'none';
+      }
+    }
   });
 }
 
@@ -5099,12 +5105,18 @@ function showDTab(tab,btn){
   if(tab==='recs'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
     const tot=recs.reduce((s,r)=>s+r.total,0);
-    cont.innerHTML=`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
+    const isAdm=curRole==='admin';
+    cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
-    </div>
+    </div>`:''}
     ${recs.map(r=>`<div class="rc" style="margin-bottom:8px">
-      <div class="rh"><div>#${r.receiptNum}</div><div>${fmtDate(r.date)}</div><div style="font-weight:800;color:var(--ok)">${fmtNum(r.total)} د.إ</div></div>
+      <div class="rh">
+        <div>#${r.receiptNum}</div>
+        <div>${fmtDate(r.date)}</div>
+        <div style="font-size:.75rem;color:var(--muted)">${fmtDate(r.fromDate)} → ${fmtDate(r.toDate)}</div>
+        ${isAdm?`<div style="font-weight:800;color:var(--ok)">${fmtNum(r.total)} د.إ</div>`:''}
+      </div>
     </div>`).join('')||`<div class="empty"><div class="ei">🧾</div><p>${lang==='ar'?'لا توجد إيصالات':'No receipts found'}</p></div>`}`;
   }
   if(tab==='att'){
