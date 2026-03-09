@@ -11540,15 +11540,16 @@ function openSalaryHistory(staffId){
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
           <div>
             <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#1e3a8a">📅 Month / الشهر *</label>
-            <input type="month" id="sh_month" style="width:100%;padding:8px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
+            <input type="month" id="sh_month" oninput="calcSHNet()" style="width:100%;padding:8px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
           </div>
           <div>
             <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">💵 Basic Salary / الأساسي (AED)</label>
-            <input type="number" id="sh_basic" min="0" placeholder="3,000" style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
+            <input type="number" id="sh_basic" min="0" placeholder="3,000" oninput="calcSHNet()" style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
           </div>
           <div>
-            <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#059669">💰 Net Paid / المدفوع فعلاً (AED) *</label>
-            <input type="number" id="sh_amount" min="0" placeholder="4,200" style="width:100%;padding:8px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#f0fdf4">
+            <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#059669">💰 Net Paid / المدفوع فعلاً (AED)</label>
+            <input type="number" id="sh_amount" min="0" placeholder="يُحسب تلقائياً ✨" readonly style="width:100%;padding:8px 10px;border:2px solid #059669;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.9rem;font-weight:800;background:#f0fdf4;color:#059669;cursor:default">
+            <div style="font-size:.63rem;color:#6b7280;margin-top:2px">يُحسب تلقائياً — يمكن تعديله يدوياً</div>
           </div>
         </div>
 
@@ -11558,19 +11559,19 @@ function openSalaryHistory(staffId){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#059669">✅ Days Present / أيام الحضور</label>
-              <input type="number" id="sh_present" min="0" max="31" placeholder="e.g. 26"
+              <input type="number" id="sh_present" min="0" max="31" placeholder="e.g. 26" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">يُحسب في الإجازة ونهاية الخدمة</div>
             </div>
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">❌ Unpaid Absent / غياب بخصم</label>
-              <input type="number" id="sh_absent" min="0" max="31" placeholder="e.g. 0"
+              <input type="number" id="sh_absent" min="0" max="31" placeholder="e.g. 0" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fef2f2">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">غياب بدون عذر — بخصم من الراتب</div>
             </div>
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#d97706">🤒 Sick Days / أيام مرضية</label>
-              <input type="number" id="sh_sick" min="0" max="31" placeholder="e.g. 0"
+              <input type="number" id="sh_sick" min="0" max="31" placeholder="e.g. 0" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #fde68a;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fffbeb">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">1-15: كاملة · 16-45: نصف · +45: بلا راتب</div>
             </div>
@@ -11583,19 +11584,19 @@ function openSalaryHistory(staffId){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">📅 Deduct Days / خصم بعدد أيام</label>
-              <input type="number" id="sh_deduct_days" min="0" max="31" placeholder="e.g. 2"
+              <input type="number" id="sh_deduct_days" min="0" max="31" placeholder="e.g. 2" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#fef2f2">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">الراتب الإجمالي ÷ أيام الشهر × عدد الأيام</div>
             </div>
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">🏦 Loan Deduction / خصم قرض (AED)</label>
-              <input type="number" id="sh_deduct_loan" min="0" placeholder="e.g. 500"
+              <input type="number" id="sh_deduct_loan" min="0" placeholder="e.g. 500" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">قسط القرض أو السلفة المخصوم</div>
             </div>
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#dc2626">⚠️ Other Deduction / خصم آخر (AED)</label>
-              <input type="number" id="sh_deduct_other" min="0" placeholder="e.g. 0"
+              <input type="number" id="sh_deduct_other" min="0" placeholder="e.g. 0" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem">
               <div style="font-size:.65rem;color:#6b7280;margin-top:2px">أي خصم إضافي آخر</div>
             </div>
@@ -11603,12 +11604,12 @@ function openSalaryHistory(staffId){
         </div>
 
         <!-- Row 4: Bonus -->
-        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;margin-bottom:10px">
           <div style="font-size:.72rem;font-weight:800;color:#0369a1;margin-bottom:8px">⭐ Bonus / المكافأة والإضافات</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div>
               <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">💎 Bonus Amount / مبلغ المكافأة (AED)</label>
-              <input type="number" id="sh_bonus" min="0" placeholder="e.g. 300"
+              <input type="number" id="sh_bonus" min="0" placeholder="e.g. 300" oninput="calcSHNet()"
                 style="width:100%;padding:7px 10px;border:1.5px solid #7dd3fc;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem;background:#e0f2fe">
             </div>
             <div>
@@ -11618,6 +11619,9 @@ function openSalaryHistory(staffId){
             </div>
           </div>
         </div>
+
+        <!-- Net Result Preview -->
+        <div id="sh_calc_preview" style="display:none;background:#1e3a8a;border-radius:10px;padding:12px 16px;margin-bottom:14px;color:#fff;font-size:.82rem"></div>
 
         <!-- Save button -->
         <div style="display:flex;justify-content:flex-end">
@@ -11774,6 +11778,73 @@ function renderSalaryHistoryList(staffId){
     </div>`;
 }
 
+function calcSHNet(){
+  const mon = el('sh_month')?.value; // "2025-10"
+  const basic = Number(el('sh_basic')?.value||0);
+  const absent = Number(el('sh_absent')?.value||0);
+  const sick = Number(el('sh_sick')?.value||0);
+  const deductDays = Number(el('sh_deduct_days')?.value||0);
+  const deductLoan = Number(el('sh_deduct_loan')?.value||0);
+  const deductOther = Number(el('sh_deduct_other')?.value||0);
+  const bonus = Number(el('sh_bonus')?.value||0);
+
+  if(!basic || !mon){
+    el('sh_amount').value='';
+    const prev=el('sh_calc_preview'); if(prev) prev.style.display='none';
+    return;
+  }
+
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const dailyRate=basic/daysInMonth;
+
+  // Absent deduction
+  const absDeduct = dailyRate * absent;
+
+  // Sick leave deduction (UAE law)
+  let sickDeduct=0;
+  if(sick>15&&sick<=45) sickDeduct=dailyRate*(sick-15)*0.5;
+  else if(sick>45) sickDeduct=dailyRate*15*0.5+dailyRate*(sick-45);
+
+  // Extra deduct days
+  const extraDeduct = dailyRate * deductDays;
+
+  const totalDeduct = absDeduct + sickDeduct + extraDeduct + deductLoan + deductOther;
+  const net = Math.max(0, Math.round((basic - totalDeduct + bonus)*100)/100);
+
+  // Set calculated value
+  const amtEl=el('sh_amount');
+  if(amtEl){ amtEl.value=net; amtEl.removeAttribute('readonly'); amtEl.style.color='#059669'; }
+
+  // Show preview
+  const prev=el('sh_calc_preview');
+  if(prev){
+    prev.style.display='block';
+    prev.innerHTML=`
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1;min-width:120px">
+          <div style="font-size:.68rem;opacity:.7">💵 الراتب الإجمالي</div>
+          <div style="font-weight:800;font-size:.9rem">${fmtNum(basic)} AED</div>
+        </div>
+        ${totalDeduct>0?`<div style="flex:1;min-width:120px">
+          <div style="font-size:.68rem;opacity:.7">➖ إجمالي الخصومات</div>
+          <div style="font-weight:800;font-size:.9rem;color:#fca5a5">- ${fmtNum(Math.round(totalDeduct*100)/100)} AED</div>
+          <div style="font-size:.63rem;opacity:.6">${absent?'غياب: '+fmtNum(Math.round(absDeduct))+' ':''} ${sick?'مرضية: '+fmtNum(Math.round(sickDeduct))+' ':''} ${deductDays?'أيام: '+fmtNum(Math.round(extraDeduct))+' ':''} ${deductLoan?'قرض: '+fmtNum(deductLoan)+' ':''} ${deductOther?'أخرى: '+fmtNum(deductOther):''}
+          </div>
+        </div>`:''}
+        ${bonus>0?`<div style="flex:1;min-width:120px">
+          <div style="font-size:.68rem;opacity:.7">⭐ البونص</div>
+          <div style="font-weight:800;font-size:.9rem;color:#86efac">+ ${fmtNum(bonus)} AED</div>
+        </div>`:''}
+        <div style="flex:1;min-width:140px;background:rgba(255,255,255,.15);border-radius:8px;padding:8px 12px">
+          <div style="font-size:.68rem;opacity:.7">✅ صافي الراتب</div>
+          <div style="font-weight:900;font-size:1.1rem;color:#86efac">${fmtNum(net)} AED</div>
+          <div style="font-size:.63rem;opacity:.6">${daysInMonth} يوم في الشهر · ${fmtNum(Math.round(dailyRate*100)/100)} AED/يوم</div>
+        </div>
+      </div>`;
+  }
+}
+
 async function addSalaryHistoryEntry(staffId){
   const month=el('sh_month')?.value;
   const amount=Number(el('sh_amount')?.value||0);
@@ -11788,7 +11859,10 @@ async function addSalaryHistoryEntry(staffId){
   const deductOther=n('sh_deduct_other');
   const bonus=n('sh_bonus');
   const bonusReason=s('sh_bonus_reason');
-  if(!month||!amount){alert('Please enter month and net paid amount — أدخلي الشهر والمبلغ المدفوع');return;}
+  if(!month){alert('أدخلي الشهر أولاً — Please select the month');return;}
+  if(!amount && !basic){alert('أدخلي الراتب الأساسي — Please enter basic salary');return;}
+  // Auto-calculate if amount not set
+  if(!amount){ calcSHNet(); }
   const history=getSalaryHistory(staffId);
   const idx=history.findIndex(r=>r.month===month);
   const entry={month,amount,basic:basic||undefined,
