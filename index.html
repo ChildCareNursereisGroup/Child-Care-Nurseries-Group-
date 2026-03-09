@@ -10541,17 +10541,33 @@ function renderPayroll(){
     // Regular absence deduction (days only, no AED entered manually)
     const regularAbsDays=Math.max(0,absCount-sickDays);
     const absDeduction=(salaryBase/daysInMonth)*regularAbsDays;
-    // Bonus/deduction from daily attendance entries (accumulated for month)
-    let monthBonus=0, monthDeductAED=0;
-    for(let d=1;d<=daysInMonth;d++){
-      const dd=mon+'-'+String(d).padStart(2,'0');
-      const dd2=getStaffDayData(s.id,dd);
-      monthBonus+=Number(dd2.bonus||0);
-      monthDeductAED+=Number(dd2.deduct||0);
+    // Check if a confirmed salary record exists for this month in salary history
+    const savedHist=(DB.salaryHistory&&DB.salaryHistory[String(s.id)])||[];
+    const savedEntry=savedHist.find(r=>r.month===mon);
+
+    let monthBonus=0, monthDeductAED=0, loanDeduct=0, absDaysUsed=regularAbsDays, sickDaysUsed=sickDays, netSalary;
+    if(savedEntry){
+      // Use confirmed saved values
+      monthBonus=savedEntry.bonus||0;
+      monthDeductAED=savedEntry.deductOther||0;
+      loanDeduct=savedEntry.deductLoan||0;
+      absDaysUsed=savedEntry.absentDays??regularAbsDays;
+      sickDaysUsed=savedEntry.sickDays??sickDays;
+      netSalary=savedEntry.amount||0;
+    } else {
+      // Calculate from daily attendance data
+      for(let d=1;d<=daysInMonth;d++){
+        const dd=mon+'-'+String(d).padStart(2,'0');
+        const dd2=getStaffDayData(s.id,dd);
+        monthBonus+=Number(dd2.bonus||0);
+        monthDeductAED+=Number(dd2.deduct||0);
+      }
+      loanDeduct=getLoanDeductionForMonth(s.id,mon);
+      netSalary=Math.max(0,salaryBase - absDeduction - sickDeduction - monthDeductAED - loanDeduct + monthBonus);
     }
-    const netSalary=Math.max(0,salaryBase - absDeduction - sickDeduction - monthDeductAED + monthBonus);
     totalPayroll+=netSalary;
-    return {s, basic, gross:salaryBase, absCount, regularAbsDays, sickDays, sickDeduction, absDeduction, monthBonus, monthDeductAED, netSalary, daysInMonth};
+    const confirmed=!!savedEntry;
+    return {s, basic, gross:salaryBase, absCount:absDaysUsed, regularAbsDays:absDaysUsed, sickDays:sickDaysUsed, sickDeduction, absDeduction, monthBonus, monthDeductAED, loanDeduct, netSalary, daysInMonth, confirmed};
   }).filter(Boolean);
 
   // Summary boxes
@@ -10615,6 +10631,7 @@ function renderPayroll(){
             </td>
             <td style="padding:8px;text-align:center">
               <button onclick="openPayrollDetail('${r.s.id}','${mon}')" style="background:#f3f4f6;color:#374151;border:none;border-radius:7px;padding:4px 9px;cursor:pointer;font-size:.72rem">✏️</button>
+              ${r.confirmed?'<div style="font-size:.6rem;color:#059669;font-weight:800;margin-top:2px">✅ مؤكد</div>':'<div style="font-size:.6rem;color:#f59e0b;font-weight:800;margin-top:2px">⚡ تقديري</div>'}
             </td>
           </tr>`;
         }).join('')}
@@ -10652,24 +10669,51 @@ function openPayrollDetail(staffId, mon){
   const [yr,mo]=mon.split('-').map(Number);
   const daysInMonth=new Date(yr,mo,0).getDate();
   const basic=Number(s.basicSalary||0);
-  const absCount=countAbsences(s.id,mon);
-  const sickDays=countSickLeave(s.id,mon);
-  const bonus=Number(s.bonus||0);
-  const deductions=Number(s.deductions||0);
+  const gross=Number(s.grossSalary||0)||basic;
+
+  // First: check if there's a saved record in salary history for this month
+  const hist=(DB.salaryHistory&&DB.salaryHistory[String(staffId)])||[];
+  const savedRec=hist.find(r=>r.month===mon);
+
+  // Use saved values if exist, otherwise calculate from attendance
+  const absFromAtt=countAbsences(s.id,mon);
+  const sickFromAtt=countSickLeave(s.id,mon);
+  let dailyBonus=0, dailyDeduct=0;
+  for(let d=1;d<=daysInMonth;d++){
+    const dd=mon+'-'+String(d).padStart(2,'0');
+    const dd2=getStaffDayData(s.id,dd);
+    dailyBonus+=Number(dd2.bonus||0);
+    dailyDeduct+=Number(dd2.deduct||0);
+  }
+
+  const absVal   = savedRec?.absentDays  ?? absFromAtt;
+  const sickVal  = savedRec?.sickDays    ?? sickFromAtt;
+  const bonusVal = savedRec?.bonus       ?? dailyBonus;
+  const dedVal   = savedRec?.deductOther ?? dailyDeduct;
+  const loanVal  = savedRec?.deductLoan  ?? 0;
+  const basicVal = savedRec?.basic       ?? gross;
+  const bonusReason = savedRec?.bonusReason||'';
+  const notes    = savedRec?.notes||'';
+
   el('payroll-detail-title').textContent=`💰 راتب ${s.name} — ${mon}`;
   el('payroll-detail-body').innerHTML=`
-    <div class="g2" style="margin-bottom:12px">
-      <div class="fg"><label>الراتب الأساسي (AED)</label><input type="number" id="pd_basic" value="${basic}" oninput="recalcPayDetail(${daysInMonth})"></div>
-      <div class="fg"><label>كود التحويل</label><input id="pd_code" value="${s.transferCode||''}" placeholder="EDNEREF Code"></div>
-      <div class="fg"><label>بونص (AED) ➕</label><input type="number" id="pd_bonus" value="${bonus}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
-      <div class="fg"><label>خصومات (AED) ➖</label><input type="number" id="pd_ded" value="${deductions}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
-      <div class="fg"><label>أيام غياب</label><input type="number" id="pd_abs" value="${absCount}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
-      <div class="fg"><label>أيام إجازة مرضية 🏥</label><input type="number" id="pd_sick" value="${sickDays}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+    <div style="background:#fef9c3;border:1.5px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.78rem;color:#78350f">
+      ⚡ أدخل أيام العمل والبونص والخصومات — السيستم هيحسب الراتب تلقائياً
     </div>
-    <div id="pd_result" style="background:#f0fdf4;border-radius:10px;padding:12px;margin-bottom:12px;font-size:.85rem"></div>
-    <div class="fg" style="margin-bottom:10px"><label>ملاحظات</label><textarea id="pd_notes" rows="2"></textarea></div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="fg"><label>💵 الراتب الإجمالي (AED)</label><input type="number" id="pd_basic" value="${basicVal}" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>📅 أيام الشهر</label><input type="number" id="pd_dim" value="${daysInMonth}" readonly style="background:#f0f4ff;font-weight:800;color:#1e3a8a"></div>
+      <div class="fg"><label>❌ أيام غياب بخصم</label><input type="number" id="pd_abs" value="${absVal}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>🏥 أيام مرضية</label><input type="number" id="pd_sick" value="${sickVal}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>⭐ بونص / مكافأة (AED)</label><input type="number" id="pd_bonus" value="${bonusVal}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>📝 سبب البونص</label><input type="text" id="pd_bonus_reason" value="${bonusReason}" placeholder="e.g. Performance, Eid..."></div>
+      <div class="fg"><label>➖ خصومات أخرى (AED)</label><input type="number" id="pd_ded" value="${dedVal}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+      <div class="fg"><label>🏦 خصم قرض/سلفة (AED)</label><input type="number" id="pd_loan" value="${loanVal}" min="0" oninput="recalcPayDetail(${daysInMonth})"></div>
+    </div>
+    <div id="pd_result" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:14px;margin-bottom:12px;font-size:.85rem"></div>
+    <div class="fg" style="margin-bottom:10px"><label>📋 ملاحظات</label><textarea id="pd_notes" rows="2">${notes}</textarea></div>
     <div style="display:flex;gap:7px">
-      <button class="btn bp" onclick="savePayrollDetail('${staffId}','${mon}')">💾 حفظ</button>
+      <button class="btn bp" onclick="savePayrollDetail('${staffId}','${mon}')">💾 حفظ وتأكيد الراتب</button>
       <button class="btn bg" onclick="el('payroll-detail-modal').classList.remove('on')">إلغاء</button>
     </div>
     <div id="pd-alert"></div>
@@ -10682,6 +10726,7 @@ function recalcPayDetail(daysInMonth){
   const basic=Number(el('pd_basic')?.value||0);
   const bonus=Number(el('pd_bonus')?.value||0);
   const ded=Number(el('pd_ded')?.value||0);
+  const loan=Number(el('pd_loan')?.value||0);
   const abs=Number(el('pd_abs')?.value||0);
   const sick=Number(el('pd_sick')?.value||0);
   const dailyRate=daysInMonth>0?basic/daysInMonth:0;
@@ -10689,36 +10734,55 @@ function recalcPayDetail(daysInMonth){
   let sickDeduct=0;
   if(sick>15&&sick<=45) sickDeduct=dailyRate*(sick-15)*0.5;
   else if(sick>45) sickDeduct=dailyRate*30*0.5+dailyRate*(sick-45);
-  const net=Math.max(0,basic-absDeduct-sickDeduct-ded+bonus);
+  const net=Math.max(0,basic-absDeduct-sickDeduct-ded-loan+bonus);
   const res=el('pd_result');
   if(res) res.innerHTML=`
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>الراتب الأساسي</span><span><b>${fmtNum(basic)} AED</b></span></div>
-    ${absDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>Absence Deduction (${Math.max(0,abs-sick)} يوم)</span><span>- ${fmtNum(absDeduct)}</span></div>`:''}
-    ${sickDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#d97706"><span>خصم إجازة مرضية (${sick} يوم)</span><span>- ${fmtNum(sickDeduct)}</span></div>`:''}
-    ${bonus>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#059669"><span>بونص</span><span>+ ${fmtNum(bonus)}</span></div>`:''}
-    ${ded>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>خصومات أخرى</span><span>- ${fmtNum(ded)}</span></div>`:''}
-    <div style="border-top:2px solid #059669;margin-top:7px;padding-top:7px;display:flex;justify-content:space-between;font-weight:900;font-size:.95rem">
-      <span>صافي الراتب</span><span style="color:#059669">${fmtNum(net)} AED</span>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span>💵 الراتب الإجمالي</span><span><b>${fmtNum(basic)} AED</b></span></div>
+    ${absDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>❌ خصم غياب (${Math.max(0,abs-sick)} يوم × ${fmtNum(Math.round(dailyRate))})</span><span>- ${fmtNum(Math.round(absDeduct))}</span></div>`:''}
+    ${sickDeduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#d97706"><span>🏥 خصم مرضية (${sick} يوم)</span><span>- ${fmtNum(Math.round(sickDeduct))}</span></div>`:''}
+    ${ded>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>➖ خصومات أخرى</span><span>- ${fmtNum(ded)}</span></div>`:''}
+    ${loan>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#dc2626"><span>🏦 خصم قرض/سلفة</span><span>- ${fmtNum(loan)}</span></div>`:''}
+    ${bonus>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#059669"><span>⭐ بونص / مكافأة</span><span>+ ${fmtNum(bonus)}</span></div>`:''}
+    <div style="border-top:2px solid #059669;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:900;font-size:1rem">
+      <span>✅ صافي الراتب</span><span style="color:#059669">${fmtNum(Math.round(net))} AED</span>
     </div>`;
 }
 
 async function savePayrollDetail(staffId, mon){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
   const basic=Number(el('pd_basic')?.value||0);
-  const code=el('pd_code')?.value||'';
   const bonus=Number(el('pd_bonus')?.value||0);
   const ded=Number(el('pd_ded')?.value||0);
-  // Update staff record with bonus/deductions/code for this calc
-  await sb.from('staff').update({
-    basic_salary: basic,
-    transfer_code: code,
-    bonus: bonus,
-    deductions: ded,
-  }).eq('id',staffId);
-  await loadStaff();
-  showAlert('pd-alert','✅ تم الحفظ!',false);
+  const loan=Number(el('pd_loan')?.value||0);
+  const abs=Number(el('pd_abs')?.value||0);
+  const sick=Number(el('pd_sick')?.value||0);
+  const bonusReason=el('pd_bonus_reason')?.value||'';
+  const notes=el('pd_notes')?.value||'';
+  const dailyRate=daysInMonth>0?basic/daysInMonth:0;
+  const absDeduct=dailyRate*Math.max(0,abs-sick);
+  let sickDeduct=0;
+  if(sick>15&&sick<=45) sickDeduct=dailyRate*(sick-15)*0.5;
+  else if(sick>45) sickDeduct=dailyRate*30*0.5+dailyRate*(sick-45);
+  const net=Math.max(0,basic-absDeduct-sickDeduct-ded-loan+bonus);
+  // Save to staff_salary_history (single source of truth)
+  const entry={
+    month:mon, amount:Math.round(net), basic,
+    presentDays:daysInMonth-abs, absentDays:abs, sickDays:sick,
+    deductOther:ded, deductLoan:loan, bonus, bonusReason, notes,
+  };
+  await upsertSalaryHistoryEntry(staffId, entry);
+  // Update local cache
+  if(!DB.salaryHistory) DB.salaryHistory={};
+  if(!DB.salaryHistory[String(staffId)]) DB.salaryHistory[String(staffId)]=[];
+  const hist=DB.salaryHistory[String(staffId)];
+  const idx=hist.findIndex(r=>r.month===mon);
+  if(idx>=0) hist[idx]=entry; else hist.push(entry);
+  showAlert('pd-alert','✅ تم حفظ الراتب!',false);
   setTimeout(()=>{ el('payroll-detail-modal').classList.remove('on'); renderPayroll(); },700);
 }
-
 function exportPayrollExcel(){
   const mon=el('payroll-month')?.value||'';
   const bf=el('payroll-branch')?.value||'all';
