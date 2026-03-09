@@ -269,6 +269,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-ch-file').click()">📥 Import Children Excel</button>
     <button class="btn bg bsm" onclick="downloadChildTemplate()">📋 Template</button>
   </div>
+  <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:#0369a1;font-weight:700">
+    💡 اضغطي على اسم الطفل لتعديل بياناته أو حذفه
+  </div>
   <input type="file" id="xl-ch-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="(()=>{const sel=el('imp-branch');if(sel)sel.value=curBid;})();readExcel({files:this.files})">
   <div class="srch"><span class="si2">🔍</span><input type="text" id="srch" placeholder="ابحث باسم الطفل أو الفصل..." id="srch-ph" oninput="filterCh(this.value)"></div>
   <div id="fpills" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px"></div>
@@ -1621,8 +1624,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- ══ INQUIRIES LIST ══ -->
 <div class="card">
   <div class="ch">
-    <div class="ct">📋 الاستفسارات — Inquiries</div>
-    <div id="vis-branch-name" style="font-size:.75rem;color:var(--muted)"></div>
+    <div class="ct">📋 الاستفسارات والزوار — Visitors</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span id="vis-count-badge" style="background:#f0f4ff;color:#1e3a8a;border-radius:18px;padding:2px 11px;font-size:.78rem;font-weight:800"></span>
+      <button onclick="loadVisitors().then(()=>renderVisitors())" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:5px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">🔄 تحديث</button>
+      <div id="vis-branch-name" style="font-size:.75rem;color:var(--muted)"></div>
+    </div>
   </div>
   <div style="margin-bottom:10px">
     <input type="text" id="vis-search" placeholder="🔍 ابحث بالاسم أو رقم الهاتف..." oninput="renderVisitors()" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.85rem">
@@ -2544,7 +2551,14 @@ async function showPage(page,btn){
   if(page==='staff'){populateStaffBranchFilter();renderStaff();renderStaffAlerts();}
   if(page==='licenses')renderLicenses();
   if(page==='buses'){renderBuses();renderBusAlerts();}
-  if(page==='visitors'){ loadVisitors().then(()=>renderVisitors()); resetInquiryForm(); }
+  if(page==='visitors'){
+    const visListEl=el('vis-list');
+    if(visListEl) visListEl.innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>';
+    loadVisitors().then(()=>{
+      renderVisitors();
+    });
+    resetInquiryForm();
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -9378,8 +9392,19 @@ function sendRegReportWA(){
 //  VISITORS MODULE
 // ═══════════════════════════════════════════════
 async function loadVisitors(){
+  // First try with branch filter
   const {data,error} = await sb.from('visitors').select('*').eq('branch_id',curBid).order('created_at',{ascending:false}).limit(2000);
-  if(!error) DB.visitors = (data||[]).map(v=>({...v, name:(v.name||'').trim()})); // trim names on load
+  if(error){
+    console.error('Visitors load error:',error.message);
+    DB.visitors = [];
+    const vl=el('vis-list');
+    if(vl) vl.innerHTML=`<div style="background:#fee2e2;border-radius:10px;padding:14px;color:#991b1b;font-weight:700;text-align:center">
+      ❌ خطأ في تحميل البيانات<br><span style="font-weight:400;font-size:.82rem">${error.message}</span>
+    </div>`;
+    return;
+  }
+  DB.visitors = (data||[]).map(v=>({...v, name:(v.name||'').trim()}));
+  console.log('✅ Visitors loaded:',DB.visitors.length,'for branch_id=',curBid);
 }
 
 function renderVisitors(){
@@ -9389,6 +9414,9 @@ function renderVisitors(){
   if(!DB.visitors) DB.visitors=[];
   const q = (el('vis-search')?.value||'').toLowerCase().trim();
   let list = DB.visitors;
+  // Update count badge
+  const badge=el('vis-count-badge');
+  if(badge) badge.textContent=list.length+' زائر';
   if(q){
     const qn=q.replace(/\s+/g,' ').trim();
     list = list.filter(v=>
@@ -9401,7 +9429,12 @@ function renderVisitors(){
   }
 
   if(!list.length){
-    el('vis-list').innerHTML = `<div class="empty"><div class="ei">📋</div><p>${q?'لا توجد نتائج':'لا يوجد استفسارات بعد — اضغط ➕ لإضافة استفسار جديد'}</p></div>`;
+    el('vis-list').innerHTML = `<div style="text-align:center;padding:20px">
+      <div style="font-size:2.5rem;margin-bottom:8px">📋</div>
+      <div style="font-weight:800;color:#374151;margin-bottom:6px">${q?'لا توجد نتائج للبحث':'لا يوجد زوار مسجلون بعد'}</div>
+      ${!q?`<div style="font-size:.82rem;color:#6b7280;margin-bottom:12px">اضغط "حفظ الاستفسار" بالأعلى لإضافة زائر جديد</div>
+      <button onclick="debugVisitors()" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;color:#374151">🔍 فحص البيانات</button>`:''}
+    </div>`;
     return;
   }
 
@@ -9581,6 +9614,29 @@ function makeReceiptForVisitor(id){
     // Focus hourly fee field
     setTimeout(()=>{ if(el('rhour_fee')) el('rhour_fee').focus(); }, 300);
   }, 250);
+}
+
+async function debugVisitors(){
+  const vl=el('vis-list');
+  if(vl) vl.innerHTML='<div style="text-align:center;padding:10px">⏳ جاري الفحص...</div>';
+  // Check all visitors in table regardless of branch
+  const {data:allData, error:allErr} = await sb.from('visitors').select('id,name,branch_id').limit(50);
+  if(allErr){
+    if(vl) vl.innerHTML=`<div style="background:#fee2e2;padding:12px;border-radius:10px;color:#991b1b">❌ جدول visitors غير موجود أو خطأ: ${allErr.message}</div>`;
+    return;
+  }
+  const total=allData?.length||0;
+  const forThisBranch=(allData||[]).filter(x=>String(x.branch_id)===String(curBid));
+  const otherBranches=[...new Set((allData||[]).filter(x=>String(x.branch_id)!==String(curBid)).map(x=>x.branch_id))];
+  if(vl) vl.innerHTML=`<div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:14px;font-size:.85rem;line-height:2">
+    <div style="font-weight:800;color:#0369a1;margin-bottom:8px">🔍 نتيجة الفحص:</div>
+    <div>📦 إجمالي السجلات في الجدول: <b>${total}</b></div>
+    <div>🏫 الـ branch_id الحالي: <b>${curBid}</b></div>
+    <div>✅ سجلات لهذا الفرع: <b>${forThisBranch.length}</b> ${forThisBranch.map(x=>'('+x.name+')').join(', ')}</div>
+    <div>🔀 فروع أخرى في الجدول: <b>${otherBranches.length>0?otherBranches.join(', '):'لا يوجد'}</b></div>
+    ${total===0?'<div style="color:#dc2626;font-weight:700">⚠️ الجدول فاضي — البيانات اللي دخلتيها مش اتحفظت في Supabase</div>':''}
+    ${forThisBranch.length===0&&total>0?'<div style="color:#d97706;font-weight:700">⚠️ في بيانات بس بـ branch_id مختلف</div>':''}
+  </div>`;
 }
 
 // Load visitors when needed
