@@ -2578,7 +2578,7 @@ function renderPV(){
   if(!active.length){el('pvcont').innerHTML=`<div class="empty"><div class="ei">👶</div><p>لا يوجد أطفال</p></div>`;return;}
   let ok=0,miss=0,part=0;
   const rows=active.map(c=>{
-    const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
+    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
     const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);const diff=exp-paid;
     let cls,txt;
     if(paid===0){cls='pmiss';txt=t('notPaid');miss++;}
@@ -2648,7 +2648,7 @@ function renderChildren(){
         ${(()=>{
           if(c.leaveDate||!(c.fee>0)) return '';
           const curMon=monthOf(new Date());
-          const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,curMon)).reduce((s,r)=>s+r.total,0);
+          const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,curMon)).reduce((s,r)=>s+r.total,0);
           const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
           if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">✅ Paid</span>';
           if(paid>0)    return '<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">⚡ Partial</span>';
@@ -3771,7 +3771,7 @@ function renderAtt(){
                   ${(()=>{
                     const attDate=el('attdate').value||today();
                     const month=monthOf(attDate);
-                    const paid=DB.receipts.filter(r=>r.childId===c.id&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
+                    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
                     const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
                     if(!exp) return '';
                     if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">✅ Paid</span>';
@@ -10276,6 +10276,12 @@ function openFeeReminderModal(){ showPage('reminders',null); }
 // ─── Check if receipt covers a specific month ─────
 // Uses fromDate first, falls back to date
 function recCoversMonth(r, month){
+  // If both fromDate and toDate exist, check if month falls within the range
+  if(r.fromDate && r.toDate){
+    const mFrom = monthOf(r.fromDate);
+    const mTo   = monthOf(r.toDate);
+    return month >= mFrom && month <= mTo;
+  }
   if(r.fromDate) return monthOf(r.fromDate)===month;
   if(r.toDate)   return monthOf(r.toDate)===month;
   return monthOf(r.date)===month;
@@ -11906,7 +11912,7 @@ function renderTodaySummary(){
   const unpaidByClass = {}; // className → [{name}]
   active.filter(c => c.fee > 0).forEach(c => {
     const paid = DB.receipts.filter(r =>
-      (r.childId===c.id||r.childId===String(c.id)) && recCoversMonth(r, mon)
+      String(r.childId)===String(c.id) && recCoversMonth(r, mon)
     ).reduce((s,r)=>s+r.total, 0);
     if(paid === 0){
       const cls = (c.className||'No Class').trim();
