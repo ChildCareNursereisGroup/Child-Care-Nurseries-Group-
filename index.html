@@ -1318,9 +1318,11 @@ main{padding:12px;max-width:960px;margin:0 auto}
       </select>
       <button class="btn bp bsm" onclick="exportPayrollExcel()">📊 Excel</button>
       <button class="btn bg bsm" onclick="printPayroll()">🖨️ Print</button>
+      <button onclick="debugSalaryHistory()" style="background:#f59e0b;color:#fff;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">🔍 فحص الرواتب</button>
     </div>
   </div>
   <div id="payroll-summary" style="margin-bottom:10px"></div>
+  <div id="payroll-debug-box" style="margin-bottom:10px"></div>
   <div id="payroll-list"></div>
 </div>
 </div>
@@ -10783,6 +10785,60 @@ async function savePayrollDetail(staffId, mon){
   showAlert('pd-alert','✅ تم حفظ الراتب!',false);
   setTimeout(()=>{ el('payroll-detail-modal').classList.remove('on'); renderPayroll(); },700);
 }
+async function debugSalaryHistory(){
+  const box=el('payroll-debug-box');
+  if(box) box.innerHTML=`<div style="background:#fef9c3;border:1.5px solid #fde68a;border-radius:10px;padding:12px;font-size:.8rem">⏳ جاري فحص البيانات من Supabase...</div>`;
+  // Query ALL salary history for this branch
+  const {data, error}=await sb.from('staff_salary_history').select('*').eq('branch_id',curBid).order('month',{ascending:false});
+  if(error){
+    if(box) box.innerHTML=`<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px;font-size:.8rem;color:#dc2626">❌ خطأ: ${error.message}</div>`;
+    return;
+  }
+  // Update DB cache
+  DB.salaryHistory={};
+  (data||[]).forEach(x=>{
+    const sid=String(x.staff_id);
+    if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+    DB.salaryHistory[sid].push({
+      month:x.month, amount:Number(x.amount||0),
+      basic:Number(x.basic_salary||0)||undefined,
+      presentDays:x.present_days??undefined, absentDays:x.absent_days??undefined,
+      sickDays:x.sick_days??undefined, deductDays:x.deduct_days??undefined,
+      deductLoan:Number(x.deduct_loan||0)||undefined, deductOther:Number(x.deduct_other||0)||undefined,
+      bonus:Number(x.bonus||0)||undefined, bonusReason:x.bonus_reason||undefined,
+    });
+  });
+  if(box){
+    if(!data||data.length===0){
+      box.innerHTML=`<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px;font-size:.82rem;color:#dc2626">
+        ⚠️ لا توجد سجلات رواتب محفوظة في Supabase لهذا الفرع (branch_id: ${curBid})<br>
+        <span style="color:#6b7280">تأكدي إن جدول staff_salary_history موجود وفيه عمود unique على (branch_id, staff_id, month)</span>
+      </div>`;
+    } else {
+      const rows=data.map(x=>{
+        const st=DB.staff.find(s=>String(s.id)===String(x.staff_id));
+        return `<tr style="border-bottom:1px solid #f3f4f6">
+          <td style="padding:5px 8px;font-weight:700">${st?.name||'ID:'+x.staff_id}</td>
+          <td style="padding:5px 8px;color:#6b7280">${x.month}</td>
+          <td style="padding:5px 8px;font-weight:800;color:#059669">${x.amount} AED</td>
+          <td style="padding:5px 8px;color:#0369a1">${x.bonus?'+'+x.bonus+' AED':'-'}</td>
+          <td style="padding:5px 8px;color:#dc2626">${x.deduct_other?'-'+x.deduct_other+' AED':'-'}</td>
+          <td style="padding:5px 8px;color:#9ca3af;font-size:.72rem">${x.absent_days??'-'} غياب</td>
+        </tr>`;
+      }).join('');
+      box.innerHTML=`<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:14px">
+        <div style="font-weight:800;color:#059669;margin-bottom:8px">✅ تم تحميل ${data.length} سجل من Supabase</div>
+        <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <tr style="background:#1e3a8a;color:#fff"><th style="padding:6px 8px">الموظفة</th><th style="padding:6px 8px">الشهر</th><th style="padding:6px 8px">صافي الراتب</th><th style="padding:6px 8px">بونص</th><th style="padding:6px 8px">خصم</th><th style="padding:6px 8px">غياب</th></tr>
+          ${rows}
+        </table></div>
+        <button onclick="el('payroll-debug-box').innerHTML='';renderPayroll();" style="margin-top:10px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem">✕ إغلاق وتحديث الجدول</button>
+      </div>`;
+    }
+  }
+  renderPayroll();
+}
+
 function exportPayrollExcel(){
   const mon=el('payroll-month')?.value||'';
   const bf=el('payroll-branch')?.value||'all';
@@ -11407,9 +11463,9 @@ async function saveSalaryHistory(staffId, records){
 }
 async function upsertSalaryHistoryEntry(staffId, entry){
   // Save single entry to Supabase
-  const {error}=await sb.from('staff_salary_history').upsert({
+  const payload={
     branch_id: curBid,
-    staff_id: staffId,
+    staff_id: String(staffId),
     month: entry.month,
     amount: entry.amount||0,
     basic_salary: entry.basic||0,
@@ -11421,8 +11477,16 @@ async function upsertSalaryHistoryEntry(staffId, entry){
     deduct_other: entry.deductOther||0,
     bonus: entry.bonus||0,
     bonus_reason: entry.bonusReason||null,
-  },{onConflict:'branch_id,staff_id,month'});
-  if(error) console.error('salary history upsert error:',error);
+  };
+  console.log('💾 Saving salary history:', payload);
+  const {data, error}=await sb.from('staff_salary_history').upsert(payload,{onConflict:'branch_id,staff_id,month'});
+  if(error){
+    console.error('❌ salary history upsert error:', error);
+    alert('❌ خطأ في حفظ الراتب:\n'+error.message);
+    return false;
+  }
+  console.log('✅ Salary history saved OK');
+  return true;
 }
 async function deleteSalaryHistorySupabase(staffId, month){
   const {error}=await sb.from('staff_salary_history')
