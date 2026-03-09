@@ -1926,16 +1926,19 @@ async function loadFromSupa(bid) {
   bid=bid||curBid;
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e,sa] = await Promise.all([
+    const [c,r,a,e,sa,vis] = await Promise.all([
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
       sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('staff_attendance').select('*').eq('branch_id',bid),
+      sb.from('visitors').select('*').eq('branch_id',bid).order('created_at',{ascending:false}).limit(500),
     ]);
     if(c.error)throw c.error;
     if(r.error)throw r.error;
     if(a.error)throw a.error;
+    // Visitors — always loaded with main data
+    if(!vis.error) DB.visitors=(vis.data||[]).map(v=>({...v,name:(v.name||'').trim()}));
     // Load salary history separately — never block main load if table missing
     const sh = await sb.from('staff_salary_history').select('*').eq('branch_id',bid)
       .then(res=>res).catch(()=>({data:[],error:null}));
@@ -9548,17 +9551,36 @@ function visWA(id){
 function makeReceiptForVisitor(id){
   const v = (DB.visitors||[]).find(x=>String(x.id)===String(id));
   if(!v) return;
-  // Switch to receipts page and pre-fill guest fields
-  showPage('receipts',null);
+  window._selectedVisitor = v;
+  // Switch to receipts page — visitors must be loaded first
+  showPage('receipts', null);
   setTimeout(()=>{
+    // Rebuild dropdown to make sure visitor is there
+    initRecForm();
     const sel=el('rch');
     if(sel){
-      sel.value='__guest__';
-      const gw=el('guest-name-wrap'); if(gw) gw.style.display='block';
-      const gn=el('rch-guest'); if(gn) gn.value=v.name;
-      const cls=el('rcls'); if(cls) cls.value='';
+      // Find the visitor option
+      const optVal='__vis__'+v.id;
+      const opt=Array.from(sel.options).find(o=>o.value===optVal);
+      if(opt){
+        sel.value=optVal;
+      } else {
+        // Fallback: add option manually if not found
+        const o=document.createElement('option');
+        o.value=optVal; o.text=v.name+' 🕐';
+        sel.appendChild(o);
+        sel.value=optVal;
+      }
+      fillFromChild();
+      // Set date to today
+      if(el('rdate')) el('rdate').value=today();
     }
-  },200);
+    // Scroll to receipts form
+    const form=el('rch');
+    if(form) form.scrollIntoView({behavior:'smooth',block:'center'});
+    // Focus hourly fee field
+    setTimeout(()=>{ if(el('rhour_fee')) el('rhour_fee').focus(); }, 300);
+  }, 250);
 }
 
 // Load visitors when needed
