@@ -2514,7 +2514,10 @@ async function showPage(page,btn){
   if(page==='children')renderChildren();
   if(page==='add')initAddForm();
   if(page==='receipts'){
-    initRecForm();renderRecs();
+    // Load visitors first so hourly visitors appear in dropdown
+    if(!DB.visitors||!DB.visitors.length) loadVisitors().then(()=>initRecForm());
+    else initRecForm();
+    renderRecs();
     // Show/hide admin-only elements
     const tw=el('rectot-wrap'); if(tw) tw.style.display=curRole==='admin'?'':'none';
     const vb=el('vat-report-btn'); if(vb) vb.style.display=curRole==='admin'?'':'none';
@@ -2811,10 +2814,19 @@ function updateSerialByPayMethod(){
 
 function initRecForm(){
   const sel=el('rch');
+  const visitors=(DB.visitors||[]).filter(v=>v.branch_id===curBid||!v.branch_id);
   sel.innerHTML='<option value="">-- اختر --</option>'
     +'<option value="__guest__">👶 زائر / Guest (غير مسجل)</option>'
     +'<option disabled style="color:#ccc">─────────────────</option>'
-    +DB.children.filter(c=>!c.leaveDate).map(c=>`<option value="${c.id}">${c.name} (${c.className||''})</option>`).join('');
+    +'<optgroup label="👶 أطفال مسجلون — Enrolled Children">'
+    +DB.children.filter(c=>!c.leaveDate).map(c=>`<option value="${c.id}">${c.name} (${c.className||''})</option>`).join('')
+    +'</optgroup>'
+    +(visitors.length
+      ? '<option disabled style="color:#ccc">─────────────────</option>'
+        +'<optgroup label="🕐 زوار بالساعة — Hourly Visitors">'
+        +visitors.map(v=>`<option value="__vis__${v.id}">${v.name}${v.phone_mom?' | '+v.phone_mom:''}</option>`).join('')
+        +'</optgroup>'
+      : '');
   if(!el('rdate').value)el('rdate').value=today();
   updateSerialByPayMethod();
 }
@@ -2822,15 +2834,29 @@ function fillFromChild(){
   const id=el('rch').value;
   // Show/hide guest name input
   const guestWrap=el('guest-name-wrap');
+
+  // ── Hourly visitor selected ──────────────────────────
+  if(id && id.startsWith('__vis__')){
+    const visId=id.replace('__vis__','');
+    const vis=(DB.visitors||[]).find(x=>String(x.id)===String(visId));
+    if(guestWrap) guestWrap.style.display='none';
+    // Clear all amounts for manual hourly entry
+    ['rfee','rbus','rclo','rreg','rsup','rfri','rsat','rsun'].forEach(i=>{if(el(i))el(i).value='';});
+    if(el('rcls')) el('rcls').value='زائر بالساعة';
+    // Highlight hourly section
+    const hourSec=el('rhour_fee');
+    if(hourSec){ hourSec.focus(); hourSec.style.borderColor='#059669'; }
+    calcTotal();
+    // Store visitor info for saving
+    window._selectedVisitor = vis;
+    return;
+  }
+  window._selectedVisitor = null;
+
   if(guestWrap) guestWrap.style.display = id==='__guest__' ? 'block' : 'none';
   if(!id){ el('rcls').value=''; return; }
   if(id==='__guest__'){
-    // Clear amounts for manual entry
-    if(el('rfee')) el('rfee').value='';
-    if(el('rbus')) el('rbus').value='';
-    if(el('rfri')) el('rfri').value='';
-    if(el('rsat')) el('rsat').value='';
-    if(el('rsun')) el('rsun').value='';
+    ['rfee','rbus','rclo','rreg','rsup','rfri','rsat','rsun'].forEach(i=>{if(el(i))el(i).value='';});
     if(el('rcls')) el('rcls').value='';
     calcTotal();
     return;
@@ -2865,10 +2891,19 @@ function calcTotal(){
 async function saveReceipt(){
   const childId=el('rch').value;const rDate=el('rdate').value;const rNum=v('rnum');
   if(!childId||!rDate||!rNum){showAlert('recalert',t('fillRequired'),true);return;}
-  const isGuest = childId==='__guest__';
+  const isGuest  = childId==='__guest__';
+  const isVisitor= childId.startsWith('__vis__');
   const guestName = el('rch-guest')?.value?.trim()||'';
   if(isGuest&&!guestName){showAlert('recalert',lang==='ar'?'❌ أدخل اسم الزائر':'❌ Enter guest name',true);return;}
-  const c = isGuest ? null : DB.children.find(x=>x.id===childId||String(x.id)===childId);
+
+  // Resolve name and phone for visitor
+  const vis = isVisitor ? (window._selectedVisitor || (DB.visitors||[]).find(x=>String(x.id)===childId.replace('__vis__',''))) : null;
+  const c   = (!isGuest&&!isVisitor) ? DB.children.find(x=>x.id===childId||String(x.id)===childId) : null;
+
+  const resolvedName = isGuest ? guestName+' 👶'
+                     : isVisitor ? (vis?.name||'زائر')+' 🕐'
+                     : (c?.name||'');
+
   const fee=n('rfee'),bus=n('rbus'),clothes=n('rclo'),reg=n('rreg'),tools=n('rsup');
   const fri=n('rfri'),sat=n('rsat'),sun=n('rsun');
   const hourFee=n('rhour_fee'), overFee=n('rover_fee');
@@ -2882,8 +2917,8 @@ async function saveReceipt(){
   setSyncing(true);
   const row={
     branch_id:curBid,
-    child_id: isGuest ? null : childId,
-    child_name: isGuest ? guestName+'  👶' : (c?.name||''),
+    child_id: (!isGuest&&!isVisitor) ? childId : null,
+    child_name: resolvedName,
     class_name: el('rcls')?.value || c?.className||'',
     receipt_num:rNum,date:rDate,from_date:el('rfrom').value||null,to_date:el('rto').value||null,
     fee,bus,clothes,reg,tools,fri_fee:fri,sat_fee:sat,sun_fee:sun,
@@ -2897,9 +2932,9 @@ async function saveReceipt(){
   const {error}=await sb.from('receipts').insert(row);
   setSyncing(false);
   if(error){showAlert('recalert','❌ خطأ: '+error.message,true);return;}
+  window._selectedVisitor=null;
   showAlert('recalert',t('receiptSaved'),false);
-  { const _la=_actLog[_actLog.length]; logActivity('receipt', (c?.name||guestName||'?')+' — '+fmtNum(total)+' د.إ ('+rNum+')'); if(_actLog[_actLog.length-1]) _actLog[_actLog.length-1].amount=total; }
-  const newR=DB.receipts.find(x=>x.receiptNum===rNum)||{id:Date.now()};
+  { logActivity('receipt', resolvedName+' — '+fmtNum(total)+' د.إ ('+rNum+')'); }
   clearRec();await loadFromSupa(curBid);renderRecs();renderDashboard();
   // Show option to preview/send receipt
   const nr=DB.receipts.find(x=>x.receiptNum===rNum);
@@ -2955,7 +2990,9 @@ function renderRecs(){
       <div style="flex:1;min-width:120px">
         <div style="font-weight:800;font-size:.85rem">
           ${r.childName}
-          ${!r.childId?'<span style="background:#fef3c7;color:#92400e;font-size:.62rem;padding:1px 5px;border-radius:5px;margin-right:3px">👶 زائر</span>':''}
+          ${r.hourFee>0&&!r.childId?'<span style="background:#d1fae5;color:#065f46;font-size:.62rem;padding:1px 6px;border-radius:5px;margin-right:3px">🕐 بالساعة</span>':''}
+          ${!r.childId&&!(r.hourFee>0)?'<span style="background:#fef3c7;color:#92400e;font-size:.62rem;padding:1px 5px;border-radius:5px;margin-right:3px">👶 زائر</span>':''}
+          ${r.childId?'':''}
         </div>
         <div style="font-size:.68rem;color:var(--muted)">${r.className||''} · #${r.receiptNum}</div>
       </div>
