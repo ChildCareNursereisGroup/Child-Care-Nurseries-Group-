@@ -9486,28 +9486,61 @@ function renderVisitors(){
 
 function openVisitorModal(id){
   const v = id ? (DB.visitors||[]).find(x=>String(x.id)===String(id)) : null;
-  el('vis-id').value         = id||'';
-  el('vis-name').value       = v?.name||'';
-  el('vis-dob').value        = v?.dob||'';
-  el('vis-gender').value     = v?.gender||'Female';
-  el('vis-nat').value        = v?.nationality||'';
-  el('vis-mom').value        = v?.phone_mom||'';
-  el('vis-dad').value        = v?.phone_dad||'';
-  el('vis-notes').value      = v?.notes||'';
-  el('vis-manager').value    = v?.manager_name||'';
-  el('vis-visit-date').value = v?.visit_date||today();
-  // Auto-fill branch name
+  if(!v && id){ alert('❌ لم يتم العثور على الزائر'); return; }
+  // Fill modal fields
+  el('vmod-id').value      = id||'';
+  el('vmod-name').value    = v?.name||'';
+  el('vmod-dob').value     = v?.dob||'';
+  el('vmod-gender').value  = v?.gender||'Female';
+  el('vmod-nat').value     = v?.nationality||'';
+  el('vmod-mom').value     = v?.phone_mom||'';
+  el('vmod-dad').value     = v?.phone_dad||'';
+  el('vmod-notes').value   = v?.notes||'';
+  el('vmod-manager').value = v?.manager_name||'';
+  el('vmod-visit').value   = v?.visit_date||today();
+  el('vmod-alert').innerHTML='';
+  const titleEl=el('vis-modal-title');
+  if(titleEl) titleEl.textContent = v ? '✏️ تعديل: '+v.name : '📋 زائر جديد';
+  // Show modal
+  const modal=el('vis-edit-modal');
+  modal.style.display='flex';
+  setTimeout(()=>el('vmod-name').focus(),200);
+}
+
+function closeVisModal(){
+  el('vis-edit-modal').style.display='none';
+}
+
+async function saveVisModal(){
+  const name=(el('vmod-name')?.value||'').trim().replace(/\s+/g,' ');
+  if(!name){ el('vmod-alert').innerHTML='<span style="color:red">❌ أدخل اسم الطفل</span>'; return; }
+  const id=el('vmod-id').value;
   const b=CB();
-  const branchEl=el('vis-branch');
-  if(branchEl) branchEl.value=(lang==='ar'?b.ar:b.en)||b.ar||b.en||'';
-  // Update form title
-  const titleEl=el('vis-form-title');
-  if(titleEl) titleEl.textContent=id?'✏️ تعديل الاستفسار — Edit Inquiry':'📋 استفسار جديد — New Inquiry';
-  el('vis-alert').innerHTML='';
-  // Scroll to form
-  const card=el('inquiry-form-card');
-  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
-  setTimeout(()=>el('vis-name').focus(),300);
+  const row={
+    branch_id:    curBid,
+    name,
+    dob:          el('vmod-dob')?.value||null,
+    gender:       el('vmod-gender')?.value||'Female',
+    nationality:  el('vmod-nat')?.value||'',
+    phone_mom:    el('vmod-mom')?.value||'',
+    phone_dad:    el('vmod-dad')?.value||'',
+    notes:        el('vmod-notes')?.value||'',
+    manager_name: el('vmod-manager')?.value||'',
+    visit_date:   el('vmod-visit')?.value||today(),
+    branch_name:  (lang==='ar'?b.ar:b.en)||b.ar||b.en||'',
+  };
+  setSyncing(true);
+  let error;
+  if(id){
+    ({error}=await sb.from('visitors').update(row).eq('id',id));
+  } else {
+    ({error}=await sb.from('visitors').insert(row));
+  }
+  setSyncing(false);
+  if(error){ el('vmod-alert').innerHTML='<span style="color:red">❌ '+error.message+'</span>'; return; }
+  closeVisModal();
+  await loadVisitors();
+  renderVisitors();
 }
 
 function resetInquiryForm(){
@@ -12210,6 +12243,65 @@ boot();
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ══ VISITOR EDIT MODAL ══ -->
+<div id="vis-edit-modal" onclick="if(event.target===this)closeVisModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:14px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:800;font-size:1rem" id="vis-modal-title">✏️ تعديل بيانات الزائر</div>
+      <button onclick="closeVisModal()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:16px">
+      <input type="hidden" id="vmod-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="grid-column:1/-1">
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">اسم الطفل / Child Name *</label>
+          <input id="vmod-name" type="text" placeholder="الاسم الكامل" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">تاريخ الميلاد / DOB</label>
+          <input id="vmod-dob" type="date" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">الجنس / Gender</label>
+          <select id="vmod-gender" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+            <option value="Female">👧 أنثى — Female</option>
+            <option value="Male">👦 ذكر — Male</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">الجنسية / Nationality</label>
+          <input id="vmod-nat" type="text" placeholder="e.g. Emirati" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📱 رقم الأم / Mother</label>
+          <input id="vmod-mom" type="tel" placeholder="+971 50 000 0000" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📱 رقم الأب / Father</label>
+          <input id="vmod-dad" type="tel" placeholder="+971 50 000 0000" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📅 تاريخ الزيارة / Visit Date</label>
+          <input id="vmod-visit" type="date" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">👔 المدير / Manager</label>
+          <input id="vmod-manager" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 ملاحظات / Notes</label>
+          <textarea id="vmod-notes" rows="2" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box;resize:vertical"></textarea>
+        </div>
+      </div>
+      <div id="vmod-alert" style="margin-bottom:8px;font-size:.82rem"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveVisModal()" style="flex:1;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">💾 حفظ التعديلات</button>
+        <button onclick="closeVisModal()" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.88rem">إلغاء</button>
+      </div>
+    </div>
   </div>
 </div>
 
