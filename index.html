@@ -815,6 +815,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
         <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusReport()">🚌 Bus Report</button>
         <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
+        <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 كشف الرحلة</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
@@ -5719,7 +5720,343 @@ async function updateField(field,value){
   const dbField=map[field]||field;
   await sb.from('children').update({[dbField]:value}).eq('id',curChild);
 }
-// ── Bus field show/hide ───────────────────────
+// ══ BUS TRIP SHEET — FULL SYSTEM ═════════════════
+let _tripTab = 'pick';
+let _tripAttCache = {}; // key: "date|type" → {childId → status}
+
+async function openBusTripSheet(){
+  el('trip-date').value = today();
+  const sel = el('trip-branch-filter');
+  sel.innerHTML = `<option value="all">كل الفروع — All Branches</option>`
+    + BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('');
+  await loadAllBuses();
+  await loadAllBusAssignments();
+  DB.allChildren = null; // force fresh load
+  await loadAllChildren();
+  _tripTab = 'pick';
+  switchTripTab('pick');
+  el('bus-trip-modal').style.display = 'flex';
+}
+
+async function loadAllBuses(){
+  const {data} = await sb.from('buses').select('*');
+  DB.allBuses = (data||[]).map(x=>({
+    id:x.id, branchId:x.branch_id,
+    busNumber:x.bus_number||'',
+    driverName:x.driver_name||'',
+    driverContact:x.driver_contact||'',
+    assistantName:x.assistant_name||'',
+  }));
+}
+
+async function loadAllChildren(){
+  const {data} = await sb.from('children').select('*').is('leave_date',null);
+  DB.allChildren = (data||[]).map(x=>({
+    id:String(x.id), branchId:x.branch_id,
+    name:x.name||'', className:x.class_name||'',
+    bus:x.bus||'No',
+    busDirection:x.bus_direction||'',
+    busPickDrop:x.bus_pick_drop||'',
+    busArea:x.bus_area||'',
+    parentMom:x.parent_mom||'',
+  }));
+}
+
+async function loadAllBusAssignments(){
+  const {data} = await sb.from('bus_assignments').select('*');
+  // Map: childId → {busId, busNumber}
+  DB.busAssignments = {};
+  (data||[]).forEach(r=>{
+    DB.busAssignments[String(r.child_id)] = {
+      busId: String(r.bus_id||''),
+      busNumber: r.bus_number||''
+    };
+  });
+}
+
+async function loadTripAttendance(tripDate, tripType){
+  const key = `${tripDate}|${tripType}`;
+  if(_tripAttCache[key]) return _tripAttCache[key];
+  const {data} = await sb.from('bus_trip_attendance')
+    .select('*').eq('trip_date', tripDate).eq('trip_type', tripType);
+  const map = {};
+  (data||[]).forEach(r=>{ map[String(r.child_id)] = r.status||'present'; });
+  _tripAttCache[key] = map;
+  return map;
+}
+
+async function saveTripAttendance(tripDate, tripType, childId, busId, busNumber, status){
+  const key = `${tripDate}|${tripType}`;
+  if(!_tripAttCache[key]) _tripAttCache[key] = {};
+  _tripAttCache[key][String(childId)] = status;
+  await sb.from('bus_trip_attendance').upsert({
+    trip_date: tripDate,
+    trip_type: tripType,
+    child_id: Number(childId),
+    bus_id: busId ? Number(busId) : null,
+    bus_number: busNumber||'',
+    status: status
+  }, {onConflict:'trip_date,trip_type,child_id'});
+}
+
+async function assignChildToBus(childId, busId, busNumber){
+  DB.busAssignments = DB.busAssignments||{};
+  DB.busAssignments[String(childId)] = {busId:String(busId), busNumber};
+  await sb.from('bus_assignments').upsert({
+    child_id: Number(childId),
+    bus_id: Number(busId),
+    bus_number: busNumber
+  }, {onConflict:'child_id'});
+}
+
+function switchTripTab(tab){
+  _tripTab = tab;
+  const pickBtn = el('trip-tab-pick');
+  const dropBtn = el('trip-tab-drop');
+  const on = 'flex:1;padding:8px;border-radius:9px;border:2px solid VAR;background:VAR;color:#fff;cursor:pointer;font-family:\'Tajawal\',sans-serif;font-weight:800;font-size:.85rem';
+  const off = 'flex:1;padding:8px;border-radius:9px;border:2px solid #e5e7eb;background:#f9fafb;color:#6b7280;cursor:pointer;font-family:\'Tajawal\',sans-serif;font-weight:800;font-size:.85rem';
+  if(tab==='pick'){
+    pickBtn.style.cssText = on.replace(/VAR/g,'#10b981');
+    dropBtn.style.cssText = off;
+  } else {
+    dropBtn.style.cssText = on.replace(/VAR/g,'#ef4444');
+    pickBtn.style.cssText = off;
+  }
+  renderBusTripSheet();
+}
+
+async function renderBusTripSheet(){
+  const body = el('bus-trip-body');
+  body.innerHTML = `<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>`;
+
+  if(!DB.allChildren) await loadAllChildren();
+  if(!DB.allBuses)    await loadAllBuses();
+  if(!DB.busAssignments) await loadAllBusAssignments();
+
+  const branchFilter = el('trip-branch-filter')?.value||'all';
+  const tripDate     = el('trip-date')?.value||today();
+  const tab          = _tripTab;
+  const tabColor     = tab==='pick'?'#10b981':'#ef4444';
+  const tabLabel     = tab==='pick'?'🟢 Pick — استقبال':'🔴 Drop — إيصال';
+  const dateLabel    = new Date(tripDate+'T00:00:00').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Load saved attendance for this date/type
+  const attMap = await loadTripAttendance(tripDate, tab);
+
+  // Filter children
+  let children = (DB.allChildren||[]).filter(c=>c.bus==='Yes'||c.bus==='نعم');
+  if(branchFilter!=='all') children = children.filter(c=>c.branchId===branchFilter);
+  const tabChildren = children.filter(c=>{
+    if(c.busDirection==='two_way') return true;
+    if(c.busDirection==='one_way'&&tab==='pick'&&c.busPickDrop==='pick') return true;
+    if(c.busDirection==='one_way'&&tab==='drop'&&c.busPickDrop==='drop') return true;
+    if(!c.busDirection) return true;
+    return false;
+  });
+
+  if(!tabChildren.length){
+    body.innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">
+      <div style="font-size:2rem;margin-bottom:8px">🚌</div>
+      <div style="font-weight:700">لا يوجد أطفال في هذا الكشف</div>
+    </div>`;
+    return;
+  }
+
+  const availBuses = (DB.allBuses||[]).filter(b=>branchFilter==='all'||b.branchId===branchFilter);
+
+  // Group children by assigned bus → fallback to busArea
+  const busGroups = {}; // busKey → {busInfo|null, area, children[]}
+  tabChildren.forEach(c=>{
+    const assign  = (DB.busAssignments||{})[String(c.id)];
+    const busKey  = assign?.busNumber || (c.busArea||'').trim() || 'غير محددة';
+    const busInfo = assign ? (availBuses.find(b=>b.busNumber===assign.busNumber)||null) : null;
+    if(!busGroups[busKey]) busGroups[busKey]={busKey, busInfo, children:[]};
+    // Try to resolve busInfo from allBuses if not yet
+    if(!busGroups[busKey].busInfo && assign){
+      busGroups[busKey].busInfo = availBuses.find(b=>b.busNumber===assign.busNumber)||null;
+    }
+    busGroups[busKey].children.push(c);
+  });
+
+  const sortedKeys = Object.keys(busGroups).sort((a,b)=>{
+    if(a==='غير محددة') return 1;
+    if(b==='غير محددة') return -1;
+    return a.localeCompare(b,'ar');
+  });
+
+  const presentTotal = tabChildren.filter(c=>!attMap[c.id]||attMap[c.id]==='present').length;
+  const absentTotal  = tabChildren.filter(c=>attMap[c.id]==='absent').length;
+
+  let html = `
+    <div style="background:${tab==='pick'?'#ecfdf5':'#fef2f2'};border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:900;font-size:.92rem;color:${tabColor}">${tabLabel} — ${dateLabel}</div>
+      <div style="display:flex;gap:10px;font-size:.82rem">
+        <span style="background:#d1fae5;color:#065f46;padding:2px 9px;border-radius:8px;font-weight:800">✅ ${presentTotal}</span>
+        <span style="background:#fee2e2;color:#991b1b;padding:2px 9px;border-radius:8px;font-weight:800">❌ ${absentTotal}</span>
+        <span style="background:#f3f4f6;color:#374151;padding:2px 9px;border-radius:8px;font-weight:800">👶 ${tabChildren.length}</span>
+      </div>
+    </div>`;
+
+  sortedKeys.forEach(busKey=>{
+    const grp  = busGroups[busKey];
+    const info = grp.busInfo;
+    const kids = grp.children.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+    const grpPresent = kids.filter(c=>!attMap[c.id]||attMap[c.id]==='present').length;
+
+    html += `
+      <div style="border:2px solid ${tabColor}44;border-radius:12px;margin-bottom:14px;overflow:hidden">
+        <div style="background:${tabColor}15;border-bottom:2px solid ${tabColor}33;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="font-weight:900;font-size:.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="background:${tabColor};color:#fff;padding:3px 11px;border-radius:9px;font-size:.85rem">🚌 ${busKey}</span>
+            ${info?.driverName?`<span style="font-size:.75rem;color:#374151">👨‍✈️ ${info.driverName}</span>`:''}
+            ${info?.driverContact?`<span style="font-size:.75rem;color:#374151">📞 ${info.driverContact}</span>`:''}
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:.75rem;color:#374151">✅ ${grpPresent}/${kids.length}</span>
+            ${busKey==='غير محددة'?'':
+              `<select onchange="reassignGroupToBus('${busKey}',this.value,'${tab}','${tripDate}')"
+                style="font-size:.72rem;padding:3px 6px;border:1px solid #d1d5db;border-radius:6px;font-family:'Tajawal',sans-serif">
+                <option value="">🔀 نقل الكل لباص...</option>
+                ${availBuses.map(b=>`<option value="${b.id}|${b.busNumber}">${b.busNumber}</option>`).join('')}
+              </select>`
+            }
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+          <thead>
+            <tr style="background:#f8fafc">
+              <th style="padding:6px 8px;text-align:right;width:28px">#</th>
+              <th style="padding:6px 8px;text-align:right">اسم الطفل</th>
+              <th style="padding:6px 8px;text-align:right">الفصل</th>
+              <th style="padding:6px 8px;text-align:right">الفرع</th>
+              <th style="padding:6px 8px;text-align:right">المنطقة</th>
+              <th style="padding:6px 8px;text-align:right">الباص</th>
+              <th style="padding:6px 8px;text-align:center;width:80px">الحضور</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${kids.map((c,i)=>{
+              const br     = BRANCHES.find(b=>b.id===c.branchId);
+              const status = attMap[String(c.id)]||'present';
+              const assign = (DB.busAssignments||{})[String(c.id)];
+              const rowBg  = status==='absent'?'background:#fff5f5':i%2===0?'background:#fafafa':'background:#fff';
+              return `<tr style="${rowBg}">
+                <td style="padding:6px 8px;color:#9ca3af">${i+1}</td>
+                <td style="padding:6px 8px;font-weight:700">${c.name}</td>
+                <td style="padding:6px 8px;color:#374151">${c.className||'—'}</td>
+                <td style="padding:6px 8px">
+                  ${br?`<span style="background:${br.l||'#f3f4f6'};color:${br.c||'#374151'};font-size:.67rem;padding:1px 6px;border-radius:5px;font-weight:700">${br.icon} ${br.ar}</span>`:'—'}
+                </td>
+                <td style="padding:6px 8px;color:#6b7280;font-size:.75rem">${c.busArea||'—'}</td>
+                <td style="padding:6px 8px">
+                  <select onchange="changeChildBus('${c.id}',this.value,'${tab}','${tripDate}')"
+                    style="font-size:.72rem;padding:2px 5px;border:1px solid #d1d5db;border-radius:6px;font-family:'Tajawal',sans-serif;max-width:90px">
+                    <option value="">— اختر —</option>
+                    ${availBuses.map(b=>`<option value="${b.id}|${b.busNumber}" ${assign?.busNumber===b.busNumber?'selected':''}>${b.busNumber}</option>`).join('')}
+                  </select>
+                </td>
+                <td style="padding:6px 8px;text-align:center">
+                  <button onclick="toggleTripAtt('${c.id}','${assign?.busId||''}','${assign?.busNumber||busKey}','${tab}','${tripDate}',this)"
+                    style="border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.82rem;font-weight:800;font-family:'Tajawal',sans-serif;background:${status==='present'?'#d1fae5':'#fee2e2'};color:${status==='present'?'#065f46':'#991b1b'}">
+                    ${status==='present'?'✅ حضر':'❌ غاب'}
+                  </button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  });
+
+  html += `
+    <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px 14px;text-align:center;font-weight:900;color:${tabColor}">
+      🚌 ${tabLabel}: ${tabChildren.length} طفل | ✅ حضر: ${presentTotal} | ❌ غاب: ${absentTotal}
+    </div>`;
+
+  body.innerHTML = html;
+  window._tripSheetData = {tabChildren, tripDate, dateLabel, tab, sortedKeys, busGroups, availBuses, attMap};
+}
+
+async function toggleTripAtt(childId, busId, busNumber, tripType, tripDate, btn){
+  const key   = `${tripDate}|${tripType}`;
+  const cur   = (_tripAttCache[key]||{})[String(childId)]||'present';
+  const next  = cur==='present'?'absent':'present';
+  btn.style.background = next==='present'?'#d1fae5':'#fee2e2';
+  btn.style.color      = next==='present'?'#065f46':'#991b1b';
+  btn.textContent      = next==='present'?'✅ حضر':'❌ غاب';
+  const row = btn.closest('tr');
+  if(row) row.style.background = next==='absent'?'#fff5f5':'';
+  await saveTripAttendance(tripDate, tripType, childId, busId, busNumber, next);
+  // Update summary counters
+  renderBusTripSheet();
+}
+
+async function changeChildBus(childId, val, tripType, tripDate){
+  if(!val) return;
+  const [busId, busNumber] = val.split('|');
+  await assignChildToBus(childId, busId, busNumber);
+  renderBusTripSheet();
+}
+
+async function reassignGroupToBus(fromBusKey, val, tripType, tripDate){
+  if(!val) return;
+  const [busId, busNumber] = val.split('|');
+  const grp = window._tripSheetData?.busGroups?.[fromBusKey];
+  if(!grp) return;
+  for(const c of grp.children){
+    await assignChildToBus(c.id, busId, busNumber);
+  }
+  renderBusTripSheet();
+}
+
+function printBusTripSheet(which){
+  (async()=>{
+    const tripDate  = el('trip-date')?.value||today();
+    const dateLabel = new Date(tripDate+'T00:00:00').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+    const snap = async (tab) => {
+      _tripTab = tab;
+      await renderBusTripSheet();
+      // Strip interactive controls from print output
+      let h = el('bus-trip-body')?.innerHTML||'';
+      h = h.replace(/<select[^>]*onchange="changeChildBus[^"]*"[\s\S]*?<\/select>/g, d=>{
+        const m = d.match(/selected[^>]*>([^<]+)<\/option>/);
+        return m ? `<span style="font-size:.75rem;font-weight:700">${m[1]}</span>` : '—';
+      });
+      h = h.replace(/<select[^>]*onchange="reassignGroupToBus[^"]*"[\s\S]*?<\/select>/g,'');
+      h = h.replace(/<button[^>]*onclick="toggleTripAtt[^"]*"[^>]*>([\s\S]*?)<\/button>/g,
+        (m,txt)=>`<div style="width:26px;height:26px;border:2px solid #d1d5db;border-radius:5px;margin:0 auto;${txt.includes('❌')?'background:#fee2e2':''}"></div>`);
+      return h;
+    };
+
+    let content = '';
+    if(which==='pick') content = await snap('pick');
+    else if(which==='drop') content = await snap('drop');
+    else {
+      const ph = await snap('pick');
+      const dh = await snap('drop');
+      content = `<div style="page-break-after:always"><h2 style="color:#10b981;margin-bottom:10px;font-family:'Tajawal',sans-serif">🟢 Pick — استقبال | ${dateLabel}</h2>${ph}</div>
+                 <div><h2 style="color:#ef4444;margin-bottom:10px;font-family:'Tajawal',sans-serif">🔴 Drop — إيصال | ${dateLabel}</h2>${dh}</div>`;
+      _tripTab='pick'; renderBusTripSheet();
+    }
+
+    const w = window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Tajawal',sans-serif;padding:14px;font-size:.8rem;direction:rtl;color:#111}
+        table{width:100%;border-collapse:collapse;margin-top:4px}
+        th,td{border:1px solid #d1d5db;padding:5px 8px}
+        thead tr{background:#f3f4f6}
+        @page{margin:8mm;size:A4} @media print{body{padding:2px}}
+      </style></head><body>${content}
+      <script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.close();
+  })();
+}
+
+// ══ BUS CHILDREN REPORT ═══════════════════════
 function toggleBusFields(mode){
   const val = el('fbus')?.value;
   const extra = el('fbus-extra');
@@ -12908,6 +13245,42 @@ boot();
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ══ BUS TRIP SHEET MODAL ══ -->
+<div id="bus-trip-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:700px;max-height:94vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:14px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:900;font-size:1rem">📋 كشف رحلة الباص — Daily Bus Trip Sheet</div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <button onclick="printBusTripSheet('pick')" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.75rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ Pick</button>
+        <button onclick="printBusTripSheet('drop')" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.75rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ Drop</button>
+        <button onclick="printBusTripSheet('both')" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.75rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ الكل</button>
+        <button onclick="el('bus-trip-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <!-- Filters -->
+    <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:.8rem;font-weight:700;color:#374151">📅 التاريخ:</label>
+        <input type="date" id="trip-date" style="padding:5px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.83rem">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:.8rem;font-weight:700;color:#374151">🔍 الفروع:</label>
+        <select id="trip-branch-filter" onchange="renderBusTripSheet()" style="padding:5px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.83rem">
+          <option value="all">كل الفروع — All Branches</option>
+        </select>
+      </div>
+      <button onclick="renderBusTripSheet()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700">🔄 تحديث</button>
+    </div>
+    <!-- Tab toggle Pick/Drop -->
+    <div style="padding:10px 16px 0;display:flex;gap:8px">
+      <button id="trip-tab-pick" onclick="switchTripTab('pick')" style="flex:1;padding:8px;border-radius:9px;border:2px solid #10b981;background:#10b981;color:#fff;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:800;font-size:.85rem">🟢 Pick — استقبال</button>
+      <button id="trip-tab-drop" onclick="switchTripTab('drop')" style="flex:1;padding:8px;border-radius:9px;border:2px solid #e5e7eb;background:#f9fafb;color:#6b7280;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:800;font-size:.85rem">🔴 Drop — إيصال</button>
+    </div>
+    <div id="bus-trip-body" style="padding:14px 16px 20px"></div>
   </div>
 </div>
 
