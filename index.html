@@ -363,10 +363,35 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="fg"><label data-t="monthlyPayment">Monthly Payment (AED)</label><input type="number" id="ffee" placeholder="0" onchange="calcWeekendTotal()"></div>
     <div class="fg"><label data-t="transportPayment">Transportation Payment (AED)</label><input type="number" id="fbfee" placeholder="0" onchange="calcWeekendTotal()"></div>
     <div class="fg"><label data-t="useBus">Use Bus</label>
-      <select id="fbus" onchange="calcWeekendTotal()">
+      <select id="fbus" onchange="toggleBusFields('add');calcWeekendTotal()">
         <option value="No">No 🚶</option>
         <option value="Yes">Yes 🚌</option>
       </select>
+    </div>
+  </div>
+  <!-- Bus extra fields -->
+  <div id="fbus-extra" style="display:none;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:10px 12px;margin-bottom:9px">
+    <div style="font-size:.78rem;font-weight:800;color:#92400e;margin-bottom:8px">🚌 تفاصيل الباص — Bus Details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="fg" style="margin:0">
+        <label style="font-size:.75rem">الاتجاه / Direction</label>
+        <select id="fbus-dir" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box" onchange="togglePickDrop('add')">
+          <option value="">-- اختر --</option>
+          <option value="two_way">🔄 اتجاهين — Two Way</option>
+          <option value="one_way">↔️ اتجاه واحد — One Way</option>
+        </select>
+      </div>
+      <div class="fg" id="fbus-pickdrop-wrap" style="margin:0;display:none">
+        <label style="font-size:.75rem">Pick أو Drop؟</label>
+        <select id="fbus-pickdrop" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box">
+          <option value="pick">🟢 Pick (استقبال)</option>
+          <option value="drop">🔴 Drop (إيصال)</option>
+        </select>
+      </div>
+      <div class="fg" style="margin:0;grid-column:1/-1">
+        <label style="font-size:.75rem">منطقة السكن / Area</label>
+        <input id="fbus-area" type="text" placeholder="e.g. Al Nahda, Muwaileh..." style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box">
+      </div>
     </div>
   </div>
   <!-- Total summary -->
@@ -789,6 +814,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <span style="font-weight:800;color:var(--err)">إجمالي: <span id="exptot">0</span> د.إ</span>
         <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
         <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusReport()">🚌 Bus Report</button>
+        <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
@@ -1965,7 +1991,8 @@ async function loadFromSupa(bid) {
       joinDate:x.join_date||null, leaveDate:x.leave_date||null,
       parentMom:x.parent_mom||'', parentDad:x.parent_dad||'', email:x.email||'',
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
-      bus:x.bus||'No', notes:x.notes||'', branchId:x.branch_id
+      bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
+      notes:x.notes||'', branchId:x.branch_id
     }));
     DB.receipts = (r.data||[]).map(x=>({
       id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
@@ -2796,6 +2823,9 @@ async function saveChild(){
     fee:Number(el('ffee').value)||0,
     bus_fee:Number(el('fbfee').value)||0,
     bus:el('fbus').value,
+    bus_direction: el('fbus').value==='Yes' ? (el('fbus-dir')?.value||'') : '',
+    bus_pick_drop: el('fbus').value==='Yes' && el('fbus-dir')?.value==='one_way' ? (el('fbus-pickdrop')?.value||'') : '',
+    bus_area: el('fbus').value==='Yes' ? (el('fbus-area')?.value?.trim()||'') : '',
     notes:v('fnotes')
   };
   const {data,error}=await sb.from('children').insert(row).select().single();
@@ -2809,6 +2839,11 @@ async function saveChild(){
 function clearAdd(){
   ['fn','fc','fr','fidnum','fnat','fdob','fktime','fmom','fdad','femail','ffee','fbfee','fnotes'].forEach(i=>el(i).value='');
   el('fgender').value='Female';el('frel').value='Muslim';el('fbus').value='No';
+  if(el('fbus-dir'))el('fbus-dir').value='';
+  if(el('fbus-pickdrop'))el('fbus-pickdrop').value='pick';
+  if(el('fbus-area'))el('fbus-area').value='';
+  if(el('fbus-extra'))el('fbus-extra').style.display='none';
+  if(el('fbus-pickdrop-wrap'))el('fbus-pickdrop-wrap').style.display='none';
   initAddForm();
 }
 
@@ -2955,6 +2990,22 @@ async function saveReceipt(){
     vat_type:vatType,vat_amount:vatAmt,pay_method:payMethod,
     total,notes:v('rnotes')
   };
+  // ── Duplicate check ──────────────────────────
+  const dupRec = DB.receipts.find(r=>
+    r.branch_id === curBid &&
+    String(r.receiptNum||r.receipt_num||'') === String(rNum) &&
+    (r.childId||r.child_id||'') === ((!isGuest&&!isVisitor)?String(childId):'') &&
+    (r.date||'') === rDate &&
+    Math.abs((r.total||0) - total) < 0.01
+  );
+  if(dupRec){
+    showAlert('recalert', lang==='ar'
+      ? `⚠️ هذه الفاتورة مسجلة مسبقاً! (رقم ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} د.إ)`
+      : `⚠️ Duplicate receipt detected! (No. ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} AED)`, true);
+    setSyncing(false);
+    return;
+  }
+  // ─────────────────────────────────────────────
   const {error}=await sb.from('receipts').insert(row);
   setSyncing(false);
   if(error){showAlert('recalert','❌ خطأ: '+error.message,true);return;}
@@ -4677,6 +4728,24 @@ async function saveExp(){
     supplier_name:supplier, tax_number:taxNum,
     extra
   };
+  // ── Duplicate check ──────────────────────────
+  const dupExp = DB.expenses.find(e=>
+    e.branch_id === curBid &&
+    e.category === expCat &&
+    (e.date||'') === date &&
+    Math.abs((e.totalAmount||e.amount||0) - totalWithVat) < 0.01 &&
+    (e.supplierName||'') === (supplier||'') &&
+    (e.subType||'') === subType
+  );
+  if(dupExp){
+    const catLabel = typeof cat.ar==='function'?cat.ar():cat.ar;
+    showAlert('expalert', lang==='ar'
+      ? `⚠️ هذا المصروف مسجل مسبقاً! (${catLabel} — ${fmtDate(date)} — ${fmtNum(totalWithVat)} د.إ)`
+      : `⚠️ Duplicate expense detected! (${catLabel} — ${fmtDate(date)} — ${fmtNum(totalWithVat)} AED)`, true);
+    setSyncing(false);
+    return;
+  }
+  // ─────────────────────────────────────────────
   const {error}=await sb.from('expenses').insert(row);
   setSyncing(false);
   if(error){showAlert('expalert','❌ خطأ: '+error.message,true);return;}
@@ -5063,10 +5132,39 @@ function showDTab(tab,btn){
         <div class="fg"><label data-t="monthlyPayment">Monthly Payment (AED)</label><input type="number" value="${c.fee||0}" onchange="updateField('fee',Number(this.value))"></div>
         <div class="fg"><label data-t="transportPayment">Transportation Payment (AED)</label><input type="number" value="${c.busFee||0}" onchange="updateField('busFee',Number(this.value))"></div>
         <div class="fg"><label data-t="useBus">Use Bus</label>
-          <select onchange="updateField('bus',this.value)">
+          <select onchange="updateField('bus',this.value);toggleBusFieldsEdit(this.value)">
             <option value="No" ${c.bus==='No'?'selected':''}>No 🚶</option>
             <option value="Yes" ${c.bus==='Yes'?'selected':''}>Yes 🚌</option>
           </select>
+        </div>
+        <!-- Bus extra fields in edit -->
+        <div id="edit-bus-extra" style="grid-column:1/-1;${c.bus==='Yes'?'':'display:none;'}background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:10px 12px">
+          <div style="font-size:.78rem;font-weight:800;color:#92400e;margin-bottom:8px">🚌 تفاصيل الباص</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="fg" style="margin:0">
+              <label style="font-size:.75rem">الاتجاه / Direction</label>
+              <select id="edit-bus-dir" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box"
+                onchange="updateField('busDirection',this.value);togglePickDropEdit(this.value)">
+                <option value="" ${!c.busDirection?'selected':''}>-- اختر --</option>
+                <option value="two_way" ${c.busDirection==='two_way'?'selected':''}>🔄 اتجاهين — Two Way</option>
+                <option value="one_way" ${c.busDirection==='one_way'?'selected':''}>↔️ اتجاه واحد — One Way</option>
+              </select>
+            </div>
+            <div class="fg" id="edit-bus-pickdrop-wrap" style="margin:0;${c.busDirection==='one_way'?'':'display:none;'}">
+              <label style="font-size:.75rem">Pick أو Drop؟</label>
+              <select id="edit-bus-pickdrop" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box"
+                onchange="updateField('busPickDrop',this.value)">
+                <option value="pick" ${c.busPickDrop==='pick'?'selected':''}>🟢 Pick (استقبال)</option>
+                <option value="drop" ${c.busPickDrop==='drop'?'selected':''}>🔴 Drop (إيصال)</option>
+              </select>
+            </div>
+            <div class="fg" style="margin:0;grid-column:1/-1">
+              <label style="font-size:.75rem">منطقة السكن / Area</label>
+              <input id="edit-bus-area" type="text" value="${c.busArea||''}" placeholder="e.g. Al Nahda, Muwaileh..."
+                style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box"
+                onchange="updateField('busArea',this.value)">
+            </div>
+          </div>
         </div>
         <div class="fg"><label>Leave Date</label><input type="date" value="${c.leaveDate||''}" onchange="updateField('leaveDate',this.value||null)"></div>
         <!-- Weekend Fees -->
@@ -5613,12 +5711,153 @@ async function updateField(field,value){
     nationality:'nationality', religion:'religion', dob:'dob', kidsTime:'kids_time',
     joinDate:'join_date', leaveDate:'leave_date',
     parentMom:'parent_mom', parentDad:'parent_dad', email:'email', dutyDays:'duty_days', friFee:'fri_fee', satFee:'sat_fee', sunFee:'sun_fee',
-    fee:'fee', busFee:'bus_fee', bus:'bus', notes:'notes'
+    fee:'fee', busFee:'bus_fee', bus:'bus',
+    busDirection:'bus_direction', busPickDrop:'bus_pick_drop', busArea:'bus_area',
+    notes:'notes'
   };
   c[field]=value;
   const dbField=map[field]||field;
   await sb.from('children').update({[dbField]:value}).eq('id',curChild);
 }
+// ── Bus field show/hide ───────────────────────
+function toggleBusFields(mode){
+  const val = el('fbus')?.value;
+  const extra = el('fbus-extra');
+  const pdWrap = el('fbus-pickdrop-wrap');
+  if(extra) extra.style.display = val==='Yes'?'block':'none';
+  if(val!=='Yes'&&pdWrap) pdWrap.style.display='none';
+}
+function togglePickDrop(mode){
+  const dir = el('fbus-dir')?.value;
+  const wrap = el('fbus-pickdrop-wrap');
+  if(wrap) wrap.style.display = dir==='one_way'?'block':'none';
+}
+function toggleBusFieldsEdit(val){
+  const extra = el('edit-bus-extra');
+  if(extra) extra.style.display = val==='Yes'?'block':'none';
+}
+function togglePickDropEdit(dir){
+  const wrap = el('edit-bus-pickdrop-wrap');
+  if(wrap) wrap.style.display = dir==='one_way'?'block':'none';
+}
+
+// ── Bus Children Report ───────────────────────
+function openBusChildrenReport(){
+  const mon = el('efmon')?.value || today().slice(0,7);
+  el('bus-ch-rpt-mon').value = mon;
+  renderBusChildrenReport();
+  el('bus-ch-rpt-modal').style.display='flex';
+}
+
+function renderBusChildrenReport(){
+  const mon = el('bus-ch-rpt-mon')?.value || today().slice(0,7);
+  const dirFilter = el('bus-ch-dir-filter')?.value||'all';
+
+  let children = DB.children.filter(c=>c.bus==='Yes'||c.bus==='نعم');
+  if(dirFilter==='two_way') children=children.filter(c=>c.busDirection==='two_way');
+  else if(dirFilter==='one_way') children=children.filter(c=>c.busDirection==='one_way');
+  else if(dirFilter==='pick') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='pick');
+  else if(dirFilter==='drop') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='drop');
+
+  // Get receipts for that month
+  const monReceipts = DB.receipts.filter(r=>monthOf(r.date)===mon);
+
+  const dirLabel = v=>{
+    if(v==='two_way') return '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700">🔄 اتجاهين</span>';
+    if(v==='one_way') return '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700">↔️ اتجاه واحد</span>';
+    return '<span style="color:#9ca3af;font-size:.72rem">—</span>';
+  };
+  const pdLabel = (dir,pd)=>{
+    if(dir!=='one_way') return '';
+    if(pd==='pick') return '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;margin-right:4px">🟢 Pick</span>';
+    if(pd==='drop') return '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;margin-right:4px">🔴 Drop</span>';
+    return '';
+  };
+
+  const monLabel = new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+  const b = CB();
+  const totalBusFees = children.reduce((s,c)=>s+(c.busFee||0),0);
+  // Paid this month
+  const totalPaid = monReceipts.filter(r=>children.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+
+  if(!children.length){
+    el('bus-ch-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا يوجد أطفال يستخدمون الباص</div>`;
+    return;
+  }
+
+  let html=`
+    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:800">${b.ar||b.en} — ${monLabel}</div>
+      <div style="display:flex;gap:14px;font-size:.82rem">
+        <span>👶 <b>${children.length}</b> طفل</span>
+        <span>💰 رسوم شهرية: <b style="color:#b45309">${fmtNum(totalBusFees)} AED</b></span>
+        <span>✅ مدفوع هذا الشهر: <b style="color:#059669">${fmtNum(totalPaid)} AED</b></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+      <thead>
+        <tr style="background:#fbbf24;color:#1c1917">
+          <th style="padding:8px 10px;text-align:right">#</th>
+          <th style="padding:8px 10px;text-align:right">اسم الطفل</th>
+          <th style="padding:8px 10px;text-align:right">الفصل</th>
+          <th style="padding:8px 10px;text-align:right">الاتجاه</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:left">رسوم الباص</th>
+          <th style="padding:8px 10px;text-align:left">مدفوع (${mon})</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${children.map((c,i)=>{
+          const rec = monReceipts.find(r=>String(r.childId)===String(c.id));
+          const paid = rec ? (rec.bus||0) : 0;
+          return`<tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
+            <td style="padding:7px 10px;color:#9ca3af">${i+1}</td>
+            <td style="padding:7px 10px;font-weight:700">${c.name}</td>
+            <td style="padding:7px 10px;color:#6b7280">${c.className||'—'}</td>
+            <td style="padding:7px 10px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
+            <td style="padding:7px 10px;color:#374151">${c.busArea||'—'}</td>
+            <td style="padding:7px 10px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
+            <td style="padding:7px 10px;text-align:left;font-weight:700;color:${paid?'#059669':'#9ca3af'}">${paid?fmtNum(paid)+' AED':'—'}</td>
+          </tr>`;
+        }).join('')}
+        <tr style="background:#fef3c7;font-weight:900;border-top:2px solid #fbbf24">
+          <td colspan="5" style="padding:8px 10px;text-align:right">الإجمالي</td>
+          <td style="padding:8px 10px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
+          <td style="padding:8px 10px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
+        </tr>
+      </tbody>
+    </table></div>`;
+
+  el('bus-ch-rpt-body').innerHTML=html;
+  window._busChRptData={children,mon:monLabel,branchName:b.ar||b.en,monReceipts};
+}
+
+function printBusChildrenReport(){
+  const b=el('bus-ch-rpt-body')?.innerHTML||'';
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Bus Children Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>body{font-family:'Tajawal',sans-serif;padding:20px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e5e7eb;padding:6px 8px}@media print{body{padding:0}}</style>
+    </head><body>${b}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
+function exportBusChildrenExcel(){
+  const d=window._busChRptData;if(!d)return;
+  const dirMap={'two_way':'اتجاهين','one_way':'اتجاه واحد','':'غير محدد'};
+  const pdMap={'pick':'Pick استقبال','drop':'Drop إيصال','':'—'};
+  const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع هذا الشهر']];
+  d.children.forEach((c,i)=>{
+    const rec=d.monReceipts.find(r=>String(r.childId)===String(c.id));
+    rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Bus Children');
+  XLSX.writeFile(wb,`Bus_Children_${d.mon||''}.xlsx`);
+}
+
 async function deleteChild(){
   if(!confirm('حذف بيانات هذا الطفل نهائياً؟'))return;
   await sb.from('children').delete().eq('id',curChild);
@@ -10139,108 +10378,6 @@ async function confirmInactiveImport(){
   </div>`;
 }
 
-// ─── Bus Children Report ─────────────────────
-function printBusReport(){
-  const b = CB();
-  const mon = el('repmon').value || monthOf(new Date());
-  const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-
-  // Children using bus
-  const busKids = DB.children.filter(c =>
-    !c.leaveDate &&
-    (c.bus==='Yes' || c.bus==='نعم')
-  ).sort((a,b)=>a.name.localeCompare(b.name));
-
-  const fmtD = s => { if(!s)return'—'; const p=String(s).split('T')[0].split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
-
-  // Get bus fees from receipts for selected month
-  const getBusFee = (childId) => {
-    return DB.receipts
-      .filter(r => r.childId===childId && (r.date||'').startsWith(mon.substring(0,7)))
-      .reduce((s,r)=>s+(r.bus||0), 0);
-  };
-
-  let html = `<!DOCTYPE html><html dir="ltr"><head><meta charset="UTF-8">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Tajawal',Arial,sans-serif;padding:18px;font-size:.82rem;color:#111}
-    .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1e3a8a;padding-bottom:10px;margin-bottom:14px}
-    .title{font-size:1.2rem;font-weight:900;color:#1e3a8a}
-    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-    .sbox{border-radius:10px;padding:12px;text-align:center}
-    .sbox .n{font-size:1.6rem;font-weight:900}
-    .sbox .l{font-size:.72rem;margin-top:2px;opacity:.8}
-    table{width:100%;border-collapse:collapse;font-size:.8rem}
-    thead tr{background:#1e3a8a;color:#fff}
-    th{padding:8px 10px;text-align:left;font-weight:700}
-    tbody tr:nth-child(even){background:#f0f4ff}
-    tbody tr:hover{background:#dbeafe}
-    td{padding:7px 10px;border-bottom:1px solid #e5e7eb}
-    .fee{font-weight:700;color:#1e3a8a}
-    .no-fee{color:#9ca3af;font-style:italic}
-    @media print{@page{margin:10mm;size:A4}body{padding:5px}}
-  </style></head><body>
-  <div class="hdr">
-    <div>
-      <div class="title">🚌 Bus Children Report — تقرير أطفال المواصلات</div>
-      <div style="font-size:.82rem;color:#6b7280;margin-top:3px">${b.en||b.ar} | ${monLabel}</div>
-    </div>
-    <div style="text-align:right;font-size:.72rem;color:#9ca3af">Generated: ${new Date().toLocaleDateString('en-GB')}</div>
-  </div>
-
-  <div class="summary">
-    <div class="sbox" style="background:#dbeafe;color:#1e3a8a">
-      <div class="n">${busKids.length}</div>
-      <div class="l">🚌 Total Bus Children<br>إجمالي أطفال الباص</div>
-    </div>
-    <div class="sbox" style="background:#d1fae5;color:#065f46">
-      <div class="n">${fmtNum(busKids.reduce((s,c)=>s+getBusFee(c.id),0))}</div>
-      <div class="l">💰 Total Bus Fees AED<br>إجمالي رسوم الباص</div>
-    </div>
-    <div class="sbox" style="background:#fef3c7;color:#92400e">
-      <div class="n">${busKids.filter(c=>getBusFee(c.id)>0).length}</div>
-      <div class="l">✅ Paid This Month<br>دفعوا هذا الشهر</div>
-    </div>
-  </div>
-
-  <table>
-    <thead><tr>
-      <th>#</th>
-      <th>Child Name — اسم الطفل</th>
-      <th>Class — الفصل</th>
-      <th>Kids Time — ميعاد الطفل</th>
-      <th>Mother — رقم الأم</th>
-      <th>Father — رقم الأب</th>
-      <th>Bus Fee (${monLabel}) — رسوم الباص</th>
-    </tr></thead>
-    <tbody>`;
-
-  busKids.forEach((c,i)=>{
-    const fee = getBusFee(c.id);
-    html += `<tr>
-      <td style="color:#9ca3af;text-align:center">${i+1}</td>
-      <td><b>${c.name}</b></td>
-      <td><span style="background:#eff6ff;color:#1e3a8a;padding:2px 8px;border-radius:6px">${c.className||'—'}</span></td>
-      <td>${c.kidsTime||'—'}</td>
-      <td>${c.parentMom||'—'}</td>
-      <td>${c.parentDad||'—'}</td>
-      <td>${fee>0?`<span class="fee">🚌 ${fmtNum(fee)} AED</span>`:'<span class="no-fee">لم يُدفع</span>'}</td>
-    </tr>`;
-  });
-
-  if(!busKids.length){
-    html += `<tr><td colspan="7" style="text-align:center;padding:20px;color:#9ca3af">لا يوجد أطفال يستخدمون الباص</td></tr>`;
-  }
-
-  html += `</tbody></table></body></html>`;
-
-  const w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(), 600);
-}
-
 // ─── Show fee reminder btn for admin ──────────
 // ─── Fee Reminder Modal ───────────────────────
 function openFeeReminderModal(){
@@ -12771,6 +12908,33 @@ boot();
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ══ BUS CHILDREN REPORT MODAL ══ -->
+<div id="bus-ch-rpt-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:720px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:13px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:800;font-size:.95rem">🚌 تقرير أطفال الباص — Bus Children Report</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="printBusChildrenReport()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.78rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ Print</button>
+        <button onclick="exportBusChildrenExcel()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.78rem;padding:5px 10px;cursor:pointer;font-weight:700">📥 Excel</button>
+        <button onclick="el('bus-ch-rpt-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div style="padding:14px 16px 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:.8rem;font-weight:700">📅 الشهر:</label>
+      <input type="month" id="bus-ch-rpt-mon" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
+      <label style="font-size:.8rem;font-weight:700">🔄 الاتجاه:</label>
+      <select id="bus-ch-dir-filter" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
+        <option value="all">الكل — All</option>
+        <option value="two_way">🔄 اتجاهين</option>
+        <option value="one_way">↔️ اتجاه واحد</option>
+        <option value="pick">🟢 Pick فقط</option>
+        <option value="drop">🔴 Drop فقط</option>
+      </select>
+    </div>
+    <div id="bus-ch-rpt-body" style="padding:0 16px 16px"></div>
   </div>
 </div>
 
