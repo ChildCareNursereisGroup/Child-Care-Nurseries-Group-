@@ -788,6 +788,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <input type="month" id="efmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderExps()">
         <span style="font-weight:800;color:var(--err)">إجمالي: <span id="exptot">0</span> د.إ</span>
         <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
+        <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusReport()">🚌 Bus Report</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
@@ -1811,7 +1812,13 @@ const TAX_SUPPLIER_FIELDS = [
 
 const EXP_CATS = [
   {k:'bus',      ic:'🚌', ar:()=>lang==='ar'?'مصاريف الباص':'Bus Expenses',
-   fields:[{id:'e1',ar:'Bus No.',t:'text'},{id:'e2',ar:'Fuel (AED)',t:'number'},{id:'e3',ar:'Other Expenses (AED)',t:'number'},{id:'ed',ar:'Invoice Date',t:'date'}],
+   fields:[
+     {id:'e1',ar:()=>lang==='ar'?'رقم الباص':'Bus No.',t:'text'},
+     {id:'e1b',ar:()=>lang==='ar'?'نوع المصروف':'Expense Type',t:'select',opts:()=>lang==='ar'?['وقود','صيانة','تأمين','مخالفات','غسيل','أخرى']:['Fuel','Maintenance','Insurance','Fines','Wash','Other']},
+     {id:'e2',ar:()=>lang==='ar'?'المبلغ (د.إ)':'Amount (AED)',t:'number'},
+     {id:'e3',ar:()=>lang==='ar'?'مصاريف إضافية (د.إ)':'Extra Expenses (AED)',t:'number'},
+     {id:'ed',ar:()=>lang==='ar'?'تاريخ الفاتورة':'Invoice Date',t:'date'}
+   ],
    getAmt:()=>n('e2')+n('e3')},
 
   {k:'purch',    ic:'🛒', ar:()=>lang==='ar'?'المشتريات':'Purchases',
@@ -1941,7 +1948,7 @@ async function loadFromSupa(bid) {
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
       sb.from('staff_attendance').select('*').eq('branch_id',bid),
-      sb.from('visitors').select('*').eq('branch_id',bid).order('created_at',{ascending:false}).limit(500),
+      sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
     if(c.error)throw c.error;
     if(r.error)throw r.error;
@@ -4615,9 +4622,10 @@ function renderExps(){
             <div style="font-weight:700">${typeof cat.ar==='function'?cat.ar():cat.ar}${e.subType?' — '+e.subType:''}</div>
             <div style="font-size:.71rem;color:var(--muted);margin-top:2px">
               📅 ${fmtDate(e.date)}
-              ${e.supplierName?' | 🏢 '+e.supplierName:''}
+              ${e.supplierName?`<span style="background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:700">🏢 ${e.supplierName}</span>`:''}
               ${e.taxNumber?' | رقم ضريبي: '+e.taxNumber:''}
             </div>
+            ${(e.extra&&e.extra['__bus_no__'])?`<div style="font-size:.72rem;margin-top:2px"><span style="background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:10px;font-weight:800">🚌 ${e.extra['__bus_no__']}${e.extra['__bus_type__']?' — '+e.extra['__bus_type__']:''}</span></div>`:''}
             ${e.note?`<div style="font-size:.71rem;color:var(--muted)">📝 ${e.note}</div>`:''}
             <div style="font-size:.71rem;margin-top:3px">
               <span style="background:#fef3c7;padding:1px 7px;border-radius:10px;color:#92400e">
@@ -4626,10 +4634,14 @@ function renderExps(){
             </div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
           <span style="font-weight:800;color:var(--err)">${fmtNum(e.totalAmount||e.amount)} د.إ</span>
           ${e.vatAmount?`<span style="font-size:.69rem;color:var(--muted)">قبل الضريبة: ${fmtNum(e.amount)}</span>`:''}
-          <button class="btn bd bsm" onclick="delExp('${e.id}')">🗑</button>
+          <div style="display:flex;gap:4px;margin-top:2px">
+            ${curRole==='admin'?`<button onclick="openExpInvoice('${e.id}')" style="background:#0369a1;color:#fff;border:none;border-radius:7px;padding:4px 8px;cursor:pointer;font-size:.72rem" title="عرض الفاتورة">🧾</button>`:''}
+            ${curRole==='admin'?`<button onclick="openEditExp('${e.id}')" style="background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:4px 8px;cursor:pointer;font-size:.72rem" title="تعديل">✏️</button>`:''}
+            ${curRole==='admin'?`<button class="btn bd bsm" onclick="delExp('${e.id}')">🗑</button>`:''}
+          </div>
         </div>
       </div>
     </div>`;
@@ -4644,7 +4656,10 @@ async function saveExp(){
   const selField=cat.fields.find(f=>f.t==='select'&&f.id!=='ex_vat');
   const subType=selField?el(selField.id)?.value||'':'';
   const extra={};
-  cat.fields.filter(f=>f.t==='text').forEach(f=>{if(v(f.id))extra[f.ar]=v(f.id);});
+  cat.fields.filter(f=>f.t==='text').forEach(f=>{if(v(f.id))extra[typeof f.ar==='function'?f.ar():f.ar]=v(f.id);});
+  // For bus — also store bus_no top-level in extra for easy reporting
+  if(expCat==='bus'&&v('e1')) extra['__bus_no__']=v('e1').trim().toUpperCase();
+  if(expCat==='bus'&&v('e1b')) extra['__bus_type__']=el('e1b')?.value||'';
   // Tax & supplier — recalc VAT in case user entered amount after selecting VAT
   const vatType=el('ex_vat')?.value||'معفى (0%)';
   const vatVal=vatType.toLowerCase();
@@ -9408,18 +9423,29 @@ function sendRegReportWA(){
 //  VISITORS MODULE
 // ═══════════════════════════════════════════════
 async function loadVisitors(){
-  // First try with branch filter
-  const {data,error} = await sb.from('visitors').select('*').eq('branch_id',curBid).order('created_at',{ascending:false}).limit(2000);
+  // Try ordering by visit_date; if that fails try without ordering
+  let query = sb.from('visitors').select('*').eq('branch_id',curBid).limit(2000);
+  const {data,error} = await query;
   if(error){
     console.error('Visitors load error:',error.message);
+    // Try without branch filter as fallback
+    const {data:data2,error:err2} = await sb.from('visitors').select('*').limit(2000);
+    if(!err2 && data2){
+      DB.visitors = (data2||[]).filter(v=>!v.branch_id||v.branch_id===curBid).map(v=>({...v, name:(v.name||'').trim()}));
+      console.log('✅ Visitors loaded (fallback):',DB.visitors.length);
+      return;
+    }
     DB.visitors = [];
     const vl=el('vis-list');
     if(vl) vl.innerHTML=`<div style="background:#fee2e2;border-radius:10px;padding:14px;color:#991b1b;font-weight:700;text-align:center">
       ❌ خطأ في تحميل البيانات<br><span style="font-weight:400;font-size:.82rem">${error.message}</span>
+      <br><button onclick="debugVisitors()" style="margin-top:8px;background:#fff;border:1.5px solid #dc2626;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;color:#dc2626">🔍 فحص</button>
     </div>`;
     return;
   }
-  DB.visitors = (data||[]).map(v=>({...v, name:(v.name||'').trim()}));
+  // Sort by visit_date descending in JS (safe regardless of column existence)
+  DB.visitors = (data||[]).map(v=>({...v, name:(v.name||'').trim()}))
+    .sort((a,b)=>(b.visit_date||b.id||'').localeCompare(a.visit_date||a.id||''));
   console.log('✅ Visitors loaded:',DB.visitors.length,'for branch_id=',curBid);
 }
 
@@ -9496,6 +9522,229 @@ function renderVisitors(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ══ BUS REPORT ═══════════════════════════════════
+function openBusReport(){
+  // Set default month to current
+  const mon=el('bus-rpt-mon');
+  if(!mon.value) mon.value=today().slice(0,7);
+  // Populate bus filter
+  const busNos=[...new Set(DB.expenses.filter(e=>e.category==='bus'&&e.extra&&e.extra['__bus_no__']).map(e=>e.extra['__bus_no__']))].sort();
+  const sel=el('bus-rpt-filter');
+  sel.innerHTML=`<option value="all">الكل — All</option>`+busNos.map(b=>`<option value="${b}">${b}</option>`).join('');
+  renderBusReport();
+  el('bus-report-modal').style.display='flex';
+}
+
+function renderBusReport(){
+  const mon=el('bus-rpt-mon')?.value||'';
+  const busFilter=el('bus-rpt-filter')?.value||'all';
+  let list=DB.expenses.filter(e=>e.category==='bus');
+  if(mon) list=list.filter(e=>monthOf(e.date)===mon);
+  if(busFilter!=='all') list=list.filter(e=>e.extra&&e.extra['__bus_no__']===busFilter);
+
+  if(!list.length){
+    el('bus-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا توجد مصاريف باصات في هذه الفترة</div>`;
+    return;
+  }
+
+  // Group by bus number
+  const groups={};
+  list.forEach(e=>{
+    const busNo=(e.extra&&e.extra['__bus_no__'])||'غير محدد';
+    if(!groups[busNo]) groups[busNo]={rows:[],total:0};
+    groups[busNo].rows.push(e);
+    groups[busNo].total+=e.totalAmount||e.amount||0;
+  });
+
+  const grandTotal=list.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+  const b=CB();
+  const monLabel=mon?new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'}):'كل الفترات';
+
+  let html=`
+    <div style="background:#fef3c7;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:800;font-size:.9rem">🚌 ${b.ar||b.en} — ${monLabel}</div>
+      <div style="font-weight:900;font-size:1rem;color:#b45309">إجمالي: ${fmtNum(grandTotal)} د.إ</div>
+    </div>`;
+
+  Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([busNo,g])=>{
+    html+=`
+      <div style="border:2px solid #fcd34d;border-radius:12px;margin-bottom:14px;overflow:hidden">
+        <div style="background:#fbbf24;padding:9px 14px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:900;font-size:.95rem">🚌 رقم الباص: ${busNo}</div>
+          <div style="font-weight:800;color:#1c1917">${fmtNum(g.total)} د.إ</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+          <thead>
+            <tr style="background:#fef9c3">
+              <th style="padding:6px 10px;text-align:right;font-weight:700">التاريخ</th>
+              <th style="padding:6px 10px;text-align:right;font-weight:700">النوع</th>
+              <th style="padding:6px 10px;text-align:right;font-weight:700">المورد</th>
+              <th style="padding:6px 10px;text-align:right;font-weight:700">ملاحظة</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:700">المبلغ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${g.rows.map((e,i)=>`
+              <tr style="${i%2===0?'background:#fffbeb':''}">
+                <td style="padding:6px 10px">${fmtDate(e.date)}</td>
+                <td style="padding:6px 10px">${e.extra&&e.extra['__bus_type__']?e.extra['__bus_type__']:(e.subType||'—')}</td>
+                <td style="padding:6px 10px">${e.supplierName||'—'}</td>
+                <td style="padding:6px 10px;color:#6b7280;font-size:.75rem">${e.note||'—'}</td>
+                <td style="padding:6px 10px;text-align:left;font-weight:700;color:#b45309">${fmtNum(e.totalAmount||e.amount)} د.إ</td>
+              </tr>`).join('')}
+            <tr style="background:#fef3c7;font-weight:900;border-top:2px solid #fbbf24">
+              <td colspan="4" style="padding:7px 10px;text-align:right">مجموع الباص ${busNo}</td>
+              <td style="padding:7px 10px;text-align:left;color:#b45309">${fmtNum(g.total)} د.إ</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  });
+
+  html+=`<div style="background:#fef3c7;border-radius:10px;padding:10px 14px;text-align:center;font-weight:900;font-size:.95rem;color:#b45309">
+    🚌 إجمالي مصاريف الباصات: ${fmtNum(grandTotal)} د.إ
+  </div>`;
+
+  el('bus-rpt-body').innerHTML=html;
+  // Store for export
+  window._busRptData={list,groups,grandTotal,mon:monLabel,branchName:b.ar||b.en};
+}
+
+function printBusReport(){
+  const body=el('bus-rpt-body')?.innerHTML||'';
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Bus Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>body{font-family:'Tajawal',sans-serif;padding:20px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e5e7eb}@media print{body{padding:0}}</style>
+    </head><body>${body}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
+function exportBusReportExcel(){
+  const d=window._busRptData;if(!d){alert('اعمل تقرير أولاً');return;}
+  const rows=[['رقم الباص','التاريخ','النوع','المورد','ملاحظة','المبلغ','ضريبة','الإجمالي']];
+  d.list.forEach(e=>{
+    rows.push([
+      (e.extra&&e.extra['__bus_no__'])||'—',
+      e.date, (e.extra&&e.extra['__bus_type__'])||e.subType||'—',
+      e.supplierName||'—', e.note||'—',
+      e.amount||0, e.vatAmount||0, e.totalAmount||e.amount||0
+    ]);
+  });
+  rows.push(['','','','','الإجمالي','','',d.grandTotal]);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Bus Report');
+  XLSX.writeFile(wb,`Bus_Report_${d.mon||'all'}.xlsx`);
+}
+
+// ══ EXPENSE EDIT & INVOICE ══════════════════════
+function openEditExp(id){
+  const e=DB.expenses.find(x=>String(x.id)===String(id));
+  if(!e){alert('لم يتم العثور على المصروف');return;}
+  const cat=EXP_CATS.find(c=>c.k===e.category)||{ar:e.type||e.category};
+  el('eedit-id').value=id;
+  el('eedit-cat').value=(typeof cat.ar==='function'?cat.ar():cat.ar)+(e.subType?' — '+e.subType:'');
+  el('eedit-date').value=e.date||today();
+  el('eedit-amount').value=e.amount||0;
+  el('eedit-vat').value=e.vatType||'معفى (0%)';
+  el('eedit-vatamt').value=e.vatAmount||0;
+  el('eedit-total').value=e.totalAmount||e.amount||0;
+  el('eedit-supplier').value=e.supplierName||'';
+  el('eedit-taxnum').value=e.taxNumber||'';
+  el('eedit-reason').value=e.note||'';
+  el('eedit-alert').innerHTML='';
+  el('exp-edit-modal').style.display='flex';
+  setTimeout(()=>el('eedit-amount').focus(),200);
+}
+
+function recalcExpEdit(){
+  const amount=Number(el('eedit-amount')?.value||0);
+  const vatType=el('eedit-vat')?.value||'';
+  const pct=vatType.includes('5')?0.05:0;
+  const vatAmt=pct?Math.round(amount*pct*100)/100:0;
+  if(el('eedit-vatamt')) el('eedit-vatamt').value=vatAmt||'';
+  if(el('eedit-total')) el('eedit-total').value=Math.round((amount+vatAmt)*100)/100;
+}
+
+async function saveEditExp(){
+  const id=el('eedit-id').value;
+  const amount=Number(el('eedit-amount')?.value||0);
+  if(!amount){el('eedit-alert').innerHTML='<span style="color:red">❌ أدخل المبلغ</span>';return;}
+  const vatType=el('eedit-vat')?.value||'معفى (0%)';
+  const pct=vatType.includes('5')?0.05:0;
+  const vatAmt=pct?Math.round(amount*pct*100)/100:(Number(el('eedit-vatamt')?.value)||0);
+  const total=Math.round((amount+vatAmt)*100)/100;
+  const row={
+    date:el('eedit-date')?.value||today(),
+    amount, vat_type:vatType, vat_amount:vatAmt, total_amount:total,
+    supplier_name:el('eedit-supplier')?.value||null,
+    tax_number:el('eedit-taxnum')?.value||null,
+    note:el('eedit-reason')?.value||null,
+  };
+  setSyncing(true);
+  const {error}=await sb.from('expenses').update(row).eq('id',id);
+  setSyncing(false);
+  if(error){el('eedit-alert').innerHTML='<span style="color:red">❌ '+error.message+'</span>';return;}
+  el('eedit-alert').innerHTML='<span style="color:green">✅ تم الحفظ</span>';
+  setTimeout(()=>{el('exp-edit-modal').style.display='none'; loadFromSupa(curBid).then(()=>renderExps());},700);
+}
+
+function openExpInvoice(id){
+  const e=DB.expenses.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  const b=CB(); const bx=getBranchExtra(b.id);
+  const cat=EXP_CATS.find(c=>c.k===e.category)||{ic:'📝',ar:e.type||e.category};
+  const catName=(typeof cat.ar==='function'?cat.ar():cat.ar)+(e.subType?' — '+e.subType:'');
+  const rcol=bx.receipt_color||b.c||'#dc2626';
+  const trn=bx.trn||'';
+  el('exp-inv-body').innerHTML=`
+    <div id="exp-inv-print" style="font-family:'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,${rcol},${rcol}cc);padding:14px 18px;border-radius:10px;margin-bottom:14px;color:#fff">
+        <div style="font-size:1rem;font-weight:900">${b.icon||'🏫'} ${b.ar||b.en}</div>
+        <div style="font-size:.7rem;opacity:.85;margin-top:2px">${bx.address||''} ${bx.phone?'| ☎ '+bx.phone:''}</div>
+        ${trn?`<div style="font-size:.7rem;opacity:.85">TRN: ${trn}</div>`:''}
+        <div style="text-align:right;font-size:.75rem;opacity:.9;margin-top:4px;font-weight:700">🧾 سند صرف — Expense Voucher</div>
+      </div>
+      <!-- Details -->
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:14px">
+        <tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280;width:40%">📅 التاريخ / Date</td><td style="padding:8px 10px;font-weight:700">${fmtDate(e.date)}</td></tr>
+        <tr><td style="padding:8px 10px;color:#6b7280">📁 الفئة / Category</td><td style="padding:8px 10px;font-weight:700">${cat.ic} ${catName}</td></tr>
+        ${e.supplierName?`<tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280">🏢 المورد / Supplier</td><td style="padding:8px 10px;font-weight:700">${e.supplierName}</td></tr>`:''}
+        ${e.taxNumber?`<tr><td style="padding:8px 10px;color:#6b7280">🔢 الرقم الضريبي / TRN</td><td style="padding:8px 10px;font-weight:700">${e.taxNumber}</td></tr>`:''}
+        ${e.note?`<tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280">📝 السبب / Reason</td><td style="padding:8px 10px;font-weight:700">${e.note}</td></tr>`:''}
+      </table>
+      <!-- Amounts -->
+      <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:.83rem"><span style="color:#6b7280">المبلغ قبل الضريبة</span><span style="font-weight:700">${fmtNum(e.amount)} AED</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:.83rem;border-bottom:1px solid #e5e7eb">
+          <span style="color:#6b7280">ضريبة القيمة المضافة (${e.vatType||'معفى'})</span>
+          <span style="font-weight:700;color:#dc2626">${e.vatAmount?fmtNum(e.vatAmount)+' AED':'—'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:.95rem;font-weight:900">
+          <span>الإجمالي / Total</span>
+          <span style="color:${rcol}">${fmtNum(e.totalAmount||e.amount)} AED</span>
+        </div>
+      </div>
+      <!-- Signature -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;font-size:.75rem;color:#6b7280;text-align:center">
+        <div style="border-top:1px solid #d1d5db;padding-top:8px">توقيع المعتمد<br>Authorized Signature</div>
+        <div style="border-top:1px solid #d1d5db;padding-top:8px">توقيع المستلم<br>Received By</div>
+      </div>
+    </div>`;
+  el('exp-inv-modal').style.display='flex';
+}
+
+function printExpInvoice(){
+  const body=el('exp-inv-print')?.innerHTML||'';
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Expense Voucher</title>
+    <style>body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;max-width:560px;margin:0 auto}@media print{body{padding:0}}</style>
+    </head><body>${body}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
 }
 
 function openVisitorModal(id){
@@ -12525,7 +12774,104 @@ boot();
   </div>
 </div>
 
-<!-- ══ VISITOR EDIT MODAL ══ -->
+<!-- ══ BUS REPORT MODAL ══ -->
+<div id="bus-report-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:650px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="background:linear-gradient(135deg,#d97706,#b45309);padding:13px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:800;font-size:1rem">🚌 تقرير مصاريف الباصات — Bus Expenses Report</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="printBusReport()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.78rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ Print</button>
+        <button onclick="exportBusReportExcel()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.78rem;padding:5px 10px;cursor:pointer;font-weight:700">📥 Excel</button>
+        <button onclick="el('bus-report-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div style="padding:14px 16px 6px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <label style="font-size:.8rem;font-weight:700">📅 الشهر:</label>
+        <input type="month" id="bus-rpt-mon" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusReport()">
+        <label style="font-size:.8rem;font-weight:700">🚌 الباص:</label>
+        <select id="bus-rpt-filter" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusReport()"><option value="all">الكل</option></select>
+      </div>
+    </div>
+    <div id="bus-rpt-body" style="padding:0 16px 16px"></div>
+  </div>
+</div>
+
+<!-- ══ EXPENSE EDIT MODAL ══ -->
+<div id="exp-edit-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="background:linear-gradient(135deg,#dc2626,#b91c1c);padding:14px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:800;font-size:1rem">✏️ تعديل المصروف — Edit Expense</div>
+      <button onclick="el('exp-edit-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:18px">
+      <input type="hidden" id="eedit-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="grid-column:1/-1">
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📁 الفئة / Category</label>
+          <input id="eedit-cat" readonly style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#f9fafb;box-sizing:border-box;font-weight:700">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📅 التاريخ / Date</label>
+          <input id="eedit-date" type="date" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">💰 المبلغ قبل الضريبة / Amount</label>
+          <input id="eedit-amount" type="number" min="0" oninput="recalcExpEdit()" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:700;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🧾 نوع الضريبة / VAT</label>
+          <select id="eedit-vat" onchange="recalcExpEdit()" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+            <option>معفى (0%)</option>
+            <option>صفر (0%)</option>
+            <option>5%</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🧾 مبلغ الضريبة / VAT Amt</label>
+          <input id="eedit-vatamt" type="number" readonly style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#f9fafb;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#059669;display:block;margin-bottom:4px">✅ الإجمالي / Total</label>
+          <input id="eedit-total" type="number" readonly style="width:100%;padding:8px 10px;border:2px solid #059669;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;color:#059669;background:#f0fdf4;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🏢 المورد / Supplier</label>
+          <input id="eedit-supplier" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🔢 الرقم الضريبي / Tax No.</label>
+          <input id="eedit-taxnum" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 سبب الصرف / Reason</label>
+          <textarea id="eedit-reason" rows="2" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box;resize:vertical"></textarea>
+        </div>
+      </div>
+      <div id="eedit-alert" style="margin-bottom:8px;font-size:.82rem"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveEditExp()" style="flex:1;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">💾 حفظ التعديلات</button>
+        <button onclick="el('exp-edit-modal').style.display='none'" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.88rem">إلغاء</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EXPENSE INVOICE MODAL ══ -->
+<div id="exp-inv-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:12px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:800;font-size:.95rem">🧾 فاتورة المصروف — Expense Invoice</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="printExpInvoice()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:.78rem;padding:5px 10px;cursor:pointer;font-weight:700">🖨️ Print</button>
+        <button onclick="el('exp-inv-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;color:#fff;font-size:1.1rem;padding:3px 10px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div id="exp-inv-body" style="padding:20px"></div>
+  </div>
+</div>
+
+</body>
 <div id="vis-edit-modal" onclick="if(event.target===this)closeVisModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:16px">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">
     <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:14px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
