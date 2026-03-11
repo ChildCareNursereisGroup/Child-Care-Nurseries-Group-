@@ -11616,7 +11616,12 @@ function showHRTab(id, btn){
   const p=el(id); if(p) p.classList.add('on');
   if(btn) btn.classList.add('on');
   if(id==='hr-payroll')  { populatePayrollBranch(); renderPayroll(); }
-  if(id==='hr-leaves')   { loadHRData().then(()=>{ populateLeaveStaffFilter(); renderLeaves(); }); }
+  if(id==='hr-leaves')   { 
+    // Show panel immediately, load data async
+    populateLeaveStaffFilter();
+    el('leave-list').innerHTML='<div style="text-align:center;padding:16px;color:#6b7280;font-size:.85rem">⏳ جاري التحميل...</div>';
+    loadHRData().then(()=>{ populateLeaveStaffFilter(); renderLeaves(); }).catch(()=>renderLeaves());
+  }
   if(id==='hr-eog')      { loadHRData().then(()=>populateEOGSelect()); }
   if(id==='hr-reports')  { populateRptSelects(); }
 }
@@ -12195,10 +12200,24 @@ function renderLeaves(){
 }
 
 function openLeaveForm(id, preStaff, preType){
+  const titleEl = el('leave-modal-title');
+  const bodyEl  = el('leave-form-body');
+  const modalEl = el('leave-modal');
+  if(!titleEl||!bodyEl||!modalEl){
+    console.error('Leave modal elements missing');
+    alert('خطأ: أعيدي تحميل الصفحة');
+    return;
+  }
+  // Make sure staff list is loaded
+  if(!DB.staff||!DB.staff.length){
+    alert('⏳ جاري تحميل بيانات الموظفين — حاولي مرة ثانية بعد ثانية');
+    loadFromSupa(curBid);
+    return;
+  }
   const l=id ? (DB.leaves||[]).find(x=>String(x.id)===String(id)) : null;
   const staffOpts=DB.staff.map(s=>`<option value="${s.id}" ${(preStaff&&String(preStaff)===String(s.id))||String(l?.staffId)===String(s.id)?'selected':''}>${s.name}</option>`).join('');
-  el('leave-modal-title').textContent=l?'✏️ تعديل إجازة':'🏖️ طلب إجازة جديد';
-  el('leave-form-body').innerHTML=`
+  titleEl.textContent=l?'✏️ تعديل إجازة':'🏖️ طلب إجازة جديد';
+  bodyEl.innerHTML=`
     <div class="g2" style="margin-bottom:10px">
       <div class="fg"><label>الموظف *</label><select id="lf_staff">${staffOpts}</select></div>
       <div class="fg"><label>نوع الإجازة</label>
@@ -12227,7 +12246,7 @@ function openLeaveForm(id, preStaff, preType){
     </div>
     <div id="lf-alert"></div>
   `;
-  el('leave-modal').classList.add('on');
+  modalEl.classList.add('on');
   calcLeaveDays();
 }
 
