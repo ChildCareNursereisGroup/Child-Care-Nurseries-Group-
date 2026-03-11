@@ -815,8 +815,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <span style="font-weight:800;color:var(--err)">إجمالي: <span id="exptot">0</span> د.إ</span>
         <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
         <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusReport()">🚌 Bus Report</button>
-        <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
-        <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 كشف الرحلة</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
@@ -901,229 +899,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <div class="page" id="pg-admin">
 
-<!-- ═══════════════════════════════════════════════ -->
-<!-- CHILDREN EXPENSES SECTION — Admin Only         -->
-<!-- ═══════════════════════════════════════════════ -->
-<div class="card" style="border:2px solid #7c3aed">
-  <div class="ch">
-    <div class="ct" style="color:#7c3aed;font-size:1rem">🧒 مصاريف الأطفال — Children Expenses</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <button onclick="switchChildExpYear('2025',this)" id="chexp-btn-2025" style="padding:5px 14px;border-radius:18px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.79rem">📅 2025</button>
-      <button onclick="switchChildExpYear('2026',this)" id="chexp-btn-2026" style="padding:5px 14px;border-radius:18px;border:2px solid #7c3aed;background:#fff;color:#7c3aed;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.79rem">📋 2026</button>
-    </div>
-  </div>
-
-  <!-- ── 2025 Panel ─────────────────────────── -->
-  <div id="chexp-panel-2025">
-    <div style="background:#f5f3ff;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:.81rem;color:#5b21b6">
-      📌 <b>2025 — ملخص شهري للمصاريف بدون اسم طفل</b> | يمكن استيراد من Excel
-    </div>
-
-    <!-- Import Excel 2025 -->
-    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
-      <button onclick="el('xl-chexp2025-file').click()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">📥 Import Excel 2025</button>
-      <button onclick="downloadChildExp2025Template()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">📋 Template 2025</button>
-    </div>
-    <input type="file" id="xl-chexp2025-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importChildExp2025(this.files[0])">
-    <div id="chexp2025-imp-preview" style="margin-bottom:8px"></div>
-
-    <!-- Manual Entry Form 2025 -->
-    <div style="background:#fff;border:1.5px solid #ddd6fe;border-radius:11px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:800;color:#7c3aed;font-size:.84rem;margin-bottom:8px">➕ إضافة مصروف يدوي — 2025</div>
-      <div class="g3" style="margin-bottom:8px">
-        <div class="fg">
-          <label>الشهر — Month</label>
-          <select id="ce25_month">
-            <option value="2025-01">يناير — January 2025</option>
-            <option value="2025-02">فبراير — February 2025</option>
-            <option value="2025-03">مارس — March 2025</option>
-            <option value="2025-04">أبريل — April 2025</option>
-            <option value="2025-05">مايو — May 2025</option>
-            <option value="2025-06">يونيو — June 2025</option>
-            <option value="2025-07">يوليو — July 2025</option>
-            <option value="2025-08">أغسطس — August 2025</option>
-            <option value="2025-09">سبتمبر — September 2025</option>
-            <option value="2025-10">أكتوبر — October 2025</option>
-            <option value="2025-11">نوفمبر — November 2025</option>
-            <option value="2025-12">ديسمبر — December 2025</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>البند — Category</label>
-          <select id="ce25_cat">
-            <option value="food">🍽️ طعام وشراب</option>
-            <option value="supplies">📦 مستلزمات</option>
-            <option value="activities">🎨 أنشطة وفعاليات</option>
-            <option value="health">💊 صحة ورعاية</option>
-            <option value="uniform">👕 زي مدرسي</option>
-            <option value="transport">🚌 مواصلات</option>
-            <option value="other">📝 أخرى</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>المبلغ — Amount (AED)</label>
-          <input type="number" id="ce25_amount" placeholder="0.00">
-        </div>
-        <div class="fg">
-          <label>طريقة الدفع — Pay Method</label>
-          <select id="ce25_pay">
-            <option value="cash">💵 كاش</option>
-            <option value="card">💳 بطاقة</option>
-            <option value="bank">🏦 تحويل بنكي</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>التاريخ — Date</label>
-          <input type="date" id="ce25_date">
-        </div>
-        <div class="fg">
-          <label>ملاحظات — Notes</label>
-          <input type="text" id="ce25_notes" placeholder="وصف المصروف...">
-        </div>
-      </div>
-      <button onclick="saveChildExp2025()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">💾 حفظ</button>
-      <div id="ce25-alert" style="margin-top:6px"></div>
-    </div>
-
-    <!-- Filter by month -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-      <label style="font-size:.8rem;font-weight:700;color:#6b7280">فلتر الشهر:</label>
-      <select id="ce25_filt_month" onchange="renderChildExp2025()" style="padding:5px 9px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
-        <option value="">كل الأشهر</option>
-        <option value="2025-01">يناير 2025</option>
-        <option value="2025-02">فبراير 2025</option>
-        <option value="2025-03">مارس 2025</option>
-        <option value="2025-04">أبريل 2025</option>
-        <option value="2025-05">مايو 2025</option>
-        <option value="2025-06">يونيو 2025</option>
-        <option value="2025-07">يوليو 2025</option>
-        <option value="2025-08">أغسطس 2025</option>
-        <option value="2025-09">سبتمبر 2025</option>
-        <option value="2025-10">أكتوبر 2025</option>
-        <option value="2025-11">نوفمبر 2025</option>
-        <option value="2025-12">ديسمبر 2025</option>
-      </select>
-      <span id="ce25-total-badge" style="background:#f5f3ff;color:#7c3aed;border-radius:18px;padding:3px 12px;font-weight:800;font-size:.8rem"></span>
-    </div>
-
-    <!-- 2025 list -->
-    <div id="chexp2025-list"></div>
-  </div>
-
-  <!-- ── 2026 Panel ─────────────────────────── -->
-  <div id="chexp-panel-2026" style="display:none">
-    <div style="background:#eff6ff;border-radius:10px;padding:10px 13px;margin-bottom:11px;font-size:.81rem;color:#1e40af">
-      📌 <b>2026 — تفصيل كل فاتورة بالكامل مع شكل الإيصال</b>
-    </div>
-
-    <!-- Import Excel 2026 -->
-    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
-      <button onclick="el('xl-chexp2026-file').click()" style="background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">📥 Import Excel 2026</button>
-      <button onclick="downloadChildExp2026Template()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">📋 Template 2026</button>
-    </div>
-    <input type="file" id="xl-chexp2026-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importChildExp2026(this.files[0])">
-    <div id="chexp2026-imp-preview" style="margin-bottom:8px"></div>
-
-    <!-- Manual Entry Form 2026 -->
-    <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:11px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:800;color:#1d4ed8;font-size:.84rem;margin-bottom:8px">➕ إضافة فاتورة — 2026</div>
-      <div class="g3" style="margin-bottom:8px">
-        <div class="fg">
-          <label>رقم الفاتورة — Invoice No</label>
-          <input type="text" id="ce26_invno" placeholder="INV-2026-001">
-        </div>
-        <div class="fg">
-          <label>التاريخ — Date</label>
-          <input type="date" id="ce26_date">
-        </div>
-        <div class="fg">
-          <label>البند — Category</label>
-          <select id="ce26_cat">
-            <option value="food">🍽️ طعام وشراب</option>
-            <option value="supplies">📦 مستلزمات</option>
-            <option value="activities">🎨 أنشطة وفعاليات</option>
-            <option value="health">💊 صحة ورعاية</option>
-            <option value="uniform">👕 زي مدرسي</option>
-            <option value="transport">🚌 مواصلات</option>
-            <option value="other">📝 أخرى</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>المورد — Supplier</label>
-          <input type="text" id="ce26_supplier" placeholder="اسم المورد">
-        </div>
-        <div class="fg">
-          <label>المبلغ قبل الضريبة — Amount</label>
-          <input type="number" id="ce26_amount" placeholder="0.00" oninput="calcCE26Vat()">
-        </div>
-        <div class="fg">
-          <label>الضريبة — VAT</label>
-          <select id="ce26_vat" onchange="calcCE26Vat()">
-            <option value="0">معفى 0%</option>
-            <option value="5">5% ضريبة</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>مبلغ الضريبة — VAT Amt</label>
-          <input type="number" id="ce26_vatamt" readonly style="background:#f9fafb">
-        </div>
-        <div class="fg">
-          <label>الإجمالي — Total</label>
-          <input type="number" id="ce26_total" readonly style="background:#f0f9ff;font-weight:800">
-        </div>
-        <div class="fg">
-          <label>طريقة الدفع — Pay Method</label>
-          <select id="ce26_pay">
-            <option value="cash">💵 كاش</option>
-            <option value="card">💳 بطاقة</option>
-            <option value="bank">🏦 تحويل بنكي</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>رقم المرجع — Ref No (bank/card)</label>
-          <input type="text" id="ce26_ref" placeholder="رقم التحويل أو البطاقة">
-        </div>
-        <div class="fg" style="grid-column:1/-1">
-          <label>الوصف — Description</label>
-          <input type="text" id="ce26_desc" placeholder="وصف الفاتورة...">
-        </div>
-      </div>
-      <button onclick="saveChildExp2026()" style="background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">💾 حفظ الفاتورة</button>
-      <button onclick="previewCE26Invoice()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;margin-right:7px">👁️ معاينة الفاتورة</button>
-      <div id="ce26-alert" style="margin-top:6px"></div>
-    </div>
-
-    <!-- Filter -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-      <label style="font-size:.8rem;font-weight:700;color:#6b7280">فلتر الشهر:</label>
-      <select id="ce26_filt_month" onchange="renderChildExp2026()" style="padding:5px 9px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
-        <option value="">كل الأشهر</option>
-        <option value="2026-01">يناير 2026</option>
-        <option value="2026-02">فبراير 2026</option>
-        <option value="2026-03">مارس 2026</option>
-        <option value="2026-04">أبريل 2026</option>
-        <option value="2026-05">مايو 2026</option>
-        <option value="2026-06">يونيو 2026</option>
-        <option value="2026-07">يوليو 2026</option>
-        <option value="2026-08">أغسطس 2026</option>
-        <option value="2026-09">سبتمبر 2026</option>
-        <option value="2026-10">أكتوبر 2026</option>
-        <option value="2026-11">نوفمبر 2026</option>
-        <option value="2026-12">ديسمبر 2026</option>
-      </select>
-      <select id="ce26_filt_pay" onchange="renderChildExp2026()" style="padding:5px 9px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.8rem">
-        <option value="">كل طرق الدفع</option>
-        <option value="cash">💵 كاش</option>
-        <option value="card">💳 بطاقة</option>
-        <option value="bank">🏦 تحويل بنكي</option>
-      </select>
-      <span id="ce26-total-badge" style="background:#eff6ff;color:#1d4ed8;border-radius:18px;padding:3px 12px;font-weight:800;font-size:.8rem"></span>
-    </div>
-
-    <!-- 2026 list -->
-    <div id="chexp2026-list"></div>
-  </div>
-</div>
 
 <!-- INVOICE PREVIEW MODAL 2026 -->
 <div class="mover" id="ce26-inv-modal">
@@ -1516,8 +1291,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="ct">🚌 Bus Fleet — أسطول الباصات</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="openBusForm(null)">➕ Add Bus</button>
+      <button class="btn bsm" style="background:#1e3a8a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 كشف الرحلة</button>
+      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
       <button class="btn" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('bus-xl-inp').click()">📥 Import Excel</button>
-      <button class="btn bg bsm" onclick="downloadBusTemplate()">📋 Download Template</button>
+      <button class="btn bg bsm" onclick="downloadBusTemplate()">📋 Template</button>
     </div>
     <input type="file" id="bus-xl-inp" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBusesFromExcel(this.files[0])">
     <div id="bus-import-alert"></div>
@@ -7045,19 +6822,19 @@ function renderLicenses(){
     {k:'rent_expire',            label:'Rent Agreement'},
     {k:'membership_expire',      label:'Membership Registration Certificate'},
   ];
-  el('licenses-body').innerHTML = BRANCHES.map(b=>{
-    const lic = DB.licenses[b.id]||{};
-    const anyExpiring = docFields.some(f=>{ const d=daysUntilExpiry(lic[f.k]); return d!==null&&d<=90; });
-    return `<div style="border:1.5px solid ${anyExpiring?'#f59e0b':'var(--border)'};border-radius:12px;padding:13px;margin-bottom:11px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:7px">
-        <div style="font-weight:800;font-size:.95rem;color:${b.c}">${b.icon} ${tBN(b)}</div>
-        <button class="btn bo bsm" onclick="openLicenseForm('${b.id}')">✏️ Edit Dates</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">
-        ${docFields.map(f=>expiryBadge(lic[f.k], f.label)).join('')}
-      </div>
-    </div>`;
-  }).join('');
+  // Show only current branch
+  const b = BRANCHES.find(x=>x.id===curBid)||CB();
+  const lic = DB.licenses[b.id]||{};
+  const anyExpiring = docFields.some(f=>{ const d=daysUntilExpiry(lic[f.k]); return d!==null&&d<=30; });
+  el('licenses-body').innerHTML = `<div style="border:2px solid ${anyExpiring?'#f59e0b':b.c};border-radius:12px;padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:7px">
+      <div style="font-weight:900;font-size:1rem;color:${b.c}">${b.icon} ${tBN(b)}</div>
+      <button class="btn bo bsm" onclick="openLicenseForm('${b.id}')">✏️ Edit Dates</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${docFields.map(f=>expiryBadge(lic[f.k], f.label)).join('')}
+    </div>
+  </div>`;
 }
 
 function openLicenseForm(branchId){
