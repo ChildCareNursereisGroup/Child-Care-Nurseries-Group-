@@ -1728,6 +1728,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="dtab" onclick="showDTab('att',this)" data-tab="att"></button>
     <button class="dtab" onclick="showDTab('trans',this)" data-tab="trans"></button>
     <button class="dtab" onclick="printChildCard()" data-tab="card"></button>
+    <button class="dtab" onclick="showDTab('cert',this)" data-tab="cert"></button>
   </div>
   <div id="dtcont"></div>
 </div>
@@ -2193,7 +2194,7 @@ const T = {
     // Modal tabs
     tabInfo:'📋 البيانات', tabRecs:'🧾 الإيصالات', tabAccount:'💰 كشف حساب',
     tabMedical:'🏥 الصحة', tabProgress:'📈 التطور', tabAtt:'✅ الحضور',
-    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة',
+    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة', tabCert:'📜 شهادة',
     // Age
     ageLabel:'Age — العمر', ageMonths:'months', ageYears:'years',
     // Expenses
@@ -5059,6 +5060,7 @@ function renderModalTabs(){
     {tab:'att',    key:'tabAtt'},
     {tab:'trans',  key:'tabTrans'},
     {tab:'card',   key:'tabCard'},
+    {tab:'cert',   key:'tabCert'},
   ];
   document.querySelectorAll('#child-modal-tabs .dtab').forEach((btn,i)=>{
     if(tabDefs[i]){
@@ -5263,6 +5265,63 @@ function showDTab(tab,btn){
         <select id="tbsel">${BRANCHES.filter(br=>br.id!==curBid).map(br=>`<option value="${br.id}">${br.icon} ${tBN(br)}</option>`).join('')}</select>
       </div>
       <button class="btn bp" onclick="transferChild()">${lang==='ar'?'🔄 تأكيد النقل':'🔄 Confirm Transfer'}</button>
+    </div>`;
+  }
+
+  // ── ATTENDANCE CERTIFICATE ─────────────────────
+  if(tab==='cert'){
+    // Count paid months (receipts with fee > 0)
+    const recs = DB.receipts.filter(r=>String(r.childId)===String(curChild)&&(r.fee||0)>0);
+    const paidMonths = new Set(recs.map(r=>(r.date||'').slice(0,7))).size;
+    const eligible = paidMonths >= 3;
+    const branch = BRANCHES.find(b=>b.id===c.branchId)||CB();
+    const mgr = DB.staff?.find(s=>s.branchId===branch.id&&(s.position||'').toLowerCase().includes('manager'))
+             || DB.staff?.find(s=>s.branchId===branch.id);
+
+    cont.innerHTML=`<div style="padding:10px 0">
+      <div style="background:${eligible?'#f0fdf4':'#fef2f2'};border:2px solid ${eligible?'#86efac':'#fca5a5'};border-radius:12px;padding:12px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.5rem">${eligible?'✅':'⛔'}</span>
+        <div>
+          <div style="font-weight:800;color:${eligible?'#065f46':'#991b1b'};font-size:.88rem">
+            ${eligible?'Eligible for Attendance Certificate':'Not Eligible Yet'}
+          </div>
+          <div style="font-size:.75rem;color:#6b7280;margin-top:2px">
+            Paid months: <b>${paidMonths}</b> — Minimum required: <b>3 months</b>
+          </div>
+        </div>
+      </div>
+
+      ${eligible ? `
+      <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:11px;padding:14px;margin-bottom:14px">
+        <div style="font-weight:800;color:#1e3a8a;font-size:.83rem;margin-bottom:11px">📝 Certificate Details — تفاصيل الشهادة</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div class="fg"><label style="font-size:.72rem">Certificate Date</label>
+            <input type="date" id="cert-date" value="${today()}" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg"><label style="font-size:.72rem">Manager / Director Name</label>
+            <input type="text" id="cert-mgr" value="${mgr?.name||''}" placeholder="Manager name" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg"><label style="font-size:.72rem">Position</label>
+            <input type="text" id="cert-pos" value="${mgr?.position||'Director / Manager'}" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg"><label style="font-size:.72rem">Contact Number</label>
+            <input type="text" id="cert-phone" value="${mgr?.contact||''}" placeholder="+971..." style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg" style="grid-column:1/-1"><label style="font-size:.72rem">Email</label>
+            <input type="email" id="cert-email" value="${mgr?.email||''}" placeholder="email@nursery.com" style="width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+      <button onclick="printAttCertificate('${c.id}')"
+        style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 22px;cursor:pointer;font-weight:800;font-size:.85rem;font-family:'Tajawal',sans-serif">
+        🖨️ Print Certificate — طباعة الشهادة
+      </button>
+      ` : `
+      <div style="text-align:center;padding:20px;color:#9ca3af;font-size:.83rem">
+        <div style="font-size:2rem;margin-bottom:8px">📅</div>
+        The child needs at least <b>3 paid months</b> to be eligible for this certificate.<br>
+        Currently: <b>${paidMonths}</b> paid month${paidMonths===1?'':'s'}.
+      </div>`}
     </div>`;
   }
 
@@ -5591,6 +5650,104 @@ function sendRenewalWhatsApp(c){
 // ═══════════════════════════════════════════════
 //  PRINT CHILD CARD (A5)
 // ═══════════════════════════════════════════════
+function printAttCertificate(childId){
+  const c = DB.children.find(x=>String(x.id)===String(childId||curChild));
+  if(!c) return;
+  const branch  = BRANCHES.find(b=>b.id===c.branchId)||CB();
+  const certDate  = el('cert-date')?.value  || today();
+  const mgrName   = el('cert-mgr')?.value   || '___________';
+  const mgrPos    = el('cert-pos')?.value    || '___________';
+  const mgrPhone  = el('cert-phone')?.value  || '___________';
+  const mgrEmail  = el('cert-email')?.value  || '___________';
+  const dateFormatted = new Date(certDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'});
+  const dobFormatted  = c.dob ? new Date(c.dob+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
+  const joinFormatted = c.joinDate ? new Date(c.joinDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
+  const nurseryName   = branch.en || branch.ar || 'Nursery';
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <title>Attendance Certificate — ${c.name}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Tajawal',sans-serif;padding:50px 60px;max-width:800px;margin:0 auto;color:#111;font-size:.95rem;line-height:1.7}
+      .header{text-align:center;border-bottom:3px solid #1e3a8a;padding-bottom:18px;margin-bottom:30px}
+      .nursery-name{font-size:1.4rem;font-weight:900;color:#1e3a8a;margin-bottom:4px}
+      .cert-title{font-size:1.1rem;font-weight:800;color:#374151;margin-top:10px;letter-spacing:.5px;text-transform:uppercase}
+      .date-line{text-align:right;font-size:.88rem;color:#6b7280;margin-bottom:28px}
+      .body-text{margin-bottom:18px;text-align:justify}
+      .signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:50px}
+      .sig-block{border-top:1.5px solid #d1d5db;padding-top:10px;font-size:.82rem;color:#374151}
+      .sig-label{font-weight:700;color:#6b7280;font-size:.75rem;text-transform:uppercase;margin-bottom:3px}
+      .sig-val{font-weight:700;font-size:.88rem;min-height:22px}
+      .stamp-box{border:2px dashed #d1d5db;border-radius:8px;height:80px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:.78rem;margin-top:10px;grid-column:1/-1}
+      @media print{body{padding:30px 40px} button{display:none} @page{margin:15mm;size:A4}}
+    </style>
+  </head><body>
+    <div class="header">
+      <div class="nursery-name">${branch.icon||'🏫'} ${nurseryName}</div>
+      <div style="font-size:.82rem;color:#6b7280">${branch.ar||''}</div>
+      <div class="cert-title">Child Enrollment and Attendance Certificate</div>
+    </div>
+
+    <div class="date-line">Date: <b>${dateFormatted}</b></div>
+
+    <div class="body-text"><b>To Whom It May Concern,</b></div>
+
+    <div class="body-text">
+      This is to certify that the child <b>${c.name}</b>, born on <b>${dobFormatted}</b>,
+      has been officially registered and attending <b>${nurseryName}</b>.
+    </div>
+
+    <div class="body-text">
+      The child has been enrolled with us since <b>${joinFormatted}</b> and attends the nursery
+      according to our regular program.
+    </div>
+
+    <div class="body-text">
+      This certificate is issued upon request to confirm the child's registration and attendance
+      at our nursery.
+    </div>
+
+    <div class="body-text">
+      If further information is required, please feel free to contact us.
+    </div>
+
+    <div class="body-text" style="margin-top:30px"><b>Sincerely,</b></div>
+
+    <div class="signature-grid">
+      <div class="sig-block">
+        <div class="sig-label">Manager / Director Name</div>
+        <div class="sig-val">${mgrName}</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-label">Position</div>
+        <div class="sig-val">${mgrPos}</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-label">Nursery Name</div>
+        <div class="sig-val">${nurseryName}</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-label">Contact Number</div>
+        <div class="sig-val">${mgrPhone}</div>
+      </div>
+      <div class="sig-block" style="grid-column:1/-1">
+        <div class="sig-label">Email</div>
+        <div class="sig-val">${mgrEmail}</div>
+      </div>
+      <div class="stamp-box">Stamp &amp; Signature: ____________________________</div>
+    </div>
+
+    <div style="margin-top:40px;font-size:.7rem;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px;text-align:center">
+      This certificate is issued by ${nurseryName} | ${dateFormatted}
+    </div>
+
+    <br><button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:9px 20px;cursor:pointer;font-weight:700;font-size:.85rem">🖨️ Print</button>
+  </body></html>`);
+  w.document.close();
+}
+
 function printChildCard(){
   const c=DB.children.find(x=>String(x.id)===String(curChild));if(!c)return;
   const b=CB();
@@ -12047,6 +12204,9 @@ function calcEOG(){
 
 function printEOG(staffId, endDate, reason){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const branch = BRANCHES.find(b=>b.id===s?.branchId);
+  const nurseryName = branch ? `${branch.icon} ${branch.ar}` : 'مجموعة رعاية الطفل للحضانات';
+  const nurseryEn   = branch ? branch.en||'' : 'Child Care Nurseries Group';
   const content=el('eog-result')?.innerHTML||'';
   const win=window.open('','_blank');
   win.document.write(`<html><head><title>End of Service - ${s?.name}</title>
@@ -12056,14 +12216,15 @@ function printEOG(staffId, endDate, reason){
     @media print{button{display:none}}</style></head>
     <body>
     <h2 style="color:#1e3a8a;border-bottom:3px solid #1e3a8a;padding-bottom:10px">
-      مجموعة رعاية الطفل للحضانات<br>
-      <span style="font-size:.85rem;font-weight:400">حساب نهاية الخدمة — End of Service Calculation</span>
+      ${nurseryName}<br>
+      <span style="font-size:.78rem;font-weight:400;color:#6b7280">${nurseryEn}</span><br>
+      <span style="font-size:.85rem;font-weight:400">End of Service Calculation — حساب نهاية الخدمة</span>
     </h2>
     ${content}
     <div style="margin-top:30px;font-size:.75rem;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:12px">
-      تاريخ الإصدار: ${new Date().toLocaleDateString('ar-AE')} | وفقاً لقانون العمل الإماراتي رقم 33 لسنة 2021
+      Issue Date: ${new Date().toLocaleDateString('en-AE')} | UAE Labour Law — Federal Decree No. 33 of 2021
     </div>
-    <br><button onclick="window.print()">🖨️ طباعة</button>
+    <br><button onclick="window.print()">🖨️ Print</button>
     </body></html>`);
 }
 
