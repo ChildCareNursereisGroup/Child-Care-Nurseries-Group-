@@ -6606,10 +6606,12 @@ function renderStaffAlerts(){
     {k:'contractEnd',     label:'Contract'},
   ];
   const urgent = [];
-  DB.staff.forEach(s=>{
+  // Only active staff (no lastWorkingDay or future)
+  const activeStaff = (DB.staff||[]).filter(s=>!s.lastWorkingDay || s.lastWorkingDay >= today());
+  activeStaff.forEach(s=>{
     expFields.forEach(f=>{
       const d = daysUntilExpiry(s[f.k]);
-      if(d!==null && d<=10) urgent.push({staff:s, field:f.label, days:d, date:s[f.k]});
+      if(d!==null && d<=30) urgent.push({staff:s, field:f.label, days:d, date:s[f.k]});
     });
   });
   const box = el('staff-alerts');
@@ -6619,8 +6621,8 @@ function renderStaffAlerts(){
   box.innerHTML = `<div style="background:#fef3c7;border-radius:11px;padding:11px 14px;margin-bottom:11px">
     <div style="font-weight:800;color:#d97706;margin-bottom:7px">⚠️ Expiry Alerts — تنبيهات انتهاء الصلاحية (${urgent.length})</div>
     <div style="display:flex;flex-wrap:wrap;gap:5px">
-      ${urgent.map(u=>`<span style="background:${u.days<0?'#fee2e2':u.days<=30?'#fef3c7':'#fff'};border:1px solid ${u.days<0?'#fca5a5':'#fde68a'};border-radius:9px;padding:4px 10px;font-size:.74rem">
-        <b>${u.staff.name}</b> — ${u.field}: ${u.days<0?'<span style="color:#dc2626">Expired '+Math.abs(u.days)+'d</span>':'<span style="color:#d97706">'+u.days+'d left</span>'}
+      ${urgent.map(u=>`<span style="background:${u.days<0?'#fee2e2':'#fef3c7'};border:1px solid ${u.days<0?'#fca5a5':'#fde68a'};border-radius:9px;padding:4px 10px;font-size:.74rem">
+        <b>${u.staff.name}</b> — ${u.field}: ${u.days<0?'<span style="color:#dc2626">Expired '+Math.abs(u.days)+'d ago</span>':'<span style="color:#d97706">'+u.days+'d left</span>'}
       </span>`).join('')}
     </div>
   </div>`;
