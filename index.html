@@ -1379,6 +1379,23 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 </div>
 
+<!-- LEAVE REQUEST MODAL -->
+<div class="mover" id="leave-modal">
+<div class="modal" style="max-width:580px">
+  <div class="mh"><div class="mt" id="leave-modal-title">🏖️ طلب إجازة</div><button class="xb" onclick="el('leave-modal').classList.remove('on')">✕</button></div>
+  <div id="leave-form-body" style="padding:14px"></div>
+</div>
+</div>
+
+<!-- PAYROLL DETAIL MODAL -->
+<div class="mover" id="payroll-detail-modal">
+<div class="modal" style="max-width:620px">
+  <div class="mh"><div class="mt" id="payroll-detail-title">💰 تفاصيل الراتب</div><button class="xb" onclick="el('payroll-detail-modal').classList.remove('on')">✕</button></div>
+  <div id="payroll-detail-body" style="padding:14px"></div>
+</div>
+</div>
+
+
 <!-- BULK ATTENDANCE MODAL -->
 <div class="mover" id="bulk-att-modal">
 <div class="modal" style="max-width:900px;width:98%">
@@ -3241,21 +3258,6 @@ function printVATReport(exportType='print'){
     </div>
   </div>
 
-<!-- LEAVE REQUEST MODAL -->
-<div class="mover" id="leave-modal">
-<div class="modal" style="max-width:580px">
-  <div class="mh"><div class="mt" id="leave-modal-title">🏖️ طلب إجازة</div><button class="xb" onclick="el('leave-modal').classList.remove('on')">✕</button></div>
-  <div id="leave-form-body" style="padding:14px"></div>
-</div>
-</div>
-
-<!-- PAYROLL DETAIL MODAL -->
-<div class="mover" id="payroll-detail-modal">
-<div class="modal" style="max-width:620px">
-  <div class="mh"><div class="mt" id="payroll-detail-title">💰 تفاصيل الراتب</div><button class="xb" onclick="el('payroll-detail-modal').classList.remove('on')">✕</button></div>
-  <div id="payroll-detail-body" style="padding:14px"></div>
-</div>
-</div>
 </body></html>`;
 
   el('vat-report-modal').classList.remove('on');
@@ -4653,17 +4655,25 @@ async function toggleStaffAtt(staffId, date){
   const {error}=await sb.from('staff_attendance').insert(payload);
   if(error){
     console.error('StaffAtt save error:', error.message);
-    // Show brief error on page
     const sum=el('staffattsum');
     if(sum){
       const errDiv=document.createElement('div');
-      errDiv.style.cssText='background:#fee2e2;color:#dc2626;border-radius:8px;padding:6px 12px;font-size:.75rem;margin-top:6px';
+      errDiv.style.cssText='background:#fee2e2;color:#dc2626;border-radius:8px;padding:6px 12px;font-size:.75rem;margin-top:6px;font-family:Tajawal,sans-serif';
       errDiv.textContent='❌ خطأ في الحفظ: '+error.message;
       sum.appendChild(errDiv);
-      setTimeout(()=>errDiv.remove(),5000);
+      setTimeout(()=>errDiv.remove(),6000);
     }
   } else {
     console.log('StaffAtt saved OK → '+newSt);
+    // Show brief save confirmation
+    const sum=el('staffattsum');
+    if(sum){
+      const okDiv=document.createElement('div');
+      okDiv.style.cssText='background:#d1fae5;color:#065f46;border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block';
+      okDiv.textContent='✅ تم الحفظ — '+(newSt==='حضور'?'حضور ✓':'غياب ✕');
+      sum.appendChild(okDiv);
+      setTimeout(()=>okDiv.remove(),2500);
+    }
   }
 }
 
@@ -13959,6 +13969,5 @@ boot();
     </div>
   </div>
 </div>
-
 </body>
 </html>
