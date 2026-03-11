@@ -1123,7 +1123,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
       </select>
       <button class="btn bp bsm" onclick="exportPayrollExcel()">📊 Excel</button>
       <button class="btn bg bsm" onclick="printPayroll()">🖨️ Print</button>
-      <button onclick="debugSalaryHistory()" style="background:#f59e0b;color:#fff;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">🔍 فحص الرواتب</button>
+      <button onclick="openSalarySearchModal()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">🔍 هيستوري موظف</button>
+      <button onclick="openBulkSalaryModal()" style="background:#0369a1;color:#fff;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">📥 إدخال رواتب سابقة</button>
     </div>
   </div>
   <div id="payroll-summary" style="margin-bottom:10px"></div>
@@ -1302,6 +1303,62 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="bus-alerts"></div>
   <div id="bus-list"></div>
+</div>
+</div>
+
+<!-- SALARY HISTORY SEARCH MODAL -->
+<div class="mover" id="sal-search-modal">
+<div class="modal" style="max-width:720px;width:98%">
+  <div class="mh">
+    <div class="mt">🔍 هيستوري رواتب موظف — Salary History</div>
+    <button class="xb" onclick="el('sal-search-modal').classList.remove('on')">✕</button>
+  </div>
+  <div style="padding:14px">
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <select id="sal-search-staff" style="flex:1;padding:8px 12px;border:1.5px solid #c4b5fd;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem" onchange="loadStaffSalaryHistory()">
+        <option value="">-- اختاري موظف --</option>
+      </select>
+      <button onclick="exportStaffSalaryHistory()" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📊 Excel</button>
+    </div>
+    <div id="sal-search-body"></div>
+  </div>
+</div>
+</div>
+
+<!-- BULK SALARY ENTRY MODAL -->
+<div class="mover" id="bulk-sal-modal">
+<div class="modal" style="max-width:860px;width:98%">
+  <div class="mh">
+    <div class="mt">📥 إدخال الرواتب السابقة — Bulk Salary Entry</div>
+    <button class="xb" onclick="el('bulk-sal-modal').classList.remove('on')">✕</button>
+  </div>
+  <div style="padding:14px">
+    <div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.8rem;color:#1e40af">
+      💡 ادخلي الرواتب السابقة لكل موظف — السيستم هيحفظها تلقائياً وينزّلها في المصاريف
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:.75rem;font-weight:700;color:#1e40af">الموظف</label>
+        <select id="bsal-staff" style="padding:7px 12px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;min-width:200px" onchange="renderBulkSalRows()">
+          <option value="">-- اختاري موظف --</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:.75rem;font-weight:700;color:#1e40af">من شهر</label>
+        <input type="month" id="bsal-from" style="padding:7px 10px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBulkSalRows()">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:.75rem;font-weight:700;color:#1e40af">إلى شهر</label>
+        <input type="month" id="bsal-to" style="padding:7px 10px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBulkSalRows()">
+      </div>
+    </div>
+    <div id="bsal-body" style="overflow-x:auto"></div>
+    <div id="bsal-alert" style="margin-top:10px"></div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button onclick="saveBulkSalary()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 24px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ كل الرواتب</button>
+      <button onclick="el('bulk-sal-modal').classList.remove('on')" style="background:#f3f4f6;border:none;border-radius:10px;padding:10px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -3981,6 +4038,277 @@ function renderStaffAtt(){
 // BULK ATTENDANCE ENTRY
 // ═══════════════════════════════════════════════
 let _bulkAttData = {}; // {date: {staffId: 'حضور'|'غياب'|''}}
+
+// ═══════════════════════════════════════════════
+// SALARY HISTORY SEARCH
+// ═══════════════════════════════════════════════
+function openSalarySearchModal(){
+  const sel = el('sal-search-staff');
+  sel.innerHTML = '<option value="">-- اختاري موظف --</option>' +
+    DB.staff.map(s=>`<option value="${s.id}">${s.name} — ${s.position||''}</option>`).join('');
+  el('sal-search-body').innerHTML = '';
+  el('sal-search-modal').classList.add('on');
+}
+
+async function loadStaffSalaryHistory(){
+  const staffId = el('sal-search-staff')?.value;
+  const body = el('sal-search-body');
+  if(!staffId){ body.innerHTML=''; return; }
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  body.innerHTML = `<div style="text-align:center;padding:16px;color:#6b7280">⏳ جاري التحميل...</div>`;
+
+  // Load from Supabase
+  const {data,error} = await sb.from('staff_salary_history').select('*')
+    .eq('staff_id', Number(staffId))
+    .order('month',{ascending:false});
+
+  if(error||!data||!data.length){
+    body.innerHTML = `<div style="background:#fef3c7;border-radius:10px;padding:14px;text-align:center;color:#92400e">لا توجد سجلات رواتب محفوظة لهذا الموظف</div>`;
+    return;
+  }
+
+  const total = data.reduce((s,r)=>s+Number(r.amount||0),0);
+  const months = data.length;
+
+  body.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="sc"><div class="si">👷</div><div class="sv">${s?.name||'—'}</div><div class="sk">${s?.position||''}</div></div>
+      <div class="sc"><div class="si">📅</div><div class="sv">${months}</div><div class="sk">أشهر مسجّلة</div></div>
+      <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(total)}</div><div class="sk">إجمالي الرواتب (AED)</div></div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem;font-family:'Tajawal',sans-serif">
+      <thead>
+        <tr style="background:#7c3aed;color:#fff">
+          <th style="padding:9px 12px;text-align:right">الشهر</th>
+          <th style="padding:9px 8px;text-align:center">الأساسي</th>
+          <th style="padding:9px 8px;text-align:center">أيام الحضور</th>
+          <th style="padding:9px 8px;text-align:center">غياب</th>
+          <th style="padding:9px 8px;text-align:center">خصم</th>
+          <th style="padding:9px 8px;text-align:center">بونص</th>
+          <th style="padding:9px 8px;text-align:center;font-weight:900">صافي الراتب</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map((r,i)=>`
+          <tr style="background:${i%2?'#fff':'#f5f3ff'};border-bottom:1px solid #e5e7eb">
+            <td style="padding:8px 12px;font-weight:800;color:#5b21b6">${r.month}</td>
+            <td style="padding:8px;text-align:center;color:#374151">${fmtNum(r.basic_salary||0)}</td>
+            <td style="padding:8px;text-align:center;color:#059669">${r.present_days??'—'}</td>
+            <td style="padding:8px;text-align:center;color:${(r.absent_days||0)>0?'#dc2626':'#374151'}">${r.absent_days||0}</td>
+            <td style="padding:8px;text-align:center;color:#dc2626">${(r.deduct_other||0)+(r.deduct_loan||0)>0?'-'+fmtNum((r.deduct_other||0)+(r.deduct_loan||0)):'—'}</td>
+            <td style="padding:8px;text-align:center;color:#059669">${(r.bonus||0)>0?'+'+fmtNum(r.bonus):'—'}</td>
+            <td style="padding:8px;text-align:center;font-weight:900;color:#1e3a8a;font-size:.9rem">${fmtNum(r.amount||0)}</td>
+          </tr>`).join('')}
+        <tr style="background:#7c3aed;color:#fff;font-weight:900">
+          <td colspan="6" style="padding:9px 12px;text-align:right">الإجمالي</td>
+          <td style="padding:9px;text-align:center;font-size:.95rem">${fmtNum(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function exportStaffSalaryHistory(){
+  const staffId = el('sal-search-staff')?.value;
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  const body = el('sal-search-body');
+  const rows = body?.querySelectorAll('tbody tr:not(:last-child)');
+  if(!rows?.length){ alert('لا توجد بيانات'); return; }
+  // Simple CSV download
+  let csv = 'الشهر,الأساسي,حضور,غياب,خصم,بونص,صافي\n';
+  rows.forEach(r=>{
+    const cells=[...r.querySelectorAll('td')].map(td=>td.textContent.trim());
+    csv+=cells.join(',')+'\n';
+  });
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=`salary_history_${s?.name||staffId}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════
+// BULK SALARY ENTRY — إدخال الرواتب السابقة
+// ═══════════════════════════════════════════════
+function openBulkSalaryModal(){
+  const sel = el('bsal-staff');
+  sel.innerHTML = '<option value="">-- اختاري موظف --</option>' +
+    DB.staff.map(s=>`<option value="${s.id}">${s.name} — ${BRANCHES.find(b=>b.id===s.branchId)?.ar||''}</option>`).join('');
+  // Default range: Jan 2025 to current month
+  el('bsal-from').value = '2025-01';
+  el('bsal-to').value = today().substring(0,7);
+  el('bsal-body').innerHTML = '';
+  el('bsal-alert').innerHTML = '';
+  el('bulk-sal-modal').classList.add('on');
+}
+
+async function renderBulkSalRows(){
+  const staffId = el('bsal-staff')?.value;
+  const from = el('bsal-from')?.value;
+  const to = el('bsal-to')?.value;
+  const body = el('bsal-body');
+  if(!staffId||!from||!to){ body.innerHTML=''; return; }
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  const basic = Number(s?.basicSalary||s?.grossSalary||0);
+
+  // Build month list
+  const months=[];
+  let cur=from;
+  while(cur<=to){
+    months.push(cur);
+    const [y,m]=cur.split('-').map(Number);
+    cur=`${m===12?y+1:y}-${String(m===12?1:m+1).padStart(2,'0')}`;
+    if(months.length>36) break;
+  }
+
+  // Load existing salary history for this staff
+  const {data:existing} = await sb.from('staff_salary_history').select('*')
+    .eq('staff_id',Number(staffId))
+    .in('month', months);
+  const existMap={};
+  (existing||[]).forEach(r=>{ existMap[r.month]=r; });
+
+  body.innerHTML = `
+    <div style="font-size:.78rem;color:#6b7280;margin-bottom:8px">
+      👷 <b>${s?.name}</b> | الراتب الأساسي: <b style="color:#1e3a8a">${fmtNum(basic)} AED</b>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem;font-family:'Tajawal',sans-serif">
+      <thead>
+        <tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:8px 12px;text-align:right">الشهر</th>
+          <th style="padding:8px;text-align:center;min-width:90px">الراتب الأساسي</th>
+          <th style="padding:8px;text-align:center;min-width:80px">أيام الغياب</th>
+          <th style="padding:8px;text-align:center;min-width:80px">بونص</th>
+          <th style="padding:8px;text-align:center;min-width:80px">خصم آخر</th>
+          <th style="padding:8px;text-align:center;min-width:90px;font-weight:900">صافي الراتب</th>
+          <th style="padding:8px;text-align:center">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${months.map((mon,i)=>{
+          const ex=existMap[mon];
+          const exBasic=ex?.basic_salary||basic;
+          const exNet=ex?.amount||'';
+          const exAbs=ex?.absent_days||0;
+          const exBonus=ex?.bonus||0;
+          const exDeduct=ex?.deduct_other||0;
+          const saved=!!ex;
+          return `<tr style="background:${saved?'#f0fdf4':i%2?'#fff':'#f8fafc'};border-bottom:1px solid #e5e7eb" id="bsal-row-${mon}">
+            <td style="padding:7px 12px;font-weight:800;color:#1e3a8a">${mon}</td>
+            <td style="padding:4px"><input type="number" id="bsal_basic_${mon}" value="${exBasic}" min="0" step="0.01"
+              oninput="calcBulkSalNet('${mon}')"
+              style="width:100%;padding:5px 8px;border:1.5px solid #dbeafe;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
+            <td style="padding:4px"><input type="number" id="bsal_abs_${mon}" value="${exAbs}" min="0" max="31"
+              oninput="calcBulkSalNet('${mon}')"
+              style="width:100%;padding:5px 8px;border:1.5px solid #fee2e2;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
+            <td style="padding:4px"><input type="number" id="bsal_bonus_${mon}" value="${exBonus}" min="0"
+              oninput="calcBulkSalNet('${mon}')"
+              style="width:100%;padding:5px 8px;border:1.5px solid #d1fae5;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
+            <td style="padding:4px"><input type="number" id="bsal_ded_${mon}" value="${exDeduct}" min="0"
+              oninput="calcBulkSalNet('${mon}')"
+              style="width:100%;padding:5px 8px;border:1.5px solid #fecaca;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
+            <td style="padding:4px">
+              <input type="number" id="bsal_net_${mon}" value="${exNet}" min="0" step="0.01"
+                style="width:100%;padding:5px 8px;border:2px solid #1e3a8a;border-radius:7px;font-family:'Tajawal',sans-serif;font-weight:800;text-align:center;background:${saved?'#f0fdf4':'#eff6ff'}">
+            </td>
+            <td style="padding:7px;text-align:center">
+              ${saved
+                ?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:700">✅ محفوظ</span>`
+                :`<span style="background:#fef3c7;color:#92400e;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:700">⏳ جديد</span>`}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function calcBulkSalNet(mon){
+  const basic=Number(el(`bsal_basic_${mon}`)?.value||0);
+  const abs=Number(el(`bsal_abs_${mon}`)?.value||0);
+  const bonus=Number(el(`bsal_bonus_${mon}`)?.value||0);
+  const ded=Number(el(`bsal_ded_${mon}`)?.value||0);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const dailyRate=daysInMonth>0?basic/daysInMonth:0;
+  const net=Math.max(0,basic-(dailyRate*abs)-ded+bonus);
+  const inp=el(`bsal_net_${mon}`);
+  if(inp) inp.value=Math.round(net*100)/100;
+}
+
+async function saveBulkSalary(){
+  const staffId=el('bsal-staff')?.value;
+  if(!staffId){ alert('اختاري موظف أولاً'); return; }
+  const s=DB.staff.find(x=>String(x.id)===staffId);
+  const alertEl=el('bsal-alert');
+  alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>`;
+
+  // Collect all rows
+  const rows=[];
+  document.querySelectorAll('[id^="bsal_net_"]').forEach(inp=>{
+    const mon=inp.id.replace('bsal_net_','');
+    const net=Number(inp.value);
+    if(!net) return; // skip empty rows
+    const basic=Number(el(`bsal_basic_${mon}`)?.value||0);
+    const abs=Number(el(`bsal_abs_${mon}`)?.value||0);
+    const bonus=Number(el(`bsal_bonus_${mon}`)?.value||0);
+    const ded=Number(el(`bsal_ded_${mon}`)?.value||0);
+    const [yr,mo]=mon.split('-').map(Number);
+    const daysInMonth=new Date(yr,mo,0).getDate();
+    rows.push({
+      branch_id: s.branchId||curBid,
+      staff_id: Number(staffId),
+      month: mon,
+      amount: Math.round(net),
+      basic_salary: basic,
+      absent_days: abs,
+      present_days: daysInMonth-abs,
+      bonus, deduct_other: ded,
+    });
+  });
+
+  if(!rows.length){
+    alertEl.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:10px;font-size:.82rem">⚠️ لا توجد بيانات للحفظ</div>`;
+    return;
+  }
+
+  // Upsert salary history
+  const {error}=await sb.from('staff_salary_history').upsert(rows,{onConflict:'branch_id,staff_id,month'});
+  if(error){
+    alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:10px;font-size:.82rem;color:#dc2626">❌ خطأ: ${error.message}</div>`;
+    return;
+  }
+
+  // Auto-create expenses for each month
+  let expOk=0;
+  for(const r of rows){
+    const mon=r.month;
+    const [yr,mo]=mon.split('-').map(Number);
+    const lastDay=new Date(yr,mo,0).getDate();
+    const expDate=`${mon}-${String(lastDay).padStart(2,'0')}`;
+    const monLabel=new Date(yr,mo-1,1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
+    const existingExp=DB.expenses.find(e=>
+      e.branch_id===r.branch_id&&e.category==='salary'&&
+      (e.extra?.['__staff_id__']===String(staffId))&&
+      (e.date||'').startsWith(mon)
+    );
+    const expRow={
+      branch_id:r.branch_id, category:'salary', type:'Staff Salaries',
+      amount:r.amount, vat_type:'معفى (0%)', vat_amount:0, total_amount:r.amount,
+      date:expDate, note:`${monLabel} — ${s.name}`, sub_type:mon,
+      supplier_name:s.name, tax_number:'',
+      extra:{'Employee Name':s.name,'Job Title':s.position||'','__staff_id__':String(staffId),'__month__':mon}
+    };
+    if(existingExp?.id) await sb.from('expenses').update(expRow).eq('id',existingExp.id);
+    else await sb.from('expenses').insert(expRow);
+    expOk++;
+  }
+
+  alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:10px;font-size:.82rem;color:#065f46">
+    ✅ تم حفظ <b>${rows.length}</b> شهر بنجاح وتسجيل <b>${expOk}</b> مصروف راتب في المصاريف!
+  </div>`;
+  await loadFromSupa(curBid);
+  setTimeout(()=>renderBulkSalRows(),600);
+}
 
 function openBulkAttModal(){
   const mon = (el('staffattdate')?.value||today()).substring(0,7);
@@ -11169,7 +11497,7 @@ function showHRTab(id, btn){
   const p=el(id); if(p) p.classList.add('on');
   if(btn) btn.classList.add('on');
   if(id==='hr-payroll')  { populatePayrollBranch(); renderPayroll(); }
-  if(id==='hr-leaves')   { populateLeaveStaffFilter(); renderLeaves(); }
+  if(id==='hr-leaves')   { loadHRData().then(()=>{ populateLeaveStaffFilter(); renderLeaves(); }); }
   if(id==='hr-eog')      { loadHRData().then(()=>populateEOGSelect()); }
   if(id==='hr-reports')  { populateRptSelects(); }
 }
