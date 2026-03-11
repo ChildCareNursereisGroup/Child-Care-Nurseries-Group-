@@ -684,6 +684,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
+      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()">📋 إدخال جماعي</button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
@@ -1301,6 +1302,41 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="bus-alerts"></div>
   <div id="bus-list"></div>
+</div>
+</div>
+
+<!-- BULK ATTENDANCE MODAL -->
+<div class="mover" id="bulk-att-modal">
+<div class="modal" style="max-width:900px;width:98%">
+  <div class="mh">
+    <div class="mt">📋 إدخال الحضور الجماعي — Bulk Attendance Entry</div>
+    <button class="xb" onclick="el('bulk-att-modal').classList.remove('on')">✕</button>
+  </div>
+  <div style="padding:14px">
+    <!-- Controls -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;background:#f0f9ff;border-radius:10px;padding:10px 14px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:.75rem;font-weight:700;color:#0369a1">الشهر — Month</label>
+        <input type="month" id="bulk-att-month" style="padding:6px 10px;border:1.5px solid #bae6fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem" onchange="renderBulkAtt()">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:.75rem;font-weight:700;color:#0369a1">الفرع — Branch</label>
+        <select id="bulk-att-branch" style="padding:6px 10px;border:1.5px solid #bae6fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem" onchange="renderBulkAtt()">
+          ${BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:auto">
+        <button onclick="bulkMarkAll('حضور')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-size:.78rem;font-weight:800;font-family:'Tajawal',sans-serif">✅ الكل حضور</button>
+        <button onclick="bulkMarkAll('غياب')" style="background:#dc2626;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-size:.78rem;font-weight:800;font-family:'Tajawal',sans-serif">❌ الكل غياب</button>
+        <button onclick="saveBulkAtt()" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:7px 16px;cursor:pointer;font-size:.82rem;font-weight:900;font-family:'Tajawal',sans-serif">💾 حفظ الكل</button>
+      </div>
+    </div>
+    <div style="font-size:.75rem;color:#6b7280;margin-bottom:8px">
+      ⬜ فارغ = لم يُسجَّل | ✓ = حضور | ✕ = غياب &nbsp;|&nbsp; اضغط على المربع للتبديل
+    </div>
+    <div id="bulk-att-alert" style="margin-bottom:8px"></div>
+    <div id="bulk-att-body" style="overflow-x:auto"></div>
+  </div>
 </div>
 </div>
 
@@ -3833,13 +3869,16 @@ function renderStaffAtt(){
   }
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
 
-  let present=0, absent=0, totalBonus=0, totalDeduct=0;
+  let present=0, absent=0, unset=0, totalBonus=0, totalDeduct=0;
   let html='';
 
   staff.forEach((s,i)=>{
-    const st=DB.staffAtt[date][String(s.id)]||'حضور'; // default حضور — absence must be explicitly recorded
-    const isP=st==='حضور';
-    if(isP) present++; else absent++;
+    // '' = not recorded yet (checkbox empty), 'حضور' = present ✅, 'غياب' = absent ❌
+    const st=DB.staffAtt[date][String(s.id)];
+    const isP = st==='حضور';
+    const isA = st==='غياب';
+    const isEmpty = !st;
+    if(isP) present++; else if(isA) absent++; else unset++;
     const phone=s.contact||'';
     const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
     const sentTime=localStorage.getItem(sentKey);
@@ -3848,67 +3887,69 @@ function renderStaffAtt(){
     const dayData=getStaffDayData(s.id,date);
     const bonus=Number(dayData.bonus||0);
     const deduct=Number(dayData.deduct||0);
-    const absType=dayData.absType||'absent'; // absent|sick|excuse
+    const absType=dayData.absType||'absent';
     const notes=dayData.notes||'';
     const sickDaysTotal=Number(dayData.sickDaysTotal||0);
     totalBonus+=bonus; totalDeduct+=deduct;
+    const todayDeduct=isA&&basic>0?dailyRate:0;
+    const netImpact=bonus - deduct - (isA?todayDeduct:0);
 
-    // Net today impact
-    const todayDeduct=!isP&&basic>0?dailyRate:0;
-    const netImpact=bonus - deduct - (isP?0:todayDeduct);
+    // Checkbox style
+    const chkBg   = isP?'#059669':isA?'#dc2626':'#fff';
+    const chkBord = isP?'#059669':isA?'#dc2626':'#9ca3af';
+    const chkIcon  = isP?'✓':isA?'✕':'';
+    const chkColor = '#fff';
+    const rowBg    = isP?'#f0fdf4':isA?'#fff5f5':'#fffbeb';
 
-    html+=`<div style="border-bottom:1px solid #e5e7eb;background:${isP?'#f0fdf4':'#fff9f9'}">
-      <!-- Main row -->
-      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;">
+    html+=`<div style="border-bottom:1px solid #e5e7eb;background:${rowBg}">
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;">
         <div class="av" style="background:#7c3aed;color:#fff;width:34px;height:34px;font-size:.85rem;flex-shrink:0">${(s.name||'؟')[0]}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:800;font-size:.87rem">${s.name}</div>
           <div style="font-size:.68rem;color:var(--muted)">${s.position||'—'}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${curRole==='admin'&&bonus>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 7px;font-size:.68rem;font-weight:800">+${fmtNum(bonus)}</span>`:''}
           ${curRole==='admin'&&deduct>0?`<span style="background:#fee2e2;color:#dc2626;border-radius:7px;padding:2px 7px;font-size:.68rem;font-weight:800">-${fmtNum(deduct)}</span>`:''}
-          ${!isP&&phone
-            ? sentTime
-              ? `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.68rem;font-weight:700">✅💬</button>`
-              : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`
+          ${isA&&phone ? (sentTime
+            ? `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#128c7e;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.68rem;font-weight:700">✅💬</button>`
+            : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`)
             : ''}
-          <span onclick="toggleStaffAtt('${s.id}','${date}')" style="padding:5px 13px;border-radius:18px;cursor:pointer;font-weight:700;font-size:.76rem;min-width:68px;text-align:center;user-select:none;${isP?'background:#d1fae5;color:#065f46':'background:#fee2e2;color:#991b1b'}">
-            ${isP?'✅ حضور':'❌ غياب'}
-          </span>
+          <!-- Checkbox -->
+          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط للتسجيل':isP?'حضور — اضغط للتغيير':'غياب — اضغط للتغيير'}"
+            style="width:28px;height:28px;border:2.5px solid ${chkBord};border-radius:7px;background:${chkBg};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;font-weight:900;color:${chkColor};user-select:none;flex-shrink:0;transition:all .15s">
+            ${chkIcon}
+          </div>
+          <div style="font-size:.7rem;font-weight:800;min-width:36px;text-align:center;color:${isP?'#059669':isA?'#dc2626':'#9ca3af'}">
+            ${isP?'حضور':isA?'غياب':'—'}
+          </div>
           <button onclick="toggleStaffExpand('${s.id}','${date}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.72rem;color:#6b7280">⚙️</button>
         </div>
       </div>
       <!-- Expandable detail panel -->
       <div id="sexp_${s.id}_${date.replace(/-/g,'')}" style="display:none;padding:10px 14px 12px;background:#fafafa;border-top:1px dashed #e5e7eb">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-
-          <!-- BONUS -->
           <div style="background:#f0fdf4;border-radius:8px;padding:8px">
             <div style="font-size:.7rem;font-weight:700;color:#059669;margin-bottom:4px">🎁 Bonus (AED)</div>
             <input type="number" min="0" value="${bonus}"
               onchange="saveStaffDayField('${s.id}','${date}','bonus',this.value)"
               style="width:100%;padding:6px 9px;border:1.5px solid #d1fae5;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#fff;box-sizing:border-box">
             <div style="font-size:.68rem;font-weight:600;color:#059669;margin-top:5px">Reason</div>
-            <input type="text" value="${dayData.bonusReason||''}" placeholder="e.g. Performance, Extra work..."
+            <input type="text" value="${dayData.bonusReason||''}" placeholder="e.g. Performance..."
               onchange="saveStaffDayField('${s.id}','${date}','bonusReason',this.value)"
               style="width:100%;padding:5px 8px;border:1.5px solid #d1fae5;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;background:#fff;box-sizing:border-box;margin-top:2px">
           </div>
-
-          <!-- DEDUCTION -->
           <div style="background:#fff9f9;border-radius:8px;padding:8px">
             <div style="font-size:.7rem;font-weight:700;color:#dc2626;margin-bottom:4px">✂️ Deduction (AED)</div>
             <input type="number" min="0" value="${deduct}"
               onchange="saveStaffDayField('${s.id}','${date}','deduct',this.value)"
               style="width:100%;padding:6px 9px;border:1.5px solid #fee2e2;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#fff;box-sizing:border-box">
             <div style="font-size:.68rem;font-weight:600;color:#dc2626;margin-top:5px">Reason</div>
-            <input type="text" value="${dayData.deductReason||''}" placeholder="e.g. Late arrival, Damage..."
+            <input type="text" value="${dayData.deductReason||''}" placeholder="e.g. Late arrival..."
               onchange="saveStaffDayField('${s.id}','${date}','deductReason',this.value)"
               style="width:100%;padding:5px 8px;border:1.5px solid #fee2e2;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;background:#fff;box-sizing:border-box;margin-top:2px">
           </div>
-
-          ${!isP?`
-          <!-- ABSENCE TYPE -->
+          ${isA?`
           <div>
             <div style="font-size:.7rem;font-weight:700;color:#d97706;margin-bottom:4px">📋 Absence Type</div>
             <select onchange="saveStaffDayField('${s.id}','${date}','absType',this.value)"
@@ -3918,289 +3959,230 @@ function renderStaffAtt(){
               <option value="excuse" ${absType==='excuse'?'selected':''}>📝 Excused</option>
               <option value="unpaid" ${absType==='unpaid'?'selected':''}>⛔ Unpaid Leave</option>
             </select>
-          </div>
-          <!-- SICK DAYS -->
-          <div>
-            <div style="font-size:.7rem;font-weight:700;color:#be185d;margin-bottom:4px">🏥 Sick Days This Month</div>
-            <input type="number" min="0" max="90" value="${dayData.sickDaysTotal||0}"
-              onchange="saveSickDaysTotal('${s.id}','${date}',this.value)"
-              style="width:100%;padding:6px 9px;border:1.5px solid #fce7f3;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#fdf2f8;box-sizing:border-box">
-            <div style="font-size:.63rem;color:#9d174d;margin-top:2px">${sickDaysTotal>0?calcSickLawNote(sickDaysTotal):'UAE Law: 15 paid | 16-45 half | 46+ unpaid'}</div>
           </div>`:''}
-
-          <!-- NOTES -->
-          <div ${!isP?'':'style="grid-column:span 2"'}>
-            <div style="font-size:.7rem;font-weight:700;color:#6b7280;margin-bottom:4px">📝 Notes</div>
-            <input type="text" value="${notes}" placeholder="Any notes..."
-              onchange="saveStaffDayField('${s.id}','${date}','notes',this.value)"
-              style="width:100%;padding:6px 9px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-          </div>
         </div>
-        ${basic>0&&curRole==='admin'?`<div style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px;font-size:.76rem">
-          <div style="font-weight:800;color:#1e3a8a;margin-bottom:5px">💰 Salary Impact Today</div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>Daily Rate</span><span>${fmtNum(dailyRate)} AED</span></div>
-          ${!isP?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>Absence Deduction</span><span>- ${fmtNum(dailyRate)}</span></div>`:''}
-          ${bonus>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#059669"><span>Bonus</span><span>+ ${fmtNum(bonus)}</span></div>`:''}
-          ${deduct>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>Extra Deduction</span><span>- ${fmtNum(deduct)}</span></div>`:''}
-          <div style="border-top:1px solid var(--border);margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;font-weight:800">
-            <span>Today's Net</span>
-            <span style="color:${netImpact>=0?'#059669':'#dc2626'}">${netImpact>=0?'+':''}${fmtNum(netImpact)} AED</span>
-          </div>
-        </div>`:''}
       </div>
     </div>`;
   });
 
-  // Absent bar
-  const absentStaff=staff.filter(s=>(DB.staffAtt[date][String(s.id)]||'غياب')!=='حضور');
-  if(absentStaff.length){
-    const notSent=absentStaff.filter(s=>s.contact&&!localStorage.getItem('wa_staff_sent_'+curBid+'_'+date+'_'+s.id));
-    html+=`<div style="margin-top:8px;padding:9px 12px;background:#fef3c7;border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-      <span style="font-size:.8rem;font-weight:700;color:#92400e">❌ ${absentStaff.length} غائب</span>
-      ${notSent.length?`<button onclick="sendAllStaffAbsentWA('${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:800">💬 واتساب للغائبين (${notSent.length})</button>`:''}
-    </div>`;
-  }
-
   container.innerHTML=html;
 
-  // Monthly salary summary button
-  const mon=date.substring(0,7);
   el('staffattsum').innerHTML=`
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:4px 0">
-      <span style="color:var(--ok);font-weight:700">✅ حضور: ${present}</span>
-      <span style="color:var(--err);font-weight:700">❌ غياب: ${absent}</span>
-      <span style="color:var(--muted)">👷 الإجمالي: ${staff.length}</span>
-      ${curRole==='admin'&&totalBonus>0?`<span style="color:#059669;font-weight:700">🎁 مكافآت: +${fmtNum(totalBonus)}</span>`:''}
-      ${curRole==='admin'&&totalDeduct>0?`<span style="color:#dc2626;font-weight:700">✂️ خصومات: -${fmtNum(totalDeduct)}</span>`:''}
-      ${curRole==='admin'?`<button onclick="showMonthlySalarySummary('${mon}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:5px 13px;cursor:pointer;font-size:.76rem;font-weight:800;margin-right:auto">💰 ملخص رواتب ${mon}</button>`:''}
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span style="color:#059669;font-weight:800">✅ حضور: ${present}</span>
+      <span style="color:#dc2626;font-weight:800">❌ غياب: ${absent}</span>
+      ${unset?`<span style="color:#f59e0b;font-weight:800">⬜ لم يُسجَّل: ${unset}</span>`:''}
+      ${totalBonus?`<span style="color:#059669;font-weight:700">🎁 بونص: ${fmtNum(totalBonus)}</span>`:''}
+      ${totalDeduct?`<span style="color:#dc2626;font-weight:700">✂️ خصم: ${fmtNum(totalDeduct)}</span>`:''}
     </div>`;
 }
 
-function toggleStaffExpand(staffId, date){
-  const id='sexp_'+staffId+'_'+date.replace(/-/g,'');
-  const el2=el(id); if(!el2) return;
-  el2.style.display=el2.style.display==='none'?'block':'none';
+// ═══════════════════════════════════════════════
+// BULK ATTENDANCE ENTRY
+// ═══════════════════════════════════════════════
+let _bulkAttData = {}; // {date: {staffId: 'حضور'|'غياب'|''}}
+
+function openBulkAttModal(){
+  const mon = (el('staffattdate')?.value||today()).substring(0,7);
+  el('bulk-att-month').value = mon;
+  el('bulk-att-branch').value = curBid;
+  _bulkAttData = {};
+  renderBulkAtt();
+  el('bulk-att-modal').classList.add('on');
 }
 
-function saveStaffDayField(staffId, date, field, value){
-  const data=getStaffDayData(staffId,date);
-  data[field]=field==='bonus'||field==='deduct'?Number(value):value;
-  setStaffDayData(staffId,date,data);
-  // Update bonus/deduction in staff record for payroll calc
-  if(field==='bonus'||field==='deduct'){
-    const mon=date.substring(0,7);
-    // Accumulate all bonuses/deductions for this month
-    const s=DB.staff.find(x=>String(x.id)===String(staffId));
-    if(s){
-      let totalBonus=0,totalDeduct=0;
-      const daysInMon=new Date(parseInt(mon.split('-')[0]),parseInt(mon.split('-')[1]),0).getDate();
-      for(let d=1;d<=daysInMon;d++){
-        const dd=mon+'-'+String(d).padStart(2,'0');
-        const dd2=getStaffDayData(staffId,dd);
-        totalBonus+=Number(dd2.bonus||0);
-        totalDeduct+=Number(dd2.deduct||0);
-      }
-      sb.from('staff').update({bonus:totalBonus,deductions:totalDeduct}).eq('id',staffId).catch(()=>{});
-      s.bonus=totalBonus; s.deductions=totalDeduct;
-    }
+async function renderBulkAtt(){
+  const mon = el('bulk-att-month')?.value;
+  const bid = el('bulk-att-branch')?.value||curBid;
+  if(!mon) return;
+  const body = el('bulk-att-body');
+  body.innerHTML = `<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>`;
+
+  const [yr,mo] = mon.split('-').map(Number);
+  const daysInMonth = new Date(yr,mo,0).getDate();
+
+  // Load staff for selected branch
+  let staffList = DB.staff.filter(s=>s.branchId===bid||s.branchId===Number(bid));
+  if(!staffList.length){
+    // Try loading from supabase
+    const {data} = await sb.from('staff').select('*').eq('branch_id',bid);
+    staffList = (data||[]).map(x=>({id:x.id,name:x.name,position:x.position||'',branchId:x.branch_id,lastWorkingDay:x.last_working_day||''}));
   }
-  renderStaffAtt();
-}
+  staffList = staffList.filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
 
-function showMonthlySalarySummary(mon){
-  const staff=DB.staff.filter(s=>Number(s.grossSalary)||Number(s.basicSalary));
-  if(!staff.length){ alert('No staff with salary defined'); return; }
-  const [yr,mo]=mon.split('-').map(Number);
-  const daysInMonth=new Date(yr,mo,0).getDate();
+  // Load existing attendance for this month+branch
+  const {data:attData} = await sb.from('staff_attendance').select('*')
+    .eq('branch_id',bid)
+    .gte('date',mon+'-01')
+    .lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'));
 
-  // Build data rows with all 9 fields
-  let grandTotal=0;
-  const rows=staff.map((s,i)=>{
-    const basic=Number(s.basicSalary||0);
-    const gross=Number(s.grossSalary)||basic;
-    const dailyRate=gross/daysInMonth;
-
-    let workDays=0, absDays=0;
-    let totalBonus=0, bonusReasons=[];
-    let totalDeduct=0, deductReasons=[];
-
-    for(let d=1;d<=daysInMonth;d++){
-      const dd=mon+'-'+String(d).padStart(2,'0');
-      const dayOfWeek=new Date(dd+'T00:00:00').getDay();
-      // Skip Fridays (dayOfWeek===5) if needed — not skipping for now
-      const attSt=DB.staffAtt[dd]?.[s.id]||DB.staffAtt[dd]?.[String(s.id)]||'';
-      if(!attSt) continue; // day not recorded
-      if(attSt==='حضور') workDays++; else absDays++;
-      const dd2=getStaffDayData(s.id,dd);
-      if(Number(dd2.bonus||0)>0){
-        totalBonus+=Number(dd2.bonus);
-        if(dd2.bonusReason) bonusReasons.push(dd2.bonusReason);
-      }
-      if(Number(dd2.deduct||0)>0){
-        totalDeduct+=Number(dd2.deduct);
-        if(dd2.deductReason) deductReasons.push(dd2.deductReason);
-      }
-    }
-
-    const absDed=dailyRate*absDays;
-    const loanDeduct=getLoanDeductionForMonth(s.id, mon);
-    const net=Math.max(0, gross - absDed - totalDeduct - loanDeduct + totalBonus);
-    grandTotal+=net;
-
-    return {
-      s, basic, gross, workDays, absDays,
-      totalDeduct, deductReasons:[...new Set(deductReasons)],
-      totalBonus, bonusReasons:[...new Set(bonusReasons)],
-      absDed, loanDeduct, net, i
-    };
+  // Build local lookup: {date:{staffId:status}}
+  const existing = {};
+  (attData||[]).forEach(r=>{
+    if(!existing[r.date]) existing[r.date]={};
+    existing[r.date][String(r.staff_id)] = r.status;
   });
 
-  const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  // Merge with any unsaved bulk edits
+  Object.keys(_bulkAttData).forEach(date=>{
+    if(!existing[date]) existing[date]={};
+    Object.assign(existing[date], _bulkAttData[date]);
+  });
 
-  let html=`
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div>
-      <div style="font-weight:900;color:#1e3a8a;font-size:1rem">📊 Monthly Salary Report — ${monLabel}</div>
-      <div style="font-size:.75rem;color:#6b7280">${staff.length} employees · ${CB().en}</div>
-    </div>
-    <div style="display:flex;gap:7px">
-      <button onclick="printMonthlySalary('${mon}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-size:.78rem">🖨️ Print</button>
-      <button onclick="exportSalarySummary('${mon}')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-weight:700;font-size:.78rem">📊 Excel</button>
-    </div>
-  </div>
+  // Build day headers (skip Fridays = day 5)
+  const days = [];
+  for(let d=1;d<=daysInMonth;d++){
+    const dd = `${mon}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(dd+'T00:00:00').getDay();
+    days.push({d,dd,dow,isFri:dow===5});
+  }
+  const dayNames=['س','ح','ن','ث','ر','خ','ج'];
 
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:.77rem;min-width:700px">
+  let html = `<table style="border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.78rem;min-width:600px">
     <thead>
-      <tr style="background:#1e3a8a;color:#fff;text-align:center">
-        <th style="padding:9px 8px;text-align:right;border-radius:8px 0 0 0">#</th>
-        <th style="padding:9px 8px;text-align:right">Employee Name</th>
-        <th style="padding:9px 8px">Employee Code</th>
-        <th style="padding:9px 8px">Work Days</th>
-        <th style="padding:9px 8px">Absent Days</th>
-        <th style="padding:9px 8px">Deduction (AED)</th>
-        <th style="padding:9px 8px">Deduction Reason</th>
-        <th style="padding:9px 8px">Bonus (AED)</th>
-        <th style="padding:9px 8px">Bonus Reason</th>
-        <th style="padding:9px 8px;font-weight:900;border-radius:0 8px 0 0">Total (AED)</th>
+      <tr style="background:#1e3a8a;color:#fff">
+        <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">الموظف</th>
+        ${days.map(({d,dow,isFri})=>`<th style="padding:6px 4px;min-width:30px;text-align:center;background:${isFri?'#374151':'#1e3a8a'};opacity:${isFri?'.6':'1'}">
+          <div style="font-size:.65rem;opacity:.8">${dayNames[dow]}</div>
+          <div>${d}</div>
+        </th>`).join('')}
+        <th style="padding:8px;white-space:nowrap">غياب</th>
       </tr>
     </thead>
     <tbody>
-      ${rows.map(r=>`
-        <tr style="background:${r.i%2?'#fff':'#f8fafc'};border-bottom:1px solid #e5e7eb;text-align:center">
-          <td style="padding:8px;text-align:right;color:#9ca3af;font-size:.72rem">${r.i+1}</td>
-          <td style="padding:8px;text-align:right">
-            <div style="font-weight:800">${r.s.name}</div>
-            <div style="font-size:.67rem;color:#9ca3af">${r.s.position||'—'}</div>
-          </td>
-          <td style="padding:8px">
-            <span style="background:#ede9fe;color:#5b21b6;border-radius:6px;padding:2px 9px;font-weight:800;font-size:.74rem">${r.s.transferCode||'—'}</span>
-          </td>
-          <td style="padding:8px;font-weight:700;color:#059669">${r.workDays}</td>
-          <td style="padding:8px">
-            ${r.absDays>0
-              ?`<span style="background:#fee2e2;color:#dc2626;border-radius:6px;padding:2px 9px;font-weight:800">${r.absDays}</span>`
-              :'<span style="color:#059669;font-weight:700">0</span>'}
-          </td>
-          <td style="padding:8px;color:#dc2626;font-weight:700">
-            ${(r.totalDeduct+r.absDed+r.loanDeduct)>0
-              ?`-${fmtNum(Math.round((r.totalDeduct+r.absDed+r.loanDeduct)*100)/100)}`
-              :'—'}
-          </td>
-          <td style="padding:8px;font-size:.72rem;color:#6b7280;max-width:130px">
-            ${[
-              r.absDays>0?`Absent(${r.absDays}d)`:'',
-              r.loanDeduct>0?`Loan installment(-${fmtNum(r.loanDeduct)})`: '',
-              ...r.deductReasons
-            ].filter(Boolean).join(', ')||'—'}
-          </td>
-          <td style="padding:8px;color:#059669;font-weight:700">
-            ${r.totalBonus>0?`+${fmtNum(r.totalBonus)}`:'—'}
-          </td>
-          <td style="padding:8px;font-size:.72rem;color:#6b7280;max-width:120px">
-            ${r.bonusReasons.length?r.bonusReasons.join(', '):'—'}
-          </td>
-          <td style="padding:8px">
-            <span style="background:#d1fae5;color:#065f46;border-radius:8px;padding:4px 12px;font-weight:900;font-size:.82rem">${fmtNum(Math.round(r.net))}</span>
-          </td>
-        </tr>`).join('')}
+    ${staffList.map((s,si)=>{
+      let absCount=0;
+      const cells = days.map(({dd,isFri})=>{
+        const st = (existing[dd]||{})[String(s.id)]||(_bulkAttData[dd]||{})[String(s.id)]||'';
+        const isP=st==='حضور', isA=st==='غياب';
+        if(isA) absCount++;
+        const bg = isP?'#059669':isA?'#dc2626':'#fff';
+        const bord = isP?'#059669':isA?'#dc2626':'#d1d5db';
+        const icon = isP?'✓':isA?'✕':'';
+        return `<td style="padding:3px;text-align:center;background:${isFri?'#f9fafb':'#fff'}">
+          <div onclick="toggleBulkCell('${s.id}','${dd}')" data-sid="${s.id}" data-date="${dd}"
+            style="width:26px;height:26px;border:2px solid ${bord};border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;font-weight:900;margin:auto;user-select:none">
+            ${icon}
+          </div>
+        </td>`;
+      }).join('');
+      return `<tr style="background:${si%2?'#f8fafc':'#fff'};border-bottom:1px solid #e5e7eb">
+        <td style="padding:7px 12px;font-weight:700;white-space:nowrap;position:sticky;left:0;background:${si%2?'#f8fafc':'#fff'};z-index:1">
+          ${s.name}<div style="font-size:.65rem;color:#9ca3af">${s.position||''}</div>
+        </td>
+        ${cells}
+        <td style="padding:7px;text-align:center">
+          <span style="background:${absCount>0?'#fee2e2':'#d1fae5'};color:${absCount>0?'#dc2626':'#059669'};border-radius:9px;padding:2px 9px;font-weight:800;font-size:.78rem">${absCount}</span>
+        </td>
+      </tr>`;
+    }).join('')}
     </tbody>
-    <tfoot>
-      <tr style="background:#1e3a8a;color:#fff;font-weight:900;text-align:center">
-        <td colspan="9" style="padding:10px;text-align:right">Total Payroll</td>
-        <td style="padding:10px;font-size:.92rem">${fmtNum(Math.round(grandTotal))} AED</td>
-      </tr>
-    </tfoot>
-  </table>
-  </div>`;
+  </table>`;
 
-  showModal('📊 Monthly Salary Report — '+monLabel, html, '900px');
+  body.innerHTML = html;
+  // store staff list for save function
+  body._staffList = staffList;
+  body._days = days;
+  body._existing = existing;
 }
 
-function printMonthlySalary(mon){
-  const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  // Trigger the same modal content but with print
-  showMonthlySalarySummary(mon);
-  setTimeout(()=>window.print(), 600);
-}
+function toggleBulkCell(staffId, date){
+  if(!_bulkAttData[date]) _bulkAttData[date]={};
+  const cur = _bulkAttData[date][String(staffId)];
+  // Cycle: '' → 'حضور' → 'غياب' → ''
+  const next = !cur||cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+  _bulkAttData[date][String(staffId)] = next;
 
-function exportSalarySummary(mon){
-  const XLSX=window.XLSX;
-  const staff=DB.staff.filter(s=>Number(s.grossSalary)||Number(s.basicSalary));
-  const [yr,mo]=mon.split('-').map(Number);
-  const daysInMonth=new Date(yr,mo,0).getDate();
-  const rows=staff.map((s,i)=>{
-    const basic=Number(s.basicSalary||0);
-    const gross=Number(s.grossSalary)||basic;
-    const dailyRate=gross/daysInMonth;
-    let workDays=0,absDays=0,totalBonus=0,totalDeduct=0;
-    let bonusReasons=[],deductReasons=[];
-    for(let d=1;d<=daysInMonth;d++){
-      const dd=mon+'-'+String(d).padStart(2,'0');
-      const attSt=DB.staffAtt[dd]?.[s.id]||DB.staffAtt[dd]?.[String(s.id)]||'';
-      if(!attSt) continue;
-      if(attSt==='حضور') workDays++; else absDays++;
-      const dd2=getStaffDayData(s.id,dd);
-      if(Number(dd2.bonus||0)>0){ totalBonus+=Number(dd2.bonus); if(dd2.bonusReason) bonusReasons.push(dd2.bonusReason); }
-      if(Number(dd2.deduct||0)>0){ totalDeduct+=Number(dd2.deduct); if(dd2.deductReason) deductReasons.push(dd2.deductReason); }
+  // Update cell visually without full re-render
+  const cell = document.querySelector(`[data-sid="${staffId}"][data-date="${date}"]`);
+  if(cell){
+    const isP=next==='حضور', isA=next==='غياب';
+    cell.style.background = isP?'#059669':isA?'#dc2626':'#fff';
+    cell.style.borderColor = isP?'#059669':isA?'#dc2626':'#d1d5db';
+    cell.textContent = isP?'✓':isA?'✕':'';
+    // update absent count for this row
+    const row = cell.closest('tr');
+    if(row){
+      const allCells = row.querySelectorAll('[data-sid]');
+      let abs=0;
+      allCells.forEach(c=>{ if(c.textContent.trim()==='✕') abs++; });
+      const badge=row.querySelector('td:last-child span');
+      if(badge){
+        badge.textContent=abs;
+        badge.style.background=abs>0?'#fee2e2':'#d1fae5';
+        badge.style.color=abs>0?'#dc2626':'#059669';
+      }
     }
-    const absDed=dailyRate*absDays;
-    const loanDeduct=getLoanDeductionForMonth(s.id, mon);
-    const totalDed=totalDeduct+absDed+loanDeduct;
-    const net=Math.max(0,gross-totalDed+totalBonus);
-    const deductReason=[absDays>0?`Absent(${absDays}d)`:'', loanDeduct>0?`Loan(-${fmtNum(loanDeduct)})`:'', ...deductReasons].filter(Boolean).join(', ');
-    return [
-      i+1, s.name, s.position||'', s.transferCode||'',
-      workDays, absDays,
-      Math.round(totalDed*100)/100, deductReason||'—',
-      Math.round(totalBonus*100)/100, bonusReasons.join(', ')||'—',
-      Math.round(net)
-    ];
+  }
+}
+
+function bulkMarkAll(status){
+  const body = el('bulk-att-body');
+  const cells = body.querySelectorAll('[data-sid]');
+  cells.forEach(cell=>{
+    const sid=cell.getAttribute('data-sid');
+    const date=cell.getAttribute('data-date');
+    if(!_bulkAttData[date]) _bulkAttData[date]={};
+    _bulkAttData[date][sid]=status;
+    const isP=status==='حضور';
+    cell.style.background=isP?'#059669':'#dc2626';
+    cell.style.borderColor=isP?'#059669':'#dc2626';
+    cell.textContent=isP?'✓':'✕';
   });
-  const ws=XLSX.utils.aoa_to_sheet([
-    ['#','Employee Name','Position','Employee Code','Work Days','Absent Days','Deduction (AED)','Deduction Reason','Bonus (AED)','Bonus Reason','Total (AED)'],
-    ...rows
-  ]);
-  ws['!cols']=[{wch:4},{wch:22},{wch:16},{wch:12},{wch:10},{wch:11},{wch:14},{wch:22},{wch:12},{wch:22},{wch:12}];
-  const wb=XLSX.utils.book_new();
-  const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  XLSX.utils.book_append_sheet(wb,ws,'Salary '+mon);
-  XLSX.writeFile(wb,'salary_report_'+mon+'.xlsx');
+  // update all abs counts
+  body.querySelectorAll('tbody tr').forEach(row=>{
+    const allCells=row.querySelectorAll('[data-sid]');
+    let abs=0;
+    allCells.forEach(c=>{ if(c.textContent.trim()==='✕') abs++; });
+    const badge=row.querySelector('td:last-child span');
+    if(badge){
+      badge.textContent=abs;
+      badge.style.background=abs>0?'#fee2e2':'#d1fae5';
+      badge.style.color=abs>0?'#dc2626':'#059669';
+    }
+  });
 }
 
-// UAE Sick Leave Law calculator
-function calcSickLawNote(days){
-  days=Number(days);
-  if(days<=15) return `✅ ${days} days — fully paid (within 15-day limit)`;
-  if(days<=45) return `⚡ ${days} days — days 16-${days} at half pay (${days-15} days half)`;
-  return `❌ ${days} days — days 1-15 full, 16-45 half, day 46+ unpaid`;
-}
+async function saveBulkAtt(){
+  const mon = el('bulk-att-month')?.value;
+  const bid = el('bulk-att-branch')?.value||curBid;
+  const alertEl = el('bulk-att-alert');
+  alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.8rem">⏳ جاري الحفظ...</div>`;
 
-function saveSickDaysTotal(staffId, date, value){
-  const data=getStaffDayData(staffId,date);
-  data.sickDaysTotal=Number(value);
-  setStaffDayData(staffId,date,data);
-  renderStaffAtt();
+  // Build rows to upsert
+  const rows=[];
+  Object.keys(_bulkAttData).forEach(date=>{
+    if(!date.startsWith(mon)) return;
+    Object.keys(_bulkAttData[date]).forEach(staffId=>{
+      const status=_bulkAttData[date][staffId];
+      if(!status) return; // skip unset
+      rows.push({branch_id:bid, staff_id:Number(staffId), date, status});
+    });
+  });
+
+  if(!rows.length){
+    alertEl.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px 12px;font-size:.8rem">⚠️ لا يوجد تغييرات للحفظ</div>`;
+    return;
+  }
+
+  // Upsert in batches of 50
+  let saved=0, errors=0;
+  for(let i=0;i<rows.length;i+=50){
+    const batch=rows.slice(i,i+50);
+    const {error}=await sb.from('staff_attendance').upsert(batch,{onConflict:'branch_id,staff_id,date'});
+    if(error){ errors++; console.error('bulk att error:',error); }
+    else saved+=batch.length;
+  }
+
+  if(errors){
+    alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#dc2626">❌ بعض السجلات لم تُحفظ (${errors} أخطاء)</div>`;
+  } else {
+    alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل بنجاح!</div>`;
+    _bulkAttData={};
+    // Refresh local DB cache
+    if(bid===curBid) await loadFromSupa(curBid);
+    setTimeout(()=>renderBulkAtt(),500);
+  }
 }
 
 async function toggleStaffAtt(staffId, date){
@@ -11281,7 +11263,7 @@ function renderPayroll(){
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
       <div class="sc"><div class="si">👷</div><div class="sv">${rows.length}</div><div class="sk">Staff on Payroll</div></div>
       <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(totalPayroll)}</div><div class="sk">Total Payroll (AED)</div></div>
-      <div class="sc"><div class="si">🏦</div><div class="sv">ednered</div><div class="sk">Transfer via</div></div>
+      <div class="sc"><div class="si">🏦</div><div class="sv">${rows.length>0?(rows[0].s.transferCode||'—'):'—'}</div><div class="sk">Transfer via</div></div>
     </div>`;
 
   el('payroll-list').innerHTML=`
@@ -12207,7 +12189,7 @@ async function upsertSalaryHistoryEntry(staffId, entry){
   // Save single entry to Supabase
   const payload={
     branch_id: curBid,
-    staff_id: String(staffId),
+    staff_id: Number(staffId),
     month: entry.month,
     amount: entry.amount||0,
     basic_salary: entry.basic||0,
