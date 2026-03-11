@@ -1913,19 +1913,12 @@ async function loadFromSupa(bid) {
     if(sa.error){
       console.error('staff_attendance load error:',sa.error);
     } else {
-      // Sort by id ascending so the LATEST record (highest id) wins when there are duplicates
-      const sorted=(sa.data||[]).slice().sort((a,b)=>{
-        if(a.id < b.id) return -1;
-        if(a.id > b.id) return 1;
-        return 0;
-      });
+      // Sort by id ascending so the LATEST record (highest id) wins
+      const sorted=(sa.data||[]).slice().sort((a,b)=>a.id-b.id);
       sorted.forEach(x=>{
         const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
-        // Only overwrite if status is حضور, or if no record yet — never let a duplicate غياب overwrite a حضور
-        const existing=DB.staffAtt[d][String(x.staff_id)];
-        if(!existing || x.status==='حضور' || existing==='غياب'){
-          DB.staffAtt[d][String(x.staff_id)]=x.status;
-        }
+        // Latest record always wins (sorted by id asc = last one overwrites)
+        DB.staffAtt[d][String(x.staff_id)]=x.status;
       });
       console.log('staff_attendance loaded:',sa.data?.length,'records');
     }
@@ -4629,33 +4622,37 @@ async function saveBulkAtt(){
 async function toggleStaffAtt(staffId, date){
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
-  const cur=DB.staffAtt[date][sid]||'حضور';
-  const newSt=cur==='حضور'?'غياب':'حضور';
+  const cur=DB.staffAtt[date][sid]||''; // '' = unset, 'حضور' = present, 'غياب' = absent
+  // Cycle: '' → 'حضور' → 'غياب' → '' 
+  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
-  if(s) logActivity('attendance', s.name+' (staff) → '+newSt);
+  if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
 
-  const payload={branch_id:String(curBid), staff_id:String(staffId), date:String(date), status:newSt};
+  if(!newSt){
+    // Cleared → delete record from Supabase
+    await sb.from('staff_attendance')
+      .delete()
+      .eq('branch_id', curBid)
+      .eq('staff_id',  Number(staffId))
+      .eq('date',      date);
+    return;
+  }
+
+  // Save to Supabase using upsert (requires unique constraint on branch_id,staff_id,date)
+  const payload={branch_id:curBid, staff_id:Number(staffId), date:date, status:newSt};
   console.log('Saving staff att:', payload);
-
-  // Step 1: Delete ALL existing records for this staff+date+branch to avoid duplicates
-  const {error:delErr}=await sb.from('staff_attendance')
-    .delete()
-    .eq('branch_id', String(curBid))
-    .eq('staff_id',  String(staffId))
-    .eq('date',      String(date));
-  if(delErr) console.warn('StaffAtt delete error (non-fatal):', delErr);
-
-  // Step 2: Insert fresh single record
-  const {error:insErr}=await sb.from('staff_attendance').insert(payload);
-  if(insErr){
-    console.error('StaffAtt insert error:', insErr);
-    // Last resort: try upsert
-    const {error:upErr}=await sb.from('staff_attendance')
-      .upsert(payload, {onConflict:'branch_id,staff_id,date'});
-    if(upErr) console.error('StaffAtt upsert error:', upErr);
-    else console.log('StaffAtt saved via upsert fallback');
+  const {error}=await sb.from('staff_attendance')
+    .upsert(payload, {onConflict:'branch_id,staff_id,date'});
+  if(error){
+    console.error('StaffAtt upsert error:', error);
+    // Fallback: delete then insert
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+    const {error:insErr}=await sb.from('staff_attendance').insert(payload);
+    if(insErr) console.error('StaffAtt insert fallback error:', insErr);
+    else console.log('StaffAtt saved via fallback → '+newSt);
   } else {
     console.log('StaffAtt saved OK → '+newSt);
   }
