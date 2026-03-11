@@ -1306,7 +1306,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <button class="hr-tab on" onclick="showHRTab('hr-records',this)">👷 الموظفون</button>
   <button class="hr-tab" onclick="showHRTab('hr-payroll',this)">💰 الرواتب</button>
   <button class="hr-tab" onclick="showHRTab('hr-leaves',this)">🏖️ الإجازات</button>
-  <button class="hr-tab" onclick="showHRTab('hr-eog',this)">📋 نهاية الخدمة</button>
+  <button class="hr-tab" onclick="showHRTab('hr-eog',this)">📋 End of Service</button>
   <button class="hr-tab" onclick="showHRTab('hr-reports',this)">📊 التقارير</button>
 </div>
 
@@ -1382,55 +1382,55 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- TAB: End of Service -->
 <div class="hr-panel" id="hr-eog">
 <div class="card np">
-  <div class="ch"><div class="ct">📋 نهاية الخدمة — End of Service (UAE Labour Law)</div></div>
+  <div class="ch"><div class="ct">📋 End of Service Calculation — UAE Labour Law</div></div>
   <div style="background:#fef3c7;border-radius:11px;padding:12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
-    <b>⚖️ قانون العمل الإماراتي:</b> 21 يوم لكل سنة (أول 5 سنوات) | 30 يوم لكل سنة (بعد 5 سنوات) | تُحسب على آخر راتب أساسي
+    <b>⚖️ UAE Labour Law (Federal Decree No. 33/2021):</b> 21 days/year (first 5 years) | 30 days/year (after 5 years) | Based on last basic salary
   </div>
   <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:10px">
     <div>
-      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">👤 الموظف / Staff</label>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">👤 Employee / Staff</label>
       <select id="eog-staff-sel" style="width:100%;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
-        <option value="">-- اختر موظف --</option>
+        <option value="">-- Select Employee --</option>
       </select>
     </div>
     <div>
-      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📋 سبب الإنهاء</label>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📋 Termination Reason</label>
       <select id="eog-reason" style="width:100%;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
-        <option value="resignation">🚪 استقالة — Resignation</option>
-        <option value="termination">⛔ إنهاء / رفد — Termination</option>
-        <option value="end_contract">📄 انتهاء عقد — End of Contract</option>
+        <option value="resignation">🚪 Resignation</option>
+        <option value="termination">⛔ Termination</option>
+        <option value="end_contract">📄 End of Contract</option>
       </select>
     </div>
     <div>
-      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📅 تاريخ آخر يوم عمل</label>
+      <label style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px;color:#374151">📅 Last Working Day</label>
       <input type="date" id="eog-end-date" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;box-sizing:border-box" onchange="calcEOG()">
     </div>
   </div>
 
   <!-- Notice period section — shown only for termination -->
   <div id="eog-notice-section" style="display:none;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:10px">
-    <div style="font-weight:800;color:#1e3a8a;font-size:.8rem;margin-bottom:8px">📢 تفاصيل الإشعار — Notice Period Details</div>
+    <div style="font-weight:800;color:#1e3a8a;font-size:.8rem;margin-bottom:8px">📢 Notice Period Details</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <div>
-        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">📅 تاريخ إشعار الموظفة</label>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">📅 Notice Given Date</label>
         <input type="date" id="eog-notice-date" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
-        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">تاريخ ما أُبلغت الموظفة بالإنهاء</div>
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">Date employee was notified of termination</div>
       </div>
       <div>
-        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">⏱️ فترة الإشعار المطلوبة</label>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#374151">⏱️ Required Notice Period</label>
         <select id="eog-notice-months" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
-          <option value="1">شهر واحد (1 month)</option>
-          <option value="2">شهرين (2 months)</option>
-          <option value="3" selected>3 أشهر (3 months) — الافتراضي</option>
+          <option value="1">1 Month</option>
+          <option value="2">2 Months</option>
+          <option value="3" selected>3 Months (Default — Nursery Contract)</option>
         </select>
-        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">حسب عقد الحضانة: 3 أشهر</div>
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">Per nursery contract: 3 months</div>
       </div>
       <div>
-        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">✅ هل اشتغلت فترة الإشعار؟</label>
+        <label style="font-size:.7rem;font-weight:700;display:block;margin-bottom:3px;color:#0369a1">✅ Did Employee Work Notice Period?</label>
         <select id="eog-notice-worked" style="width:100%;padding:7px;border:1.5px solid #93c5fd;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box;font-size:.83rem" onchange="calcEOG()">
-          <option value="yes">✅ نعم — اشتغلت وأخذت راتبها</option>
-          <option value="no">❌ لا — لم تشتغل</option>
-          <option value="partial">⚡ جزئي — اشتغلت جزء منها</option>
+          <option value="yes">✅ Yes — Worked full notice, salary paid</option>
+          <option value="no">❌ No — Did not work notice period</option>
+          <option value="partial">⚡ Partial — Worked part of notice</option>
         </select>
       </div>
     </div>
@@ -6627,18 +6627,22 @@ function renderStaffAlerts(){
 }
 
 function renderStaff(){
-  const q = (el('staff-srch')?.value||'').toLowerCase();
+  const q  = (el('staff-srch')?.value||'').toLowerCase();
   const bf = el('staff-branch-filter')?.value||'all';
   let list = [...DB.staff];
-  if(q) list = list.filter(s=>(s.name+s.position+s.nationality).toLowerCase().includes(q));
+  if(q)      list = list.filter(s=>(s.name+s.position+s.nationality).toLowerCase().includes(q));
   if(bf!=='all') list = list.filter(s=>s.branchId===bf);
+
+  const active = list.filter(s=>!s.lastWorkingDay || s.lastWorkingDay >= today());
+  const exited = list.filter(s=>s.lastWorkingDay  && s.lastWorkingDay <  today());
 
   const container = el('staff-list');
   if(!list.length){
     container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>${lang==='ar'?'لا يوجد موظفون':'No staff records found'}</p></div>`;
     return;
   }
-  container.innerHTML = list.map(s=>{
+
+  const renderCard = (s, isExited=false) => {
     const b = BRANCHES.find(x=>x.id===s.branchId)||CB();
     const expiryFields = [
       {k:'passportExpire','label':'Passport'},
@@ -6648,19 +6652,21 @@ function renderStaff(){
       {k:'healthCardExpire','label':'Health Card'},
       {k:'contractEnd','label':'Contract End'},
     ];
-    return `<div class="rc" style="margin-bottom:9px;border-right:4px solid ${b.c}">
+    return `<div class="rc" style="margin-bottom:9px;border-right:4px solid ${isExited?'#9ca3af':b.c};${isExited?'opacity:.85':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:7px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:9px">
-          <div class="av" style="background:${b.c};width:40px;height:40px;font-size:1rem;flex-shrink:0">${(s.name||'?')[0]}</div>
+          <div class="av" style="background:${isExited?'#9ca3af':b.c};width:40px;height:40px;font-size:1rem;flex-shrink:0">${(s.name||'?')[0]}</div>
           <div>
-            <div style="font-weight:800;font-size:.95rem">${s.name}</div>
+            <div style="font-weight:800;font-size:.95rem">${s.name} ${isExited?'<span style="background:#fee2e2;color:#991b1b;font-size:.65rem;padding:2px 7px;border-radius:6px;font-weight:700;margin-right:4px">⛔ Exited</span>':''}</div>
             <div style="font-size:.76rem;color:var(--muted)">${s.position||'—'} | ${b.icon} ${tBN(b)}</div>
             <div style="font-size:.74rem;color:var(--muted)">${s.nationality||''} ${s.contact?'📞 '+s.contact:''}</div>
+            ${isExited?`<div style="font-size:.72rem;color:#dc2626;font-weight:700;margin-top:2px">🗓️ Last Day: ${fmtDate(s.lastWorkingDay)}</div>`:''}
           </div>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn bo bsm" onclick="openStaffForm('${s.id}')">✏️ Edit</button>
           ${curRole==='admin'?`<button class="btn bsm" onclick="openLoanModal('${s.id}')" style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">💳 Loans</button>`:''}
+          ${curRole==='admin'&&isExited?`<button class="btn bsm" onclick="calcEOGForStaff('${s.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">📋 EOS</button>`:''}
           <button class="btn bd bsm" onclick="deleteStaff('${s.id}')">🗑</button>
           ${(s.grossSalary||s.basicSalary)>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">Gross: ${fmtNum(s.grossSalary||s.basicSalary)} AED</span>`:''}
           ${s.transferCode?`<span style="background:#ede9fe;color:#5b21b6;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">${s.transferCode}</span>`:''}
@@ -6670,7 +6676,46 @@ function renderStaff(){
         ${expiryFields.map(f=>expiryBadge(s[f.k], f.label)).join('')}
       </div>
     </div>`;
-  }).join('');
+  };
+
+  let html = '';
+
+  // ── Active Staff ──────────────────────────────
+  html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;margin-top:4px">
+    <div style="font-weight:900;color:#065f46;font-size:.88rem">✅ Active Staff — الموظفون الحاليون</div>
+    <span style="background:#d1fae5;color:#065f46;border-radius:8px;padding:2px 9px;font-size:.75rem;font-weight:800">${active.length}</span>
+  </div>`;
+
+  if(active.length){
+    html += active.map(s=>renderCard(s,false)).join('');
+  } else {
+    html += `<div style="text-align:center;padding:14px;color:#9ca3af;font-size:.83rem;margin-bottom:12px">No active staff</div>`;
+  }
+
+  // ── Exited Staff ──────────────────────────────
+  if(exited.length){
+    html += `
+      <div style="border-top:2px dashed #e5e7eb;margin:16px 0 12px"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="font-weight:900;color:#991b1b;font-size:.88rem">⛔ Former Staff — الموظفون المنتهية خدمتهم</div>
+        <span style="background:#fee2e2;color:#991b1b;border-radius:8px;padding:2px 9px;font-size:.75rem;font-weight:800">${exited.length}</span>
+      </div>
+      ${exited.sort((a,b)=>(b.lastWorkingDay||'').localeCompare(a.lastWorkingDay||'')).map(s=>renderCard(s,true)).join('')}`;
+  }
+
+  container.innerHTML = html;
+}
+
+function calcEOGForStaff(staffId){
+  showPage('staff');
+  setTimeout(()=>{
+    const tabs = document.querySelectorAll('.hr-tab');
+    tabs.forEach(t=>{ if(t.textContent.includes('End of Service')) t.click(); });
+    setTimeout(()=>{
+      const sel = el('eog-staff-sel');
+      if(sel){ sel.value = staffId; calcEOG(); }
+    }, 150);
+  }, 100);
 }
 
 function openStaffForm(id){
@@ -11840,7 +11885,7 @@ async function deleteLeave(id){
 // ═══════════════════════════════════════════════
 function populateEOGSelect(){
   const sel=el('eog-staff-sel'); if(!sel) return;
-  sel.innerHTML=`<option value="">-- اختر موظف --</option>`+
+  sel.innerHTML=`<option value="">-- Select Employee --</option>`+
     DB.staff.map(s=>`<option value="${s.id}">${s.name} ${s.position?'('+s.position+')':''}</option>`).join('');
   // Default end date = today
   const ed=el('eog-end-date');
@@ -11880,25 +11925,24 @@ function calcEOG(){
 
   if(years<1){
     gratuity=0;
-    gratuityNote='أقل من سنة — لا يستحق مكافأة نهاية خدمة';
+    gratuityNote='Less than 1 year — No gratuity entitlement';
   } else {
-    // Calculate full entitlement
     const yrs1to5 = Math.min(years, 5);
     const yrsAfter5 = Math.max(0, years - 5);
     const gratuity1to5  = (basic/30) * 21 * yrs1to5;
     const gratuityAfter5= (basic/30) * 30 * yrsAfter5;
     const fullGratuity  = gratuity1to5 + gratuityAfter5;
     gratuityBreakdown = yrsAfter5>0
-      ? `(${yrs1to5.toFixed(2)} سنة × 21 يوم) + (${yrsAfter5.toFixed(2)} سنة × 30 يوم)`
-      : `${yrs1to5.toFixed(2)} سنة × 21 يوم`;
+      ? `(${yrs1to5.toFixed(2)} yrs × 21 days) + (${yrsAfter5.toFixed(2)} yrs × 30 days)`
+      : `${yrs1to5.toFixed(2)} yrs × 21 days`;
 
     if(reason==='resignation'){
-      if(years<3)       { gratuity=fullGratuity*(1/3); gratuityNote='استقالة (1-3 سنوات): ثلث المكافأة'; }
-      else if(years<5)  { gratuity=fullGratuity*(2/3); gratuityNote='استقالة (3-5 سنوات): ثلثا المكافأة'; }
-      else              { gratuity=fullGratuity;        gratuityNote='استقالة (أكثر من 5 سنوات): مكافأة كاملة'; }
+      if(years<3)       { gratuity=fullGratuity*(1/3); gratuityNote='Resignation (1–3 years): 1/3 of gratuity'; }
+      else if(years<5)  { gratuity=fullGratuity*(2/3); gratuityNote='Resignation (3–5 years): 2/3 of gratuity'; }
+      else              { gratuity=fullGratuity;        gratuityNote='Resignation (5+ years): Full gratuity'; }
     } else {
       gratuity=fullGratuity;
-      gratuityNote=reason==='termination'?'إنهاء من صاحب العمل: مكافأة كاملة':'انتهاء عقد: مكافأة كاملة';
+      gratuityNote=reason==='termination'?'Termination by employer: Full gratuity':'End of contract: Full gratuity';
     }
   }
 
@@ -11914,20 +11958,18 @@ function calcEOG(){
 
   if(reason==='resignation'){
     noticePay=0;
-    noticeNote='استقالة — لا يوجد بدل إشعار (الموظفة هي من تعطي إشعار)';
+    noticeNote='Resignation — No notice pay (employee gives notice)';
     if(noticeSection) noticeSection.style.display='none';
   } else if(reason==='end_contract'){
     noticePay=0;
-    noticeNote='انتهاء عقد — لا يوجد بدل إشعار';
+    noticeNote='End of contract — No notice pay applicable';
     if(noticeSection) noticeSection.style.display='none';
   } else {
-    // termination — show notice section
     if(noticeSection) noticeSection.style.display='';
     const noticeMons=Number(el('eog-notice-months')?.value||3);
     const noticeWorked=el('eog-notice-worked')?.value||'yes';
     const noticeDate=el('eog-notice-date')?.value;
 
-    // Check if employee worked through notice period
     let workedFullNotice=false;
     if(noticeDate && endDate){
       const nDate=new Date(noticeDate);
@@ -11939,9 +11981,8 @@ function calcEOG(){
 
     if(noticeWorked==='yes' || workedFullNotice){
       noticePay=0;
-      noticeNote=`✅ اشتغلت فترة الإشعار كاملة (${noticeMons} أشهر) وأخذت راتبها — لا يوجد بدل إشعار إضافي`;
+      noticeNote=`✅ Employee worked full notice period (${noticeMons} months) and received salary — No additional notice pay`;
     } else if(noticeWorked==='partial'){
-      // Calculate remaining days not worked
       const noticeDate2=el('eog-notice-date')?.value;
       let remainDays=0;
       if(noticeDate2 && endDate){
@@ -11949,56 +11990,55 @@ function calcEOG(){
         const required=noticeMons*30;
         remainDays=Math.max(0, required-worked);
       } else {
-        remainDays=noticeMons*15; // assume half
+        remainDays=noticeMons*15;
       }
       noticePay=(basic/30)*remainDays;
-      noticeNote=`⚡ اشتغلت جزء من فترة الإشعار — بدل الأيام المتبقية (${remainDays} يوم)`;
+      noticeNote=`⚡ Partial notice worked — Pay for remaining ${remainDays} days`;
     } else {
-      // Did not work notice period — company pays notice
       noticePay=basic*noticeMons;
-      noticeNote=`❌ لم تشتغل فترة الإشعار — بدل إشعار ${noticeMons} أشهر`;
+      noticeNote=`❌ Notice period not worked — ${noticeMons} month(s) notice pay due`;
     }
   }
 
   res.innerHTML=`
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:16px">
-      <div style="font-weight:900;color:#065f46;font-size:1rem;margin-bottom:12px">📋 حساب نهاية الخدمة — ${s.name}</div>
+      <div style="font-weight:900;color:#065f46;font-size:1rem;margin-bottom:12px">📋 End of Service Calculation — ${s.name}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} سنة ${Math.floor((years%1)*12)} شهر</div><div class="sk">مدة الخدمة ${usingActual?'(فعلية)':'(عقد)'}</div></div>
-        <div class="sc"><div class="si">🗓️</div><div class="sv">${totalDays}</div><div class="sk">إجمالي أيام العمل الفعلية</div></div>
-        <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(basic)}</div><div class="sk">الراتب الأساسي (AED)</div></div>
-        <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining} يوم</div><div class="sk">رصيد الإجازة المتبقي</div></div>
+        <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} yr ${Math.floor((years%1)*12)} mo</div><div class="sk">Service Duration ${usingActual?'(Actual)':'(Contract)'}</div></div>
+        <div class="sc"><div class="si">🗓️</div><div class="sv">${totalDays}</div><div class="sk">Total Working Days</div></div>
+        <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(basic)}</div><div class="sk">Basic Salary (AED)</div></div>
+        <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining} days</div><div class="sk">Remaining Leave Balance</div></div>
         <div class="sc"><div class="si">📆</div><div class="sv">${fmtNum(dailyRate)}</div><div class="sk">Daily Rate (AED)</div></div>
       </div>
       <div style="border-top:1px dashed #86efac;padding-top:12px">
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>مكافأة نهاية الخدمة</span>
+          <span>End of Service Gratuity</span>
           <span style="font-weight:700">${fmtNum(gratuity)} AED</span>
         </div>
         <div style="font-size:.72rem;color:#6b7280;margin-bottom:2px;font-style:italic">${gratuityNote}</div>
-        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:6px">${gratuityBreakdown} × (${fmtNum(basic)}/30 = ${fmtNum(Math.round(basic/30*100)/100)} AED/يوم)</div>
+        <div style="font-size:.7rem;color:#9ca3af;margin-bottom:6px">${gratuityBreakdown} × (${fmtNum(basic)}/30 = ${fmtNum(Math.round(basic/30*100)/100)} AED/day)</div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>بدل الإجازة (${bal.remaining} يوم × ${fmtNum(Math.round(basic/30*100)/100)} AED)</span>
+          <span>Leave Compensation (${bal.remaining} days × ${fmtNum(Math.round(basic/30*100)/100)} AED)</span>
           <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
         </div>
         <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">
-          📊 ${bal.calcMethod} | مستحق: ${bal.entitled} يوم (${bal.yearsWorked} سنة × 30) | 
-          مأخوذ في السيستم: ${bal.takenInSystem} يوم | 
-          مأخوذ قبل السيستم: ${bal.takenBefore} يوم | 
-          <b style="color:#059669">متبقي: ${bal.remaining} يوم</b>
+          📊 ${bal.calcMethod} | Entitled: ${bal.entitled} days (${bal.yearsWorked} yr × 30) |
+          Taken (system): ${bal.takenInSystem} days |
+          Taken (before): ${bal.takenBefore} days |
+          <b style="color:#059669">Remaining: ${bal.remaining} days</b>
         </div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>بدل الإشعار</span>
-          <span style="font-weight:700;color:${noticePay>0?'#dc2626':'#6b7280'}">${noticePay>0?fmtNum(noticePay)+' AED':'لا يوجد'}</span>
+          <span>Notice Pay</span>
+          <span style="font-weight:700;color:${noticePay>0?'#dc2626':'#6b7280'}">${noticePay>0?fmtNum(noticePay)+' AED':'N/A'}</span>
         </div>
         <div style="font-size:.7rem;color:#6b7280;margin-bottom:6px;font-style:italic">${noticeNote}</div>
         <div style="border-top:2px solid #059669;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;font-weight:900;font-size:1.05rem">
-          <span>الإجمالي المستحق</span>
+          <span>Total Amount Due</span>
           <span style="color:#059669">${fmtNum(Math.round((total+noticePay)*100)/100)} AED</span>
         </div>
       </div>
       <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
-        <button onclick="printEOG('${s.id}','${endDate}','${reason}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:.82rem">🖨️ طباعة الحساب</button>
+        <button onclick="printEOG('${s.id}','${endDate}','${reason}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:.82rem">🖨️ Print Calculation</button>
       </div>
     </div>`;
 }
