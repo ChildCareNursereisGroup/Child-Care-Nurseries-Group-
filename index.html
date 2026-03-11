@@ -4457,6 +4457,11 @@ function renderExps(){
               ${e.taxNumber?' | رقم ضريبي: '+e.taxNumber:''}
             </div>
             ${(e.extra&&e.extra['__bus_no__'])?`<div style="font-size:.72rem;margin-top:2px"><span style="background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:10px;font-weight:800">🚌 ${e.extra['__bus_no__']}${e.extra['__bus_type__']?' — '+e.extra['__bus_type__']:''}</span></div>`:''}
+            ${(e.category==='salary'&&e.extra)?(()=>{
+              const name = e.extra['Employee Name']||e.extra['اسم الموظف']||'';
+              const title= e.extra['Job Title']||e.extra['المسمى الوظيفي']||'';
+              return name?`<div style="font-size:.72rem;margin-top:2px"><span style="background:#dbeafe;color:#1e40af;padding:2px 9px;border-radius:10px;font-weight:800">👷 ${name}${title?' — '+title:''}</span></div>`:'';
+            })():''}
             ${e.note?`<div style="font-size:.71rem;color:var(--muted)">📝 ${e.note}</div>`:''}
             <div style="font-size:.71rem;margin-top:3px">
               <span style="background:#fef3c7;padding:1px 7px;border-radius:10px;color:#92400e">
@@ -11481,8 +11486,47 @@ async function savePayrollDetail(staffId, mon){
   const hist=DB.salaryHistory[String(staffId)];
   const idx=hist.findIndex(r=>r.month===mon);
   if(idx>=0) hist[idx]=entry; else hist.push(entry);
-  showAlert('pd-alert','✅ تم حفظ الراتب!',false);
-  setTimeout(()=>{ el('payroll-detail-modal').classList.remove('on'); renderPayroll(); },700);
+
+  // ── Auto-sync to Expenses ───────────────────────────
+  // Use last day of salary month as expense date
+  const expDate = `${yr}-${String(mo).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+  const monLabel = new Date(yr, mo-1, 1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
+  // Check if a salary expense already exists for this staff+month to avoid duplicates
+  const existingExp = DB.expenses.find(e=>
+    e.branch_id===curBid && e.category==='salary' &&
+    (e.extra?.['__staff_id__']===String(staffId)) &&
+    (e.date||'').startsWith(mon)
+  );
+  const expRow = {
+    branch_id: curBid,
+    category: 'salary',
+    type: 'Staff Salaries',
+    amount: Math.round(net),
+    vat_type: 'معفى (0%)',
+    vat_amount: 0,
+    total_amount: Math.round(net),
+    date: expDate,
+    note: `${monLabel} — ${s.name}`,
+    sub_type: mon,
+    supplier_name: s.name,
+    tax_number: '',
+    extra: {
+      'Employee Name': s.name,
+      'Job Title': s.position||'',
+      '__staff_id__': String(staffId),
+      '__month__': mon,
+    }
+  };
+  if(existingExp?.id){
+    await sb.from('expenses').update(expRow).eq('id', existingExp.id);
+  } else {
+    await sb.from('expenses').insert(expRow);
+  }
+  await loadFromSupa(curBid); // refresh expenses cache
+  // ────────────────────────────────────────────────────
+
+  showAlert('pd-alert','✅ تم حفظ الراتب وتسجيله في المصاريف تلقائياً!',false);
+  setTimeout(()=>{ el('payroll-detail-modal').classList.remove('on'); renderPayroll(); },900);
 }
 async function debugSalaryHistory(){
   const box=el('payroll-debug-box');
