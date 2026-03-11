@@ -1140,6 +1140,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="ct">🏖️ طلبات الإجازة — Leave Requests</div>
     <button class="btn bp bsm" onclick="openLeaveForm(null)">➕ طلب إجازة جديد</button>
   </div>
+  <div id="leaves-error-box"></div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px">
     <select id="leave-staff-filter" style="flex:1;padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif" onchange="renderLeaves()">
       <option value="all">All Staff</option>
@@ -1327,35 +1328,51 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- BULK SALARY ENTRY MODAL -->
 <div class="mover" id="bulk-sal-modal">
-<div class="modal" style="max-width:860px;width:98%">
+<div class="modal" style="max-width:950px;width:98%">
   <div class="mh">
-    <div class="mt">📥 إدخال الرواتب السابقة — Bulk Salary Entry</div>
+    <div class="mt">📥 استيراد الرواتب السابقة — Bulk Salary Import</div>
     <button class="xb" onclick="el('bulk-sal-modal').classList.remove('on')">✕</button>
   </div>
   <div style="padding:14px">
-    <div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.8rem;color:#1e40af">
-      💡 ادخلي الرواتب السابقة لكل موظف — السيستم هيحفظها تلقائياً وينزّلها في المصاريف
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <label style="font-size:.75rem;font-weight:700;color:#1e40af">الموظف</label>
-        <select id="bsal-staff" style="padding:7px 12px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;min-width:200px" onchange="renderBulkSalRows()">
-          <option value="">-- اختاري موظف --</option>
+
+    <!-- Step 1: Download Template -->
+    <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:11px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:800;color:#065f46;margin-bottom:6px;font-size:.88rem">📋 الخطوة ١ — حمّلي Template وأدخلي فيه الرواتب</div>
+      <div style="font-size:.78rem;color:#374151;margin-bottom:8px">
+        الـ Template فيه كل موظفين السيستم الحاليين — تقدري تضيفي موظفين انتهت خدمتهم بالاسم فقط بدون ID
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="bsal-branch-sel" style="padding:6px 12px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.83rem">
+          <option value="all">كل الفروع</option>
         </select>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <label style="font-size:.75rem;font-weight:700;color:#1e40af">من شهر</label>
-        <input type="month" id="bsal-from" style="padding:7px 10px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBulkSalRows()">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <label style="font-size:.75rem;font-weight:700;color:#1e40af">إلى شهر</label>
-        <input type="month" id="bsal-to" style="padding:7px 10px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBulkSalRows()">
+        <button onclick="downloadBulkSalTemplate()" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:7px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          ⬇️ تحميل Template
+        </button>
       </div>
     </div>
-    <div id="bsal-body" style="overflow-x:auto"></div>
-    <div id="bsal-alert" style="margin-top:10px"></div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button onclick="saveBulkSalary()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 24px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ كل الرواتب</button>
+
+    <!-- Step 2: Upload filled file -->
+    <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:11px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:800;color:#1e40af;margin-bottom:6px;font-size:.88rem">📤 الخطوة ٢ — ارفعي الملف بعد التعبئة</div>
+      <div style="font-size:.78rem;color:#374151;margin-bottom:8px">
+        السيستم هيطابق الأسماء تلقائياً — الموظفين الموجودين هيتحفظ راتبهم في الهيستوري، الموظفين الغير موجودين هينزل راتبهم كمصروف باسمهم فقط
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button onclick="el('bsal-file-inp').click()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:7px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+          📂 اختاري ملف Excel
+        </button>
+        <span id="bsal-fname" style="font-size:.78rem;color:#6b7280"></span>
+        <input type="file" id="bsal-file-inp" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewBulkSalary(this.files[0])">
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div id="bsal-preview" style="margin-bottom:10px"></div>
+    <div id="bsal-alert" style="margin-bottom:8px"></div>
+
+    <!-- Save button -->
+    <div id="bsal-save-bar" style="display:none;gap:8px">
+      <button onclick="confirmBulkSalaryImport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ كل الرواتب وإنزالها في المصاريف</button>
       <button onclick="el('bulk-sal-modal').classList.remove('on')" style="background:#f3f4f6;border:none;border-radius:10px;padding:10px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
     </div>
   </div>
@@ -4128,187 +4145,283 @@ function exportStaffSalaryHistory(){
 }
 
 // ═══════════════════════════════════════════════
-// BULK SALARY ENTRY — إدخال الرواتب السابقة
 // ═══════════════════════════════════════════════
+// BULK SALARY IMPORT — استيراد الرواتب السابقة
+// ═══════════════════════════════════════════════
+let _bulkSalRows = []; // parsed preview rows
+
 function openBulkSalaryModal(){
-  const sel = el('bsal-staff');
-  sel.innerHTML = '<option value="">-- اختاري موظف --</option>' +
-    DB.staff.map(s=>`<option value="${s.id}">${s.name} — ${BRANCHES.find(b=>b.id===s.branchId)?.ar||''}</option>`).join('');
-  // Default range: Jan 2025 to current month
-  el('bsal-from').value = '2025-01';
-  el('bsal-to').value = today().substring(0,7);
-  el('bsal-body').innerHTML = '';
+  // Populate branch selector
+  const sel = el('bsal-branch-sel');
+  if(sel){
+    sel.innerHTML = '<option value="all">كل الفروع</option>' +
+      BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('');
+    sel.value = curBid;
+  }
+  el('bsal-preview').innerHTML = '';
   el('bsal-alert').innerHTML = '';
+  const bar = el('bsal-save-bar');
+  if(bar) bar.style.display = 'none';
+  const fn = el('bsal-fname');
+  if(fn) fn.textContent = '';
+  _bulkSalRows = [];
   el('bulk-sal-modal').classList.add('on');
 }
 
-async function renderBulkSalRows(){
-  const staffId = el('bsal-staff')?.value;
-  const from = el('bsal-from')?.value;
-  const to = el('bsal-to')?.value;
-  const body = el('bsal-body');
-  if(!staffId||!from||!to){ body.innerHTML=''; return; }
-  const s = DB.staff.find(x=>String(x.id)===staffId);
-  const basic = Number(s?.basicSalary||s?.grossSalary||0);
+function downloadBulkSalTemplate(){
+  const XLSX = window.XLSX;
+  if(!XLSX){ alert('Excel library not loaded'); return; }
+  const bid = el('bsal-branch-sel')?.value||'all';
+  let staff = bid==='all' ? DB.staff : DB.staff.filter(s=>s.branchId===bid||s.branchId===Number(bid));
 
-  // Build month list
-  const months=[];
-  let cur=from;
-  while(cur<=to){
-    months.push(cur);
-    const [y,m]=cur.split('-').map(Number);
-    cur=`${m===12?y+1:y}-${String(m===12?1:m+1).padStart(2,'0')}`;
-    if(months.length>36) break;
+  // Header row
+  const headers = ['Staff Name','Branch','Month (YYYY-MM)','Basic Salary (AED)','Net Paid (AED)','Days Absent','Bonus (AED)','Deduction (AED)','Notes'];
+  // Build sample rows for each staff member × last 3 months
+  const rows = [headers];
+  const months = [];
+  const now = new Date();
+  for(let i=2;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  staff.forEach(s=>{
+    const br = BRANCHES.find(b=>b.id===s.branchId)||{ar:''};
+    months.forEach(mon=>{
+      rows.push([s.name, br.ar||s.branchId||'', mon, s.basicSalary||s.grossSalary||0, s.grossSalary||s.basicSalary||0, 0, 0, 0, '']);
+    });
+  });
+  // Add example row for former staff
+  rows.push(['EXAMPLE - Former Employee (مثال موظف سابق)', 'الفرع', '2025-01', 2500, 2500, 0, 0, 0, 'موظف سابق']);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:28},{wch:16},{wch:16},{wch:18},{wch:18},{wch:12},{wch:12},{wch:14},{wch:20}];
+  // Style header row
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Salaries');
+  XLSX.writeFile(wb, 'salary_import_template.xlsx');
+}
+
+async function previewBulkSalary(file){
+  const XLSX = window.XLSX;
+  if(!XLSX||!file) return;
+  const fn = el('bsal-fname');
+  if(fn) fn.textContent = file.name;
+  const preview = el('bsal-preview');
+  const alertEl = el('bsal-alert');
+  preview.innerHTML = '<div style="padding:12px;color:#6b7280;font-size:.8rem">⏳ جاري قراءة الملف...</div>';
+  alertEl.innerHTML = '';
+
+  const ab = await file.arrayBuffer();
+  const wb = XLSX.read(ab);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+  if(!rawRows.length){ preview.innerHTML='<div style="color:#dc2626">❌ الملف فارغ</div>'; return; }
+
+  // Flexible column detection
+  const hdr = Object.keys(rawRows[0]);
+  const col = (...keys) => hdr.find(h=>keys.some(k=>h.toLowerCase().includes(k.toLowerCase())))||null;
+  const nameCol   = col('name','staff','employee','موظف','اسم');
+  const branchCol = col('branch','فرع');
+  const monthCol  = col('month','date','period','شهر');
+  const basicCol  = col('basic','أساسي','اساسي');
+  const netCol    = col('net','paid','total','amount','صافي','إجمالي','اجمالي');
+  const absCol    = col('absent','غياب');
+  const bonusCol  = col('bonus','مكافأة','مكافاة');
+  const dedCol    = col('deduct','خصم');
+  const notesCol  = col('notes','ملاحظ');
+
+  const toMonth = v => {
+    if(!v) return null;
+    const s = String(v).trim();
+    if(/^\d{4}-\d{2}$/.test(s)) return s;
+    const m1 = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+    if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
+    const mo = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const m2 = s.toLowerCase().match(/([a-z]{3})\D*(\d{4})/);
+    if(m2&&mo[m2[1]]) return m2[2]+'-'+mo[m2[1]];
+    const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return null;
+  };
+
+  _bulkSalRows = [];
+  let matched=0, unmatched=0, skipped=0;
+
+  rawRows.forEach((row,i)=>{
+    const name   = nameCol   ? String(row[nameCol]||'').trim()  : '';
+    const month  = monthCol  ? toMonth(row[monthCol])           : null;
+    const net    = netCol    ? Number(row[netCol]||0)           : 0;
+    const basic  = basicCol  ? Number(row[basicCol]||0)         : 0;
+    const absent = absCol    ? Number(row[absCol]||0)           : 0;
+    const bonus  = bonusCol  ? Number(row[bonusCol]||0)         : 0;
+    const deduct = dedCol    ? Number(row[dedCol]||0)           : 0;
+    const notes  = notesCol  ? String(row[notesCol]||'').trim() : '';
+    const branchRaw = branchCol ? String(row[branchCol]||'').trim() : '';
+
+    if(!name||!month||(!net&&!basic)){ skipped++; return; }
+    if(name.toLowerCase().includes('example')||name.toLowerCase().includes('مثال')){ skipped++; return; }
+
+    // Try to match staff in system
+    const nm = name.toLowerCase();
+    const found = DB.staff.find(s=>{
+      const sn = s.name.toLowerCase();
+      return sn===nm || sn.includes(nm) || nm.includes(sn) ||
+             nm.split(' ').some(part=>part.length>3&&sn.includes(part));
+    });
+
+    // Determine branch
+    let branchId = curBid;
+    if(found) branchId = found.branchId||curBid;
+    else if(branchRaw){
+      const br = BRANCHES.find(b=>b.ar.includes(branchRaw)||b.en?.toLowerCase().includes(branchRaw.toLowerCase())||b.id===branchRaw);
+      if(br) branchId = br.id;
+    }
+
+    const finalNet = net||basic;
+    _bulkSalRows.push({
+      rowNum: i+2, name, month, basic: basic||finalNet, net: finalNet,
+      absent, bonus, deduct, notes, branchId,
+      staffId: found ? String(found.id) : null,
+      staffName: found ? found.name : null,
+      status: found ? 'matched' : 'new'
+    });
+    if(found) matched++; else unmatched++;
+  });
+
+  if(!_bulkSalRows.length){
+    preview.innerHTML='<div style="background:#fee2e2;border-radius:9px;padding:12px;color:#dc2626">❌ لا توجد بيانات صالحة — تأكدي من الأعمدة</div>';
+    return;
   }
 
-  // Load existing salary history for this staff
-  const {data:existing} = await sb.from('staff_salary_history').select('*')
-    .eq('staff_id',Number(staffId))
-    .in('month', months);
-  const existMap={};
-  (existing||[]).forEach(r=>{ existMap[r.month]=r; });
+  // Build preview table
+  const bar = el('bsal-save-bar');
+  if(bar) bar.style.display='flex';
 
-  body.innerHTML = `
-    <div style="font-size:.78rem;color:#6b7280;margin-bottom:8px">
-      👷 <b>${s?.name}</b> | الراتب الأساسي: <b style="color:#1e3a8a">${fmtNum(basic)} AED</b>
+  preview.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <span style="background:#d1fae5;color:#065f46;border-radius:9px;padding:4px 12px;font-weight:800;font-size:.8rem">✅ موظفين موجودين: ${matched}</span>
+      <span style="background:#fef3c7;color:#92400e;border-radius:9px;padding:4px 12px;font-weight:800;font-size:.8rem">⚠️ موظفين سابقين (مش في السيستم): ${unmatched}</span>
+      ${skipped?`<span style="background:#f3f4f6;color:#6b7280;border-radius:9px;padding:4px 12px;font-size:.8rem">⏭ تم تجاهل: ${skipped} صف</span>`:''}
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:.8rem;font-family:'Tajawal',sans-serif">
-      <thead>
+    <div style="overflow-x:auto;max-height:400px;border:1.5px solid var(--border);border-radius:10px">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;font-family:'Tajawal',sans-serif">
+      <thead style="position:sticky;top:0;z-index:1">
         <tr style="background:#1e3a8a;color:#fff">
-          <th style="padding:8px 12px;text-align:right">الشهر</th>
-          <th style="padding:8px;text-align:center;min-width:90px">الراتب الأساسي</th>
-          <th style="padding:8px;text-align:center;min-width:80px">أيام الغياب</th>
-          <th style="padding:8px;text-align:center;min-width:80px">بونص</th>
-          <th style="padding:8px;text-align:center;min-width:80px">خصم آخر</th>
-          <th style="padding:8px;text-align:center;min-width:90px;font-weight:900">صافي الراتب</th>
-          <th style="padding:8px;text-align:center">الحالة</th>
+          <th style="padding:8px 10px;text-align:right">الاسم</th>
+          <th style="padding:8px 8px;text-align:center">الشهر</th>
+          <th style="padding:8px 8px;text-align:center">الفرع</th>
+          <th style="padding:8px 8px;text-align:center">الأساسي</th>
+          <th style="padding:8px 8px;text-align:center">الصافي</th>
+          <th style="padding:8px 8px;text-align:center">غياب</th>
+          <th style="padding:8px 8px;text-align:center">بونص</th>
+          <th style="padding:8px 8px;text-align:center">خصم</th>
+          <th style="padding:8px 8px;text-align:center">الحالة</th>
         </tr>
       </thead>
       <tbody>
-        ${months.map((mon,i)=>{
-          const ex=existMap[mon];
-          const exBasic=ex?.basic_salary||basic;
-          const exNet=ex?.amount||'';
-          const exAbs=ex?.absent_days||0;
-          const exBonus=ex?.bonus||0;
-          const exDeduct=ex?.deduct_other||0;
-          const saved=!!ex;
-          return `<tr style="background:${saved?'#f0fdf4':i%2?'#fff':'#f8fafc'};border-bottom:1px solid #e5e7eb" id="bsal-row-${mon}">
-            <td style="padding:7px 12px;font-weight:800;color:#1e3a8a">${mon}</td>
-            <td style="padding:4px"><input type="number" id="bsal_basic_${mon}" value="${exBasic}" min="0" step="0.01"
-              oninput="calcBulkSalNet('${mon}')"
-              style="width:100%;padding:5px 8px;border:1.5px solid #dbeafe;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
-            <td style="padding:4px"><input type="number" id="bsal_abs_${mon}" value="${exAbs}" min="0" max="31"
-              oninput="calcBulkSalNet('${mon}')"
-              style="width:100%;padding:5px 8px;border:1.5px solid #fee2e2;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
-            <td style="padding:4px"><input type="number" id="bsal_bonus_${mon}" value="${exBonus}" min="0"
-              oninput="calcBulkSalNet('${mon}')"
-              style="width:100%;padding:5px 8px;border:1.5px solid #d1fae5;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
-            <td style="padding:4px"><input type="number" id="bsal_ded_${mon}" value="${exDeduct}" min="0"
-              oninput="calcBulkSalNet('${mon}')"
-              style="width:100%;padding:5px 8px;border:1.5px solid #fecaca;border-radius:7px;font-family:'Tajawal',sans-serif;text-align:center;background:${saved?'#f0fdf4':'#fff'}"></td>
-            <td style="padding:4px">
-              <input type="number" id="bsal_net_${mon}" value="${exNet}" min="0" step="0.01"
-                style="width:100%;padding:5px 8px;border:2px solid #1e3a8a;border-radius:7px;font-family:'Tajawal',sans-serif;font-weight:800;text-align:center;background:${saved?'#f0fdf4':'#eff6ff'}">
-            </td>
-            <td style="padding:7px;text-align:center">
-              ${saved
-                ?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:700">✅ محفوظ</span>`
-                :`<span style="background:#fef3c7;color:#92400e;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:700">⏳ جديد</span>`}
-            </td>
+        ${_bulkSalRows.map((r,i)=>{
+          const br = BRANCHES.find(b=>b.id===r.branchId);
+          const statusBadge = r.status==='matched'
+            ? `<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:2px 7px;font-size:.7rem;font-weight:700">✅ موجود</span>`
+            : `<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 7px;font-size:.7rem;font-weight:700">⚠️ سابق</span>`;
+          return `<tr style="background:${r.status==='matched'?(i%2?'#fff':'#f0fdf4'):(i%2?'#fff':'#fffbeb')};border-bottom:1px solid #e5e7eb">
+            <td style="padding:7px 10px;font-weight:700">${r.name}${r.staffName&&r.staffName!==r.name?`<div style="font-size:.65rem;color:#6b7280">${r.staffName}</div>`:''}</td>
+            <td style="padding:7px;text-align:center;color:#1e3a8a;font-weight:700">${r.month}</td>
+            <td style="padding:7px;text-align:center;font-size:.72rem">${br?.ar||r.branchId||'—'}</td>
+            <td style="padding:7px;text-align:center">${r.basic?fmtNum(r.basic):'—'}</td>
+            <td style="padding:7px;text-align:center;font-weight:800;color:#059669">${fmtNum(r.net)}</td>
+            <td style="padding:7px;text-align:center;color:${r.absent>0?'#dc2626':'#9ca3af'}">${r.absent||'—'}</td>
+            <td style="padding:7px;text-align:center;color:#059669">${r.bonus?'+'+fmtNum(r.bonus):'—'}</td>
+            <td style="padding:7px;text-align:center;color:#dc2626">${r.deduct?'-'+fmtNum(r.deduct):'—'}</td>
+            <td style="padding:7px;text-align:center">${statusBadge}</td>
           </tr>`;
         }).join('')}
       </tbody>
-    </table>`;
+    </table>
+    </div>`;
 }
 
-function calcBulkSalNet(mon){
-  const basic=Number(el(`bsal_basic_${mon}`)?.value||0);
-  const abs=Number(el(`bsal_abs_${mon}`)?.value||0);
-  const bonus=Number(el(`bsal_bonus_${mon}`)?.value||0);
-  const ded=Number(el(`bsal_ded_${mon}`)?.value||0);
-  const [yr,mo]=mon.split('-').map(Number);
-  const daysInMonth=new Date(yr,mo,0).getDate();
-  const dailyRate=daysInMonth>0?basic/daysInMonth:0;
-  const net=Math.max(0,basic-(dailyRate*abs)-ded+bonus);
-  const inp=el(`bsal_net_${mon}`);
-  if(inp) inp.value=Math.round(net*100)/100;
-}
+async function confirmBulkSalaryImport(){
+  if(!_bulkSalRows.length){ alert('لا توجد بيانات'); return; }
+  const alertEl = el('bsal-alert');
+  alertEl.innerHTML = '<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>';
 
-async function saveBulkSalary(){
-  const staffId=el('bsal-staff')?.value;
-  if(!staffId){ alert('اختاري موظف أولاً'); return; }
-  const s=DB.staff.find(x=>String(x.id)===staffId);
-  const alertEl=el('bsal-alert');
-  alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>`;
+  let salOk=0, salErr=0, expOk=0;
 
-  // Collect all rows
-  const rows=[];
-  document.querySelectorAll('[id^="bsal_net_"]').forEach(inp=>{
-    const mon=inp.id.replace('bsal_net_','');
-    const net=Number(inp.value);
-    if(!net) return; // skip empty rows
-    const basic=Number(el(`bsal_basic_${mon}`)?.value||0);
-    const abs=Number(el(`bsal_abs_${mon}`)?.value||0);
-    const bonus=Number(el(`bsal_bonus_${mon}`)?.value||0);
-    const ded=Number(el(`bsal_ded_${mon}`)?.value||0);
-    const [yr,mo]=mon.split('-').map(Number);
-    const daysInMonth=new Date(yr,mo,0).getDate();
-    rows.push({
-      branch_id: s.branchId||curBid,
-      staff_id: Number(staffId),
-      month: mon,
-      amount: Math.round(net),
-      basic_salary: basic,
-      absent_days: abs,
-      present_days: daysInMonth-abs,
-      bonus, deduct_other: ded,
-    });
-  });
+  for(const r of _bulkSalRows){
+    const [yr,mo] = r.month.split('-').map(Number);
+    const daysInMonth = new Date(yr,mo,0).getDate();
+    const lastDay = `${r.month}-${String(daysInMonth).padStart(2,'0')}`;
 
-  if(!rows.length){
-    alertEl.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:10px;font-size:.82rem">⚠️ لا توجد بيانات للحفظ</div>`;
-    return;
-  }
+    // ── A: Staff exists in system → save salary history ──
+    if(r.staffId){
+      const payload = {
+        branch_id: r.branchId,
+        staff_id: Number(r.staffId),
+        month: r.month,
+        amount: Math.round(r.net),
+        basic_salary: r.basic||r.net,
+        absent_days: r.absent||0,
+        present_days: daysInMonth-(r.absent||0),
+        bonus: r.bonus||0,
+        deduct_other: r.deduct||0,
+      };
+      const {error} = await sb.from('staff_salary_history')
+        .upsert(payload, {onConflict:'branch_id,staff_id,month'});
+      if(error){ salErr++; console.error('sal hist error:',error); }
+      else salOk++;
+    }
 
-  // Upsert salary history
-  const {error}=await sb.from('staff_salary_history').upsert(rows,{onConflict:'branch_id,staff_id,month'});
-  if(error){
-    alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:10px;font-size:.82rem;color:#dc2626">❌ خطأ: ${error.message}</div>`;
-    return;
-  }
-
-  // Auto-create expenses for each month
-  let expOk=0;
-  for(const r of rows){
-    const mon=r.month;
-    const [yr,mo]=mon.split('-').map(Number);
-    const lastDay=new Date(yr,mo,0).getDate();
-    const expDate=`${mon}-${String(lastDay).padStart(2,'0')}`;
-    const monLabel=new Date(yr,mo-1,1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
-    const existingExp=DB.expenses.find(e=>
-      e.branch_id===r.branch_id&&e.category==='salary'&&
-      (e.extra?.['__staff_id__']===String(staffId))&&
-      (e.date||'').startsWith(mon)
-    );
-    const expRow={
-      branch_id:r.branch_id, category:'salary', type:'Staff Salaries',
-      amount:r.amount, vat_type:'معفى (0%)', vat_amount:0, total_amount:r.amount,
-      date:expDate, note:`${monLabel} — ${s.name}`, sub_type:mon,
-      supplier_name:s.name, tax_number:'',
-      extra:{'Employee Name':s.name,'Job Title':s.position||'','__staff_id__':String(staffId),'__month__':mon}
+    // ── B: Always create expense (for all — matched & unmatched) ──
+    const monLabel = new Date(yr,mo-1,1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
+    const expRow = {
+      branch_id: r.branchId,
+      category: 'salary',
+      type: 'Staff Salaries',
+      amount: Math.round(r.net),
+      vat_type: 'معفى (0%)',
+      vat_amount: 0,
+      total_amount: Math.round(r.net),
+      date: lastDay,
+      note: `${monLabel} — ${r.name}`,
+      sub_type: r.month,
+      supplier_name: r.name,
+      tax_number: '',
+      extra: {
+        'Employee Name': r.name,
+        'Job Title': DB.staff.find(s=>String(s.id)===r.staffId)?.position||'',
+        '__staff_id__': r.staffId||'',
+        '__month__': r.month,
+      }
     };
-    if(existingExp?.id) await sb.from('expenses').update(expRow).eq('id',existingExp.id);
-    else await sb.from('expenses').insert(expRow);
+    // Check for duplicate expense
+    const {data:existExp} = await sb.from('expenses').select('id')
+      .eq('branch_id', r.branchId)
+      .eq('category','salary')
+      .eq('date', lastDay)
+      .eq('supplier_name', r.name)
+      .limit(1);
+    if(existExp?.length){
+      await sb.from('expenses').update(expRow).eq('id', existExp[0].id);
+    } else {
+      await sb.from('expenses').insert(expRow);
+    }
     expOk++;
   }
 
-  alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:10px;font-size:.82rem;color:#065f46">
-    ✅ تم حفظ <b>${rows.length}</b> شهر بنجاح وتسجيل <b>${expOk}</b> مصروف راتب في المصاريف!
-  </div>`;
   await loadFromSupa(curBid);
-  setTimeout(()=>renderBulkSalRows(),600);
+
+  const matched = _bulkSalRows.filter(r=>r.staffId).length;
+  const former  = _bulkSalRows.filter(r=>!r.staffId).length;
+
+  alertEl.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:12px;font-size:.83rem;color:#065f46">
+    ✅ <b>تم الحفظ بنجاح!</b><br>
+    • ${salOk} راتب محفوظ في هيستوري الموظفين الحاليين<br>
+    ${former?`• ${former} راتب سُجِّل في المصاريف لموظفين سابقين (بدون هيستوري)<br>`:''}
+    • ${expOk} مصروف راتب أُنزل في صفحة المصاريف${salErr?`<br>⚠️ ${salErr} سجل لم يُحفظ — راجعي console`:''}
+  </div>`;
+  _bulkSalRows = [];
 }
+
 
 function openBulkAttModal(){
   const mon = (el('staffattdate')?.value||today()).substring(0,7);
@@ -11504,19 +11617,45 @@ function showHRTab(id, btn){
 
 // ── Load HR data from Supabase ───────────────────
 async function loadHRData(){
-  try{
-    const [lv] = await Promise.all([
-      sb.from('staff_leaves').select('*').eq('branch_id',curBid).order('start_date',{ascending:false}),
-    ]);
-    DB.leaves = (lv.data||[]).map(x=>({
-      id:x.id, staffId:x.staff_id, branchId:x.branch_id,
-      type:x.type||'annual', startDate:x.start_date||'', endDate:x.end_date||'',
-      days:Number(x.days||0), paid:x.paid!==false,
-      sickCertificate:x.sick_certificate||false,
-      notes:x.notes||'', status:x.status||'approved',
-      createdAt:x.created_at||''
-    }));
-  }catch(e){ DB.leaves=[]; }
+  const {data, error} = await sb.from('staff_leaves').select('*').eq('branch_id',curBid).order('start_date',{ascending:false});
+  if(error){
+    console.error('staff_leaves error:', error);
+    // Show SQL needed if table missing
+    if(error.code==='42P01'||error.message?.includes('does not exist')){
+      const box = el('leaves-error-box');
+      if(box) box.innerHTML=`<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px;font-size:.8rem;color:#dc2626;margin-bottom:10px">
+        ❌ جدول <b>staff_leaves</b> غير موجود في Supabase.<br>
+        شغّلي هذا الـ SQL في Supabase SQL Editor:<br><br>
+        <code style="background:#fff;padding:8px;border-radius:6px;display:block;direction:ltr;font-size:.75rem;color:#374151">
+CREATE TABLE IF NOT EXISTS staff_leaves (<br>
+&nbsp;&nbsp;id BIGSERIAL PRIMARY KEY,<br>
+&nbsp;&nbsp;branch_id TEXT NOT NULL,<br>
+&nbsp;&nbsp;staff_id BIGINT NOT NULL,<br>
+&nbsp;&nbsp;type TEXT DEFAULT 'annual',<br>
+&nbsp;&nbsp;start_date DATE,<br>
+&nbsp;&nbsp;end_date DATE,<br>
+&nbsp;&nbsp;days INTEGER DEFAULT 0,<br>
+&nbsp;&nbsp;sick_certificate BOOLEAN DEFAULT false,<br>
+&nbsp;&nbsp;notes TEXT,<br>
+&nbsp;&nbsp;status TEXT DEFAULT 'approved',<br>
+&nbsp;&nbsp;paid BOOLEAN DEFAULT true,<br>
+&nbsp;&nbsp;created_at TIMESTAMPTZ DEFAULT NOW()<br>
+);
+        </code>
+      </div>`;
+    }
+    DB.leaves=[];
+    return;
+  }
+  const box=el('leaves-error-box'); if(box) box.innerHTML='';
+  DB.leaves=(data||[]).map(x=>({
+    id:x.id, staffId:x.staff_id, branchId:x.branch_id,
+    type:x.type||'annual', startDate:x.start_date||'', endDate:x.end_date||'',
+    days:Number(x.days||0), paid:x.paid!==false,
+    sickCertificate:x.sick_certificate||false,
+    notes:x.notes||'', status:x.status||'approved',
+    createdAt:x.created_at||''
+  }));
 }
 
 // ═══════════════════════════════════════════════
