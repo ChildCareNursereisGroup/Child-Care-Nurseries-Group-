@@ -4594,6 +4594,18 @@ async function confirmBulkSalaryImport(){
   const alertEl = el('bsal-alert');
   alertEl.innerHTML = '<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>';
 
+  // DEBUG: show what we have
+  console.log('_bulkSalRows:', JSON.stringify(_bulkSalRows.map(r=>({name:r.name,staffId:r.staffId,branchId:r.branchId,month:r.month,net:r.net}))));
+  console.log('DB.staff ids:', DB.staff.map(s=>({id:s.id,name:s.name})));
+
+  // Show debug in UI temporarily
+  alertEl.innerHTML += `<div style="background:#f0f4ff;border-radius:8px;padding:8px;font-size:.72rem;margin-top:6px;direction:ltr;text-align:left">
+    Rows to save: ${_bulkSalRows.length} | 
+    Matched (have staffId): ${_bulkSalRows.filter(r=>r.staffId).length} | 
+    Unmatched: ${_bulkSalRows.filter(r=>!r.staffId).length}<br>
+    First row: ${JSON.stringify(_bulkSalRows[0])}
+  </div>`;
+
   let salOk=0, salErr=0, expOk=0;
   const errDetails = [];
 
