@@ -1938,9 +1938,8 @@ async function loadFromSupa(bid) {
     if(c.error)throw c.error;
     if(r.error)throw r.error;
     if(a.error)throw a.error;
-    // Visitors — always loaded with main data
+    // Visitors
     if(!vis.error) DB.visitors=(vis.data||[]).map(v=>({...v,name:(v.name||'').trim()}));
-    // Salary history loaded on-demand only (in Salary History tab)
     DB.children = (c.data||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
@@ -1989,12 +1988,30 @@ async function loadFromSupa(bid) {
       });
       console.log('staff_attendance loaded:',sa.data?.length,'records');
     }
-    // Load salary history from Supabase
     if(!DB.salaryHistory) DB.salaryHistory={};
 
     hideLoad();
-    // Load staff attendance separately — table may not exist yet, never block main load
-    // staff_attendance loaded in Promise.all above (sa variable)
+
+    // Load salary history in background (needed for EOS & leave calculations)
+    sb.from('staff_salary_history').select('*')
+      .then(({data:sh})=>{
+        if(!sh) return;
+        DB.salaryHistory={};
+        sh.forEach(x=>{
+          const sid=String(x.staff_id);
+          if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+          DB.salaryHistory[sid].push({
+            month:x.month, amount:Number(x.amount||0),
+            basic:Number(x.basic_salary||0)||undefined,
+            presentDays:x.present_days??undefined, absentDays:x.absent_days??undefined,
+            sickDays:x.sick_days??undefined, deductDays:x.deduct_days??undefined,
+            deductLoan:Number(x.deduct_loan||0)||undefined,
+            deductOther:Number(x.deduct_other||0)||undefined,
+            bonus:Number(x.bonus||0)||undefined, bonusReason:x.bonus_reason||undefined,
+          });
+        });
+      }).catch(()=>{});
+
     return true;
   } catch(err) {
     hideLoad();
@@ -13640,9 +13657,11 @@ async function openSalaryHistory(staffId){
     </div>
 
     <!-- ── RECORDS LIST ── -->
-    <div id="sh_list" style="margin-top:14px">${renderSalaryHistoryList(staffId)}</div>
+    <div id="sh_list" style="margin-top:14px"><div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div></div>
   `;
   modal.classList.add('on');
+  // Render AFTER data is loaded (openSalaryHistory is async, data ready now)
+  setTimeout(()=>{ const l=el('sh_list'); if(l) l.innerHTML=renderSalaryHistoryList(staffId); }, 50);
 }
 
 function showSHTab(tab, staffId, btn){
