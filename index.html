@@ -4595,16 +4595,19 @@ async function confirmBulkSalaryImport(){
   alertEl.innerHTML = '<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>';
 
   let salOk=0, salErr=0, expOk=0;
+  const errDetails = [];
 
   for(const r of _bulkSalRows){
     const [yr,mo] = r.month.split('-').map(Number);
     const daysInMonth = new Date(yr,mo,0).getDate();
     const lastDay = `${r.month}-${String(daysInMonth).padStart(2,'0')}`;
+    // Ensure branch_id is always b1-b5
+    const branchId = ['b1','b2','b3','b4','b5'].includes(r.branchId) ? r.branchId : curBid;
 
     // ── A: Staff exists in system → save salary history ──
     if(r.staffId){
       const payload = {
-        branch_id: r.branchId,
+        branch_id: branchId,
         staff_id: Number(r.staffId),
         month: r.month,
         amount: Math.round(r.net),
@@ -4614,10 +4617,14 @@ async function confirmBulkSalaryImport(){
         bonus: r.bonus||0,
         deduct_other: r.deduct||0,
       };
+      console.log('💾 Saving salary history:', payload);
       const {error} = await sb.from('staff_salary_history')
         .upsert(payload, {onConflict:'branch_id,staff_id,month'});
-      if(error){ salErr++; console.error('sal hist error:',error); }
-      else salOk++;
+      if(error){
+        salErr++;
+        errDetails.push(`${r.name} (${r.month}): ${error.message}`);
+        console.error('sal hist error:', error, payload);
+      } else salOk++;
     }
 
     // ── B: Always create expense (for all — matched & unmatched) ──
@@ -4662,12 +4669,21 @@ async function confirmBulkSalaryImport(){
   const matched = _bulkSalRows.filter(r=>r.staffId).length;
   const former  = _bulkSalRows.filter(r=>!r.staffId).length;
 
-  alertEl.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:12px;font-size:.83rem;color:#065f46">
-    ✅ <b>تم الحفظ بنجاح!</b><br>
-    • ${salOk} راتب محفوظ في هيستوري الموظفين الحاليين<br>
-    ${former?`• ${former} راتب سُجِّل في المصاريف لموظفين سابقين (بدون هيستوري)<br>`:''}
-    • ${expOk} مصروف راتب أُنزل في صفحة المصاريف${salErr?`<br>⚠️ ${salErr} سجل لم يُحفظ — راجعي console`:''}
-  </div>`;
+  if(salErr && salOk===0){
+    alertEl.innerHTML = `<div style="background:#fee2e2;border-radius:10px;padding:12px;font-size:.83rem;color:#dc2626">
+      ❌ <b>Failed to save salary history!</b><br>
+      ${errDetails.map(e=>`• ${e}`).join('<br>')}
+      <br><br><small style="color:#6b7280">Open browser Console (F12) for full details</small>
+    </div>`;
+  } else {
+    alertEl.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:12px;font-size:.83rem;color:#065f46">
+      ✅ <b>Saved successfully!</b><br>
+      • ${salOk} salary records saved to history<br>
+      ${former?`• ${former} former staff — saved to expenses only<br>`:''}
+      • ${expOk} expense records created
+      ${salErr?`<br><span style="color:#dc2626">⚠️ ${salErr} records failed:<br>${errDetails.map(e=>`• ${e}`).join('<br>')}</span>`:''}
+    </div>`;
+  }
   _bulkSalRows = [];
 }
 
