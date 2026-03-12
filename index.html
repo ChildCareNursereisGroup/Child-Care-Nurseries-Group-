@@ -4644,23 +4644,8 @@ async function confirmBulkSalaryImport(){
 
     // ── A: Staff exists in system → save salary history ──
     if(r.staffId){
-      const s = DB.staff.find(x=>String(x.id)===r.staffId);
-      const entry = {
-        month: r.month,
-        amount: Math.round(r.net),
-        basic: r.basic||r.net,
-        absentDays: r.absent||0,
-        presentDays: daysInMonth-(r.absent||0),
-        bonus: r.bonus||0,
-        deductOther: r.deduct||0,
-      };
-      // Use the branch from the staff record (most reliable)
-      const savedBid = curBid;
-      const origBid = curBid;
-      // temporarily set curBid to staff's branch for upsertSalaryHistoryEntry
-      const staffBranch = s?.branchId||branchId;
       const payload = {
-        branch_id: staffBranch,
+        branch_id: curBid,
         staff_id: Number(r.staffId),
         month: r.month,
         amount: Math.round(r.net),
@@ -4672,16 +4657,8 @@ async function confirmBulkSalaryImport(){
       };
       const {error} = await sb.from('staff_salary_history')
         .upsert(payload, {onConflict:'branch_id,staff_id,month'});
-      if(error){
-        // Try again with curBid in case branch mismatch
-        const payload2 = {...payload, branch_id: curBid};
-        const {error:err2} = await sb.from('staff_salary_history')
-          .upsert(payload2, {onConflict:'branch_id,staff_id,month'});
-        if(err2){
-          salErr++;
-          errDetails.push(`${r.name} (${r.month}): ${err2.message}`);
-        } else salOk++;
-      } else salOk++;
+      if(error){ salErr++; errDetails.push(`${r.name} (${r.month}): ${error.message}`); }
+      else salOk++;
     }
 
     // ── B: Always create expense (for all — matched & unmatched) ──
@@ -13471,9 +13448,24 @@ async function deleteSalaryHistorySupabase(staffId, month){
   if(error) console.error('salary history delete error:',error);
 }
 
-function openSalaryHistory(staffId){
+async function openSalaryHistory(staffId){
   if(!staffId){ alert('Save staff first'); return; }
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  // ── Load from Supabase first ──
+  const {data:rows} = await sb.from('staff_salary_history').select('*')
+    .eq('staff_id', Number(staffId)).order('month',{ascending:false});
+  if(rows && rows.length){
+    if(!DB.salaryHistory) DB.salaryHistory={};
+    DB.salaryHistory[String(staffId)] = rows.map(x=>({
+      month:x.month, amount:Number(x.amount||0),
+      basic:Number(x.basic_salary||0)||undefined,
+      presentDays:x.present_days??undefined, absentDays:x.absent_days??undefined,
+      sickDays:x.sick_days??undefined, deductDays:x.deduct_days??undefined,
+      deductLoan:Number(x.deduct_loan||0)||undefined,
+      deductOther:Number(x.deduct_other||0)||undefined,
+      bonus:Number(x.bonus||0)||undefined, bonusReason:x.bonus_reason||undefined,
+    }));
+  }
   const modal=el('salary-history-modal');
   const body=el('salary-history-body');
   el('salary-history-modal').querySelector('.mt').textContent='📋 Past Salary Records — '+(s?s.name:'Staff');
