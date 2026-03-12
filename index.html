@@ -1322,6 +1322,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="">-- اختاري موظف --</option>
       </select>
       <button onclick="exportStaffSalaryHistory()" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📊 Excel</button>
+      <button onclick="debugAllSalaryHistory()" style="background:#dc2626;color:#fff;border:none;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🔍 فحص Supabase</button>
     </div>
     <div id="sal-search-body"></div>
   </div>
@@ -4096,6 +4097,80 @@ function openSalarySearchModal(){
     DB.staff.map(s=>`<option value="${s.id}">${s.name} — ${s.position||''}</option>`).join('');
   el('sal-search-body').innerHTML = '';
   el('sal-search-modal').classList.add('on');
+}
+
+async function debugAllSalaryHistory(){
+  const body = el('sal-search-body');
+  body.innerHTML = '<div style="padding:12px;color:#6b7280">⏳ جاري جلب كل البيانات من Supabase...</div>';
+
+  // Query ALL records — no filter at all
+  const {data, error} = await sb.from('staff_salary_history').select('*').order('month',{ascending:false}).limit(200);
+
+  if(error){
+    body.innerHTML = `<div style="background:#fee2e2;border-radius:10px;padding:12px;color:#dc2626">
+      ❌ خطأ في الجدول: ${error.message}<br>
+      <small>تأكدي إن الجدول staff_salary_history اتعمل بالـ SQL الصح</small>
+    </div>`;
+    return;
+  }
+
+  if(!data||!data.length){
+    body.innerHTML = `<div style="background:#fef3c7;border-radius:10px;padding:14px;color:#92400e;text-align:center">
+      ⚠️ الجدول فارغ تماماً — لا توجد أي سجلات رواتب في Supabase<br>
+      <small style="color:#6b7280">يعني البيانات اللي دخلتيها اتحفظت في المصاريف بس (مش في salary history)</small>
+    </div>`;
+    return;
+  }
+
+  // Group by branch_id to diagnose
+  const byBranch = {};
+  data.forEach(x=>{ byBranch[x.branch_id]=(byBranch[x.branch_id]||0)+1; });
+
+  body.innerHTML = `
+    <div style="background:#d1fae5;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;color:#065f46">
+      ✅ وُجد ${data.length} سجل في Supabase
+      <br><small>branch_ids الموجودة: ${Object.entries(byBranch).map(([k,v])=>`${k}(${v})`).join(', ')}</small>
+    </div>
+    <div style="overflow-x:auto;max-height:350px">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;font-family:'Tajawal',sans-serif">
+      <thead style="position:sticky;top:0">
+        <tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:7px 10px;text-align:right">الموظف</th>
+          <th style="padding:7px 6px;text-align:center">branch_id</th>
+          <th style="padding:7px 6px;text-align:center">staff_id</th>
+          <th style="padding:7px 6px;text-align:center">الشهر</th>
+          <th style="padding:7px 6px;text-align:center">الصافي</th>
+          <th style="padding:7px 6px;text-align:center">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map((x,i)=>{
+          const s = DB.staff.find(st=>String(st.id)===String(x.staff_id));
+          const branchOk = ['b1','b2','b3','b4','b5'].includes(x.branch_id);
+          const staffOk = !!s;
+          return `<tr style="background:${i%2?'#fff':'#f8fafc'};border-bottom:1px solid #e5e7eb">
+            <td style="padding:6px 10px;font-weight:700">${s?.name||'❓ غير معروف'}</td>
+            <td style="padding:6px;text-align:center">
+              <span style="background:${branchOk?'#d1fae5':'#fee2e2'};color:${branchOk?'#065f46':'#dc2626'};border-radius:5px;padding:2px 6px;font-size:.72rem">
+                ${x.branch_id}
+              </span>
+            </td>
+            <td style="padding:6px;text-align:center;color:#6b7280;font-size:.75rem">${x.staff_id}</td>
+            <td style="padding:6px;text-align:center;color:#1e3a8a;font-weight:700">${x.month}</td>
+            <td style="padding:6px;text-align:center;font-weight:800;color:#059669">${Number(x.amount||0).toLocaleString()} AED</td>
+            <td style="padding:6px;text-align:center">
+              ${staffOk&&branchOk
+                ? '<span style="color:#059669;font-size:.72rem">✅</span>'
+                : `<span style="color:#dc2626;font-size:.68rem">${!staffOk?'موظف مش موجود':''} ${!branchOk?'branch خاطئ':''}</span>`}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:10px;background:#eff6ff;border-radius:9px;padding:8px 12px;font-size:.75rem;color:#1e40af">
+      💡 لو branch_id أحمر → البيانات اتحفظت بـ branch_id غلط | لو موظف "غير معروف" → staff_id مش متطابق مع السيستم
+    </div>`;
 }
 
 async function loadStaffSalaryHistory(){
