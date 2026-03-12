@@ -4245,7 +4245,7 @@ async function previewBulkSalary(file){
   const ab = await file.arrayBuffer();
   const wb = XLSX.read(ab);
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+  const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});  // raw:true to keep numbers
   if(!rawRows.length){ preview.innerHTML='<div style="color:#dc2626">❌ الملف فارغ</div>'; return; }
 
   // Flexible column detection
@@ -4280,15 +4280,21 @@ async function previewBulkSalary(file){
   rawRows.forEach((row,i)=>{
     const name   = nameCol   ? String(row[nameCol]||'').trim()  : '';
     const month  = monthCol  ? toMonth(row[monthCol])           : null;
-    const net    = netCol    ? Number(row[netCol]||0)           : 0;
-    const basic  = basicCol  ? Number(row[basicCol]||0)         : 0;
+    const netRaw  = netCol   ? row[netCol]   : undefined;
+    const basicRaw = basicCol ? row[basicCol] : undefined;
+    const net    = netRaw   !== undefined && netRaw   !== '' ? Number(netRaw)   : null;
+    const basic  = basicRaw !== undefined && basicRaw !== '' ? Number(basicRaw) : 0;
+
+    // Net Paid is the authoritative value — if explicitly provided, use it.
+    // If net column missing entirely, fall back to basic.
+    const finalNet = (net !== null) ? net : basic;
     const absent = absCol    ? Number(row[absCol]||0)           : 0;
     const bonus  = bonusCol  ? Number(row[bonusCol]||0)         : 0;
     const deduct = dedCol    ? Number(row[dedCol]||0)           : 0;
     const notes  = notesCol  ? String(row[notesCol]||'').trim() : '';
     const branchRaw = branchCol ? String(row[branchCol]||'').trim() : '';
 
-    if(!name||!month||(!net&&!basic)){ skipped++; return; }
+    if(!name||!month||finalNet===null){ skipped++; return; }
     if(name.toLowerCase().includes('example')||name.toLowerCase().includes('مثال')){ skipped++; return; }
 
     // Try to match staff in system
@@ -4307,7 +4313,6 @@ async function previewBulkSalary(file){
       if(br) branchId = br.id;
     }
 
-    const finalNet = net||basic;
     _bulkSalRows.push({
       rowNum: i+2, name, month, basic: basic||finalNet, net: finalNet,
       absent, bonus, deduct, notes, branchId,
