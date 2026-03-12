@@ -9237,7 +9237,7 @@ function renderExpiryAlerts(filterBid){
     return Math.round((new Date(dateStr) - today) / (1000*60*60*24));
   };
 
-  const isUrgent = d => d !== null && d <= 10; // Only show: expired OR expiring within 10 days
+  const isUrgent = d => d !== null && d >= -0 && d <= 30; // Only expiring within 30 days (not already expired long ago)
 
   // ── STAFF ─────────────────────────────────────
   const staffFields = [
@@ -9248,7 +9248,11 @@ function renderExpiryAlerts(filterBid){
     {k:'healthCardExpire', label:'Health Card'},
     {k:'contractEnd',      label:'Contract'},
   ];
-  (DB.staff||[]).filter(s=>!filterBid||!s.branchId||s.branchId===filterBid).forEach(s => {
+  const todayStr = today.toISOString().split('T')[0];
+  (DB.staff||[])
+    .filter(s=>!filterBid||!s.branchId||s.branchId===filterBid)
+    .filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=todayStr) // exclude exited staff
+    .forEach(s => {
     staffFields.forEach(f => {
       const d = daysDiff(s[f.k]);
       if(isUrgent(d)) alerts.push({
@@ -9326,8 +9330,8 @@ function renderExpiryAlerts(filterBid){
 
   // Count by severity: expired (red) vs expiring soon 0-10d (yellow)
   const expired  = alerts.filter(a=>a.days<0).length;
-  const critical = alerts.filter(a=>a.days>=0&&a.days<=10).length;
-  const warning  = 0; // removed — only show 10d window
+  const critical = alerts.filter(a=>a.days>=0&&a.days<=30).length;
+  const warning  = 0;
 
   const rowColor   = d => d<0?'#fee2e2':'#fef3c7';
   const badgeColor = d => d<0?'#dc2626':'#d97706';
