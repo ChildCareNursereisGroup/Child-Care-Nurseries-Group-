@@ -4757,9 +4757,11 @@ async function confirmBulkSalaryImport(){
     }
 
     // ── B: Always create expense (for all — matched & unmatched) ──
-    const monLabel = new Date(yr,mo-1,1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
+    // Use DB staff name (most reliable) or fall back to Excel name
+    const staffObj = DB.staff.find(s=>String(s.id)===r.staffId);
+    const staffName = staffObj?.name || r.name;
     const expRow = {
-      branch_id: r.branchId,
+      branch_id: curBid,
       category: 'salary',
       type: 'Staff Salaries',
       amount: Math.round(r.net),
@@ -4767,23 +4769,23 @@ async function confirmBulkSalaryImport(){
       vat_amount: 0,
       total_amount: Math.round(r.net),
       date: lastDay,
-      note: `${monLabel} — ${r.name}`,
+      note: `${monLabel} — ${staffName}`,
       sub_type: r.month,
-      supplier_name: r.name,
+      supplier_name: staffName,
       tax_number: '',
       extra: {
-        'Employee Name': r.name,
-        'Job Title': DB.staff.find(s=>String(s.id)===r.staffId)?.position||'',
+        'Employee Name': staffName,
+        'Job Title': staffObj?.position||'',
         '__staff_id__': r.staffId||'',
         '__month__': r.month,
       }
     };
-    // Check for duplicate expense by staff name + month (sub_type)
+    // Check for duplicate: match by month + staff_id in extra OR supplier_name
     const {data:existExp} = await sb.from('expenses').select('id')
       .eq('branch_id', curBid)
       .eq('category','salary')
       .eq('sub_type', r.month)
-      .eq('supplier_name', r.name)
+      .or(`supplier_name.eq.${staffName},extra->>__staff_id__.eq.${r.staffId||''}`)
       .limit(1);
     if(existExp?.length){
       await sb.from('expenses').update(expRow).eq('id', existExp[0].id);
@@ -12364,11 +12366,20 @@ async function savePayrollDetail(staffId, mon){
   const expDate = `${yr}-${String(mo).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
   const monLabel = new Date(yr, mo-1, 1).toLocaleDateString('en-AE',{month:'long',year:'numeric'});
   // Check if a salary expense already exists for this staff+month to avoid duplicates
-  const existingExp = DB.expenses.find(e=>
+  // First check DB cache, then query Supabase for old records without staff_id
+  let existingExp = DB.expenses.find(e=>
     e.branch_id===curBid && e.category==='salary' &&
     (e.extra?.['__staff_id__']===String(staffId)) &&
-    (e.date||'').startsWith(mon)
+    (e.subType||e.sub_type||'')===mon
   );
+  if(!existingExp){
+    // Also check by supplier_name + month for old records
+    const {data:dbExp} = await sb.from('expenses').select('id')
+      .eq('branch_id',curBid).eq('category','salary').eq('sub_type',mon)
+      .or(`supplier_name.eq.${s.name},extra->>__staff_id__.eq.${String(staffId)}`)
+      .limit(1);
+    if(dbExp?.length) existingExp = {id: dbExp[0].id};
+  }
   const expRow = {
     branch_id: curBid,
     category: 'salary',
