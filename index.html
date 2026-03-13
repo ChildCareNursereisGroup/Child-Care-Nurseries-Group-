@@ -14076,12 +14076,11 @@ async function importSalaryHistoryExcel(file, targetStaffId){
   const statusEl=el('sh-xl-status');
   if(statusEl) statusEl.innerHTML='<span style="color:#6b7280;font-size:.8rem">⏳ Reading file...</span>';
   const ab=await file.arrayBuffer();
-  const wb=XLSX.read(ab);
+  const wb=XLSX.read(ab,{type:'array',cellFormula:false,cellHTML:false});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
   if(!rows.length){if(statusEl)statusEl.innerHTML='<span style="color:#dc2626">No data found</span>';return;}
 
-  // Normalise month → YYYY-MM
   const toMonth=v=>{
     if(!v) return null;
     const s=String(v).trim();
@@ -14091,15 +14090,12 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
     const m2=s.toLowerCase().match(/([a-z]{3})\D*(\d{4})/);
     if(m2&&months[m2[1]]) return m2[2]+'-'+months[m2[1]];
-    // Try direct date parse
     const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     return null;
   };
-
-  // Detect column names flexibly
   const col=(keys)=>{
     for(const k of keys){
-      const found=Object.keys(rows[0]).find(h=>h.toLowerCase().includes(k));
+      const found=Object.keys(rows[0]).find(h=>h.toLowerCase().includes(k.toLowerCase()));
       if(found) return found;
     }
     return null;
@@ -14107,53 +14103,95 @@ async function importSalaryHistoryExcel(file, targetStaffId){
   const nameCol      =col(['name','staff','employee']);
   const monthCol     =col(['month','date','period','شهر']);
   const basicCol     =col(['basic','أساسي','اساسي']);
-  const grossCol     =col(['gross','net paid','net','paid','total','amount','إجمالي','صافي','اجمالي']);
-  const presentCol   =col(['present','حضور','attendance','attend']);
+  const grossCol     =col(['net paid','net','gross','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const presentCol   =col(['present','حضور','attend']);
   const absentCol    =col(['absent','غياب','absence','unpaid']);
   const sickCol      =col(['sick','مرضية','مرض']);
-  const dDaysCol     =col(['deduct days','deduct day','خصم يوم','عدد أيام الخصم']);
-  const dLoanCol     =col(['deduct loan','loan deduct','deduction loan','خصم قرض']);
-  const dOtherCol    =col(['deduct other','other deduct','خصم آخر','خصم اخر']);
-  const bonusCol     =col(['bonus','مكافأة','مكافاة']);
+  const dLoanCol     =col(['deduct loan','loan']);
+  const dOtherCol    =col(['deduct other','other deduct']);
+  const bonusCol     =col(['bonus','مكافأة']);
   const bonusReasonCol=col(['bonus reason','reason','سبب']);
 
-  let ok=0, skipped=0;
+  // Build all payloads first
+  const payloads=[];
+  let skipped=0;
   for(const row of rows){
     const month=toMonth(monthCol?row[monthCol]:'');
-    const amount=Number((grossCol?row[grossCol]:0)||0);
-    if(!month||!amount){skipped++;continue;}
+    const rawNet=grossCol?row[grossCol]:null;
+    const amount=rawNet!==null&&rawNet!==''?Math.round(Number(rawNet)):null;
+    if(!month||amount===null||isNaN(amount)){skipped++;continue;}
+
     let staffId=targetStaffId;
     if(nameCol&&row[nameCol]){
       const nm=String(row[nameCol]).trim().toLowerCase();
-      const found=DB.staff.find(s=>s.name.toLowerCase().includes(nm)||nm.includes(s.name.toLowerCase().split(' ')[0]));
+      const found=DB.staff.find(s=>
+        s.name.toLowerCase()===nm||
+        s.name.toLowerCase().includes(nm)||
+        nm.includes(s.name.toLowerCase())
+      );
       if(found) staffId=String(found.id);
     }
     if(!staffId){skipped++;continue;}
+
+    const nv=c=>(c&&row[c]!==''&&row[c]!==null)?Number(row[c]):null;
+    const sv=c=>(c&&row[c])?String(row[c]).trim():null;
     const basic=basicCol?Number(row[basicCol])||0:0;
-    const nv=c=>c&&row[c]!==''?Number(row[c]):undefined;
-    const sv=c=>c&&row[c]?String(row[c]).trim():undefined;
     const presentDays=nv(presentCol);
     const absentDays=nv(absentCol);
-    const sickDays=nv(sickCol);
-    const deductDays=nv(dDaysCol);
-    const deductLoan=nv(dLoanCol);
-    const deductOther=nv(dOtherCol);
-    const bonus=nv(bonusCol);
-    const bonusReason=sv(bonusReasonCol);
-    const history=getSalaryHistory(staffId);
-    const idx=history.findIndex(r=>r.month===month);
-    const entry={month,amount,basic:basic||undefined,presentDays,absentDays,sickDays,
-      deductDays,deductLoan,deductOther,bonus,bonusReason,addedAt:new Date().toISOString()};
-    if(idx>=0) history[idx]=Object.assign(history[idx],entry);
-    else history.push(entry);
-    await saveSalaryHistory(staffId,history);
-    await upsertSalaryHistoryEntry(staffId, entry);
-    ok++;
+    const [yr,mo]=month.split('-').map(Number);
+    const dim=new Date(yr,mo,0).getDate();
+    payloads.push({
+      branch_id: curBid,
+      staff_id:  Number(staffId),
+      month,
+      amount,
+      basic_salary: basic||0,
+      present_days: presentDays!==null ? presentDays : (absentDays!==null ? dim-absentDays : null),
+      absent_days:  absentDays!==null ? absentDays : null,
+      sick_days:    nv(sickCol),
+      deduct_loan:  nv(dLoanCol)||0,
+      deduct_other: nv(dOtherCol)||0,
+      bonus:        nv(bonusCol)||0,
+      bonus_reason: sv(bonusReasonCol),
+    });
   }
 
-  if(statusEl) statusEl.innerHTML=`<span style="color:#059669;font-weight:700;font-size:.82rem">✅ Imported ${ok} records${skipped?` · ⏭ ${skipped} skipped`:''}</span>`;
-  const listEl=el('sh_list');
+  if(!payloads.length){
+    if(statusEl) statusEl.innerHTML='<span style="color:#dc2626">❌ No valid rows found</span>';
+    return;
+  }
+
+  if(statusEl) statusEl.innerHTML=`<span style="color:#6b7280;font-size:.8rem">⏳ Saving ${payloads.length} records...</span>`;
+
+  // Single batch upsert
+  const {error}=await sb.from('staff_salary_history')
+    .upsert(payloads,{onConflict:'branch_id,staff_id,month'});
+
+  if(error){
+    if(statusEl) statusEl.innerHTML=`<span style="color:#dc2626">❌ Error: ${error.message}</span>`;
+    return;
+  }
+
+  // Update memory cache
+  if(!DB.salaryHistory) DB.salaryHistory={};
+  payloads.forEach(p=>{
+    const sid=String(p.staff_id);
+    if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+    const idx=DB.salaryHistory[sid].findIndex(r=>r.month===p.month);
+    const entry={month:p.month,amount:p.amount,basic:p.basic_salary||undefined,
+      presentDays:p.present_days??undefined,absentDays:p.absent_days??undefined,
+      bonus:p.bonus||undefined,deductLoan:p.deduct_loan||undefined};
+    if(idx>=0) DB.salaryHistory[sid][idx]=entry;
+    else DB.salaryHistory[sid].push(entry);
+  });
+
+  if(statusEl) statusEl.innerHTML=`<span style="color:#059669;font-weight:700;font-size:.85rem">✅ Imported ${payloads.length} records successfully${skipped?` · ${skipped} skipped`:''}</span>`;
+
+  // Refresh display
   renderSalaryHistoryList(targetStaffId);
+  // Also refresh inline view if open
+  const inlineSel=el('sh-tab-staff');
+  if(inlineSel&&inlineSel.value===targetStaffId) loadSHInline();
 }
 
 // ═══════════════════════════════════════════════════
