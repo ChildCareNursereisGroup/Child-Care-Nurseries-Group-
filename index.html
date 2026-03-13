@@ -4778,11 +4778,11 @@ async function confirmBulkSalaryImport(){
         '__month__': r.month,
       }
     };
-    // Check for duplicate expense
+    // Check for duplicate expense by staff name + month (sub_type)
     const {data:existExp} = await sb.from('expenses').select('id')
-      .eq('branch_id', r.branchId)
+      .eq('branch_id', curBid)
       .eq('category','salary')
-      .eq('date', lastDay)
+      .eq('sub_type', r.month)
       .eq('supplier_name', r.name)
       .limit(1);
     if(existExp?.length){
