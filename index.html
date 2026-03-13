@@ -14187,11 +14187,48 @@ async function importSalaryHistoryExcel(file, targetStaffId){
 
   if(statusEl) statusEl.innerHTML=`<span style="color:#059669;font-weight:700;font-size:.85rem">✅ Imported ${payloads.length} records successfully${skipped?` · ${skipped} skipped`:''}</span>`;
 
-  // Refresh display
-  renderSalaryHistoryList(targetStaffId);
-  // Also refresh inline view if open
+  // Update sh_list if modal is open
+  const listEl=el('sh_list');
+  if(listEl) {
+    // Re-render from the updated DB cache (no extra Supabase call needed)
+    const history=(DB.salaryHistory[String(targetStaffId)]||[]).sort((a,b)=>b.month.localeCompare(a.month));
+    if(!history.length){
+      listEl.innerHTML='<div style="text-align:center;padding:20px;color:#9ca3af">No records</div>';
+    } else {
+      const totalPaid=history.reduce((t,r)=>t+(r.amount||0),0);
+      const totalPresent=history.reduce((t,r)=>t+(r.presentDays||0),0);
+      listEl.innerHTML=`<div style="background:#d1fae5;border-radius:10px;padding:12px;text-align:center;font-weight:800;color:#065f46;font-size:.9rem">
+        ✅ ${history.length} months · ${totalPresent} days present · ${fmtNum(Math.round(totalPaid))} AED total
+      </div>
+      <div style="overflow-x:auto;margin-top:10px">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead><tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:8px 10px;text-align:left">Month</th>
+          <th style="padding:8px;text-align:center">Basic</th>
+          <th style="padding:8px;text-align:center">Present</th>
+          <th style="padding:8px;text-align:center">Absent</th>
+          <th style="padding:8px;text-align:center;background:#065f46">Net Paid</th>
+        </tr></thead>
+        <tbody>
+          ${history.map((r,i)=>`<tr style="background:${i%2?'#fff':'#f8fafc'};border-bottom:1px solid #e5e7eb">
+            <td style="padding:7px 10px;font-weight:800;color:#1e3a8a">${r.month}</td>
+            <td style="padding:7px;text-align:center;color:#6b7280">${r.basic?fmtNum(r.basic):'—'}</td>
+            <td style="padding:7px;text-align:center;color:#059669;font-weight:700">${r.presentDays??'—'}</td>
+            <td style="padding:7px;text-align:center;color:#dc2626">${r.absentDays??'—'}</td>
+            <td style="padding:7px;text-align:center;font-weight:900;color:#059669">${fmtNum(r.amount)} AED</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+    }
+  }
+
+  // Refresh Salary History tab if open
   const inlineSel=el('sh-tab-staff');
-  if(inlineSel&&inlineSel.value===targetStaffId) loadSHInline();
+  if(inlineSel){
+    // Set dropdown to this staff and reload
+    inlineSel.value=targetStaffId;
+    loadSHInline();
+  }
 }
 
 // ═══════════════════════════════════════════════════
