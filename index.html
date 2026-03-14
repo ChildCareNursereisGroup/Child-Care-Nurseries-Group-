@@ -1791,6 +1791,7 @@ const ROLES_PAGES = {
 };
 // Common tax & supplier fields added to every expense
 const TAX_SUPPLIER_FIELDS = [
+  {id:'ex_invoice_num', ar:()=>lang==='ar'?'رقم الفاتورة':'Invoice No.',  t:'text'},
   {id:'ex_supplier', ar:()=>t('supplierName'),    t:'text'},
   {id:'ex_tax_num',  ar:()=>t('supplierTaxNo'),   t:'text'},
   {id:'ex_reason',   ar:()=>t('payReason'),        t:'text'},
@@ -1976,7 +1977,8 @@ async function loadFromSupa(bid) {
         amount:Number(x.amount||0),vatType:x.vat_type||'معفى (0%)',vatAmount:Number(x.vat_amount||0),
         totalAmount:Number(x.total_amount||x.amount||0),
         date:x.date||null,note:x.note||'',subType:x.sub_type||'',
-        supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',extra};
+        supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',
+        invoiceNumber:x.invoice_number||'',extra};
     });
     DB.staffAtt={};
     if(sa.error){
@@ -5292,6 +5294,7 @@ function renderExps(){
             <div style="font-size:.71rem;color:var(--muted);margin-top:2px">
               📅 ${fmtDate(e.date)}
               ${e.supplierName?`<span style="background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:700">🏢 ${e.supplierName}</span>`:''}
+              ${e.invoiceNumber?`<span style="background:#ede9fe;color:#6d28d9;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:700">🧾 ${e.invoiceNumber}</span>`:''}
               ${e.taxNumber?' | رقم ضريبي: '+e.taxNumber:''}
             </div>
             ${(e.extra&&e.extra['__bus_no__'])?`<div style="font-size:.72rem;margin-top:2px"><span style="background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:10px;font-weight:800">🚌 ${e.extra['__bus_no__']}${e.extra['__bus_type__']?' — '+e.extra['__bus_type__']:''}</span></div>`:''}
@@ -5342,6 +5345,7 @@ async function saveExp(){
   const supplier=v('ex_supplier');
   const taxNum=v('ex_tax_num');
   const reason=v('ex_reason');
+  const invoiceNum=v('ex_invoice_num');
   const totalWithVat=amount+vatAmt;
   setSyncing(true);
   const row={
@@ -5349,6 +5353,7 @@ async function saveExp(){
     amount, vat_type:vatType, vat_amount:vatAmt, total_amount:totalWithVat,
     date, note:reason, sub_type:subType,
     supplier_name:supplier, tax_number:taxNum,
+    invoice_number:invoiceNum||null,
     extra
   };
   // ── Duplicate check ──────────────────────────
@@ -11053,6 +11058,7 @@ function openEditExp(id){
   el('eedit-total').value=e.totalAmount||e.amount||0;
   el('eedit-supplier').value=e.supplierName||'';
   el('eedit-taxnum').value=e.taxNumber||'';
+  el('eedit-invoice-num').value=e.invoiceNumber||'';
   el('eedit-reason').value=e.note||'';
   el('eedit-alert').innerHTML='';
   el('exp-edit-modal').style.display='flex';
@@ -11081,6 +11087,7 @@ async function saveEditExp(){
     amount, vat_type:vatType, vat_amount:vatAmt, total_amount:total,
     supplier_name:el('eedit-supplier')?.value||null,
     tax_number:el('eedit-taxnum')?.value||null,
+    invoice_number:el('eedit-invoice-num')?.value||null,
     note:el('eedit-reason')?.value||null,
   };
   setSyncing(true);
@@ -14839,6 +14846,10 @@ boot();
         <div>
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🏢 المورد / Supplier</label>
           <input id="eedit-supplier" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#6366f1;display:block;margin-bottom:4px">🧾 رقم الفاتورة / Invoice No.</label>
+          <input id="eedit-invoice-num" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
         </div>
         <div>
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🔢 الرقم الضريبي / Tax No.</label>
