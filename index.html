@@ -9056,10 +9056,14 @@ async function confirmImportExpenses(rows){
       const vatAmt=toNum(row['VAT Amount']||row['vat_amount']);
       const total=toNum(row['Total Amount']||row['total_amount'])||amt+vatAmt;
       
+      const supplier = String(row['Supplier Name']||row['supplier_name']||'').trim();
+      const taxNo    = String(row['Supplier Tax No']||row['tax_number']||'').trim();
+      const reason   = String(row['Description/Reason']||row['description']||'').trim();
+
       const extra={
-        supplier: String(row['Supplier Name']||''),
-        taxNo: String(row['Supplier Tax No']||''),
-        reason: String(row['Description/Reason']||row['description']||''),
+        supplier,
+        taxNo,
+        reason,
       };
       
       const r={
@@ -9071,8 +9075,10 @@ async function confirmImportExpenses(rows){
         vat_amount: vatAmt,
         total_amount: total,
         date: toDate(row['Date']||row['date']),
-        note: String(row['Sub Type/Notes']||row['notes']||''),
+        note: reason,
         sub_type: String(row['Sub Type/Notes']||''),
+        supplier_name: supplier||null,
+        tax_number: taxNo||null,
         extra: JSON.stringify(extra),
       };
       if(!r.date) continue;
