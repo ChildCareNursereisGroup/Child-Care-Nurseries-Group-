@@ -9389,7 +9389,7 @@ function renderExpiryAlerts(filterBid){
     return Math.round((new Date(dateStr) - today) / (1000*60*60*24));
   };
 
-  const isUrgent = d => d !== null && d >= -0 && d <= 30; // Only expiring within 30 days (not already expired long ago)
+  const isUrgent = d => d !== null && d >= 0 && d <= 30; // Only expiring within next 30 days
 
   // ── STAFF ─────────────────────────────────────
   const staffFields = [
