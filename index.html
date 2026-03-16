@@ -4759,9 +4759,10 @@ async function confirmBulkSalaryImport(){
     }
 
     // ── B: Always create expense (for all — matched & unmatched) ──
-    // Use DB staff name (most reliable) or fall back to Excel name
-    const staffObj = DB.staff.find(s=>String(s.id)===r.staffId);
-    const staffName = staffObj?.name || r.name;
+    // Search staff in ALL branches (not just curBid)
+    const staffObj = DB.staff.find(s=>String(s.id)===r.staffId) ||
+                     DB.staff.find(s=>s.name?.toLowerCase()===r.name?.toLowerCase());
+    const staffName = (staffObj?.name || r.name || '').trim();
     const expRow = {
       branch_id: curBid,
       category: 'salary',
@@ -4782,15 +4783,29 @@ async function confirmBulkSalaryImport(){
         '__month__': r.month,
       }
     };
-    // Check for duplicate: match by month + staff_id in extra OR supplier_name
-    const {data:existExp} = await sb.from('expenses').select('id')
-      .eq('branch_id', curBid)
-      .eq('category','salary')
-      .eq('sub_type', r.month)
-      .or(`supplier_name.eq.${staffName},extra->>__staff_id__.eq.${r.staffId||''}`)
-      .limit(1);
-    if(existExp?.length){
-      await sb.from('expenses').update(expRow).eq('id', existExp[0].id);
+    // Check for duplicate: by staff_id+month first, then supplier_name+month
+    let existExp = null;
+    if(r.staffId){
+      const {data:d1} = await sb.from('expenses').select('id')
+        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
+        .eq('extra->>__staff_id__', r.staffId).limit(1);
+      if(d1?.length) existExp = d1[0];
+    }
+    if(!existExp && staffName){
+      const {data:d2} = await sb.from('expenses').select('id')
+        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
+        .eq('supplier_name', staffName).limit(1);
+      if(d2?.length) existExp = d2[0];
+    }
+    if(!existExp){
+      // Also check old records with null supplier_name by date+amount
+      const {data:d3} = await sb.from('expenses').select('id')
+        .eq('branch_id',curBid).eq('category','salary').eq('date',lastDay)
+        .eq('amount', Math.round(r.net)).is('supplier_name',null).limit(1);
+      if(d3?.length) existExp = d3[0];
+    }
+    if(existExp?.id){
+      await sb.from('expenses').update(expRow).eq('id', existExp.id);
     } else {
       await sb.from('expenses').insert(expRow);
     }
