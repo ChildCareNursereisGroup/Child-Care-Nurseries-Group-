@@ -4739,9 +4739,11 @@ async function confirmBulkSalaryImport(){
   const errDetails = [];
 
   for(const r of _bulkSalRows){
-    const [yr,mo] = r.month.split('-').map(Number);
+    const month = (r.month||'').trim();
+    if(!month || !month.match(/^\d{4}-\d{2}$/)) { salErr++; errDetails.push(`${r.name}: invalid month "${month}"`); continue; }
+    const [yr,mo] = month.split('-').map(Number);
     const daysInMonth = new Date(yr,mo,0).getDate();
-    const lastDay = `${r.month}-${String(daysInMonth).padStart(2,'0')}`;
+    const lastDay = `${month}-${String(daysInMonth).padStart(2,'0')}`;
     // Ensure branch_id is always b1-b5
     const branchId = ['b1','b2','b3','b4','b5'].includes(r.branchId) ? r.branchId : curBid;
 
@@ -4839,6 +4841,26 @@ async function confirmBulkSalaryImport(){
     </div>`;
   }
   _bulkSalRows = [];
+
+  // Refresh salary history cache so Payroll tab shows updated data
+  sb.from('staff_salary_history').select('*')
+    .then(({data:sh})=>{
+      if(!sh) return;
+      DB.salaryHistory={};
+      sh.forEach(x=>{
+        const sid=String(x.staff_id);
+        if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+        DB.salaryHistory[sid].push({
+          month:x.month, amount:Number(x.amount||0),
+          basic:Number(x.basic_salary||0)||undefined,
+          presentDays:x.present_days??undefined, absentDays:x.absent_days??undefined,
+          sickDays:x.sick_days??undefined, deductDays:x.deduct_days??undefined,
+          deductLoan:Number(x.deduct_loan||0)||undefined,
+          deductOther:Number(x.deduct_other||0)||undefined,
+          bonus:Number(x.bonus||0)||undefined, bonusReason:x.bonus_reason||undefined,
+        });
+      });
+    }).catch(()=>{});
 }
 
 
