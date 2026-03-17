@@ -4918,7 +4918,7 @@ async function renderBulkAtt(){
     const dow = new Date(dd+'T00:00:00').getDay();
     days.push({d,dd,dow,isFri:dow===5});
   }
-  const dayNames=['س','ح','ن','ث','ر','خ','ج'];
+  const dayNames=    lang==='ar'?['أحد','اثن','ثلا','أرب','خمس','جمع','سبت']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   let html = `<table style="border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.78rem;min-width:600px">
     <thead>
