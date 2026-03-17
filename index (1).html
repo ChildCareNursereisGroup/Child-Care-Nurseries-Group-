@@ -4599,8 +4599,14 @@ async function previewBulkSalary(file){
 
   const toMonth = v => {
     if(!v) return null;
+    if(typeof v === 'number' && v > 40000 && v < 60000){
+      const d = new Date((v - 25569) * 86400000);
+      return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+    }
     const s = String(v).trim();
     if(/^\d{4}-\d{2}$/.test(s)) return s;
+    const mFull=s.match(/^(\d{4})-(\d{2})-\d{2}/);
+    if(mFull) return mFull[1]+'-'+mFull[2];
     const m1 = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
     if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
     const mo = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
@@ -4733,9 +4739,11 @@ async function confirmBulkSalaryImport(){
   const errDetails = [];
 
   for(const r of _bulkSalRows){
-    const [yr,mo] = r.month.split('-').map(Number);
+    const month = (r.month||'').trim();
+    if(!month || !month.match(/^\d{4}-\d{2}$/)) { salErr++; errDetails.push(`${r.name}: invalid month "${month}"`); continue; }
+    const [yr,mo] = month.split('-').map(Number);
     const daysInMonth = new Date(yr,mo,0).getDate();
-    const lastDay = `${r.month}-${String(daysInMonth).padStart(2,'0')}`;
+    const lastDay = `${month}-${String(daysInMonth).padStart(2,'0')}`;
     // Ensure branch_id is always b1-b5
     const branchId = ['b1','b2','b3','b4','b5'].includes(r.branchId) ? r.branchId : curBid;
 
@@ -9121,7 +9129,10 @@ async function confirmImportExpenses(rows){
       const vatAmt=toNum(row['VAT Amount']||row['vat_amount']);
       const total=toNum(row['Total Amount']||row['total_amount'])||amt+vatAmt;
       
-      const supplier = String(row['Supplier Name']||row['supplier_name']||'').trim();
+      const supplierRaw = String(row['Supplier Name']||row['supplier_name']||'').trim();
+      const subType  = String(row['Sub Type/Notes']||'').trim();
+      // Combine supplier + sub type to make unique (e.g. "Etisalat Bus no 1 - 050-3313746")
+      const supplier = subType ? `${supplierRaw} ${subType}`.trim() : supplierRaw;
       const taxNo    = String(row['Supplier Tax No']||row['tax_number']||'').trim();
       const reason   = String(row['Description/Reason']||row['description']||'').trim();
 
@@ -14206,8 +14217,16 @@ async function importSalaryHistoryExcel(file, targetStaffId){
 
   const toMonth=v=>{
     if(!v) return null;
+    // Handle Excel serial number (e.g. 45688 = a date)
+    if(typeof v === 'number' && v > 40000 && v < 60000){
+      const d = new Date((v - 25569) * 86400000);
+      return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+    }
     const s=String(v).trim();
     if(/^\d{4}-\d{2}$/.test(s)) return s;
+    // Full date like 2025-01-31 → take YYYY-MM only
+    const mFull=s.match(/^(\d{4})-(\d{2})-\d{2}/);
+    if(mFull) return mFull[1]+'-'+mFull[2];
     const m1=s.match(/^(\d{1,2})[\/\-](\d{4})$/);
     if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
     const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
