@@ -4599,8 +4599,14 @@ async function previewBulkSalary(file){
 
   const toMonth = v => {
     if(!v) return null;
+    if(typeof v === 'number' && v > 40000 && v < 60000){
+      const d = new Date((v - 25569) * 86400000);
+      return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+    }
     const s = String(v).trim();
     if(/^\d{4}-\d{2}$/.test(s)) return s;
+    const mFull=s.match(/^(\d{4})-(\d{2})-\d{2}/);
+    if(mFull) return mFull[1]+'-'+mFull[2];
     const m1 = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
     if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
     const mo = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
@@ -14209,8 +14215,16 @@ async function importSalaryHistoryExcel(file, targetStaffId){
 
   const toMonth=v=>{
     if(!v) return null;
+    // Handle Excel serial number (e.g. 45688 = a date)
+    if(typeof v === 'number' && v > 40000 && v < 60000){
+      const d = new Date((v - 25569) * 86400000);
+      return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+    }
     const s=String(v).trim();
     if(/^\d{4}-\d{2}$/.test(s)) return s;
+    // Full date like 2025-01-31 → take YYYY-MM only
+    const mFull=s.match(/^(\d{4})-(\d{2})-\d{2}/);
+    if(mFull) return mFull[1]+'-'+mFull[2];
     const m1=s.match(/^(\d{1,2})[\/\-](\d{4})$/);
     if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
     const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
