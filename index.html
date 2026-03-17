@@ -9108,7 +9108,7 @@ async function confirmImportExpenses(rows){
     'bus':'bus','transport':'bus','transportation':'bus','vehicle':'bus',
   };
   
-  let ok=0,err=0;
+  let ok=0,err=0,skipped=0;
   showAlert('exp-imp-alert','⏳ Importing...', false);
   
   for(const row of rows){
@@ -9121,7 +9121,10 @@ async function confirmImportExpenses(rows){
       const vatAmt=toNum(row['VAT Amount']||row['vat_amount']);
       const total=toNum(row['Total Amount']||row['total_amount'])||amt+vatAmt;
       
-      const supplier = String(row['Supplier Name']||row['supplier_name']||'').trim();
+      const supplierRaw = String(row['Supplier Name']||row['supplier_name']||'').trim();
+      const subType  = String(row['Sub Type/Notes']||'').trim();
+      // Combine supplier + sub type to make unique (e.g. "Etisalat Bus no 1 - 050-3313746")
+      const supplier = subType ? `${supplierRaw} ${subType}`.trim() : supplierRaw;
       const taxNo    = String(row['Supplier Tax No']||row['tax_number']||'').trim();
       const reason   = String(row['Description/Reason']||row['description']||'').trim();
 
@@ -9148,25 +9151,28 @@ async function confirmImportExpenses(rows){
       };
       if(!r.date) continue;
 
-      // ── Duplicate check: same category + date + amount + supplier ──
-      const {data:existing} = await sb.from('expenses').select('id')
+      // ── Duplicate check ──
+      let dupQuery = sb.from('expenses').select('id')
         .eq('branch_id', curBid)
         .eq('category', validCat)
         .eq('date', r.date)
-        .eq('amount', amt)
-        .eq('supplier_name', supplier||'')
-        .limit(1);
-      if(existing?.length){
-        // Already exists — skip
-        continue;
+        .eq('amount', amt);
+
+      if(supplier){
+        dupQuery = dupQuery.eq('supplier_name', supplier);
+      } else {
+        dupQuery = dupQuery.eq('note', reason||'');
       }
+
+      const {data:existing} = await dupQuery.limit(1);
+      if(existing?.length){ skipped++; continue; } // Already exists — skip
 
       await sb.from('expenses').insert(r); ok++;
     }catch(e){ err++; }
   }
   
   await loadFromSupa(curBid);
-  const msg=`✅ Imported ${ok} expense records${err?' | ⚠️ '+err+' errors':''}`;
+  const msg=`✅ Imported ${ok} expense records${skipped?' | ⏭ '+skipped+' already existed (skipped)':''}${err?' | ⚠️ '+err+' errors':''}`;
   document.getElementById('exp-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>`;
 }
 
