@@ -9147,6 +9147,20 @@ async function confirmImportExpenses(rows){
         extra: JSON.stringify(extra),
       };
       if(!r.date) continue;
+
+      // ── Duplicate check: same category + date + amount + supplier ──
+      const {data:existing} = await sb.from('expenses').select('id')
+        .eq('branch_id', curBid)
+        .eq('category', validCat)
+        .eq('date', r.date)
+        .eq('amount', amt)
+        .eq('supplier_name', supplier||'')
+        .limit(1);
+      if(existing?.length){
+        // Already exists — skip
+        continue;
+      }
+
       await sb.from('expenses').insert(r); ok++;
     }catch(e){ err++; }
   }
