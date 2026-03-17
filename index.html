@@ -9093,6 +9093,20 @@ async function confirmImportExpenses(rows){
   };
   const toNum=v=>parseFloat(v)||0;
   const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','other'];
+  // Map common variations to valid categories
+  const catMap={
+    'communication':'tel','communications':'tel','telephone':'tel','telecom':'tel',
+    'etisalat':'tel','du':'tel','phone':'tel','internet':'tel','mobile':'tel',
+    'electricity':'util','utilities':'util','water':'util','electric':'util',
+    'purchase':'purch','purchases':'purch','shopping':'purch',
+    'maintenance':'maint','repair':'maint','repairs':'maint',
+    'government':'govt','gov':'govt','municipality':'govt','visa':'govt',
+    'advertising':'ads','advertisement':'ads','marketing':'ads',
+    'printing':'printing','print':'printing','stationery':'printing',
+    'bank':'bank','banking':'bank','finance':'bank',
+    'contract':'contract','rent':'contract','lease':'contract',
+    'bus':'bus','transport':'bus','transportation':'bus','vehicle':'bus',
+  };
   
   let ok=0,err=0;
   showAlert('exp-imp-alert','⏳ Importing...', false);
@@ -9100,7 +9114,7 @@ async function confirmImportExpenses(rows){
   for(const row of rows){
     try{
       const cat=String(row['Category']||row['category']||'other').toLowerCase().trim();
-      const validCat=validCats.includes(cat)?cat:'other';
+      const validCat=validCats.includes(cat)?cat:(catMap[cat]||'other');
       const catObj=EXP_CATS.find(c=>c.k===validCat)||EXP_CATS[0];
       const catLabel=typeof catObj.ar==='function'?catObj.ar():catObj.ar;
       const amt=toNum(row['Amount']||row['amount']);
