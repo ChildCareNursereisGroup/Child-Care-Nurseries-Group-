@@ -9265,8 +9265,12 @@ async function confirmImportReceipts(rows){
   
   for(const row of rows){
     try{
-      // Find child by name
+      // Find child by name — REQUIRED, skip if empty
       const cname=(row['Child Name']||row['child_name']||row['Kids Name']||'').toString().trim();
+      if(!cname){
+        err++;
+        continue; // Never import without a child name
+      }
       const child=DB.children.find(c=>c.name.toLowerCase()===cname.toLowerCase())||
                   DB.children.find(c=>c.name.toLowerCase().includes(cname.toLowerCase()));
       
