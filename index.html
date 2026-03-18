@@ -9169,6 +9169,14 @@ async function importReceiptsExcel(file){
 
     // Show preview table first
     const previewRows=rows.slice(0,5);
+    // Format values for display (convert date serials)
+    const fmtVal=v=>{
+      if(typeof v==='number' && v>40000 && v<60000){
+        const d=new Date((v-25569)*86400000);
+        return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+      }
+      return v;
+    };
     preview.innerHTML=`
       <div style="background:#eff6ff;border-radius:9px;padding:10px;margin-bottom:9px">
         <b>${rows.length} receipts found</b> — Preview of first ${Math.min(5,rows.length)}:
@@ -9176,7 +9184,7 @@ async function importReceiptsExcel(file){
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;font-size:.75rem;border-collapse:collapse">
           <tr style="background:#1d4ed8;color:#fff">${Object.keys(previewRows[0]).slice(0,8).map(h=>`<th style="padding:5px 7px">${h}</th>`).join('')}</tr>
-          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,8).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${v}</td>`).join('')}</tr>`).join('')}
+          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,8).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${fmtVal(v)}</td>`).join('')}</tr>`).join('')}
         </table>
       </div>
       <div style="display:flex;gap:7px">
