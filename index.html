@@ -223,6 +223,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="page on" id="pg-dashboard">
   <div class="sgrid" id="dstats"></div>
 
+  <!-- YEARLY FINANCIAL SUMMARY — ADMIN ONLY -->
+  <div id="yearly-summary" style="display:none;margin-bottom:12px"></div>
+
   <!-- TODAY'S QUICK SUMMARY -->
   <div class="card" id="today-summary-card" style="border-top:3px solid #1e3a8a;padding-bottom:4px">
     <div class="ch" style="margin-bottom:8px">
@@ -2621,6 +2624,51 @@ function renderDashboard(){
     <div class="sc"><div class="si">✅</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
     ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
     <div class="sc"><div class="si">🚌</div><div class="sv">${bus}</div><div class="sk">${t('busUsers')}</div></div>`;
+
+  // ── Admin-only yearly summary ──
+  const yearlyEl = el('yearly-summary');
+  if(yearlyEl){
+    if(curRole==='admin'){
+      // Get all years from receipts and expenses
+      const recYears = [...new Set(DB.receipts.map(r=>(r.date||'').substring(0,4)).filter(y=>y>='2020'))].sort();
+      const expYears = [...new Set(DB.expenses.map(e=>(e.date||'').substring(0,4)).filter(y=>y>='2020'))].sort();
+      const years = [...new Set([...recYears,...expYears])].sort();
+
+      if(years.length){
+        const cards = years.map(yr=>{
+          const rev = DB.receipts.filter(r=>(r.date||'').startsWith(yr)).reduce((s,r)=>s+(r.total||0),0);
+          const exp = DB.expenses.filter(e=>(e.date||'').startsWith(yr)).reduce((s,e)=>s+(e.totalAmount||e.total_amount||e.amount||0),0);
+          const net = rev - exp;
+          return `<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;min-width:200px">
+            <div style="font-weight:900;font-size:1rem;color:#1e3a8a;margin-bottom:10px;text-align:center">📅 ${yr}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;color:#6b7280">💰 Revenue</span>
+                <span style="font-weight:800;color:#059669;font-size:.88rem">${fmtNum(Math.round(rev))} AED</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;color:#6b7280">💸 Expenses</span>
+                <span style="font-weight:800;color:#dc2626;font-size:.88rem">${fmtNum(Math.round(exp))} AED</span>
+              </div>
+              <div style="border-top:1px solid #e5e7eb;padding-top:6px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;font-weight:700;color:#374151">Net</span>
+                <span style="font-weight:900;color:${net>=0?'#1d4ed8':'#dc2626'};font-size:.9rem">${net>=0?'+':''}${fmtNum(Math.round(net))} AED</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+        yearlyEl.innerHTML=`
+          <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:14px;padding:14px 16px;margin-bottom:4px">
+            <div style="font-weight:900;color:#fff;font-size:.9rem;margin-bottom:12px">📊 Yearly Financial Summary — Admin Only</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>
+          </div>`;
+        yearlyEl.style.display='block';
+      }
+    } else {
+      yearlyEl.innerHTML='';
+      yearlyEl.style.display='none';
+    }
+  }
   if(curRole==='admin'){
     el('bovcard').style.display='block';
     el('bovgrid').innerHTML=BRANCHES.map(b=>`
