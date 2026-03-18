@@ -1127,6 +1127,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bp bsm" onclick="exportPayrollExcel()">📊 Excel</button>
       <button class="btn bg bsm" onclick="printPayroll()">🖨️ Print</button>
       <button onclick="openBulkSalaryModal()" style="background:#0369a1;color:#fff;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">📥 Import Past Salaries</button>
+      <button onclick="openEOSPaymentModal()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800">🏁 End of Service Payment</button>
     </div>
   </div>
   <div id="payroll-summary" style="margin-bottom:10px"></div>
@@ -1348,6 +1349,62 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <!-- BULK SALARY ENTRY MODAL -->
+<!-- EOS PAYMENT MODAL -->
+<div class="mover" id="eos-payment-modal" onclick="if(event.target===this)this.classList.remove('on')">
+<div class="modal" style="max-width:600px;width:98%">
+  <div class="mh">
+    <div class="mt">🏁 End of Service Payment — مكافأة نهاية الخدمة</div>
+    <button class="xb" onclick="el('eos-payment-modal').classList.remove('on')">✕</button>
+  </div>
+  <div style="padding:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px;color:#7c3aed">👷 Staff Member</label>
+        <select id="eos-pay-staff" onchange="calcEOSPayment()" style="width:100%;padding:8px 10px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem">
+          <option value="">— Select Staff —</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px;color:#7c3aed">📅 Last Working Day</label>
+        <input type="date" id="eos-pay-date" onchange="calcEOSPayment()" style="width:100%;padding:8px 10px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+      </div>
+    </div>
+    <div id="eos-pay-calc" style="margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💰 Gratuity Amount (AED)</label>
+        <input type="number" id="eos-pay-gratuity" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">🏖️ Leave Compensation (AED)</label>
+        <input type="number" id="eos-pay-leave" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">📋 Notice Pay (AED)</label>
+        <input type="number" id="eos-pay-notice" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💵 Last Month Salary (AED)</label>
+        <input type="number" id="eos-pay-salary" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:800;font-size:.95rem">💰 Total Due:</span>
+      <span id="eos-pay-total" style="font-weight:900;font-size:1.1rem;color:#059669">0 AED</span>
+    </div>
+    <div>
+      <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">📝 Notes</label>
+      <textarea id="eos-pay-notes" rows="2" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <div id="eos-pay-alert" style="margin:10px 0;font-size:.82rem"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="saveEOSPayment()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">💾 Save & Record in Expenses</button>
+      <button onclick="el('eos-payment-modal').classList.remove('on')" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.88rem">Cancel</button>
+    </div>
+  </div>
+</div>
+</div>
+
 <div class="mover" id="bulk-sal-modal">
 <div class="modal" style="max-width:950px;width:98%">
   <div class="mh">
@@ -4517,6 +4574,129 @@ function exportStaffSalaryHistory(){
 // ═══════════════════════════════════════════════
 let _bulkSalRows = []; // parsed preview rows
 
+function openEOSPaymentModal(){
+  // Populate staff dropdown
+  const sel = el('eos-pay-staff');
+  sel.innerHTML = '<option value="">— Select Staff —</option>' +
+    DB.staff.filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=today())
+    .map(s=>`<option value="${s.id}">${s.name} — ${s.position||''}</option>`).join('');
+  el('eos-pay-date').value = today();
+  el('eos-pay-gratuity').value = '';
+  el('eos-pay-leave').value = '';
+  el('eos-pay-notice').value = '';
+  el('eos-pay-salary').value = '';
+  el('eos-pay-notes').value = '';
+  el('eos-pay-total').textContent = '0 AED';
+  el('eos-pay-calc').innerHTML = '';
+  el('eos-pay-alert').innerHTML = '';
+  el('eos-payment-modal').classList.add('on');
+}
+
+function calcEOSPayment(){
+  const staffId = el('eos-pay-staff')?.value;
+  const endDate = el('eos-pay-date')?.value;
+  if(!staffId || !endDate) return;
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  if(!s) return;
+
+  // Calculate using existing EOS logic
+  const basic = Number(s.basicSalary||0);
+  const gross = Number(s.grossSalary||s.basicSalary||0);
+  const start = new Date(s.contractStart||s.joinDate||endDate);
+  const end = new Date(endDate);
+  const diffMs = end - start;
+  if(diffMs < 0){ el('eos-pay-calc').innerHTML='<div style="color:#dc2626;font-size:.8rem">⚠️ End date before start date</div>'; return; }
+
+  const totalDays = Math.floor(diffMs/(1000*60*60*24));
+  const years = totalDays/365;
+  const dailyRate = basic/30;
+
+  // Gratuity calculation (UAE law)
+  let gratuity = 0;
+  if(years >= 1){
+    if(years <= 5) gratuity = dailyRate * 21 * years;
+    else gratuity = (dailyRate * 21 * 5) + (dailyRate * 30 * (years-5));
+  }
+
+  // Leave balance
+  const leaveData = calcLeaveBalance(staffId, endDate);
+  const leaveComp = leaveData.remaining * (basic/30);
+
+  el('eos-pay-gratuity').value = Math.round(gratuity);
+  el('eos-pay-leave').value = Math.round(leaveComp);
+  el('eos-pay-salary').value = Math.round(gross);
+
+  el('eos-pay-calc').innerHTML = `
+    <div style="background:#ede9fe;border-radius:8px;padding:10px;font-size:.78rem;color:#5b21b6">
+      <b>${s.name}</b> | Service: ${years.toFixed(2)} years (${totalDays} days) | 
+      Basic: ${fmtNum(basic)} AED/month | Daily: ${fmtNum(dailyRate.toFixed(2))} AED
+    </div>`;
+
+  updateEOSTotal();
+}
+
+function updateEOSTotal(){
+  const g = Number(el('eos-pay-gratuity')?.value||0);
+  const l = Number(el('eos-pay-leave')?.value||0);
+  const n = Number(el('eos-pay-notice')?.value||0);
+  const s = Number(el('eos-pay-salary')?.value||0);
+  el('eos-pay-total').textContent = fmtNum(g+l+n+s) + ' AED';
+}
+
+// Add listeners for manual edits
+['eos-pay-gratuity','eos-pay-leave','eos-pay-notice','eos-pay-salary'].forEach(id=>{
+  document.addEventListener('input', e=>{ if(e.target.id===id) updateEOSTotal(); });
+});
+
+async function saveEOSPayment(){
+  const staffId = el('eos-pay-staff')?.value;
+  const endDate = el('eos-pay-date')?.value;
+  if(!staffId||!endDate){ showAlert('eos-pay-alert','⚠️ Select staff and date',true); return; }
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  const gratuity = Number(el('eos-pay-gratuity')?.value||0);
+  const leave = Number(el('eos-pay-leave')?.value||0);
+  const notice = Number(el('eos-pay-notice')?.value||0);
+  const salary = Number(el('eos-pay-salary')?.value||0);
+  const notes = el('eos-pay-notes')?.value||'';
+  const total = gratuity+leave+notice+salary;
+  if(!total){ showAlert('eos-pay-alert','⚠️ Enter at least one amount',true); return; }
+
+  showAlert('eos-pay-alert','⏳ Saving...', false);
+
+  const rows = [];
+  if(gratuity) rows.push({type:'End of Service Gratuity', amt:gratuity});
+  if(leave)    rows.push({type:'Leave Compensation', amt:leave});
+  if(notice)   rows.push({type:'Notice Pay', amt:notice});
+  if(salary)   rows.push({type:'Final Salary', amt:salary});
+
+  let ok=0, err=0;
+  for(const row of rows){
+    const expRow = {
+      branch_id: s.branchId||curBid,
+      category: 'salary',
+      type: row.type,
+      amount: Math.round(row.amt),
+      vat_type: 'معفى (0%)',
+      vat_amount: 0,
+      total_amount: Math.round(row.amt),
+      date: endDate,
+      note: `${row.type} — ${s.name}${notes?' | '+notes:''}`,
+      sub_type: endDate.substring(0,7),
+      supplier_name: s.name,
+      extra: JSON.stringify({'Employee Name':s.name,'Type':row.type,'__staff_id__':staffId}),
+    };
+    const {error} = await sb.from('expenses').insert(expRow);
+    if(error) err++;
+    else ok++;
+  }
+
+  if(err){ showAlert('eos-pay-alert',`⚠️ ${err} errors saving`, true); return; }
+
+  await loadFromSupa(curBid);
+  showAlert('eos-pay-alert',`✅ Saved ${ok} records — Total: ${fmtNum(total)} AED`, false);
+  setTimeout(()=>el('eos-payment-modal').classList.remove('on'), 2000);
+}
+
 function openBulkSalaryModal(){
   // Populate branch selector
   const sel = el('bsal-branch-sel');
@@ -4841,6 +5021,26 @@ async function confirmBulkSalaryImport(){
     </div>`;
   }
   _bulkSalRows = [];
+
+  // Refresh salary history cache so Payroll tab shows updated data
+  sb.from('staff_salary_history').select('*')
+    .then(({data:sh})=>{
+      if(!sh) return;
+      DB.salaryHistory={};
+      sh.forEach(x=>{
+        const sid=String(x.staff_id);
+        if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+        DB.salaryHistory[sid].push({
+          month:x.month, amount:Number(x.amount||0),
+          basic:Number(x.basic_salary||0)||undefined,
+          presentDays:x.present_days??undefined, absentDays:x.absent_days??undefined,
+          sickDays:x.sick_days??undefined, deductDays:x.deduct_days??undefined,
+          deductLoan:Number(x.deduct_loan||0)||undefined,
+          deductOther:Number(x.deduct_other||0)||undefined,
+          bonus:Number(x.bonus||0)||undefined, bonusReason:x.bonus_reason||undefined,
+        });
+      });
+    }).catch(()=>{});
 }
 
 
@@ -4898,7 +5098,7 @@ async function renderBulkAtt(){
     const dow = new Date(dd+'T00:00:00').getDay();
     days.push({d,dd,dow,isFri:dow===5});
   }
-  const dayNames=['س','ح','ن','ث','ر','خ','ج'];
+  const dayNames=    lang==='ar'?['أحد','اثن','ثلا','أرب','خمس','جمع','سبت']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   let html = `<table style="border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.78rem;min-width:600px">
     <thead>
@@ -9159,7 +9359,7 @@ async function confirmImportExpenses(rows){
       };
       if(!r.date) continue;
 
-      // ── Duplicate check ──
+      // ── Duplicate check: same category + date + amount + supplier + note ──
       let dupQuery = sb.from('expenses').select('id')
         .eq('branch_id', curBid)
         .eq('category', validCat)
@@ -9168,8 +9368,9 @@ async function confirmImportExpenses(rows){
 
       if(supplier){
         dupQuery = dupQuery.eq('supplier_name', supplier);
-      } else {
-        dupQuery = dupQuery.eq('note', reason||'');
+      }
+      if(reason){
+        dupQuery = dupQuery.eq('note', reason);
       }
 
       const {data:existing} = await dupQuery.limit(1);
