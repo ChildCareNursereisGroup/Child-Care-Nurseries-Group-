@@ -223,6 +223,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="page on" id="pg-dashboard">
   <div class="sgrid" id="dstats"></div>
 
+  <!-- YEARLY FINANCIAL SUMMARY — ADMIN ONLY -->
+  <div id="yearly-summary" style="display:none;margin-bottom:12px"></div>
+
   <!-- TODAY'S QUICK SUMMARY -->
   <div class="card" id="today-summary-card" style="border-top:3px solid #1e3a8a;padding-bottom:4px">
     <div class="ch" style="margin-bottom:8px">
@@ -1879,8 +1882,8 @@ const EXP_CATS = [
    fields:[{id:'ct1',ar:'Contract Name',t:'text'},{id:'ct2',ar:'Amount (AED)',t:'number'},{id:'ctd',ar:'Invoice Date',t:'date'},{id:'ctfrom',ar:'From Date',t:'date'},{id:'ctto',ar:'To Date',t:'date'}],
    getAmt:()=>n('ct2')},
 
-  {k:'printing', ic:'🖨️', ar:()=>lang==='ar'?'رسوم طباعة العقود':'Contract Printing Fees',
-   fields:[{id:'pr1',ar:'Print Type / Contract',t:'text'},{id:'pr2',ar:'No. of Copies',t:'number'},{id:'pr3',ar:'Amount (AED)',t:'number'},{id:'prd',ar:'Invoice Date',t:'date'}],
+  {k:'printing', ic:'✍️', ar:()=>lang==='ar'?'أعمال التايبينج':'Typing Work',
+   fields:[{id:'pr1',ar:'Description',t:'text'},{id:'pr2',ar:'No. of Items',t:'number'},{id:'pr3',ar:'Amount (AED)',t:'number'},{id:'prd',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('pr3')},
 
   {k:'maint',    ic:'🔧', ar:()=>lang==='ar'?'الصيانة':'Maintenance',
@@ -1907,15 +1910,13 @@ const EXP_CATS = [
    fields:[{id:'a1',ar:'القناة / الوسيلة',t:'text'},{id:'a2',ar:'Amount (AED)',t:'number'},{id:'aad',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('a2')},
 
-  {k:'weekend',  ic:'🎉', ar:()=>lang==='ar'?'مصاريف الويكند':'Weekend Expenses',
-   fields:[
-     {id:'wk1',ar:'Day',t:'select',opts:['Friday','Saturday','Sunday','Friday & Saturday','Sat & Sun','Full Weekend']},
-     {id:'wk2',ar:'Activity / Description',t:'text'},
-     {id:'wk3',ar:'No. of Children',t:'number'},
-     {id:'wk4',ar:'Amount (AED)',t:'number'},
-     {id:'wkd',ar:'Date',t:'date'}
-   ],
-   getAmt:()=>n('wk4')},
+  {k:'rent',     ic:'🏠', ar:()=>lang==='ar'?'رسوم الإيجار':'Rent Fees',
+   fields:[{id:'rn1',ar:'Property / Description',t:'text'},{id:'rn2',ar:'Amount (AED)',t:'number'},{id:'rnd',ar:'Invoice Date',t:'date'},{id:'rnfrom',ar:'From Date',t:'date'},{id:'rnto',ar:'To Date',t:'date'}],
+   getAmt:()=>n('rn2')},
+
+  {k:'license',  ic:'📋', ar:()=>lang==='ar'?'رسوم الترخيص':'License Fees',
+   fields:[{id:'lc1',ar:'License Type',t:'text'},{id:'lc2',ar:'Amount (AED)',t:'number'},{id:'lcd',ar:'Invoice Date',t:'date'},{id:'lcfrom',ar:'From Date',t:'date'},{id:'lcto',ar:'To Date',t:'date'}],
+   getAmt:()=>n('lc2')},
 
   {k:'other',    ic:'📝', ar:()=>lang==='ar'?'أخرى':'Other',
    fields:[{id:'o1',ar:'Item Name',t:'text'},{id:'o2',ar:'Amount (AED)',t:'number'},{id:'od',ar:'Invoice Date',t:'date'}],
@@ -1989,10 +1990,11 @@ async function loadFromSupa(bid) {
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
     const [c,r,a,e,sa,vis] = await Promise.all([
-      sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
-      sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}).limit(5000),
+      // Receipts loaded separately with pagination below
+      Promise.resolve({data:[],error:null}),
       sb.from('attendance').select('*').eq('branch_id',bid),
-      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(5000),
       sb.from('staff_attendance').select('*').eq('branch_id',bid),
       sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
@@ -2011,18 +2013,34 @@ async function loadFromSupa(bid) {
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id
     }));
-    DB.receipts = (r.data||[]).map(x=>({
-      id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
-      receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
-      fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
-      reg:Number(x.reg||0), tools:Number(x.tools||0),
-      friFee:Number(x.fri_fee||0), satFee:Number(x.sat_fee||0), sunFee:Number(x.sun_fee||0),
-      hourFee:Number(x.hour_fee||0), hourIn:x.hour_in||'', hourOut:x.hour_out||'',
-      overtimeFee:Number(x.overtime_fee||0), overtimeDur:x.overtime_dur||'',
-      vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
-      payMethod:x.pay_method||'cash',
-      total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||''
-    }));
+    // Load ALL receipts with pagination (Supabase default limit is 1000)
+    {
+      let allRecs = [];
+      let page = 0;
+      const pageSize = 1000;
+      while(true){
+        const {data:pg} = await sb.from('receipts').select('*')
+          .eq('branch_id',bid)
+          .order('date',{ascending:true})
+          .range(page*pageSize, (page+1)*pageSize-1);
+        if(!pg || pg.length===0) break;
+        allRecs = allRecs.concat(pg);
+        if(pg.length < pageSize) break;
+        page++;
+      }
+      DB.receipts = allRecs.map(x=>({
+        id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
+        receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
+        fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
+        reg:Number(x.reg||0), tools:Number(x.tools||0),
+        friFee:Number(x.fri_fee||0), satFee:Number(x.sat_fee||0), sunFee:Number(x.sun_fee||0),
+        hourFee:Number(x.hour_fee||0), hourIn:x.hour_in||'', hourOut:x.hour_out||'',
+        overtimeFee:Number(x.overtime_fee||0), overtimeDur:x.overtime_dur||'',
+        vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
+        payMethod:x.pay_method||'cash',
+        total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||''
+      }));
+    }
     DB.attendance={};
     (a.data||[]).forEach(x=>{
       const d=x.date;if(!DB.attendance[d])DB.attendance[d]={};
@@ -2086,9 +2104,9 @@ async function loadAllBranches() {
   const result={};
   for(const b of BRANCHES){
     const [c,r,e]=await Promise.all([
-      sb.from('children').select('*').eq('branch_id',b.id),
-      sb.from('receipts').select('*').eq('branch_id',b.id),
-      sb.from('expenses').select('*').eq('branch_id',b.id),
+      sb.from('children').select('*').eq('branch_id',b.id).limit(5000),
+      sb.from('receipts').select('*').eq('branch_id',b.id).limit(5000),
+      sb.from('expenses').select('*').eq('branch_id',b.id).limit(5000),
     ]);
     result[b.id]={
       children:(c.data||[]),
@@ -2621,6 +2639,51 @@ function renderDashboard(){
     <div class="sc"><div class="si">✅</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
     ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
     <div class="sc"><div class="si">🚌</div><div class="sv">${bus}</div><div class="sk">${t('busUsers')}</div></div>`;
+
+  // ── Admin-only yearly summary ──
+  const yearlyEl = el('yearly-summary');
+  if(yearlyEl){
+    if(curRole==='admin'){
+      // Get all years from receipts and expenses
+      const recYears = [...new Set(DB.receipts.map(r=>(r.date||'').substring(0,4)).filter(y=>y>='2020'))].sort();
+      const expYears = [...new Set(DB.expenses.map(e=>(e.date||'').substring(0,4)).filter(y=>y>='2020'))].sort();
+      const years = [...new Set([...recYears,...expYears])].sort();
+
+      if(years.length){
+        const cards = years.map(yr=>{
+          const rev = DB.receipts.filter(r=>(r.date||'').startsWith(yr)).reduce((s,r)=>s+(r.total||0),0);
+          const exp = DB.expenses.filter(e=>(e.date||'').startsWith(yr)).reduce((s,e)=>s+(e.totalAmount||e.total_amount||e.amount||0),0);
+          const net = rev - exp;
+          return `<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;min-width:200px">
+            <div style="font-weight:900;font-size:1rem;color:#1e3a8a;margin-bottom:10px;text-align:center">📅 ${yr}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;color:#6b7280">💰 Revenue</span>
+                <span style="font-weight:800;color:#059669;font-size:.88rem">${fmtNum(Math.round(rev))} AED</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;color:#6b7280">💸 Expenses</span>
+                <span style="font-weight:800;color:#dc2626;font-size:.88rem">${fmtNum(Math.round(exp))} AED</span>
+              </div>
+              <div style="border-top:1px solid #e5e7eb;padding-top:6px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.75rem;font-weight:700;color:#374151">Net</span>
+                <span style="font-weight:900;color:${net>=0?'#1d4ed8':'#dc2626'};font-size:.9rem">${net>=0?'+':''}${fmtNum(Math.round(net))} AED</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+        yearlyEl.innerHTML=`
+          <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:14px;padding:14px 16px;margin-bottom:4px">
+            <div style="font-weight:900;color:#fff;font-size:.9rem;margin-bottom:12px">📊 Yearly Financial Summary — Admin Only</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>
+          </div>`;
+        yearlyEl.style.display='block';
+      }
+    } else {
+      yearlyEl.innerHTML='';
+      yearlyEl.style.display='none';
+    }
+  }
   if(curRole==='admin'){
     el('bovcard').style.display='block';
     el('bovgrid').innerHTML=BRANCHES.map(b=>`
@@ -9001,7 +9064,7 @@ async function confirmImportCE2025(rows){
       const cat=String(row['Category']||row['البند']||row['category']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||row['pay_method']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
-      const date=toDate(row['Date']||row['التاريخ']||row['date'])||'2025-01-01';
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['التاريخ']||row['date'])||'2025-01-01';
       const notes=String(row['Notes']||row['ملاحظات']||row['notes']||'');
       const month=row['Month']||row['الشهر']||monthOf(date);
       const r={
@@ -9070,7 +9133,7 @@ async function confirmImportCE2026(rows){
       const cat=String(row['Category']||row['البند']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
-      const date=toDate(row['Date']||row['التاريخ'])||'2026-01-01';
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['التاريخ'])||'2026-01-01';
       const invNo=String(row['Invoice No']||row['رقم الفاتورة']||'');
       const ref=String(row['Ref No']||row['المرجع']||'');
       const r={
@@ -9123,14 +9186,15 @@ function downloadChildExp2026Template(){
 function downloadExpensesTemplate(){
   const XLSX=window.XLSX; if(!XLSX) return;
   const data=[
-    ['Category','Date','Amount','VAT Type','VAT Amount','Total Amount','Supplier Name','Supplier Tax No','Description/Reason','Sub Type/Notes'],
-    ['purch','2025-10-05','500','exempt','0','500','ABC Stationery','100123456700003','School supplies for KG1',''],
-    ['salary','2025-10-30','3500','exempt','0','3500','','','October salary - Teacher',''],
-    ['util','2025-10-15','800','5','40','840','DEWA','','Electricity bill October',''],
-    ['bus','2025-10-10','300','exempt','0','300','','','Fuel bus SHJ-1234','Bus No. SHJ-1234'],
+    ['Category','Date (DD/MM/YYYY)','Amount','VAT Type','VAT Amount','Total Amount','Supplier Name','Supplier Tax No','Description/Reason','Sub Type/Notes'],
+    ['purch','05/10/2025','500','exempt','0','500','ABC Stationery','100123456700003','School supplies for KG1',''],
+    ['salary','30/10/2025','3500','exempt','0','3500','','','October salary - Teacher',''],
+    ['util','15/10/2025','800','5','40','840','DEWA','','Electricity bill October',''],
+    ['bus','10/10/2025','300','exempt','0','300','','','Fuel bus SHJ-1234','Bus No. SHJ-1234'],
+    ['tel','01/10/2025','110','5','5.5','115.5','Etisalat','','Etisalat bill September','Nursery Phone - 050-4742500'],
   ];
   const ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:18},{wch:30},{wch:20}];
+  ws['!cols']=[{wch:12},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:18},{wch:30},{wch:20}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Expenses');
   XLSX.writeFile(wb,'expenses_import_template.xlsx');
 }
@@ -9168,6 +9232,14 @@ async function importReceiptsExcel(file){
 
     // Show preview table first
     const previewRows=rows.slice(0,5);
+    // Format values for display (convert date serials)
+    const fmtVal=v=>{
+      if(typeof v==='number' && v>40000 && v<60000){
+        const d=new Date((v-25569)*86400000);
+        return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+      }
+      return v;
+    };
     preview.innerHTML=`
       <div style="background:#eff6ff;border-radius:9px;padding:10px;margin-bottom:9px">
         <b>${rows.length} receipts found</b> — Preview of first ${Math.min(5,rows.length)}:
@@ -9175,7 +9247,7 @@ async function importReceiptsExcel(file){
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;font-size:.75rem;border-collapse:collapse">
           <tr style="background:#1d4ed8;color:#fff">${Object.keys(previewRows[0]).slice(0,8).map(h=>`<th style="padding:5px 7px">${h}</th>`).join('')}</tr>
-          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,8).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${v}</td>`).join('')}</tr>`).join('')}
+          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,8).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${fmtVal(v)}</td>`).join('')}</tr>`).join('')}
         </table>
       </div>
       <div style="display:flex;gap:7px">
@@ -9208,8 +9280,12 @@ async function confirmImportReceipts(rows){
   
   for(const row of rows){
     try{
-      // Find child by name
+      // Find child by name — REQUIRED, skip if empty
       const cname=(row['Child Name']||row['child_name']||row['Kids Name']||'').toString().trim();
+      if(!cname){
+        err++;
+        continue; // Never import without a child name
+      }
       const child=DB.children.find(c=>c.name.toLowerCase()===cname.toLowerCase())||
                   DB.children.find(c=>c.name.toLowerCase().includes(cname.toLowerCase()));
       
@@ -9219,7 +9295,7 @@ async function confirmImportReceipts(rows){
         child_name: cname,
         class_name: row['Class']||row['class_name']||child?.className||'',
         receipt_num: String(row['Receipt No']||row['receipt_num']||''),
-        date: toDate(row['Date']||row['date']),
+        date: toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']),
         from_date: toDate(row['From Date']||row['from_date']),
         to_date: toDate(row['To Date']||row['to_date']),
         fee:    toNum(row['Fee']||row['fee']),
@@ -9266,6 +9342,14 @@ async function importExpensesExcel(file){
     if(!rows.length){preview.innerHTML='<div class="alert aerr">❌ No data found</div>';return;}
     
     const previewRows=rows.slice(0,5);
+    // Format values for display (convert date serials to DD/MM/YYYY)
+    const fmtPreview=v=>{
+      if(typeof v==='number' && v>40000 && v<60000){
+        const d=new Date((v-25569)*86400000);
+        return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+      }
+      return v;
+    };
     preview.innerHTML=`
       <div style="background:#fff7ed;border-radius:9px;padding:10px;margin-bottom:9px">
         <b>${rows.length} expense rows found</b> — Preview:
@@ -9273,7 +9357,7 @@ async function importExpensesExcel(file){
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;font-size:.75rem;border-collapse:collapse">
           <tr style="background:#d97706;color:#fff">${Object.keys(previewRows[0]).slice(0,7).map(h=>`<th style="padding:5px 7px">${h}</th>`).join('')}</tr>
-          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,7).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${v}</td>`).join('')}</tr>`).join('')}
+          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,7).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${fmtPreview(v)}</td>`).join('')}</tr>`).join('')}
         </table>
       </div>
       <div style="display:flex;gap:7px">
@@ -9300,7 +9384,7 @@ async function confirmImportExpenses(rows){
     return s||null;
   };
   const toNum=v=>parseFloat(v)||0;
-  const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','other'];
+  const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','rent','license','other'];
   // Map common variations to valid categories
   const catMap={
     'communication':'tel','communications':'tel','telephone':'tel','telecom':'tel',
@@ -9309,11 +9393,15 @@ async function confirmImportExpenses(rows){
     'purchase':'purch','purchases':'purch','shopping':'purch',
     'maintenance':'maint','repair':'maint','repairs':'maint',
     'government':'govt','gov':'govt','municipality':'govt','visa':'govt',
+    'government fees':'govt','governmental':'govt','govt fees':'govt','رسوم حكومية':'govt',
     'advertising':'ads','advertisement':'ads','marketing':'ads',
-    'printing':'printing','print':'printing','stationery':'printing',
+    'typing':'printing','typing work':'printing','print':'printing','stationery':'printing',
     'bank':'bank','banking':'bank','finance':'bank',
-    'contract':'contract','rent':'contract','lease':'contract',
+    'contract':'contract','annual contract':'contract',
     'bus':'bus','transport':'bus','transportation':'bus','vehicle':'bus',
+    'rent':'rent','rental':'rent','lease':'rent','إيجار':'rent','rent fees':'rent',
+    'license':'license','licence':'license','licensing':'license','license fees':'license',
+    'رخصة':'license','ترخيص':'license',
   };
   
   let ok=0,err=0,skipped=0;
@@ -9350,7 +9438,7 @@ async function confirmImportExpenses(rows){
         vat_type: String(row['VAT Type']||row['vat_type']||'exempt'),
         vat_amount: vatAmt,
         total_amount: total,
-        date: toDate(row['Date']||row['date']),
+        date: toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']),
         note: reason,
         sub_type: String(row['Sub Type/Notes']||''),
         supplier_name: supplier||null,
@@ -9897,7 +9985,7 @@ async function importAttendanceExcel(file){
     };
     let ok=0,skip=0;
     for(const row of rows){
-      const date=toDate(row['Date']||row['date']||row['التاريخ']);
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']||row['التاريخ']);
       const name=String(row['Child Name']||row['name']||row['اسم الطفل']||'').trim();
       const status=String(row['Status']||row['status']||row['الحضور']||'').trim();
       if(!date||!name) continue;
