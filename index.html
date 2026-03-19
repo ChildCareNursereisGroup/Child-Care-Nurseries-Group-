@@ -9066,7 +9066,7 @@ async function confirmImportCE2025(rows){
       const cat=String(row['Category']||row['البند']||row['category']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||row['pay_method']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
-      const date=toDate(row['Date']||row['التاريخ']||row['date'])||'2025-01-01';
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['التاريخ']||row['date'])||'2025-01-01';
       const notes=String(row['Notes']||row['ملاحظات']||row['notes']||'');
       const month=row['Month']||row['الشهر']||monthOf(date);
       const r={
@@ -9135,7 +9135,7 @@ async function confirmImportCE2026(rows){
       const cat=String(row['Category']||row['البند']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
-      const date=toDate(row['Date']||row['التاريخ'])||'2026-01-01';
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['التاريخ'])||'2026-01-01';
       const invNo=String(row['Invoice No']||row['رقم الفاتورة']||'');
       const ref=String(row['Ref No']||row['المرجع']||'');
       const r={
@@ -9297,7 +9297,7 @@ async function confirmImportReceipts(rows){
         child_name: cname,
         class_name: row['Class']||row['class_name']||child?.className||'',
         receipt_num: String(row['Receipt No']||row['receipt_num']||''),
-        date: toDate(row['Date']||row['date']),
+        date: toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']),
         from_date: toDate(row['From Date']||row['from_date']),
         to_date: toDate(row['To Date']||row['to_date']),
         fee:    toNum(row['Fee']||row['fee']),
@@ -9436,7 +9436,7 @@ async function confirmImportExpenses(rows){
         vat_type: String(row['VAT Type']||row['vat_type']||'exempt'),
         vat_amount: vatAmt,
         total_amount: total,
-        date: toDate(row['Date']||row['date']),
+        date: toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']),
         note: reason,
         sub_type: String(row['Sub Type/Notes']||''),
         supplier_name: supplier||null,
@@ -9983,7 +9983,7 @@ async function importAttendanceExcel(file){
     };
     let ok=0,skip=0;
     for(const row of rows){
-      const date=toDate(row['Date']||row['date']||row['التاريخ']);
+      const date=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']||row['التاريخ']);
       const name=String(row['Child Name']||row['name']||row['اسم الطفل']||'').trim();
       const status=String(row['Status']||row['status']||row['الحضور']||'').trim();
       if(!date||!name) continue;
