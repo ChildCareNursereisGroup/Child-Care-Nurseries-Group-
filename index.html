@@ -1882,8 +1882,8 @@ const EXP_CATS = [
    fields:[{id:'ct1',ar:'Contract Name',t:'text'},{id:'ct2',ar:'Amount (AED)',t:'number'},{id:'ctd',ar:'Invoice Date',t:'date'},{id:'ctfrom',ar:'From Date',t:'date'},{id:'ctto',ar:'To Date',t:'date'}],
    getAmt:()=>n('ct2')},
 
-  {k:'printing', ic:'🖨️', ar:()=>lang==='ar'?'رسوم طباعة العقود':'Contract Printing Fees',
-   fields:[{id:'pr1',ar:'Print Type / Contract',t:'text'},{id:'pr2',ar:'No. of Copies',t:'number'},{id:'pr3',ar:'Amount (AED)',t:'number'},{id:'prd',ar:'Invoice Date',t:'date'}],
+  {k:'printing', ic:'✍️', ar:()=>lang==='ar'?'أعمال التايبينج':'Typing Work',
+   fields:[{id:'pr1',ar:'Description',t:'text'},{id:'pr2',ar:'No. of Items',t:'number'},{id:'pr3',ar:'Amount (AED)',t:'number'},{id:'prd',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('pr3')},
 
   {k:'maint',    ic:'🔧', ar:()=>lang==='ar'?'الصيانة':'Maintenance',
@@ -1910,15 +1910,13 @@ const EXP_CATS = [
    fields:[{id:'a1',ar:'القناة / الوسيلة',t:'text'},{id:'a2',ar:'Amount (AED)',t:'number'},{id:'aad',ar:'Invoice Date',t:'date'}],
    getAmt:()=>n('a2')},
 
-  {k:'weekend',  ic:'🎉', ar:()=>lang==='ar'?'مصاريف الويكند':'Weekend Expenses',
-   fields:[
-     {id:'wk1',ar:'Day',t:'select',opts:['Friday','Saturday','Sunday','Friday & Saturday','Sat & Sun','Full Weekend']},
-     {id:'wk2',ar:'Activity / Description',t:'text'},
-     {id:'wk3',ar:'No. of Children',t:'number'},
-     {id:'wk4',ar:'Amount (AED)',t:'number'},
-     {id:'wkd',ar:'Date',t:'date'}
-   ],
-   getAmt:()=>n('wk4')},
+  {k:'rent',     ic:'🏠', ar:()=>lang==='ar'?'رسوم الإيجار':'Rent Fees',
+   fields:[{id:'rn1',ar:'Property / Description',t:'text'},{id:'rn2',ar:'Amount (AED)',t:'number'},{id:'rnd',ar:'Invoice Date',t:'date'},{id:'rnfrom',ar:'From Date',t:'date'},{id:'rnto',ar:'To Date',t:'date'}],
+   getAmt:()=>n('rn2')},
+
+  {k:'license',  ic:'📋', ar:()=>lang==='ar'?'رسوم الترخيص':'License Fees',
+   fields:[{id:'lc1',ar:'License Type',t:'text'},{id:'lc2',ar:'Amount (AED)',t:'number'},{id:'lcd',ar:'Invoice Date',t:'date'},{id:'lcfrom',ar:'From Date',t:'date'},{id:'lcto',ar:'To Date',t:'date'}],
+   getAmt:()=>n('lc2')},
 
   {k:'other',    ic:'📝', ar:()=>lang==='ar'?'أخرى':'Other',
    fields:[{id:'o1',ar:'Item Name',t:'text'},{id:'o2',ar:'Amount (AED)',t:'number'},{id:'od',ar:'Invoice Date',t:'date'}],
@@ -9386,7 +9384,7 @@ async function confirmImportExpenses(rows){
     return s||null;
   };
   const toNum=v=>parseFloat(v)||0;
-  const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','other'];
+  const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','rent','license','other'];
   // Map common variations to valid categories
   const catMap={
     'communication':'tel','communications':'tel','telephone':'tel','telecom':'tel',
@@ -9397,10 +9395,13 @@ async function confirmImportExpenses(rows){
     'government':'govt','gov':'govt','municipality':'govt','visa':'govt',
     'government fees':'govt','governmental':'govt','govt fees':'govt','رسوم حكومية':'govt',
     'advertising':'ads','advertisement':'ads','marketing':'ads',
-    'printing':'printing','print':'printing','stationery':'printing',
+    'typing':'printing','typing work':'printing','print':'printing','stationery':'printing',
     'bank':'bank','banking':'bank','finance':'bank',
-    'contract':'contract','rent':'contract','lease':'contract',
+    'contract':'contract','annual contract':'contract',
     'bus':'bus','transport':'bus','transportation':'bus','vehicle':'bus',
+    'rent':'rent','rental':'rent','lease':'rent','إيجار':'rent','rent fees':'rent',
+    'license':'license','licence':'license','licensing':'license','license fees':'license',
+    'رخصة':'license','ترخيص':'license',
   };
   
   let ok=0,err=0,skipped=0;
