@@ -1992,10 +1992,10 @@ async function loadFromSupa(bid) {
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
     const [c,r,a,e,sa,vis] = await Promise.all([
-      sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}),
-      sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}).range(0,4999),
+      sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:false}).range(0,4999),
       sb.from('attendance').select('*').eq('branch_id',bid),
-      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}),
+      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).range(0,4999),
       sb.from('staff_attendance').select('*').eq('branch_id',bid),
       sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
@@ -2089,9 +2089,9 @@ async function loadAllBranches() {
   const result={};
   for(const b of BRANCHES){
     const [c,r,e]=await Promise.all([
-      sb.from('children').select('*').eq('branch_id',b.id),
-      sb.from('receipts').select('*').eq('branch_id',b.id),
-      sb.from('expenses').select('*').eq('branch_id',b.id),
+      sb.from('children').select('*').eq('branch_id',b.id).range(0,4999),
+      sb.from('receipts').select('*').eq('branch_id',b.id).range(0,4999),
+      sb.from('expenses').select('*').eq('branch_id',b.id).range(0,4999),
     ]);
     result[b.id]={
       children:(c.data||[]),
