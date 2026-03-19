@@ -5034,7 +5034,7 @@ async function confirmBulkSalaryImport(){
         '__month__': r.month,
       }
     };
-    // Check for duplicate: by staff_id+month first, then supplier_name+month
+    // Check for duplicate: by staff_id+month first, then supplier_name+month, then note+month
     let existExp = null;
     if(r.staffId){
       const {data:d1} = await sb.from('expenses').select('id')
@@ -5049,10 +5049,10 @@ async function confirmBulkSalaryImport(){
       if(d2?.length) existExp = d2[0];
     }
     if(!existExp){
-      // Also check old records with null supplier_name by date+amount
+      // Check by note (contains staff name) + month
       const {data:d3} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('date',lastDay)
-        .eq('amount', Math.round(r.net)).is('supplier_name',null).limit(1);
+        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
+        .eq('note', `${monLabel} — ${staffName}`).limit(1);
       if(d3?.length) existExp = d3[0];
     }
     if(existExp?.id){
