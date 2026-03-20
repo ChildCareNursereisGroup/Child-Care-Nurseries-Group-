@@ -5014,8 +5014,10 @@ async function confirmBulkSalaryImport(){
     const staffObj = DB.staff.find(s=>String(s.id)===r.staffId) ||
                      DB.staff.find(s=>s.name?.toLowerCase()===r.name?.toLowerCase());
     const staffName = (staffObj?.name || r.name || '').trim();
+    // Salary expense goes to CONTRACT branch (branchId), not work branch
+    const salaryBranch = staffObj?.branchId || branchId || curBid;
     const expRow = {
-      branch_id: curBid,
+      branch_id: salaryBranch,
       category: 'salary',
       type: 'Staff Salaries',
       amount: Math.round(r.net),
@@ -5127,7 +5129,10 @@ async function renderBulkAtt(){
   const daysInMonth = new Date(yr,mo,0).getDate();
 
   // Load staff for selected branch
-  let staffList = DB.staff.filter(s=>s.branchId===bid||s.branchId===Number(bid));
+  let staffList = DB.staff.filter(s=>{
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(bid)||String(s.branchId)===String(bid);
+  });
   if(!staffList.length){
     // Try loading from supabase
     const {data} = await sb.from('staff').select('*').eq('branch_id',bid);
@@ -7670,7 +7675,7 @@ function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.st
 async function loadStaff(){
   const {data} = await sb.from('staff').select('*').eq('branch_id', curBid);
   DB.staff = (data||[]).map(x=>({
-    id:x.id, branchId:x.branch_id,
+    id:x.id, branchId:x.branch_id, workBranch:x.work_branch||x.branch_id||'',
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
     emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
@@ -7824,12 +7829,14 @@ function openStaffForm(id){
   const modal = el('staff-modal');
   el('staff-modal-title').textContent = s ? '✏️ Edit: '+s.name : '➕ New Staff Member';
   const branchOpts = BRANCHES.map(b=>`<option value="${b.id}" ${(s?.branchId||curBid)===b.id?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
+  const workBranchOpts = BRANCHES.map(b=>`<option value="${b.id}" ${s?.workBranch===b.id?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
 
   el('staff-form-body').innerHTML = `
     <div class="g3" style="margin-bottom:8px">
       <div class="fg"><label>Staff Name *</label><input id="sf_name" value="${s?.name||''}" placeholder="Full name"></div>
       <div class="fg"><label>Position / الوظيفة</label><input id="sf_pos" value="${s?.position||''}" placeholder="e.g. Teacher, Driver..."></div>
-      <div class="fg"><label>Working Place / الفرع</label><select id="sf_branch">${branchOpts}</select></div>
+      <div class="fg"><label>Contract Branch — فرع التعاقد 📄</label><select id="sf_branch">${branchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع المسؤول عن الراتب والمصاريف</div></div>
+      <div class="fg"><label>Work Branch — فرع العمل الفعلي 🏢</label><select id="sf_work_branch"><option value="">Same as Contract Branch</option>${workBranchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع اللي بيشتغل فيه فعلياً — الحضور بيتسجل عليه</div></div>
       <div class="fg"><label>Nationality</label><input id="sf_nat" value="${s?.nationality||''}"></div>
       <div class="fg"><label>Date of Birth</label><input type="date" id="sf_dob" value="${s?.dob||''}"></div>
       <div class="fg"><label>Contact Number</label><input id="sf_contact" value="${s?.contact||''}" placeholder="+971..."></div>
@@ -7905,6 +7912,7 @@ async function saveStaff(id){
   if(!name){ showAlert('staff-save-alert','⚠️ Name is required',true); return; }
   const row = {
     branch_id: document.getElementById('sf_branch')?.value||curBid,
+    work_branch: document.getElementById('sf_work_branch')?.value||null,
     name, position: document.getElementById('sf_pos')?.value||'',
     nationality: document.getElementById('sf_nat')?.value||'',
     dob: document.getElementById('sf_dob')?.value||null,
