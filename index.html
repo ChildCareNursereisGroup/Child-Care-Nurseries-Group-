@@ -4091,11 +4091,15 @@ function renderStaffAtt(){
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
-  // Show staff who WORK in this branch (workBranch) or are contracted here (branchId)
+  // Show staff in their WORK branch only (if set), else contract branch
   const staff=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
-    const wb = s.workBranch||s.branchId;
-    return String(wb)===String(curBid) || String(s.branchId)===String(curBid);
+    // If work branch is set → show ONLY in work branch
+    if(s.workBranch && s.workBranch !== s.branchId){
+      return String(s.workBranch)===String(curBid);
+    }
+    // No work branch set → show in contract branch
+    return String(s.branchId)===String(curBid);
   });
   const b=CB();
 
@@ -5124,10 +5128,12 @@ async function renderBulkAtt(){
   const [yr,mo] = mon.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
 
-  // Load staff for selected branch
+  // Load staff for selected branch - show ONLY in work branch if set, else contract branch
   let staffList = DB.staff.filter(s=>{
-    const wb = s.workBranch||s.branchId;
-    return String(wb)===String(bid)||String(s.branchId)===String(bid);
+    if(s.workBranch && s.workBranch !== s.branchId){
+      return String(s.workBranch)===String(bid);
+    }
+    return String(s.branchId)===String(bid);
   });
   if(!staffList.length){
     // Try loading from supabase
