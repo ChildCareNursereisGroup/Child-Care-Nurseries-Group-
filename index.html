@@ -4672,7 +4672,7 @@ function calcEOSPayment(){
   const diffMs = end - start;
   if(diffMs < 0){ el('eos-pay-calc').innerHTML='<div style="color:#dc2626;font-size:.8rem">⚠️ End date before start date</div>'; return; }
 
-  const totalDays = Math.floor(diffMs/(1000*60*60*24));
+  const totalDays = Math.floor(diffMs/(1000*60*60*24)) + Number(s.daysWorkedBefore||0);
   const years = totalDays/365;
   const dailyRate = basic/30;
 
@@ -7680,6 +7680,7 @@ async function loadStaff(){
     transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
     lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
       leavesTakenBefore:Number(x.leaves_taken_before||0),
+    daysWorkedBefore:Number(x.days_worked_before||0),
     notes:x.notes||''
   }));
 }
@@ -7874,6 +7875,11 @@ function openStaffForm(id){
             <input type="number" id="sf_leaves_before" min="0" placeholder="e.g. 30" value="${s?.leavesTakenBefore||''}">
             <div style="font-size:.68rem;color:#6b7280;margin-top:2px">أدخلي عدد أيام الإجازة اللي اخذتها الموظفة قبل ما تسجليها في السيستم — بيتخصم من رصيد الإجازة تلقائياً</div>
           </div>
+          <div class="fg">
+            <label style="color:#1e3a8a">📅 Total Working Days Before System — إجمالي أيام العمل قبل السيستم</label>
+            <input type="number" id="sf_days_before" min="0" placeholder="e.g. 1825 (5 years)" value="${s?.daysWorkedBefore||''}">
+            <div style="font-size:.68rem;color:#6b7280;margin-top:2px">أدخلي إجمالي أيام العمل قبل السيستم — بيُحسب في نهاية الخدمة والإجازة السنوية تلقائياً</div>
+          </div>
         </div>
       </div>
     </div>
@@ -7925,6 +7931,7 @@ async function saveStaff(id){
     transfer_code: document.getElementById('sf_tcode')?.value||'',
     last_working_day: document.getElementById('sf_lastday')?.value||null,
     leaves_taken_before: Number(document.getElementById('sf_leaves_before')?.value||0),
+    days_worked_before: Number(document.getElementById('sf_days_before')?.value||0),
   };
   // Always save salary fields to localStorage as backup (in case Supabase columns missing)
   if(id){
@@ -13610,10 +13617,11 @@ function calcEOG(){
   const diffMs=end-start;
   if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
 
-  // Use actual work days if available
-  const actualDays=getActualWorkDaysCount(s.id);
-  const totalDays=actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24));
-  const years=totalDays/365;
+  // Use actual work days if available, add days worked before system
+  const actualDays = getActualWorkDaysCount(s.id);
+  const daysBeforeSystem = Number(s.daysWorkedBefore||0);
+  const totalDays = (actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24))) + daysBeforeSystem;
+  const years = totalDays/365;
   const usingActual=actualDays>0;
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
