@@ -1387,8 +1387,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <input type="number" id="eos-pay-notice" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💵 Last Month Salary (AED)</label>
-        <input type="number" id="eos-pay-salary" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💵 Last Month Salary — اختياري (AED)</label>
+        <input type="number" id="eos-pay-salary" placeholder="0 — handled in Payroll" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">الراتب بيتحسب في Payroll — أضيفيه هنا بس لو مش هيتدفع من الـ Payroll</div>
       </div>
     </div>
     <div style="background:#f0fdf4;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
@@ -1401,7 +1402,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div id="eos-pay-alert" style="margin:10px 0;font-size:.82rem"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="saveEOSPayment()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">💾 Save & Record in Expenses</button>
+      <button onclick="printEOSPayment()" style="flex:1;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">🖨️ Print Calculation</button>
+      <button onclick="saveEOSPayment()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:700">💾 Record in Expenses</button>
       <button onclick="el('eos-payment-modal').classList.remove('on')" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.88rem">Cancel</button>
     </div>
   </div>
@@ -1453,7 +1455,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
     <!-- Save button -->
     <div id="bsal-save-bar" style="display:none;gap:8px">
-      <button onclick="confirmBulkSalaryImport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ كل الرواتب وإنزالها في المصاريف</button>
+      <button onclick="confirmBulkSalaryImport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ سجل الرواتب</button>
       <button onclick="el('bulk-sal-modal').classList.remove('on')" style="background:#f3f4f6;border:none;border-radius:10px;padding:10px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
     </div>
   </div>
@@ -4688,7 +4690,7 @@ function calcEOSPayment(){
 
   el('eos-pay-gratuity').value = Math.round(gratuity);
   el('eos-pay-leave').value = Math.round(leaveComp);
-  el('eos-pay-salary').value = Math.round(gross);
+  el('eos-pay-salary').value = ''; // Last month salary handled separately in Payroll
 
   el('eos-pay-calc').innerHTML = `
     <div style="background:#ede9fe;border-radius:8px;padding:10px;font-size:.78rem;color:#5b21b6">
@@ -4711,6 +4713,50 @@ function updateEOSTotal(){
 ['eos-pay-gratuity','eos-pay-leave','eos-pay-notice','eos-pay-salary'].forEach(id=>{
   document.addEventListener('input', e=>{ if(e.target.id===id) updateEOSTotal(); });
 });
+
+function printEOSPayment(){
+  const staffId = el('eos-pay-staff')?.value;
+  const endDate = el('eos-pay-date')?.value;
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  if(!s) return;
+  const gratuity = Number(el('eos-pay-gratuity')?.value||0);
+  const leave    = Number(el('eos-pay-leave')?.value||0);
+  const notice   = Number(el('eos-pay-notice')?.value||0);
+  const salary   = Number(el('eos-pay-salary')?.value||0);
+  const notes    = el('eos-pay-notes')?.value||'';
+  const total    = gratuity+leave+notice+salary;
+  const rows = [];
+  if(gratuity) rows.push(['End of Service Gratuity — مكافأة نهاية الخدمة', fmtNum(gratuity)+' AED']);
+  if(leave)    rows.push(['Leave Compensation — تعويض الإجازة', fmtNum(leave)+' AED']);
+  if(notice)   rows.push(['Notice Pay — بدل الإشعار', fmtNum(notice)+' AED']);
+  if(salary)   rows.push(['Last Month Salary — راتب آخر شهر', fmtNum(salary)+' AED']);
+  const html = `<html><head><meta charset="utf-8">
+    <style>body{font-family:'Arial',sans-serif;padding:30px;direction:ltr}
+    h2{text-align:center;color:#1e3a8a;border-bottom:2px solid #1e3a8a;padding-bottom:8px}
+    table{width:100%;border-collapse:collapse;margin-top:20px}
+    th{background:#1e3a8a;color:#fff;padding:10px;text-align:left}
+    td{padding:9px 10px;border-bottom:1px solid #e5e7eb}
+    .total{font-weight:900;font-size:1.1rem;color:#1e3a8a;text-align:right;margin-top:16px}
+    .notes{margin-top:16px;font-size:.85rem;color:#6b7280}
+    </style></head><body>
+    <h2>🏁 End of Service Calculation — حساب نهاية الخدمة</h2>
+    <table>
+      <tr><th>Staff Name</th><td><b>${s.name}</b></td></tr>
+      <tr><th>Last Working Day</th><td>${endDate}</td></tr>
+      <tr><th>Contract Start</th><td>${s.contractStart||'—'}</td></tr>
+    </table>
+    <table style="margin-top:16px">
+      <tr><th>Description</th><th style="text-align:right">Amount</th></tr>
+      ${rows.map(r=>`<tr><td>${r[0]}</td><td style="text-align:right"><b>${r[1]}</b></td></tr>`).join('')}
+    </table>
+    <div class="total">Total Amount Due: ${fmtNum(total)} AED</div>
+    ${notes?`<div class="notes">Notes: ${notes}</div>`:''}
+    </body></html>`;
+  const w = window.open('','_blank','width=700,height=600');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
 
 async function saveEOSPayment(){
   const staffId = el('eos-pay-staff')?.value;
@@ -5010,60 +5056,6 @@ async function confirmBulkSalaryImport(){
       else salOk++;
     }
 
-    // ── B: Always create expense (for all — matched & unmatched) ──
-    // Search staff in ALL branches (not just curBid)
-    const staffObj = DB.staff.find(s=>String(s.id)===r.staffId) ||
-                     DB.staff.find(s=>s.name?.toLowerCase()===r.name?.toLowerCase());
-    const staffName = (staffObj?.name || r.name || '').trim();
-    // Salary expense goes to CONTRACT branch (branchId), not work branch
-    const salaryBranch = staffObj?.branchId || branchId || curBid;
-    const expRow = {
-      branch_id: salaryBranch,
-      category: 'salary',
-      type: 'Staff Salaries',
-      amount: Math.round(r.net),
-      vat_type: 'معفى (0%)',
-      vat_amount: 0,
-      total_amount: Math.round(r.net),
-      date: lastDay,
-      note: `${monLabel} — ${staffName}`,
-      sub_type: r.month,
-      supplier_name: staffName,
-      tax_number: '',
-      extra: {
-        'Employee Name': staffName,
-        'Job Title': staffObj?.position||'',
-        '__staff_id__': r.staffId||'',
-        '__month__': r.month,
-      }
-    };
-    // Check for duplicate: by staff_id+month first, then supplier_name+month, then note+month
-    let existExp = null;
-    if(r.staffId){
-      const {data:d1} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
-        .eq('extra->>__staff_id__', r.staffId).limit(1);
-      if(d1?.length) existExp = d1[0];
-    }
-    if(!existExp && staffName){
-      const {data:d2} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
-        .eq('supplier_name', staffName).limit(1);
-      if(d2?.length) existExp = d2[0];
-    }
-    if(!existExp){
-      // Check by note (contains staff name) + month
-      const {data:d3} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
-        .eq('note', `${monLabel} — ${staffName}`).limit(1);
-      if(d3?.length) existExp = d3[0];
-    }
-    if(existExp?.id){
-      await sb.from('expenses').update(expRow).eq('id', existExp.id);
-    } else {
-      await sb.from('expenses').insert(expRow);
-    }
-    expOk++;
   }
 
   await loadFromSupa(curBid);
@@ -5080,9 +5072,7 @@ async function confirmBulkSalaryImport(){
   } else {
     alertEl.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:12px;font-size:.83rem;color:#065f46">
       ✅ <b>Saved successfully!</b><br>
-      • ${salOk} salary records saved to history<br>
-      ${former?`• ${former} former staff — saved to expenses only<br>`:''}
-      • ${expOk} expense records created
+      • ${salOk} salary records saved to history
       ${salErr?`<br><span style="color:#dc2626">⚠️ ${salErr} records failed:<br>${errDetails.map(e=>`• ${e}`).join('<br>')}</span>`:''}
     </div>`;
   }
