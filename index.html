@@ -4132,8 +4132,9 @@ function renderStaffAtt(){
     const st=DB.staffAtt[date][String(s.id)];
     const isP = st==='حضور';
     const isA = st==='غياب';
+    const isH = st==='نص يوم';
     const isEmpty = !st;
-    if(isP) present++; else if(isA) absent++; else unset++;
+    if(isP) present++; else if(isA) absent++; else if(isH){ present+=0.5; absent+=0.5; } else unset++;
     const phone=s.contact||'';
     const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
     const sentTime=localStorage.getItem(sentKey);
@@ -4146,15 +4147,15 @@ function renderStaffAtt(){
     const notes=dayData.notes||'';
     const sickDaysTotal=Number(dayData.sickDaysTotal||0);
     totalBonus+=bonus; totalDeduct+=deduct;
-    const todayDeduct=isA&&basic>0?dailyRate:0;
-    const netImpact=bonus - deduct - (isA?todayDeduct:0);
+    const todayDeduct=isA&&basic>0?dailyRate:isH&&basic>0?dailyRate/2:0;
+    const netImpact=bonus - deduct - todayDeduct;
 
     // Checkbox style
-    const chkBg   = isP?'#059669':isA?'#dc2626':'#fff';
-    const chkBord = isP?'#059669':isA?'#dc2626':'#9ca3af';
-    const chkIcon  = isP?'✓':isA?'✕':'';
+    const chkBg   = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    const chkBord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#9ca3af';
+    const chkIcon  = isP?'✓':isA?'✕':isH?'½':'';
     const chkColor = '#fff';
-    const rowBg    = isP?'#f0fdf4':isA?'#fff5f5':'#fffbeb';
+    const rowBg    = isP?'#f0fdf4':isA?'#fff5f5':isH?'#fffbeb':'#fffbeb';
 
     html+=`<div style="border-bottom:1px solid #e5e7eb;background:${rowBg}">
       <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;">
@@ -4171,12 +4172,12 @@ function renderStaffAtt(){
             : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`)
             : ''}
           <!-- Checkbox -->
-          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط للتسجيل':isP?'حضور — اضغط للتغيير':'غياب — اضغط للتغيير'}"
+          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط: حضور → نص يوم → غياب':isP?'حضور ✓ — اضغط للتغيير':isH?'نص يوم ½ — اضغط للغياب':'غياب ✕ — اضغط للمسح'}"
             style="width:28px;height:28px;border:2.5px solid ${chkBord};border-radius:7px;background:${chkBg};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;font-weight:900;color:${chkColor};user-select:none;flex-shrink:0;transition:all .15s">
             ${chkIcon}
           </div>
           <div style="font-size:.7rem;font-weight:800;min-width:36px;text-align:center;color:${isP?'#059669':isA?'#dc2626':'#9ca3af'}">
-            ${isP?'حضور':isA?'غياب':'—'}
+            ${isP?'حضور':isA?'غياب':isH?'نص يوم':'—'}
           </div>
           <button onclick="toggleStaffExpand('${s.id}','${date}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.72rem;color:#6b7280">⚙️</button>
         </div>
@@ -4286,7 +4287,10 @@ async function loadSHInline(){
 
   const totalPaid = rows.reduce((t,r)=>t+Number(r.amount||0),0);
   const totalPresent = rows.reduce((t,r)=>t+(r.present_days||0),0);
-  const liveDays = Object.values(DB.staffAtt||{}).filter(m=>m[staffId]==='حضور').length;
+  const liveDays = Object.values(DB.staffAtt||{}).reduce((sum,m)=>{
+    const st=m[staffId];
+    return sum + (st==='حضور'?1:st==='نص يوم'?0.5:0);
+  },0);
   const totalDays = totalPresent + liveDays;
 
   body.innerHTML = `
@@ -5186,11 +5190,11 @@ async function renderBulkAtt(){
       let absCount=0;
       const cells = days.map(({dd,isFri})=>{
         const st = (existing[dd]||{})[String(s.id)]||(_bulkAttData[dd]||{})[String(s.id)]||'';
-        const isP=st==='حضور', isA=st==='غياب';
-        if(isA) absCount++;
-        const bg = isP?'#059669':isA?'#dc2626':'#fff';
-        const bord = isP?'#059669':isA?'#dc2626':'#d1d5db';
-        const icon = isP?'✓':isA?'✕':'';
+        const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
+        if(isA) absCount++; else if(isH) absCount+=0.5;
+        const bg = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+        const bord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+        const icon = isP?'✓':isA?'✕':isH?'½':'';
         return `<td style="padding:3px;text-align:center;background:${isFri?'#f9fafb':'#fff'}">
           <div onclick="toggleBulkCell('${s.id}','${dd}')" data-sid="${s.id}" data-date="${dd}"
             style="width:26px;height:26px;border:2px solid ${bord};border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;font-weight:900;margin:auto;user-select:none">
@@ -5221,17 +5225,17 @@ async function renderBulkAtt(){
 function toggleBulkCell(staffId, date){
   if(!_bulkAttData[date]) _bulkAttData[date]={};
   const cur = _bulkAttData[date][String(staffId)];
-  // Cycle: '' → 'حضور' → 'غياب' → ''
-  const next = !cur||cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+  // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
+  const next = !cur||cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   _bulkAttData[date][String(staffId)] = next;
 
   // Update cell visually without full re-render
   const cell = document.querySelector(`[data-sid="${staffId}"][data-date="${date}"]`);
   if(cell){
-    const isP=next==='حضور', isA=next==='غياب';
-    cell.style.background = isP?'#059669':isA?'#dc2626':'#fff';
-    cell.style.borderColor = isP?'#059669':isA?'#dc2626':'#d1d5db';
-    cell.textContent = isP?'✓':isA?'✕':'';
+    const isP=next==='حضور', isA=next==='غياب', isH=next==='نص يوم';
+    cell.style.background = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    cell.style.borderColor = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+    cell.textContent = isP?'✓':isA?'✕':isH?'½':'';
     // update absent count for this row
     const row = cell.closest('tr');
     if(row){
@@ -5320,9 +5324,9 @@ async function saveBulkAtt(){
 async function toggleStaffAtt(staffId, date){
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
-  const cur=DB.staffAtt[date][sid]||''; // '' = unset, 'حضور' = present, 'غياب' = absent
-  // Cycle: '' → 'حضور' → 'غياب' → '' 
-  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+  const cur=DB.staffAtt[date][sid]||'';
+  // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
+  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
