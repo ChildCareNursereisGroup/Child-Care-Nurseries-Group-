@@ -1997,7 +1997,7 @@ async function loadFromSupa(bid) {
       Promise.resolve({data:[],error:null}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(5000),
-      sb.from('staff_attendance').select('*').eq('branch_id',bid),
+      sb.from('staff_attendance').select('*'), // Load from ALL branches - staff may work in different branch
       sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
     if(c.error)throw c.error;
@@ -4091,7 +4091,12 @@ function renderStaffAtt(){
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
-  const staff=(DB.staff||[]).filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=date);
+  // Show staff who WORK in this branch (workBranch) or are contracted here (branchId)
+  const staff=(DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(curBid) || String(s.branchId)===String(curBid);
+  });
   const b=CB();
 
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
