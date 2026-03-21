@@ -4094,11 +4094,11 @@ function renderStaffAtt(){
   // Show staff in their WORK branch only (if set), else contract branch
   const staff=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
-    // If work branch is set → show ONLY in work branch
-    if(s.workBranch && s.workBranch !== s.branchId){
+    if(s.workBranch){
+      // Work branch set → show ONLY in work branch
       return String(s.workBranch)===String(curBid);
     }
-    // No work branch set → show in contract branch
+    // No work branch → show in contract branch
     return String(s.branchId)===String(curBid);
   });
   const b=CB();
@@ -5134,7 +5134,7 @@ async function renderBulkAtt(){
 
   // Load staff for selected branch - show ONLY in work branch if set, else contract branch
   let staffList = DB.staff.filter(s=>{
-    if(s.workBranch && s.workBranch !== s.branchId){
+    if(s.workBranch){
       return String(s.workBranch)===String(bid);
     }
     return String(s.branchId)===String(bid);
@@ -7681,7 +7681,7 @@ function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.st
 async function loadStaff(){
   const {data} = await sb.from('staff').select('*').eq('branch_id', curBid);
   DB.staff = (data||[]).map(x=>({
-    id:x.id, branchId:x.branch_id, workBranch:x.work_branch||x.branch_id||'',
+    id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
     emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
@@ -9150,7 +9150,7 @@ async function confirmImportCE2026(rows){
       if(!amt)continue;
       const vatPct=parseFloat(row['VAT %']||row['الضريبة %']||0);
       const vatAmt=parseFloat(row['VAT Amount']||row['مبلغ الضريبة']||Math.round(amt*vatPct/100*100)/100);
-      const total=parseFloat(row['Total']||row['الإجمالي']||amt+vatAmt);
+      const total=parseFloat(row['Total']||row['Total (AED)']||row['الإجمالي']||amt+vatAmt);
       const cat=String(row['Category']||row['البند']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
@@ -9327,7 +9327,7 @@ async function confirmImportReceipts(rows){
         vat_type: String(row['VAT Type']||row['vat_type']||'exempt'),
         vat_amount: toNum(row['VAT Amount']||row['vat_amount']),
         pay_method: String(row['Pay Method']||row['pay_method']||'cash'),
-        total:  toNum(row['Total']||row['total']),
+        total:  toNum(row['Total']||row['Total (AED)']||row['total']||row['الإجمالي']),
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
