@@ -2072,6 +2072,27 @@ async function loadFromSupa(bid) {
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
 
+    // Load ALL staff (cross-branch) so work_branch filtering works correctly
+    const {data:allStaff} = await sb.from('staff').select('*');
+    DB.staff = (allStaff||[]).map(x=>({
+      id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
+      contact:x.contact||'', address:x.address||'',
+      emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'',
+      position:x.position||'', email:x.email||'',
+      contractStart:x.contract_start||'', contractEnd:x.contract_end||'',
+      passportExpire:x.passport_expire||'', idExpire:x.id_expire||'',
+      labourExpire:x.labour_expire||'', speaExpire:x.spea_expire||'',
+      healthCardExpire:x.health_card_expire||'',
+      basicSalary:Number(x.basic_salary||0)||Number(getStaffSalaryLocal(x.id).basic||0),
+      grossSalary:Number(x.gross_salary||0)||Number(getStaffSalaryLocal(x.id).gross||0),
+      transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
+      lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
+      leavesTakenBefore:Number(x.leaves_taken_before||0),
+      daysWorkedBefore:Number(x.days_worked_before||0),
+      notes:x.notes||''
+    }));
+
     hideLoad();
 
     // Load salary history in background (needed for EOS & leave calculations)
@@ -7679,7 +7700,8 @@ function getStaffSalaryLocal(id){ try{return JSON.parse(localStorage.getItem('st
 function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.stringify(d)); }
 
 async function loadStaff(){
-  const {data} = await sb.from('staff').select('*').eq('branch_id', curBid);
+  // Load ALL staff - we need those contracted elsewhere but working here
+  const {data} = await sb.from('staff').select('*');
   DB.staff = (data||[]).map(x=>({
     id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
