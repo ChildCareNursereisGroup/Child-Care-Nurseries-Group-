@@ -828,48 +828,73 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- EXPENSE REPORT MODAL -->
 <div class="mover" id="exp-report-modal">
-  <div class="mbox" style="max-width:500px">
+  <div class="mbox" style="max-width:620px">
     <div class="mh">
-      <div class="mt">📊 Expense Report</div>
+      <div class="mt">📊 Expense Report — تقرير المصاريف</div>
       <button class="xb" onclick="el('exp-report-modal').classList.remove('on')">✕</button>
     </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label>From Month</label>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>From Month — من</label>
           <input type="month" id="exp-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
-        <div class="fg">
-          <label>To Month</label>
+        <div class="fg"><label>To Month — إلى</label>
           <input type="month" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
       </div>
-      <div class="fg">
-        <label>Category — البند</label>
-        <select id="exp-rep-cat" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-          <option value="all">📋 All Categories — كل البنود</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Language — اللغة</label>
-        <div style="display:flex;gap:8px">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="exp-lang" value="en" checked> 🇬🇧 English
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="exp-lang" value="ar"> 🇦🇪 العربية
-          </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Branch — الفرع</label>
+          <select id="exp-rep-branch" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="current">🏢 Current Branch</option>
+            <option value="all">🌐 All Branches</option>
+          </select>
+        </div>
+        <div class="fg"><label>Category — البند</label>
+          <select id="exp-rep-cat" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">📋 All Categories</option>
+          </select>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Paid By — دفع بواسطة</label>
+          <select id="exp-rep-paidby" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">👥 All</option>
+            <option value="accountant">👩‍💼 Accountant — المحاسب</option>
+            <option value="owner">👑 Owner — المالك</option>
+            <option value="bank">🏦 Bank Transfer</option>
+          </select>
+        </div>
+        <div class="fg"><label>Language</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="exp-lang" value="en" checked> 🇬🇧 EN
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="exp-lang" value="ar"> 🇦🇪 AR
+            </label>
+          </div>
+        </div>
+      </div>
+      <!-- Petty Cash Section -->
+      <div style="background:#fef3c7;border-radius:10px;padding:12px;border:1.5px solid #f59e0b">
+        <div style="font-weight:800;color:#92400e;margin-bottom:8px;font-size:.83rem">💵 Petty Cash Tracker — متابعة الكاش</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg">
+            <label style="font-size:.75rem;color:#92400e">Cash Received by Accountant (AED)</label>
+            <input type="number" id="exp-petty-received" placeholder="0" style="width:100%;padding:7px;border:1.5px solid #f59e0b;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg">
+            <label style="font-size:.75rem;color:#92400e">Cash Received by Owner (AED)</label>
+            <input type="number" id="exp-petty-owner" placeholder="0" style="width:100%;padding:7px;border:1.5px solid #f59e0b;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="printExpReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
-          🖨️ Print/PDF
+          🖨️ Print / PDF
         </button>
         <button onclick="printExpReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
           📊 Excel
-        </button>
-        <button onclick="printExpReport('pdf')" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
-          📄 PDF
         </button>
       </div>
     </div>
@@ -1387,8 +1412,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <input type="number" id="eos-pay-notice" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💵 Last Month Salary (AED)</label>
-        <input type="number" id="eos-pay-salary" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+        <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:4px">💵 Last Month Salary — اختياري (AED)</label>
+        <input type="number" id="eos-pay-salary" placeholder="0 — handled in Payroll" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.88rem;box-sizing:border-box">
+        <div style="font-size:.65rem;color:#6b7280;margin-top:2px">الراتب بيتحسب في Payroll — أضيفيه هنا بس لو مش هيتدفع من الـ Payroll</div>
       </div>
     </div>
     <div style="background:#f0fdf4;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
@@ -1401,7 +1427,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div id="eos-pay-alert" style="margin:10px 0;font-size:.82rem"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="saveEOSPayment()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">💾 Save & Record in Expenses</button>
+      <button onclick="printEOSPayment()" style="flex:1;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800">🖨️ Print Calculation</button>
+      <button onclick="saveEOSPayment()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:700">💾 Record in Expenses</button>
       <button onclick="el('eos-payment-modal').classList.remove('on')" style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.88rem">Cancel</button>
     </div>
   </div>
@@ -1453,7 +1480,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
     <!-- Save button -->
     <div id="bsal-save-bar" style="display:none;gap:8px">
-      <button onclick="confirmBulkSalaryImport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ كل الرواتب وإنزالها في المصاريف</button>
+      <button onclick="confirmBulkSalaryImport()" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.9rem">💾 حفظ سجل الرواتب</button>
       <button onclick="el('bulk-sal-modal').classList.remove('on')" style="background:#f3f4f6;border:none;border-radius:10px;padding:10px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">إلغاء</button>
     </div>
   </div>
@@ -1857,6 +1884,8 @@ const TAX_SUPPLIER_FIELDS = [
   {id:'ex_reason',   ar:()=>t('payReason'),        t:'text'},
   {id:'ex_vat',      ar:()=>t('expVatType'),       t:'select', opts:()=>[t('vatExempt'),t('vatZero'),t('vat5')]},
   {id:'ex_vatamt',   ar:()=>t('expVatAmt'),        t:'number'},
+  {id:'ex_paid_by',  ar:()=>lang==='ar'?'💳 دفع بواسطة':'💳 Paid By', t:'select', opts:()=>['👩‍💼 المحاسب — Accountant','👑 المالك — Owner','🏦 تحويل بنكي — Bank Transfer','أخرى — Other']},
+  {id:'ex_branch_override', ar:()=>lang==='ar'?'🏢 الفرع (اختياري — افتراضي الفرع الحالي)':'🏢 Branch (optional)', t:'select', opts:()=>['— Current Branch —',...BRANCHES.map(b=>`${b.icon} ${tBN(b)}`)]},
 ];
 
 const EXP_CATS = [
@@ -1995,7 +2024,7 @@ async function loadFromSupa(bid) {
       Promise.resolve({data:[],error:null}),
       sb.from('attendance').select('*').eq('branch_id',bid),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(5000),
-      sb.from('staff_attendance').select('*').eq('branch_id',bid),
+      sb.from('staff_attendance').select('*'), // Load from ALL branches - staff may work in different branch
       sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
     if(c.error)throw c.error;
@@ -2053,7 +2082,8 @@ async function loadFromSupa(bid) {
         totalAmount:Number(x.total_amount||x.amount||0),
         date:x.date||null,note:x.note||'',subType:x.sub_type||'',
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',
-        invoiceNumber:x.invoice_number||'',extra};
+        invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
+        branchId:x.branch_id||'',extra};
     });
     DB.staffAtt={};
     if(sa.error){
@@ -2069,6 +2099,27 @@ async function loadFromSupa(bid) {
       console.log('staff_attendance loaded:',sa.data?.length,'records');
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
+
+    // Load ALL staff (cross-branch) so work_branch filtering works correctly
+    const {data:allStaff} = await sb.from('staff').select('*');
+    DB.staff = (allStaff||[]).map(x=>({
+      id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
+      contact:x.contact||'', address:x.address||'',
+      emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'',
+      position:x.position||'', email:x.email||'',
+      contractStart:x.contract_start||'', contractEnd:x.contract_end||'',
+      passportExpire:x.passport_expire||'', idExpire:x.id_expire||'',
+      labourExpire:x.labour_expire||'', speaExpire:x.spea_expire||'',
+      healthCardExpire:x.health_card_expire||'',
+      basicSalary:Number(x.basic_salary||0)||Number(getStaffSalaryLocal(x.id).basic||0),
+      grossSalary:Number(x.gross_salary||0)||Number(getStaffSalaryLocal(x.id).gross||0),
+      transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
+      lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
+      leavesTakenBefore:Number(x.leaves_taken_before||0),
+      daysWorkedBefore:Number(x.days_worked_before||0),
+      notes:x.notes||''
+    }));
 
     hideLoad();
 
@@ -4089,7 +4140,16 @@ function renderStaffAtt(){
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
-  const staff=(DB.staff||[]).filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=date);
+  // Show staff in their WORK branch only (if set), else contract branch
+  const staff=(DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
+    if(s.workBranch){
+      // Work branch set → show ONLY in work branch
+      return String(s.workBranch)===String(curBid);
+    }
+    // No work branch → show in contract branch
+    return String(s.branchId)===String(curBid);
+  });
   const b=CB();
 
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -4121,8 +4181,9 @@ function renderStaffAtt(){
     const st=DB.staffAtt[date][String(s.id)];
     const isP = st==='حضور';
     const isA = st==='غياب';
+    const isH = st==='نص يوم';
     const isEmpty = !st;
-    if(isP) present++; else if(isA) absent++; else unset++;
+    if(isP) present++; else if(isA) absent++; else if(isH){ present+=0.5; absent+=0.5; } else unset++;
     const phone=s.contact||'';
     const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
     const sentTime=localStorage.getItem(sentKey);
@@ -4135,15 +4196,15 @@ function renderStaffAtt(){
     const notes=dayData.notes||'';
     const sickDaysTotal=Number(dayData.sickDaysTotal||0);
     totalBonus+=bonus; totalDeduct+=deduct;
-    const todayDeduct=isA&&basic>0?dailyRate:0;
-    const netImpact=bonus - deduct - (isA?todayDeduct:0);
+    const todayDeduct=isA&&basic>0?dailyRate:isH&&basic>0?dailyRate/2:0;
+    const netImpact=bonus - deduct - todayDeduct;
 
     // Checkbox style
-    const chkBg   = isP?'#059669':isA?'#dc2626':'#fff';
-    const chkBord = isP?'#059669':isA?'#dc2626':'#9ca3af';
-    const chkIcon  = isP?'✓':isA?'✕':'';
+    const chkBg   = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    const chkBord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#9ca3af';
+    const chkIcon  = isP?'✓':isA?'✕':isH?'½':'';
     const chkColor = '#fff';
-    const rowBg    = isP?'#f0fdf4':isA?'#fff5f5':'#fffbeb';
+    const rowBg    = isP?'#f0fdf4':isA?'#fff5f5':isH?'#fffbeb':'#fffbeb';
 
     html+=`<div style="border-bottom:1px solid #e5e7eb;background:${rowBg}">
       <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;">
@@ -4160,12 +4221,12 @@ function renderStaffAtt(){
             : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`)
             : ''}
           <!-- Checkbox -->
-          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط للتسجيل':isP?'حضور — اضغط للتغيير':'غياب — اضغط للتغيير'}"
+          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط: حضور → نص يوم → غياب':isP?'حضور ✓ — اضغط للتغيير':isH?'نص يوم ½ — اضغط للغياب':'غياب ✕ — اضغط للمسح'}"
             style="width:28px;height:28px;border:2.5px solid ${chkBord};border-radius:7px;background:${chkBg};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;font-weight:900;color:${chkColor};user-select:none;flex-shrink:0;transition:all .15s">
             ${chkIcon}
           </div>
           <div style="font-size:.7rem;font-weight:800;min-width:36px;text-align:center;color:${isP?'#059669':isA?'#dc2626':'#9ca3af'}">
-            ${isP?'حضور':isA?'غياب':'—'}
+            ${isP?'حضور':isA?'غياب':isH?'نص يوم':'—'}
           </div>
           <button onclick="toggleStaffExpand('${s.id}','${date}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.72rem;color:#6b7280">⚙️</button>
         </div>
@@ -4275,7 +4336,10 @@ async function loadSHInline(){
 
   const totalPaid = rows.reduce((t,r)=>t+Number(r.amount||0),0);
   const totalPresent = rows.reduce((t,r)=>t+(r.present_days||0),0);
-  const liveDays = Object.values(DB.staffAtt||{}).filter(m=>m[staffId]==='حضور').length;
+  const liveDays = Object.values(DB.staffAtt||{}).reduce((sum,m)=>{
+    const st=m[staffId];
+    return sum + (st==='حضور'?1:st==='نص يوم'?0.5:0);
+  },0);
   const totalDays = totalPresent + liveDays;
 
   body.innerHTML = `
@@ -4670,15 +4734,16 @@ function calcEOSPayment(){
   const diffMs = end - start;
   if(diffMs < 0){ el('eos-pay-calc').innerHTML='<div style="color:#dc2626;font-size:.8rem">⚠️ End date before start date</div>'; return; }
 
-  const totalDays = Math.floor(diffMs/(1000*60*60*24));
+  const totalDays = Math.floor(diffMs/(1000*60*60*24)) + Number(s.daysWorkedBefore||0);
   const years = totalDays/365;
   const dailyRate = basic/30;
 
-  // Gratuity calculation (UAE law)
+  // Gratuity calculation (UAE Federal Decree No. 33/2021 — full gratuity, no resignation penalty)
   let gratuity = 0;
   if(years >= 1){
-    if(years <= 5) gratuity = dailyRate * 21 * years;
-    else gratuity = (dailyRate * 21 * 5) + (dailyRate * 30 * (years-5));
+    const yrs1to5 = Math.min(years, 5);
+    const yrsAfter5 = Math.max(0, years - 5);
+    gratuity = (dailyRate * 21 * yrs1to5) + (dailyRate * 30 * yrsAfter5);
   }
 
   // Leave balance
@@ -4687,7 +4752,7 @@ function calcEOSPayment(){
 
   el('eos-pay-gratuity').value = Math.round(gratuity);
   el('eos-pay-leave').value = Math.round(leaveComp);
-  el('eos-pay-salary').value = Math.round(gross);
+  el('eos-pay-salary').value = ''; // Last month salary handled separately in Payroll
 
   el('eos-pay-calc').innerHTML = `
     <div style="background:#ede9fe;border-radius:8px;padding:10px;font-size:.78rem;color:#5b21b6">
@@ -4710,6 +4775,50 @@ function updateEOSTotal(){
 ['eos-pay-gratuity','eos-pay-leave','eos-pay-notice','eos-pay-salary'].forEach(id=>{
   document.addEventListener('input', e=>{ if(e.target.id===id) updateEOSTotal(); });
 });
+
+function printEOSPayment(){
+  const staffId = el('eos-pay-staff')?.value;
+  const endDate = el('eos-pay-date')?.value;
+  const s = DB.staff.find(x=>String(x.id)===staffId);
+  if(!s) return;
+  const gratuity = Number(el('eos-pay-gratuity')?.value||0);
+  const leave    = Number(el('eos-pay-leave')?.value||0);
+  const notice   = Number(el('eos-pay-notice')?.value||0);
+  const salary   = Number(el('eos-pay-salary')?.value||0);
+  const notes    = el('eos-pay-notes')?.value||'';
+  const total    = gratuity+leave+notice+salary;
+  const rows = [];
+  if(gratuity) rows.push(['End of Service Gratuity — مكافأة نهاية الخدمة', fmtNum(gratuity)+' AED']);
+  if(leave)    rows.push(['Leave Compensation — تعويض الإجازة', fmtNum(leave)+' AED']);
+  if(notice)   rows.push(['Notice Pay — بدل الإشعار', fmtNum(notice)+' AED']);
+  if(salary)   rows.push(['Last Month Salary — راتب آخر شهر', fmtNum(salary)+' AED']);
+  const html = `<html><head><meta charset="utf-8">
+    <style>body{font-family:'Arial',sans-serif;padding:30px;direction:ltr}
+    h2{text-align:center;color:#1e3a8a;border-bottom:2px solid #1e3a8a;padding-bottom:8px}
+    table{width:100%;border-collapse:collapse;margin-top:20px}
+    th{background:#1e3a8a;color:#fff;padding:10px;text-align:left}
+    td{padding:9px 10px;border-bottom:1px solid #e5e7eb}
+    .total{font-weight:900;font-size:1.1rem;color:#1e3a8a;text-align:right;margin-top:16px}
+    .notes{margin-top:16px;font-size:.85rem;color:#6b7280}
+    </style></head><body>
+    <h2>🏁 End of Service Calculation — حساب نهاية الخدمة</h2>
+    <table>
+      <tr><th>Staff Name</th><td><b>${s.name}</b></td></tr>
+      <tr><th>Last Working Day</th><td>${endDate}</td></tr>
+      <tr><th>Contract Start</th><td>${s.contractStart||'—'}</td></tr>
+    </table>
+    <table style="margin-top:16px">
+      <tr><th>Description</th><th style="text-align:right">Amount</th></tr>
+      ${rows.map(r=>`<tr><td>${r[0]}</td><td style="text-align:right"><b>${r[1]}</b></td></tr>`).join('')}
+    </table>
+    <div class="total">Total Amount Due: ${fmtNum(total)} AED</div>
+    ${notes?`<div class="notes">Notes: ${notes}</div>`:''}
+    </body></html>`;
+  const w = window.open('','_blank','width=700,height=600');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
 
 async function saveEOSPayment(){
   const staffId = el('eos-pay-staff')?.value;
@@ -5009,58 +5118,6 @@ async function confirmBulkSalaryImport(){
       else salOk++;
     }
 
-    // ── B: Always create expense (for all — matched & unmatched) ──
-    // Search staff in ALL branches (not just curBid)
-    const staffObj = DB.staff.find(s=>String(s.id)===r.staffId) ||
-                     DB.staff.find(s=>s.name?.toLowerCase()===r.name?.toLowerCase());
-    const staffName = (staffObj?.name || r.name || '').trim();
-    const expRow = {
-      branch_id: curBid,
-      category: 'salary',
-      type: 'Staff Salaries',
-      amount: Math.round(r.net),
-      vat_type: 'معفى (0%)',
-      vat_amount: 0,
-      total_amount: Math.round(r.net),
-      date: lastDay,
-      note: `${monLabel} — ${staffName}`,
-      sub_type: r.month,
-      supplier_name: staffName,
-      tax_number: '',
-      extra: {
-        'Employee Name': staffName,
-        'Job Title': staffObj?.position||'',
-        '__staff_id__': r.staffId||'',
-        '__month__': r.month,
-      }
-    };
-    // Check for duplicate: by staff_id+month first, then supplier_name+month
-    let existExp = null;
-    if(r.staffId){
-      const {data:d1} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
-        .eq('extra->>__staff_id__', r.staffId).limit(1);
-      if(d1?.length) existExp = d1[0];
-    }
-    if(!existExp && staffName){
-      const {data:d2} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('sub_type',r.month)
-        .eq('supplier_name', staffName).limit(1);
-      if(d2?.length) existExp = d2[0];
-    }
-    if(!existExp){
-      // Also check old records with null supplier_name by date+amount
-      const {data:d3} = await sb.from('expenses').select('id')
-        .eq('branch_id',curBid).eq('category','salary').eq('date',lastDay)
-        .eq('amount', Math.round(r.net)).is('supplier_name',null).limit(1);
-      if(d3?.length) existExp = d3[0];
-    }
-    if(existExp?.id){
-      await sb.from('expenses').update(expRow).eq('id', existExp.id);
-    } else {
-      await sb.from('expenses').insert(expRow);
-    }
-    expOk++;
   }
 
   await loadFromSupa(curBid);
@@ -5077,9 +5134,7 @@ async function confirmBulkSalaryImport(){
   } else {
     alertEl.innerHTML = `<div style="background:#d1fae5;border-radius:10px;padding:12px;font-size:.83rem;color:#065f46">
       ✅ <b>Saved successfully!</b><br>
-      • ${salOk} salary records saved to history<br>
-      ${former?`• ${former} former staff — saved to expenses only<br>`:''}
-      • ${expOk} expense records created
+      • ${salOk} salary records saved to history
       ${salErr?`<br><span style="color:#dc2626">⚠️ ${salErr} records failed:<br>${errDetails.map(e=>`• ${e}`).join('<br>')}</span>`:''}
     </div>`;
   }
@@ -5126,8 +5181,13 @@ async function renderBulkAtt(){
   const [yr,mo] = mon.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
 
-  // Load staff for selected branch
-  let staffList = DB.staff.filter(s=>s.branchId===bid||s.branchId===Number(bid));
+  // Load staff for selected branch - show ONLY in work branch if set, else contract branch
+  let staffList = DB.staff.filter(s=>{
+    if(s.workBranch){
+      return String(s.workBranch)===String(bid);
+    }
+    return String(s.branchId)===String(bid);
+  });
   if(!staffList.length){
     // Try loading from supabase
     const {data} = await sb.from('staff').select('*').eq('branch_id',bid);
@@ -5179,11 +5239,11 @@ async function renderBulkAtt(){
       let absCount=0;
       const cells = days.map(({dd,isFri})=>{
         const st = (existing[dd]||{})[String(s.id)]||(_bulkAttData[dd]||{})[String(s.id)]||'';
-        const isP=st==='حضور', isA=st==='غياب';
-        if(isA) absCount++;
-        const bg = isP?'#059669':isA?'#dc2626':'#fff';
-        const bord = isP?'#059669':isA?'#dc2626':'#d1d5db';
-        const icon = isP?'✓':isA?'✕':'';
+        const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
+        if(isA) absCount++; else if(isH) absCount+=0.5;
+        const bg = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+        const bord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+        const icon = isP?'✓':isA?'✕':isH?'½':'';
         return `<td style="padding:3px;text-align:center;background:${isFri?'#f9fafb':'#fff'}">
           <div onclick="toggleBulkCell('${s.id}','${dd}')" data-sid="${s.id}" data-date="${dd}"
             style="width:26px;height:26px;border:2px solid ${bord};border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;font-weight:900;margin:auto;user-select:none">
@@ -5214,17 +5274,17 @@ async function renderBulkAtt(){
 function toggleBulkCell(staffId, date){
   if(!_bulkAttData[date]) _bulkAttData[date]={};
   const cur = _bulkAttData[date][String(staffId)];
-  // Cycle: '' → 'حضور' → 'غياب' → ''
-  const next = !cur||cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+  // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
+  const next = !cur||cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   _bulkAttData[date][String(staffId)] = next;
 
   // Update cell visually without full re-render
   const cell = document.querySelector(`[data-sid="${staffId}"][data-date="${date}"]`);
   if(cell){
-    const isP=next==='حضور', isA=next==='غياب';
-    cell.style.background = isP?'#059669':isA?'#dc2626':'#fff';
-    cell.style.borderColor = isP?'#059669':isA?'#dc2626':'#d1d5db';
-    cell.textContent = isP?'✓':isA?'✕':'';
+    const isP=next==='حضور', isA=next==='غياب', isH=next==='نص يوم';
+    cell.style.background = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    cell.style.borderColor = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+    cell.textContent = isP?'✓':isA?'✕':isH?'½':'';
     // update absent count for this row
     const row = cell.closest('tr');
     if(row){
@@ -5313,9 +5373,9 @@ async function saveBulkAtt(){
 async function toggleStaffAtt(staffId, date){
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
-  const cur=DB.staffAtt[date][sid]||''; // '' = unset, 'حضور' = present, 'غياب' = absent
-  // Cycle: '' → 'حضور' → 'غياب' → '' 
-  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+  const cur=DB.staffAtt[date][sid]||'';
+  // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
+  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
@@ -5633,13 +5693,23 @@ async function saveExp(){
   const reason=v('ex_reason');
   const invoiceNum=v('ex_invoice_num');
   const totalWithVat=amount+vatAmt;
+  // Paid by
+  const paidByRaw=el('ex_paid_by')?.value||'';
+  const paidBy = paidByRaw.includes('محاسب')||paidByRaw.includes('Accountant') ? 'accountant'
+               : paidByRaw.includes('مالك')||paidByRaw.includes('Owner') ? 'owner'
+               : paidByRaw.includes('بنك')||paidByRaw.includes('Bank') ? 'bank' : 'other';
+  // Branch override
+  const branchOverrideRaw=el('ex_branch_override')?.value||'';
+  const targetBranch = branchOverrideRaw.startsWith('—') ? curBid
+    : BRANCHES.find(b=>branchOverrideRaw.includes(tBN(b)))?.id || curBid;
   setSyncing(true);
   const row={
-    branch_id:curBid, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
+    branch_id:targetBranch, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
     amount, vat_type:vatType, vat_amount:vatAmt, total_amount:totalWithVat,
     date, note:reason, sub_type:subType,
     supplier_name:supplier, tax_number:taxNum,
     invoice_number:invoiceNum||null,
+    paid_by:paidBy,
     extra
   };
   // ── Duplicate check ──────────────────────────
@@ -7668,9 +7738,10 @@ function getStaffSalaryLocal(id){ try{return JSON.parse(localStorage.getItem('st
 function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.stringify(d)); }
 
 async function loadStaff(){
-  const {data} = await sb.from('staff').select('*').eq('branch_id', curBid);
+  // Load ALL staff - we need those contracted elsewhere but working here
+  const {data} = await sb.from('staff').select('*');
   DB.staff = (data||[]).map(x=>({
-    id:x.id, branchId:x.branch_id,
+    id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
     emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
@@ -7684,6 +7755,7 @@ async function loadStaff(){
     transferCode:x.transfer_code||getStaffSalaryLocal(x.id).tcode||'',
     lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
       leavesTakenBefore:Number(x.leaves_taken_before||0),
+    daysWorkedBefore:Number(x.days_worked_before||0),
     notes:x.notes||''
   }));
 }
@@ -7824,12 +7896,14 @@ function openStaffForm(id){
   const modal = el('staff-modal');
   el('staff-modal-title').textContent = s ? '✏️ Edit: '+s.name : '➕ New Staff Member';
   const branchOpts = BRANCHES.map(b=>`<option value="${b.id}" ${(s?.branchId||curBid)===b.id?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
+  const workBranchOpts = BRANCHES.map(b=>`<option value="${b.id}" ${s?.workBranch===b.id?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
 
   el('staff-form-body').innerHTML = `
     <div class="g3" style="margin-bottom:8px">
       <div class="fg"><label>Staff Name *</label><input id="sf_name" value="${s?.name||''}" placeholder="Full name"></div>
       <div class="fg"><label>Position / الوظيفة</label><input id="sf_pos" value="${s?.position||''}" placeholder="e.g. Teacher, Driver..."></div>
-      <div class="fg"><label>Working Place / الفرع</label><select id="sf_branch">${branchOpts}</select></div>
+      <div class="fg"><label>Contract Branch — فرع التعاقد 📄</label><select id="sf_branch">${branchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع المسؤول عن الراتب والمصاريف</div></div>
+      <div class="fg"><label>Work Branch — فرع العمل الفعلي 🏢</label><select id="sf_work_branch"><option value="">Same as Contract Branch</option>${workBranchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع اللي بيشتغل فيه فعلياً — الحضور بيتسجل عليه</div></div>
       <div class="fg"><label>Nationality</label><input id="sf_nat" value="${s?.nationality||''}"></div>
       <div class="fg"><label>Date of Birth</label><input type="date" id="sf_dob" value="${s?.dob||''}"></div>
       <div class="fg"><label>Contact Number</label><input id="sf_contact" value="${s?.contact||''}" placeholder="+971..."></div>
@@ -7876,6 +7950,11 @@ function openStaffForm(id){
             <input type="number" id="sf_leaves_before" min="0" placeholder="e.g. 30" value="${s?.leavesTakenBefore||''}">
             <div style="font-size:.68rem;color:#6b7280;margin-top:2px">أدخلي عدد أيام الإجازة اللي اخذتها الموظفة قبل ما تسجليها في السيستم — بيتخصم من رصيد الإجازة تلقائياً</div>
           </div>
+          <div class="fg">
+            <label style="color:#1e3a8a">📅 Total Working Days Before System — إجمالي أيام العمل قبل السيستم</label>
+            <input type="number" id="sf_days_before" min="0" placeholder="e.g. 1825 (5 years)" value="${s?.daysWorkedBefore||''}">
+            <div style="font-size:.68rem;color:#6b7280;margin-top:2px">أدخلي إجمالي أيام العمل قبل السيستم — بيُحسب في نهاية الخدمة والإجازة السنوية تلقائياً</div>
+          </div>
         </div>
       </div>
     </div>
@@ -7905,6 +7984,7 @@ async function saveStaff(id){
   if(!name){ showAlert('staff-save-alert','⚠️ Name is required',true); return; }
   const row = {
     branch_id: document.getElementById('sf_branch')?.value||curBid,
+    work_branch: document.getElementById('sf_work_branch')?.value||null,
     name, position: document.getElementById('sf_pos')?.value||'',
     nationality: document.getElementById('sf_nat')?.value||'',
     dob: document.getElementById('sf_dob')?.value||null,
@@ -7926,6 +8006,7 @@ async function saveStaff(id){
     transfer_code: document.getElementById('sf_tcode')?.value||'',
     last_working_day: document.getElementById('sf_lastday')?.value||null,
     leaves_taken_before: Number(document.getElementById('sf_leaves_before')?.value||0),
+    days_worked_before: Number(document.getElementById('sf_days_before')?.value||0),
   };
   // Always save salary fields to localStorage as backup (in case Supabase columns missing)
   if(id){
@@ -9129,7 +9210,7 @@ async function confirmImportCE2026(rows){
       if(!amt)continue;
       const vatPct=parseFloat(row['VAT %']||row['الضريبة %']||0);
       const vatAmt=parseFloat(row['VAT Amount']||row['مبلغ الضريبة']||Math.round(amt*vatPct/100*100)/100);
-      const total=parseFloat(row['Total']||row['الإجمالي']||amt+vatAmt);
+      const total=parseFloat(row['Total']||row['Total (AED)']||row['الإجمالي']||amt+vatAmt);
       const cat=String(row['Category']||row['البند']||'other').toLowerCase();
       const pay=String(row['Pay Method']||row['طريقة الدفع']||'cash').toLowerCase();
       const payClean=pay.includes('card')||pay.includes('بطاقة')?'card':pay.includes('bank')||pay.includes('تحويل')?'bank':'cash';
@@ -9306,7 +9387,7 @@ async function confirmImportReceipts(rows){
         vat_type: String(row['VAT Type']||row['vat_type']||'exempt'),
         vat_amount: toNum(row['VAT Amount']||row['vat_amount']),
         pay_method: String(row['Pay Method']||row['pay_method']||'cash'),
-        total:  toNum(row['Total']||row['total']),
+        total:  toNum(row['Total']||row['Total (AED)']||row['total']||row['الإجمالي']),
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
@@ -10419,8 +10500,14 @@ function openExpReportModal(){
   const sel = el('exp-rep-cat');
   sel.innerHTML = '<option value="all">📋 All Categories — كل البنود</option>' +
     EXP_CATS.map(c=>`<option value="${c.k}">${c.ic} ${typeof c.ar==='function'?c.ar():c.ar}</option>`).join('');
-  // Pre-select current filter
   if(expFilt !== 'all') sel.value = expFilt;
+  // Populate branches
+  const bsel = el('exp-rep-branch');
+  if(bsel){
+    bsel.innerHTML = `<option value="current">🏢 ${CB()?.name||'Current Branch'}</option>
+      <option value="all">🌐 All Branches — كل الفروع</option>` +
+      BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
+  }
   el('exp-report-modal').classList.add('on');
 }
 
@@ -10428,19 +10515,36 @@ function printExpReport(exportType='print'){
   const from   = el('exp-rep-from').value;
   const to     = el('exp-rep-to').value;
   const catF   = el('exp-rep-cat').value;
+  const paidByF= el('exp-rep-paidby')?.value||'all';
+  const branchF= el('exp-rep-branch')?.value||'current';
   const rLang  = document.querySelector('input[name="exp-lang"]:checked')?.value || 'en';
   const isAr   = rLang === 'ar';
   const dir    = isAr ? 'rtl' : 'ltr';
   const b      = CB();
+  const pettyCashAcc   = Number(el('exp-petty-received')?.value||0);
+  const pettyCashOwner = Number(el('exp-petty-owner')?.value||0);
 
   if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
 
-  // Filter expenses
-  let list = DB.expenses.filter(e => {
+  // Determine which branches to include
+  let targetBids = [curBid];
+  if(branchF === 'all') targetBids = BRANCHES.map(b=>b.id);
+  else if(branchF !== 'current') targetBids = [branchF];
+
+  // Filter expenses - use allBranchData if available, else DB.expenses
+  let allExp = [];
+  if(branchF === 'all' && DB.allBranchData){
+    BRANCHES.forEach(br=>{ allExp = allExp.concat(DB.allBranchData[br.id]?.expenses||[]); });
+  } else {
+    allExp = DB.expenses.filter(e=>targetBids.includes(e.branchId||e.branch_id||curBid));
+  }
+
+  let list = allExp.filter(e => {
     const m = monthOf(e.date);
     return m >= from && m <= to;
   });
   if(catF !== 'all') list = list.filter(e => e.category === catF);
+  if(paidByF !== 'all') list = list.filter(e => (e.paidBy||'owner') === paidByF);
 
   const fmt = n => (Math.round((n||0)*100)/100).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtD = s => { if(!s)return'—'; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
@@ -10607,6 +10711,71 @@ function printExpReport(exportType='print'){
 
   <h3 style="color:#374151;font-size:.9rem;margin-bottom:8px">📋 ${isAr?'ملخص حسب البند':'Summary by Category'}</h3>
   ${summaryTable}
+
+  <!-- Paid By Breakdown -->
+  <h3 style="color:#374151;font-size:.9rem;margin:16px 0 8px">💳 ${isAr?'ملخص حسب من دفع':'Summary by Payer'}</h3>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.8rem">
+    <tr style="background:#1e3a8a;color:#fff">
+      <th style="padding:7px 10px;text-align:${dir==='rtl'?'right':'left'}">${isAr?'دفع بواسطة':'Paid By'}</th>
+      <th style="padding:7px 10px;text-align:center">${isAr?'عدد الفواتير':'Items'}</th>
+      <th style="padding:7px 10px;text-align:center">${isAr?'الإجمالي':'Total'}</th>
+    </tr>
+    ${['accountant','owner','bank','other'].map(pb=>{
+      const pbList = list.filter(e=>(e.paidBy||'owner')===pb);
+      if(!pbList.length) return '';
+      const pbTotal = pbList.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+      const pbLabel = pb==='accountant'?(isAr?'👩‍💼 المحاسب':'👩‍💼 Accountant')
+                    : pb==='owner'?(isAr?'👑 المالك':'👑 Owner')
+                    : pb==='bank'?(isAr?'🏦 تحويل بنكي':'🏦 Bank Transfer'):'أخرى/Other';
+      return `<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:6px 10px"><b>${pbLabel}</b></td>
+        <td style="padding:6px 10px;text-align:center">${pbList.length}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(pbTotal)} AED</td>
+      </tr>`;
+    }).join('')}
+  </table>
+
+  ${(pettyCashAcc>0||pettyCashOwner>0)?`
+  <!-- Petty Cash Section -->
+  <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:16px">
+    <h3 style="color:#92400e;font-size:.9rem;margin-bottom:10px">💵 ${isAr?'متابعة الكاش — Petty Cash':'Petty Cash Reconciliation'}</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <tr style="background:#f59e0b;color:#fff">
+        <th style="padding:7px 10px;text-align:${dir==='rtl'?'right':'left'}">${isAr?'البيان':'Description'}</th>
+        <th style="padding:7px 10px;text-align:center">AED</th>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👩‍💼 ${isAr?'كاش استلمه المحاسب':'Cash Received by Accountant'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#059669">${fmt(pettyCashAcc)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👑 ${isAr?'كاش استلمه المالك':'Cash Received by Owner'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#059669">${fmt(pettyCashOwner)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👩‍💼 ${isAr?'مصاريف دفعها المحاسب':'Expenses Paid by Accountant'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(list.filter(e=>(e.paidBy||'owner')==='accountant').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0))}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👑 ${isAr?'مصاريف دفعها المالك':'Expenses Paid by Owner'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(list.filter(e=>(e.paidBy||'owner')==='owner').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0))}</td>
+      </tr>
+      ${(()=>{
+        const accSpent=list.filter(e=>(e.paidBy||'owner')==='accountant').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+        const ownerSpent=list.filter(e=>(e.paidBy||'owner')==='owner').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+        const accBalance=pettyCashAcc-accSpent;
+        const ownerBalance=pettyCashOwner-ownerSpent;
+        return `<tr style="background:#fde68a">
+          <td style="padding:8px 10px;font-weight:900">📊 ${isAr?'رصيد المحاسب':'Accountant Balance'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:900;color:${accBalance>=0?'#059669':'#dc2626'}">${fmt(accBalance)} AED ${accBalance>=0?'✅':'⚠️'}</td>
+        </tr>
+        <tr style="background:#fde68a">
+          <td style="padding:8px 10px;font-weight:900">📊 ${isAr?'رصيد المالك':'Owner Balance'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:900;color:${ownerBalance>=0?'#059669':'#dc2626'}">${fmt(ownerBalance)} AED ${ownerBalance>=0?'✅':'⚠️'}</td>
+        </tr>`;
+      })()}
+    </table>
+  </div>`:''}
 
   <h3 style="color:#374151;font-size:.9rem;margin:16px 0 10px">📄 ${isAr?'التفاصيل':'Details'}</h3>
   ${activeCats.map(g=>mkCatTable(g)).join('')}
@@ -13611,19 +13780,19 @@ function calcEOG(){
   const diffMs=end-start;
   if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
 
-  // Use actual work days if available
-  const actualDays=getActualWorkDaysCount(s.id);
-  const totalDays=actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24));
-  const years=totalDays/365;
+  // Use actual work days if available, add days worked before system
+  const actualDays = getActualWorkDaysCount(s.id);
+  const daysBeforeSystem = Number(s.daysWorkedBefore||0);
+  const totalDays = (actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24))) + daysBeforeSystem;
+  const years = totalDays/365;
   const usingActual=actualDays>0;
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
 
-  // ── UAE Gratuity (قانون العمل الإماراتي) ──
+  // ── UAE Gratuity (قانون العمل الإماراتي - Federal Decree No. 33/2021) ──
   // Formula: (Basic ÷ 30) × 21 days × years  [first 5 yrs]
   //          (Basic ÷ 30) × 30 days × years  [after 5 yrs]
-  // Resignation penalty: <1yr=0, 1-3yr=1/3, 3-5yr=2/3, 5+yr=full
-  // Termination/End of contract: always full
+  // NEW LAW 2021: No resignation penalty — full gratuity for all cases after 1 year
   let gratuity=0;
   let gratuityNote='';
   let gratuityBreakdown='';
@@ -13641,14 +13810,11 @@ function calcEOG(){
       ? `(${yrs1to5.toFixed(2)} yrs × 21 days) + (${yrsAfter5.toFixed(2)} yrs × 30 days)`
       : `${yrs1to5.toFixed(2)} yrs × 21 days`;
 
-    if(reason==='resignation'){
-      if(years<3)       { gratuity=fullGratuity*(1/3); gratuityNote='Resignation (1–3 years): 1/3 of gratuity'; }
-      else if(years<5)  { gratuity=fullGratuity*(2/3); gratuityNote='Resignation (3–5 years): 2/3 of gratuity'; }
-      else              { gratuity=fullGratuity;        gratuityNote='Resignation (5+ years): Full gratuity'; }
-    } else {
-      gratuity=fullGratuity;
-      gratuityNote=reason==='termination'?'Termination by employer: Full gratuity':'End of contract: Full gratuity';
-    }
+    // Federal Decree No. 33/2021: Full gratuity regardless of resignation or termination
+    gratuity = fullGratuity;
+    if(reason==='resignation')       gratuityNote='Resignation: Full gratuity (Federal Decree No. 33/2021)';
+    else if(reason==='termination')  gratuityNote='Termination by employer: Full gratuity';
+    else                             gratuityNote='End of contract: Full gratuity';
   }
 
   // ── Leave balance compensation ──
