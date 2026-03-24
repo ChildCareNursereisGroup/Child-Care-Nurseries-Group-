@@ -7783,8 +7783,16 @@ function renderStaffAlerts(){
     {k:'contractEnd',     label:'Contract'},
   ];
   const urgent = [];
-  // Only active staff (no lastWorkingDay or future)
-  const activeStaff = (DB.staff||[]).filter(s=>!s.lastWorkingDay || s.lastWorkingDay >= today());
+  const seenIds = new Set();
+  // Only active staff in this branch (work branch or contract branch), deduplicated
+  const activeStaff = (DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay < today()) return false;
+    const effectiveBranch = s.workBranch || s.branchId;
+    if(String(effectiveBranch) !== String(curBid)) return false;
+    if(seenIds.has(String(s.id))) return false;
+    seenIds.add(String(s.id));
+    return true;
+  });
   activeStaff.forEach(s=>{
     expFields.forEach(f=>{
       const d = daysUntilExpiry(s[f.k]);
