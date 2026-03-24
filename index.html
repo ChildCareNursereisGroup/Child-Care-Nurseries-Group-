@@ -828,48 +828,73 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- EXPENSE REPORT MODAL -->
 <div class="mover" id="exp-report-modal">
-  <div class="mbox" style="max-width:500px">
+  <div class="mbox" style="max-width:620px">
     <div class="mh">
-      <div class="mt">📊 Expense Report</div>
+      <div class="mt">📊 Expense Report — تقرير المصاريف</div>
       <button class="xb" onclick="el('exp-report-modal').classList.remove('on')">✕</button>
     </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label>From Month</label>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>From Month — من</label>
           <input type="month" id="exp-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
-        <div class="fg">
-          <label>To Month</label>
+        <div class="fg"><label>To Month — إلى</label>
           <input type="month" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
       </div>
-      <div class="fg">
-        <label>Category — البند</label>
-        <select id="exp-rep-cat" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-          <option value="all">📋 All Categories — كل البنود</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Language — اللغة</label>
-        <div style="display:flex;gap:8px">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="exp-lang" value="en" checked> 🇬🇧 English
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="exp-lang" value="ar"> 🇦🇪 العربية
-          </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Branch — الفرع</label>
+          <select id="exp-rep-branch" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="current">🏢 Current Branch</option>
+            <option value="all">🌐 All Branches</option>
+          </select>
+        </div>
+        <div class="fg"><label>Category — البند</label>
+          <select id="exp-rep-cat" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">📋 All Categories</option>
+          </select>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Paid By — دفع بواسطة</label>
+          <select id="exp-rep-paidby" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">👥 All</option>
+            <option value="accountant">👩‍💼 Accountant — المحاسب</option>
+            <option value="owner">👑 Owner — المالك</option>
+            <option value="bank">🏦 Bank Transfer</option>
+          </select>
+        </div>
+        <div class="fg"><label>Language</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="exp-lang" value="en" checked> 🇬🇧 EN
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="exp-lang" value="ar"> 🇦🇪 AR
+            </label>
+          </div>
+        </div>
+      </div>
+      <!-- Petty Cash Section -->
+      <div style="background:#fef3c7;border-radius:10px;padding:12px;border:1.5px solid #f59e0b">
+        <div style="font-weight:800;color:#92400e;margin-bottom:8px;font-size:.83rem">💵 Petty Cash Tracker — متابعة الكاش</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg">
+            <label style="font-size:.75rem;color:#92400e">Cash Received by Accountant (AED)</label>
+            <input type="number" id="exp-petty-received" placeholder="0" style="width:100%;padding:7px;border:1.5px solid #f59e0b;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div class="fg">
+            <label style="font-size:.75rem;color:#92400e">Cash Received by Owner (AED)</label>
+            <input type="number" id="exp-petty-owner" placeholder="0" style="width:100%;padding:7px;border:1.5px solid #f59e0b;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="printExpReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
-          🖨️ Print/PDF
+          🖨️ Print / PDF
         </button>
         <button onclick="printExpReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
           📊 Excel
-        </button>
-        <button onclick="printExpReport('pdf')" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
-          📄 PDF
         </button>
       </div>
     </div>
@@ -1859,6 +1884,8 @@ const TAX_SUPPLIER_FIELDS = [
   {id:'ex_reason',   ar:()=>t('payReason'),        t:'text'},
   {id:'ex_vat',      ar:()=>t('expVatType'),       t:'select', opts:()=>[t('vatExempt'),t('vatZero'),t('vat5')]},
   {id:'ex_vatamt',   ar:()=>t('expVatAmt'),        t:'number'},
+  {id:'ex_paid_by',  ar:()=>lang==='ar'?'💳 دفع بواسطة':'💳 Paid By', t:'select', opts:()=>['👩‍💼 المحاسب — Accountant','👑 المالك — Owner','🏦 تحويل بنكي — Bank Transfer','أخرى — Other']},
+  {id:'ex_branch_override', ar:()=>lang==='ar'?'🏢 الفرع (اختياري — افتراضي الفرع الحالي)':'🏢 Branch (optional)', t:'select', opts:()=>['— Current Branch —',...BRANCHES.map(b=>`${b.icon} ${tBN(b)}`)]},
 ];
 
 const EXP_CATS = [
@@ -2055,7 +2082,8 @@ async function loadFromSupa(bid) {
         totalAmount:Number(x.total_amount||x.amount||0),
         date:x.date||null,note:x.note||'',subType:x.sub_type||'',
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',
-        invoiceNumber:x.invoice_number||'',extra};
+        invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
+        branchId:x.branch_id||'',extra};
     });
     DB.staffAtt={};
     if(sa.error){
@@ -2585,8 +2613,14 @@ function initApp(){
   else if(curRole==='visitor_reg') showPage('visitors',null);
   else if(curRole==='inquiry')     showPage('visitors',null);
   else showPage('dashboard',null);
-  // Load staff, buses, licenses in background
-  Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
+  // Load staff, buses, licenses in background — re-render panels after staff loads
+  Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()])
+    .then(()=>{
+      renderBirthdayPanel();
+      renderExpiryAlerts(curBid);
+      renderStaffAtt();
+    })
+    .catch(()=>{});
 }
 function renderNav(){
   const pages=ROLES_PAGES[curRole];
@@ -5665,13 +5699,23 @@ async function saveExp(){
   const reason=v('ex_reason');
   const invoiceNum=v('ex_invoice_num');
   const totalWithVat=amount+vatAmt;
+  // Paid by
+  const paidByRaw=el('ex_paid_by')?.value||'';
+  const paidBy = paidByRaw.includes('محاسب')||paidByRaw.includes('Accountant') ? 'accountant'
+               : paidByRaw.includes('مالك')||paidByRaw.includes('Owner') ? 'owner'
+               : paidByRaw.includes('بنك')||paidByRaw.includes('Bank') ? 'bank' : 'other';
+  // Branch override
+  const branchOverrideRaw=el('ex_branch_override')?.value||'';
+  const targetBranch = branchOverrideRaw.startsWith('—') ? curBid
+    : BRANCHES.find(b=>branchOverrideRaw.includes(tBN(b)))?.id || curBid;
   setSyncing(true);
   const row={
-    branch_id:curBid, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
+    branch_id:targetBranch, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
     amount, vat_type:vatType, vat_amount:vatAmt, total_amount:totalWithVat,
     date, note:reason, sub_type:subType,
     supplier_name:supplier, tax_number:taxNum,
     invoice_number:invoiceNum||null,
+    paid_by:paidBy,
     extra
   };
   // ── Duplicate check ──────────────────────────
@@ -9832,9 +9876,21 @@ function renderExpiryAlerts(filterBid){
     {k:'contractEnd',      label:'Contract'},
   ];
   const todayStr = today.toISOString().split('T')[0];
+  const seenStaffExpiry = new Set();
   (DB.staff||[])
-    .filter(s=>!filterBid||!s.branchId||s.branchId===filterBid)
+    .filter(s=>{
+      if(filterBid){
+        const effectiveBranch = s.workBranch || s.branchId;
+        if(String(effectiveBranch) !== String(filterBid)) return false;
+      }
+      return true;
+    })
     .filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=todayStr) // exclude exited staff
+    .filter(s=>{ // deduplicate
+      if(seenStaffExpiry.has(String(s.id))) return false;
+      seenStaffExpiry.add(String(s.id));
+      return true;
+    })
     .forEach(s => {
     staffFields.forEach(f => {
       const d = daysDiff(s[f.k]);
@@ -10462,8 +10518,14 @@ function openExpReportModal(){
   const sel = el('exp-rep-cat');
   sel.innerHTML = '<option value="all">📋 All Categories — كل البنود</option>' +
     EXP_CATS.map(c=>`<option value="${c.k}">${c.ic} ${typeof c.ar==='function'?c.ar():c.ar}</option>`).join('');
-  // Pre-select current filter
   if(expFilt !== 'all') sel.value = expFilt;
+  // Populate branches
+  const bsel = el('exp-rep-branch');
+  if(bsel){
+    bsel.innerHTML = `<option value="current">🏢 ${CB()?.name||'Current Branch'}</option>
+      <option value="all">🌐 All Branches — كل الفروع</option>` +
+      BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
+  }
   el('exp-report-modal').classList.add('on');
 }
 
@@ -10471,19 +10533,36 @@ function printExpReport(exportType='print'){
   const from   = el('exp-rep-from').value;
   const to     = el('exp-rep-to').value;
   const catF   = el('exp-rep-cat').value;
+  const paidByF= el('exp-rep-paidby')?.value||'all';
+  const branchF= el('exp-rep-branch')?.value||'current';
   const rLang  = document.querySelector('input[name="exp-lang"]:checked')?.value || 'en';
   const isAr   = rLang === 'ar';
   const dir    = isAr ? 'rtl' : 'ltr';
   const b      = CB();
+  const pettyCashAcc   = Number(el('exp-petty-received')?.value||0);
+  const pettyCashOwner = Number(el('exp-petty-owner')?.value||0);
 
   if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
 
-  // Filter expenses
-  let list = DB.expenses.filter(e => {
+  // Determine which branches to include
+  let targetBids = [curBid];
+  if(branchF === 'all') targetBids = BRANCHES.map(b=>b.id);
+  else if(branchF !== 'current') targetBids = [branchF];
+
+  // Filter expenses - use allBranchData if available, else DB.expenses
+  let allExp = [];
+  if(branchF === 'all' && DB.allBranchData){
+    BRANCHES.forEach(br=>{ allExp = allExp.concat(DB.allBranchData[br.id]?.expenses||[]); });
+  } else {
+    allExp = DB.expenses.filter(e=>targetBids.includes(e.branchId||e.branch_id||curBid));
+  }
+
+  let list = allExp.filter(e => {
     const m = monthOf(e.date);
     return m >= from && m <= to;
   });
   if(catF !== 'all') list = list.filter(e => e.category === catF);
+  if(paidByF !== 'all') list = list.filter(e => (e.paidBy||'owner') === paidByF);
 
   const fmt = n => (Math.round((n||0)*100)/100).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtD = s => { if(!s)return'—'; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
@@ -10650,6 +10729,71 @@ function printExpReport(exportType='print'){
 
   <h3 style="color:#374151;font-size:.9rem;margin-bottom:8px">📋 ${isAr?'ملخص حسب البند':'Summary by Category'}</h3>
   ${summaryTable}
+
+  <!-- Paid By Breakdown -->
+  <h3 style="color:#374151;font-size:.9rem;margin:16px 0 8px">💳 ${isAr?'ملخص حسب من دفع':'Summary by Payer'}</h3>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.8rem">
+    <tr style="background:#1e3a8a;color:#fff">
+      <th style="padding:7px 10px;text-align:${dir==='rtl'?'right':'left'}">${isAr?'دفع بواسطة':'Paid By'}</th>
+      <th style="padding:7px 10px;text-align:center">${isAr?'عدد الفواتير':'Items'}</th>
+      <th style="padding:7px 10px;text-align:center">${isAr?'الإجمالي':'Total'}</th>
+    </tr>
+    ${['accountant','owner','bank','other'].map(pb=>{
+      const pbList = list.filter(e=>(e.paidBy||'owner')===pb);
+      if(!pbList.length) return '';
+      const pbTotal = pbList.reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+      const pbLabel = pb==='accountant'?(isAr?'👩‍💼 المحاسب':'👩‍💼 Accountant')
+                    : pb==='owner'?(isAr?'👑 المالك':'👑 Owner')
+                    : pb==='bank'?(isAr?'🏦 تحويل بنكي':'🏦 Bank Transfer'):'أخرى/Other';
+      return `<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:6px 10px"><b>${pbLabel}</b></td>
+        <td style="padding:6px 10px;text-align:center">${pbList.length}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(pbTotal)} AED</td>
+      </tr>`;
+    }).join('')}
+  </table>
+
+  ${(pettyCashAcc>0||pettyCashOwner>0)?`
+  <!-- Petty Cash Section -->
+  <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:16px">
+    <h3 style="color:#92400e;font-size:.9rem;margin-bottom:10px">💵 ${isAr?'متابعة الكاش — Petty Cash':'Petty Cash Reconciliation'}</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <tr style="background:#f59e0b;color:#fff">
+        <th style="padding:7px 10px;text-align:${dir==='rtl'?'right':'left'}">${isAr?'البيان':'Description'}</th>
+        <th style="padding:7px 10px;text-align:center">AED</th>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👩‍💼 ${isAr?'كاش استلمه المحاسب':'Cash Received by Accountant'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#059669">${fmt(pettyCashAcc)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👑 ${isAr?'كاش استلمه المالك':'Cash Received by Owner'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#059669">${fmt(pettyCashOwner)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👩‍💼 ${isAr?'مصاريف دفعها المحاسب':'Expenses Paid by Accountant'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(list.filter(e=>(e.paidBy||'owner')==='accountant').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0))}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #fde68a">
+        <td style="padding:6px 10px">👑 ${isAr?'مصاريف دفعها المالك':'Expenses Paid by Owner'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626">${fmt(list.filter(e=>(e.paidBy||'owner')==='owner').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0))}</td>
+      </tr>
+      ${(()=>{
+        const accSpent=list.filter(e=>(e.paidBy||'owner')==='accountant').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+        const ownerSpent=list.filter(e=>(e.paidBy||'owner')==='owner').reduce((s,e)=>s+(e.totalAmount||e.amount||0),0);
+        const accBalance=pettyCashAcc-accSpent;
+        const ownerBalance=pettyCashOwner-ownerSpent;
+        return `<tr style="background:#fde68a">
+          <td style="padding:8px 10px;font-weight:900">📊 ${isAr?'رصيد المحاسب':'Accountant Balance'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:900;color:${accBalance>=0?'#059669':'#dc2626'}">${fmt(accBalance)} AED ${accBalance>=0?'✅':'⚠️'}</td>
+        </tr>
+        <tr style="background:#fde68a">
+          <td style="padding:8px 10px;font-weight:900">📊 ${isAr?'رصيد المالك':'Owner Balance'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:900;color:${ownerBalance>=0?'#059669':'#dc2626'}">${fmt(ownerBalance)} AED ${ownerBalance>=0?'✅':'⚠️'}</td>
+        </tr>`;
+      })()}
+    </table>
+  </div>`:''}
 
   <h3 style="color:#374151;font-size:.9rem;margin:16px 0 10px">📄 ${isAr?'التفاصيل':'Details'}</h3>
   ${activeCats.map(g=>mkCatTable(g)).join('')}
@@ -12291,8 +12435,15 @@ function renderBirthdayPanel(){
 
   // ── Collect staff ─────────────────────────────
   const staffList=[];
+  const seenStaffIds = new Set();
   (DB.staff||[]).forEach(s=>{
     if(!s.dob) return;
+    // Show staff in their work branch (if set), else contract branch
+    const effectiveBranch = s.workBranch || s.branchId;
+    if(String(effectiveBranch) !== String(curBid)) return;
+    // Deduplicate by staff id
+    if(seenStaffIds.has(String(s.id))) return;
+    seenStaffIds.add(String(s.id));
     const d=new Date(s.dob);
     if(d.getMonth()+1===mo)
       staffList.push({name:s.name,dob:s.dob,type:'Staff',phone:s.contact||s.phone||'',id:s.id,inactive:false});
