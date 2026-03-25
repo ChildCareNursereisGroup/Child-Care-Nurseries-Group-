@@ -3028,27 +3028,49 @@ function clearAdd(){
 // ═══════════════════════════════════════════════
 //  RECEIPTS
 // ═══════════════════════════════════════════════
+async function getNextSerialAsync(payMethod){
+  const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
+  // Query ONLY current branch receipts with this prefix
+  const {data} = await sb.from('receipts')
+    .select('receipt_num')
+    .eq('branch_id', curBid)
+    .like('receipt_num', prefix+'-%');
+  const allNums = (data||[]).map(r=>{
+    const rn = String(r.receipt_num||'');
+    const m = rn.match(/(\d+)$/);
+    return m ? parseInt(m[1]) : 0;
+  });
+  const maxN = allNums.length ? Math.max(...allNums)+1 : 1;
+  return prefix+'-'+String(maxN).padStart(4,'0');
+}
+
 function getNextSerial(payMethod){
   const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
-  const filtered=DB.receipts.filter(r=>{
-    const rn=String(r.receiptNum||'');
+  // Use local data as fallback (sync version)
+  let allReceipts = [...(DB.receipts||[])];
+  if(DB.allBranchData){
+    Object.values(DB.allBranchData).forEach(bd=>{
+      if(bd.receipts) allReceipts = allReceipts.concat(bd.receipts);
+    });
+  }
+  const filtered = allReceipts.filter(r=>{
+    const rn=String(r.receiptNum||r.receipt_num||'');
     return rn.startsWith(prefix+'-')||rn.startsWith(prefix);
   });
-  // Use max number + 1 to avoid duplicates regardless of date
-  const nums=filtered.map(r=>{
-    const rn=String(r.receiptNum||'');
+  const nums = filtered.map(r=>{
+    const rn=String(r.receiptNum||r.receipt_num||'');
     const m=rn.match(/(\d+)$/);
     return m?parseInt(m[1]):0;
   });
-  const maxN=nums.length?Math.max(...nums)+1:1;
+  const maxN = nums.length ? Math.max(...nums)+1 : 1;
   return prefix+'-'+String(maxN).padStart(4,'0');
-  // Note: Receipt numbers are sequential by entry order, not by date.
-  // Display is sorted by receipt DATE. This is intentional.
 }
 
-function updateSerialByPayMethod(){
+async function updateSerialByPayMethod(){
   const pm=el('rpaymethod')?.value||'cash';
-  el('rnum').value=getNextSerial(pm);
+  el('rnum').value=getNextSerial(pm); // show local estimate first
+  const num = await getNextSerialAsync(pm); // then update with global
+  el('rnum').value=num;
 }
 
 function initRecForm(){
@@ -3168,18 +3190,17 @@ async function saveReceipt(){
     vat_type:vatType,vat_amount:vatAmt,pay_method:payMethod,
     total,notes:v('rnotes')
   };
-  // ── Duplicate check ──────────────────────────
-  const dupRec = DB.receipts.find(r=>
-    r.branch_id === curBid &&
-    String(r.receiptNum||r.receipt_num||'') === String(rNum) &&
-    (r.childId||r.child_id||'') === ((!isGuest&&!isVisitor)?String(childId):'') &&
-    (r.date||'') === rDate &&
-    Math.abs((r.total||0) - total) < 0.01
-  );
-  if(dupRec){
+  // ── Duplicate check — receipt number unique within branch ──
+  const {data:dupCheck} = await sb.from('receipts').select('id')
+    .eq('branch_id', curBid)
+    .eq('receipt_num', rNum).limit(1);
+  if(dupCheck && dupCheck.length > 0){
+    // Race condition — someone else just used this number, get fresh one
+    const newNum = await getNextSerialAsync(payMethod);
+    el('rnum').value = newNum;
     showAlert('recalert', lang==='ar'
-      ? `⚠️ هذه الفاتورة مسجلة مسبقاً! (رقم ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} د.إ)`
-      : `⚠️ Duplicate receipt detected! (No. ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} AED)`, true);
+      ? `⚠️ رقم الإيصال محجوز، تم توليد رقم جديد: ${newNum}`
+      : `⚠️ Receipt number taken, new number generated: ${newNum}`, true);
     setSyncing(false);
     return;
   }
@@ -3191,6 +3212,8 @@ async function saveReceipt(){
   showAlert('recalert',t('receiptSaved'),false);
   { logActivity('receipt', resolvedName+' — '+fmtNum(total)+' د.إ ('+rNum+')'); }
   clearRec();await loadFromSupa(curBid);renderRecs();renderDashboard();
+  // Refresh serial for next receipt
+  updateSerialByPayMethod();
   // Show option to preview/send receipt
   const nr=DB.receipts.find(x=>x.receiptNum===rNum);
   if(nr) showAlert('recalert',`✅ تم الحفظ! <button onclick="prevRec('${nr.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:7px;padding:3px 10px;cursor:pointer;margin-left:5px;font-family:'Tajawal',sans-serif">👁 معاينة</button> <button onclick="_quickSendWA('${nr.id}')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:3px 10px;cursor:pointer;margin-left:5px;font-family:'Tajawal',sans-serif">💬 واتساب للأهل</button>`,false);
