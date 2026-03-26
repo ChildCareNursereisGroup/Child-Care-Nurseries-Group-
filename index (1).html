@@ -554,6 +554,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="card">💳 Card only</option>
       </select>
       <button id="vat-report-btn" class="btn bo bsm np" style="display:none" onclick="openVATReportModal()">🧾 VAT Report</button>
+      <button id="rec-report-btn" class="btn bsm np" style="display:none;background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.72rem;font-weight:700;font-family:'Tajawal',sans-serif" onclick="openRecReportModal()">📊 Receipt Report</button>
     </div>
   </div>
   <div id="reclist"></div>
@@ -823,6 +824,50 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
     <div id="explist"></div>
+  </div>
+</div>
+
+<!-- RECEIPT REPORT MODAL -->
+<div class="mover" id="rec-report-modal">
+  <div class="mbox" style="max-width:560px">
+    <div class="mh">
+      <div class="mt">📊 Monthly Receipt Report — تقرير الإيصالات</div>
+      <button class="xb" onclick="el('rec-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>From Month — من</label>
+          <input type="month" id="rec-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg"><label>To Month — إلى</label>
+          <input type="month" id="rec-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Payment Method — طريقة الدفع</label>
+          <select id="rec-rep-pay" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">💰 All — الكل</option>
+            <option value="cash">💵 Cash — كاش</option>
+            <option value="bank">🏦 Bank Transfer — تحويل</option>
+            <option value="card">💳 Card — كارت</option>
+          </select>
+        </div>
+        <div class="fg"><label>Language</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="rec-lang" value="en" checked> 🇬🇧 EN
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+              <input type="radio" name="rec-lang" value="ar"> 🇦🇪 AR
+            </label>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="printRecReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ Print / PDF</button>
+        <button onclick="printRecReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">📊 Excel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2613,8 +2658,14 @@ function initApp(){
   else if(curRole==='visitor_reg') showPage('visitors',null);
   else if(curRole==='inquiry')     showPage('visitors',null);
   else showPage('dashboard',null);
-  // Load staff, buses, licenses in background
-  Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()]).catch(()=>{});
+  // Load staff, buses, licenses in background — re-render panels after staff loads
+  Promise.all([loadStaff(), loadBuses(), loadLicenses(), loadBranchSettings()])
+    .then(()=>{
+      renderBirthdayPanel();
+      renderExpiryAlerts(curBid);
+      renderStaffAtt();
+    })
+    .catch(()=>{});
 }
 function renderNav(){
   const pages=ROLES_PAGES[curRole];
@@ -2648,6 +2699,7 @@ async function showPage(page,btn){
     // Show/hide admin-only elements
     const tw=el('rectot-wrap'); if(tw) tw.style.display=curRole==='admin'?'':'none';
     const vb=el('vat-report-btn'); if(vb) vb.style.display=curRole==='admin'?'':'none';
+    const rb=el('rec-report-btn'); if(rb) rb.style.display=curRole==='admin'?'':'none';
   }
   if(page==='attendance'){
     if(!el('attdate').value) el('attdate').value=today();
@@ -2976,27 +3028,49 @@ function clearAdd(){
 // ═══════════════════════════════════════════════
 //  RECEIPTS
 // ═══════════════════════════════════════════════
+async function getNextSerialAsync(payMethod){
+  const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
+  // Query ONLY current branch receipts with this prefix
+  const {data} = await sb.from('receipts')
+    .select('receipt_num')
+    .eq('branch_id', curBid)
+    .like('receipt_num', prefix+'-%');
+  const allNums = (data||[]).map(r=>{
+    const rn = String(r.receipt_num||'');
+    const m = rn.match(/(\d+)$/);
+    return m ? parseInt(m[1]) : 0;
+  });
+  const maxN = allNums.length ? Math.max(...allNums)+1 : 1;
+  return prefix+'-'+String(maxN).padStart(4,'0');
+}
+
 function getNextSerial(payMethod){
   const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
-  const filtered=DB.receipts.filter(r=>{
-    const rn=String(r.receiptNum||'');
+  // Use local data as fallback (sync version)
+  let allReceipts = [...(DB.receipts||[])];
+  if(DB.allBranchData){
+    Object.values(DB.allBranchData).forEach(bd=>{
+      if(bd.receipts) allReceipts = allReceipts.concat(bd.receipts);
+    });
+  }
+  const filtered = allReceipts.filter(r=>{
+    const rn=String(r.receiptNum||r.receipt_num||'');
     return rn.startsWith(prefix+'-')||rn.startsWith(prefix);
   });
-  // Use max number + 1 to avoid duplicates regardless of date
-  const nums=filtered.map(r=>{
-    const rn=String(r.receiptNum||'');
+  const nums = filtered.map(r=>{
+    const rn=String(r.receiptNum||r.receipt_num||'');
     const m=rn.match(/(\d+)$/);
     return m?parseInt(m[1]):0;
   });
-  const maxN=nums.length?Math.max(...nums)+1:1;
+  const maxN = nums.length ? Math.max(...nums)+1 : 1;
   return prefix+'-'+String(maxN).padStart(4,'0');
-  // Note: Receipt numbers are sequential by entry order, not by date.
-  // Display is sorted by receipt DATE. This is intentional.
 }
 
-function updateSerialByPayMethod(){
+async function updateSerialByPayMethod(){
   const pm=el('rpaymethod')?.value||'cash';
-  el('rnum').value=getNextSerial(pm);
+  el('rnum').value=getNextSerial(pm); // show local estimate first
+  const num = await getNextSerialAsync(pm); // then update with global
+  el('rnum').value=num;
 }
 
 function initRecForm(){
@@ -3116,18 +3190,17 @@ async function saveReceipt(){
     vat_type:vatType,vat_amount:vatAmt,pay_method:payMethod,
     total,notes:v('rnotes')
   };
-  // ── Duplicate check ──────────────────────────
-  const dupRec = DB.receipts.find(r=>
-    r.branch_id === curBid &&
-    String(r.receiptNum||r.receipt_num||'') === String(rNum) &&
-    (r.childId||r.child_id||'') === ((!isGuest&&!isVisitor)?String(childId):'') &&
-    (r.date||'') === rDate &&
-    Math.abs((r.total||0) - total) < 0.01
-  );
-  if(dupRec){
+  // ── Duplicate check — receipt number unique within branch ──
+  const {data:dupCheck} = await sb.from('receipts').select('id')
+    .eq('branch_id', curBid)
+    .eq('receipt_num', rNum).limit(1);
+  if(dupCheck && dupCheck.length > 0){
+    // Race condition — someone else just used this number, get fresh one
+    const newNum = await getNextSerialAsync(payMethod);
+    el('rnum').value = newNum;
     showAlert('recalert', lang==='ar'
-      ? `⚠️ هذه الفاتورة مسجلة مسبقاً! (رقم ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} د.إ)`
-      : `⚠️ Duplicate receipt detected! (No. ${rNum} — ${fmtDate(rDate)} — ${fmtNum(total)} AED)`, true);
+      ? `⚠️ رقم الإيصال محجوز، تم توليد رقم جديد: ${newNum}`
+      : `⚠️ Receipt number taken, new number generated: ${newNum}`, true);
     setSyncing(false);
     return;
   }
@@ -3139,6 +3212,8 @@ async function saveReceipt(){
   showAlert('recalert',t('receiptSaved'),false);
   { logActivity('receipt', resolvedName+' — '+fmtNum(total)+' د.إ ('+rNum+')'); }
   clearRec();await loadFromSupa(curBid);renderRecs();renderDashboard();
+  // Refresh serial for next receipt
+  updateSerialByPayMethod();
   // Show option to preview/send receipt
   const nr=DB.receipts.find(x=>x.receiptNum===rNum);
   if(nr) showAlert('recalert',`✅ تم الحفظ! <button onclick="prevRec('${nr.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:7px;padding:3px 10px;cursor:pointer;margin-left:5px;font-family:'Tajawal',sans-serif">👁 معاينة</button> <button onclick="_quickSendWA('${nr.id}')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:3px 10px;cursor:pointer;margin-left:5px;font-family:'Tajawal',sans-serif">💬 واتساب للأهل</button>`,false);
@@ -7777,8 +7852,16 @@ function renderStaffAlerts(){
     {k:'contractEnd',     label:'Contract'},
   ];
   const urgent = [];
-  // Only active staff (no lastWorkingDay or future)
-  const activeStaff = (DB.staff||[]).filter(s=>!s.lastWorkingDay || s.lastWorkingDay >= today());
+  const seenIds = new Set();
+  // Only active staff in this branch (work branch or contract branch), deduplicated
+  const activeStaff = (DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay < today()) return false;
+    const effectiveBranch = s.workBranch || s.branchId;
+    if(String(effectiveBranch) !== String(curBid)) return false;
+    if(seenIds.has(String(s.id))) return false;
+    seenIds.add(String(s.id));
+    return true;
+  });
   activeStaff.forEach(s=>{
     expFields.forEach(f=>{
       const d = daysUntilExpiry(s[f.k]);
@@ -9391,6 +9474,14 @@ async function confirmImportReceipts(rows){
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
+      // Duplicate check: same receipt_num + same branch only
+      if(r.receipt_num){
+        const {data:dup} = await sb.from('receipts').select('id')
+          .eq('branch_id', curBid)
+          .eq('receipt_num', r.receipt_num)
+          .limit(1);
+        if(dup && dup.length > 0){ err++; continue; } // skip duplicate
+      }
       await sb.from('receipts').insert(r); ok++;
       if(!child && cname) notFound.push(cname);
     }catch(e){ err++; }
@@ -9870,9 +9961,21 @@ function renderExpiryAlerts(filterBid){
     {k:'contractEnd',      label:'Contract'},
   ];
   const todayStr = today.toISOString().split('T')[0];
+  const seenStaffExpiry = new Set();
   (DB.staff||[])
-    .filter(s=>!filterBid||!s.branchId||s.branchId===filterBid)
+    .filter(s=>{
+      if(filterBid){
+        const effectiveBranch = s.workBranch || s.branchId;
+        if(String(effectiveBranch) !== String(filterBid)) return false;
+      }
+      return true;
+    })
     .filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=todayStr) // exclude exited staff
+    .filter(s=>{ // deduplicate
+      if(seenStaffExpiry.has(String(s.id))) return false;
+      seenStaffExpiry.add(String(s.id));
+      return true;
+    })
     .forEach(s => {
     staffFields.forEach(f => {
       const d = daysDiff(s[f.k]);
@@ -10492,6 +10595,170 @@ function calcWeekendTotal(){
 }
 
 // ─── Expense Report ────────────────────────────
+function openRecReportModal(){
+  const now = el('rfmon')?.value || monthOf(new Date());
+  if(!el('rec-rep-from').value) el('rec-rep-from').value = now;
+  if(!el('rec-rep-to').value)   el('rec-rep-to').value   = now;
+  el('rec-report-modal').classList.add('on');
+}
+
+function printRecReport(exportType='print'){
+  const from  = el('rec-rep-from').value;
+  const to    = el('rec-rep-to').value;
+  const payF  = el('rec-rep-pay').value;
+  const rLang = document.querySelector('input[name="rec-lang"]:checked')?.value||'en';
+  const isAr  = rLang==='ar';
+  const dir   = isAr?'rtl':'ltr';
+  const b     = CB();
+
+  if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
+
+  let list = DB.receipts.filter(r=>{
+    const m = monthOf(r.date);
+    return m >= from && m <= to;
+  });
+  if(payF!=='all') list = list.filter(r=>(r.payMethod||'cash')===payF);
+  list = list.sort((a,b)=>{
+    const dateDiff = new Date(a.date) - new Date(b.date);
+    if(dateDiff !== 0) return dateDiff;
+    // Same date → sort by receipt number
+    const rA = parseInt(String(a.receiptNum||'0').replace(/\D/g,''))||0;
+    const rB = parseInt(String(b.receiptNum||'0').replace(/\D/g,''))||0;
+    return rA - rB;
+  });
+
+  const fmt  = n => (Math.round((n||0)*100)/100).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtD = s => { if(!s)return'—'; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+
+  const totalCash  = list.filter(r=>(r.payMethod||'cash')==='cash').reduce((s,r)=>s+r.total,0);
+  const totalBank  = list.filter(r=>(r.payMethod||'cash')==='bank').reduce((s,r)=>s+r.total,0);
+  const totalCard  = list.filter(r=>(r.payMethod||'cash')==='card').reduce((s,r)=>s+r.total,0);
+  const totalVAT   = list.reduce((s,r)=>s+(r.vatAmount||0),0);
+  const grandTotal = list.reduce((s,r)=>s+r.total,0);
+
+  if(exportType==='excel'){
+    const wsData = [
+      [isAr?'تقرير الإيصالات':'Receipt Report', b.en||b.ar, `${from} → ${to}`, payF==='all'?'All Payments':payF],
+      [],
+      [isAr?'اسم الطفل':'Child Name', isAr?'الفصل':'Class', isAr?'رقم الإيصال':'Receipt#',
+       isAr?'التاريخ':'Date', isAr?'من':'From', isAr?'إلى':'To',
+       isAr?'الرسوم':'Fee', isAr?'التسجيل':'Reg', isAr?'المواصلات':'Transport',
+       isAr?'ملابس':'Uniforms', isAr?'أدوات':'Stationary',
+       isAr?'ضريبة':'VAT', isAr?'طريقة الدفع':'Pay Method', isAr?'الإجمالي':'Total'],
+      ...list.map(r=>[
+        r.childName||'', r.className||'', r.receiptNum||'',
+        fmtD(r.date), fmtD(r.fromDate), fmtD(r.toDate),
+        r.fee||0, r.reg||0, r.bus||0,
+        r.clothes||0, r.tools||0,
+        r.vatAmount||0, r.payMethod||'cash', r.total||0
+      ]),
+      [],
+      [isAr?'إجمالي كاش':'Total Cash','','','','','','','','','','','','',totalCash],
+      [isAr?'إجمالي تحويل':'Total Bank','','','','','','','','','','','','',totalBank],
+      [isAr?'إجمالي كارت':'Total Card','','','','','','','','','','','','',totalCard],
+      [isAr?'إجمالي ضريبة':'Total VAT','','','','','','','','','','','','',totalVAT],
+      [isAr?'الإجمالي الكلي':'Grand Total','','','','','','','','','','','','',grandTotal],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:22},{wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12}];
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, isAr?'الإيصالات':'Receipts');
+    XLSX.writeFile(wb2, `Receipt_Report_${from}_${to}.xlsx`);
+    el('rec-report-modal').classList.remove('on');
+    return;
+  }
+
+  const payLabel = payF==='cash'?(isAr?'كاش':'Cash'):payF==='bank'?(isAr?'تحويل بنكي':'Bank Transfer'):payF==='card'?(isAr?'كارت':'Card'):(isAr?'الكل':'All');
+  const html=`<!DOCTYPE html><html dir="${dir}" lang="${rLang}">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:16px;color:#111;font-size:.78rem}
+  h1{font-size:1.2rem;color:#1e3a8a}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;background:#eff6ff;border-radius:10px;padding:12px}
+  .sbox{text-align:center}.sv{font-size:1.1rem;font-weight:900;color:#1e3a8a}.sk{font-size:.68rem;color:#6b7280;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.72rem}
+  th{background:#1e3a8a;color:#fff;padding:6px 8px;text-align:${isAr?'right':'left'};white-space:nowrap}
+  td{padding:5px 8px;border-bottom:1px solid #e5e7eb}
+  tr:nth-child(even){background:#f8fafc}
+  .cash{color:#059669;font-weight:700}.bank{color:#1e3a8a;font-weight:700}.card{color:#7c3aed;font-weight:700}
+  .total-row{background:#1e3a8a!important;color:#fff;font-weight:900}
+  .total-row td{color:#fff;font-weight:900}
+  @media print{body{padding:5px}@page{margin:8mm;size:A4 landscape}}
+</style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;border-bottom:2px solid #1e3a8a;padding-bottom:8px">
+    <div>
+      <h1>📊 ${isAr?'تقرير الإيصالات':'Receipt Report'}</h1>
+      <div style="font-size:.82rem;color:#6b7280;margin-top:3px">${b.icon} ${b.en||b.ar} | ${from} → ${to} | ${payLabel}</div>
+    </div>
+    <div style="font-size:.72rem;color:#6b7280;text-align:${isAr?'left':'right'}">
+      <div>${new Date().toLocaleDateString('en-GB')}</div>
+      <div>${list.length} ${isAr?'إيصال':'receipts'}</div>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="sbox"><div class="sv" style="color:#059669">${fmt(totalCash)}</div><div class="sk">💵 ${isAr?'كاش':'Cash'}</div></div>
+    <div class="sbox"><div class="sv" style="color:#1e3a8a">${fmt(totalBank)}</div><div class="sk">🏦 ${isAr?'تحويل':'Bank'}</div></div>
+    <div class="sbox"><div class="sv" style="color:#7c3aed">${fmt(totalCard)}</div><div class="sk">💳 ${isAr?'كارت':'Card'}</div></div>
+    <div class="sbox"><div class="sv">${fmt(grandTotal)} AED</div><div class="sk">📊 ${isAr?'الإجمالي':'Grand Total'}</div></div>
+  </div>
+  ${totalVAT>0?`<div style="background:#fef3c7;border-radius:8px;padding:6px 12px;margin-bottom:10px;font-size:.78rem">🧾 ${isAr?'إجمالي الضريبة':'Total VAT'}: <b>${fmt(totalVAT)} AED</b></div>`:''}
+  <table>
+    <thead><tr>
+      <th>#</th>
+      <th>${isAr?'اسم الطفل':'Child Name'}</th>
+      <th>${isAr?'الفصل':'Class'}</th>
+      <th>${isAr?'رقم الإيصال':'Receipt#'}</th>
+      <th>${isAr?'التاريخ':'Date'}</th>
+      <th>${isAr?'من':'From'}</th>
+      <th>${isAr?'إلى':'To'}</th>
+      <th>${isAr?'الرسوم':'Fee'}</th>
+      <th>${isAr?'تسجيل':'Reg'}</th>
+      <th>${isAr?'مواصلات':'Transport'}</th>
+      <th>${isAr?'ملابس':'Uniforms'}</th>
+      <th>${isAr?'أدوات':'Stat.'}</th>
+      <th>${isAr?'ضريبة':'VAT'}</th>
+      <th>${isAr?'طريقة الدفع':'Pay Method'}</th>
+      <th>${isAr?'الإجمالي':'Total'}</th>
+    </tr></thead>
+    <tbody>
+    ${list.map((r,i)=>{
+      const pm=r.payMethod||'cash';
+      const pmLabel=pm==='cash'?'💵 Cash':pm==='bank'?'🏦 Bank':'💳 Card';
+      return`<tr>
+        <td>${i+1}</td>
+        <td><b>${r.childName||'—'}</b></td>
+        <td>${r.className||'—'}</td>
+        <td>#${r.receiptNum||'—'}</td>
+        <td>${fmtD(r.date)}</td>
+        <td>${fmtD(r.fromDate)}</td>
+        <td>${fmtD(r.toDate)}</td>
+        <td>${r.fee?fmt(r.fee):''}</td>
+        <td>${r.reg?fmt(r.reg):''}</td>
+        <td>${r.bus?fmt(r.bus):''}</td>
+        <td>${r.clothes?fmt(r.clothes):''}</td>
+        <td>${r.tools?fmt(r.tools):''}</td>
+        <td>${r.vatAmount?fmt(r.vatAmount):''}</td>
+        <td class="${pm}">${pmLabel}</td>
+        <td><b>${fmt(r.total)} AED</b></td>
+      </tr>`;
+    }).join('')}
+    <tr class="total-row">
+      <td colspan="14" style="text-align:${isAr?'left':'right'}">${isAr?'الإجمالي الكلي':'Grand Total'} (${list.length} ${isAr?'إيصال':'receipts'})</td>
+      <td><b>${fmt(grandTotal)} AED</b></td>
+    </tr>
+    </tbody>
+  </table>
+</body></html>`;
+
+  el('rec-report-modal').classList.remove('on');
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 700);
+}
+
 function openExpReportModal(){
   const now = el('efmon')?.value || monthOf(new Date());
   if(!el('exp-rep-from').value) el('exp-rep-from').value = now;
@@ -12417,8 +12684,15 @@ function renderBirthdayPanel(){
 
   // ── Collect staff ─────────────────────────────
   const staffList=[];
+  const seenStaffIds = new Set();
   (DB.staff||[]).forEach(s=>{
     if(!s.dob) return;
+    // Show staff in their work branch (if set), else contract branch
+    const effectiveBranch = s.workBranch || s.branchId;
+    if(String(effectiveBranch) !== String(curBid)) return;
+    // Deduplicate by staff id
+    if(seenStaffIds.has(String(s.id))) return;
+    seenStaffIds.add(String(s.id));
     const d=new Date(s.dob);
     if(d.getMonth()+1===mo)
       staffList.push({name:s.name,dob:s.dob,type:'Staff',phone:s.contact||s.phone||'',id:s.id,inactive:false});
