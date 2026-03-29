@@ -5360,65 +5360,114 @@ async function printStaffAttReport(exportType='print'){
     return;
   }
 
-  // Print HTML
+  // Print HTML — Portrait, per-staff page with employee info header
   const dayNames=['أح','إث','ثل','أر','خم','جم','سب'];
+  const dayNamesAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+  const staffPages = staffList.map(s=>{
+    let present=0, absent=0, half=0;
+    const absences=[];
+    const rows = days.map(d=>{
+      const dow=new Date(d).getDay();
+      const st=(attMap[s.id]||{})[d]||'';
+      const day=d.split('-')[2];
+      const dayName=dayNamesAr[dow];
+      const isFri=dow===5, isSat=dow===6;
+      let statusHtml='', statusClass='';
+      if(st==='حضور'){present++;statusHtml='✓ حضور';statusClass='p';}
+      else if(st==='غياب'){absent++;absences.push(`${day} ${dayName}`);statusHtml='✕ غياب';statusClass='a';}
+      else if(st==='نص يوم'){half++;present+=0.5;absent+=0.5;statusHtml='½ نص يوم';statusClass='h';}
+      else{statusHtml='—';statusClass='';}
+      const rowBg=isFri?'#fef9c3':isSat?'#fdf2f8':st==='حضور'?'#f0fdf4':st==='غياب'?'#fff5f5':st==='نص يوم'?'#fffbeb':'#fff';
+      return `<tr style="background:${rowBg}">
+        <td style="padding:7px 12px;font-weight:700;font-size:.85rem">${day}</td>
+        <td style="padding:7px 12px;color:#6b7280">${dayName}</td>
+        <td style="padding:7px 12px;text-align:center;font-weight:900;font-size:.9rem" class="${statusClass}">${statusHtml}</td>
+      </tr>`;
+    }).join('');
+
+    const basic=Number(s.basicSalary||0);
+    const dailyRate=basic>0?(basic/30).toFixed(2):0;
+    const deduction=absent>0&&basic>0?(absent*(basic/30)).toFixed(2):0;
+
+    return `
+    <div class="page-break">
+      <!-- Employee Info Header -->
+      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:1.1rem;font-weight:900;margin-bottom:4px">${s.name}</div>
+            <div style="font-size:.82rem;opacity:.85">${s.position||'—'} &nbsp;|&nbsp; ${b.icon} ${b.ar||b.en}</div>
+            <div style="font-size:.78rem;opacity:.75;margin-top:2px">${s.nationality||''} ${s.contact?'· '+s.contact:''}</div>
+          </div>
+          <div style="text-align:left">
+            <div style="font-size:.78rem;opacity:.75">تقرير شهر</div>
+            <div style="font-size:1rem;font-weight:800">${monthLabel}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+        <div style="background:#d1fae5;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+          <div style="font-size:.72rem;color:#065f46;font-weight:700">أيام حضور</div>
+        </div>
+        <div style="background:#fee2e2;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+          <div style="font-size:.72rem;color:#7f1d1d;font-weight:700">أيام غياب</div>
+        </div>
+        <div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:900;color:#d97706">${half}</div>
+          <div style="font-size:.72rem;color:#78350f;font-weight:700">نص يوم</div>
+        </div>
+        <div style="background:#ede9fe;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:900;color:#7c3aed">${days.length - present - absent}</div>
+          <div style="font-size:.72rem;color:#4c1d95;font-weight:700">غير مسجل</div>
+        </div>
+      </div>
+
+      ${basic>0?`<div style="background:#fff7ed;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:.78rem;display:flex;gap:16px">
+        <span>💰 الراتب الأساسي: <b>${basic} AED</b></span>
+        <span>📅 اليومية: <b>${dailyRate} AED</b></span>
+        ${absent>0?`<span style="color:#dc2626">✂️ خصم الغياب: <b>${deduction} AED</b></span>`:''}
+      </div>`:''}
+
+      ${absences.length?`<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.78rem">
+        <span style="color:#dc2626;font-weight:700">📋 أيام الغياب: </span>${absences.join(' ، ')}
+      </div>`:''}
+
+      <!-- Attendance Table -->
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead>
+          <tr style="background:#1e3a8a;color:#fff">
+            <th style="padding:8px 12px;text-align:right">اليوم</th>
+            <th style="padding:8px 12px;text-align:right">اليوم بالاسم</th>
+            <th style="padding:8px 12px;text-align:center">الحالة</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div style="margin-top:14px;border-top:1px dashed #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;font-size:.72rem;color:#9ca3af">
+        <span>🟢 حضور ✓ &nbsp; 🔴 غياب ✕ &nbsp; 🟡 نص يوم ½</span>
+        <span>طُبع: ${new Date().toLocaleDateString('ar-AE')}</span>
+      </div>
+    </div>`;
+  }).join('');
+
   const html=`<!DOCTYPE html><html dir="rtl" lang="ar">
 <head><meta charset="UTF-8">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Tajawal',Arial,sans-serif;padding:12px;font-size:.72rem;color:#111}
-  h1{font-size:1rem;color:#1e3a8a;margin-bottom:4px}
-  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.65rem}
-  th{background:#1e3a8a;color:#fff;padding:4px 3px;text-align:center;white-space:nowrap}
-  td{padding:3px;border:1px solid #e5e7eb;text-align:center}
-  td.name{text-align:right;padding:3px 6px;font-weight:700;white-space:nowrap}
-  .p{color:#059669;font-weight:900}.a{color:#dc2626;font-weight:900}.h{color:#f59e0b;font-weight:900}
-  .fri{background:#fef9c3}.sat{background:#fdf2f8}
-  .total{background:#eff6ff;font-weight:900}
-  @media print{body{padding:5px}@page{margin:6mm;size:A4 landscape}}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:16px;color:#111;font-size:.82rem}
+  .page-break{page-break-after:always;margin-bottom:20px}
+  .page-break:last-child{page-break-after:auto}
+  .p{color:#059669;font-weight:900}.a{color:#dc2626;font-weight:900}.h{color:#d97706;font-weight:900}
+  @media print{body{padding:8px}@page{margin:10mm;size:A4 portrait}}
 </style></head><body>
-  <h1>📊 تقرير الحضور والغياب — ${monthLabel}</h1>
-  <div style="font-size:.8rem;color:#6b7280;margin-bottom:8px">${b.icon} ${b.en||b.ar} | ${staffList.length} موظف</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="text-align:right;min-width:120px">الموظف</th>
-        ${days.map(d=>{
-          const dow=new Date(d).getDay();
-          const cls=dow===5?'fri':dow===6?'sat':'';
-          return`<th class="${cls}">${d.split('-')[2]}<br><span style="font-size:.55rem;opacity:.8">${dayNames[dow]}</span></th>`;
-        }).join('')}
-        <th class="total">✓<br>حضور</th>
-        <th class="total">✕<br>غياب</th>
-        <th class="total">½<br>نص</th>
-      </tr>
-    </thead>
-    <tbody>
-    ${staffList.map(s=>{
-      let present=0,absent=0,half=0;
-      const cells=days.map(d=>{
-        const dow=new Date(d).getDay();
-        const cls=dow===5?'fri':dow===6?'sat':'';
-        const st=(attMap[s.id]||{})[d]||'';
-        if(st==='حضور'){present++;return`<td class="${cls} p">✓</td>`;}
-        if(st==='غياب'){absent++;return`<td class="${cls} a">✕</td>`;}
-        if(st==='نص يوم'){half++;present+=0.5;absent+=0.5;return`<td class="${cls} h">½</td>`;}
-        return`<td class="${cls}"></td>`;
-      }).join('');
-      return`<tr>
-        <td class="name">${s.name}<br><span style="font-size:.6rem;color:#6b7280">${s.position||''}</span></td>
-        ${cells}
-        <td class="total p">${fmt(present)}</td>
-        <td class="total a">${fmt(absent)}</td>
-        <td class="total h">${half}</td>
-      </tr>`;
-    }).join('')}
-    </tbody>
-  </table>
-  <div style="margin-top:10px;font-size:.72rem;color:#6b7280">
-    🟢 حضور ✓ &nbsp;|&nbsp; 🔴 غياب ✕ &nbsp;|&nbsp; 🟡 نص يوم ½ &nbsp;|&nbsp; 🟡 جمعة &nbsp;|&nbsp; 🩷 سبت
-  </div>
+${staffPages}
 </body></html>`;
 
   el('staff-att-report-modal').classList.remove('on');
