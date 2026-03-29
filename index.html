@@ -2123,6 +2123,7 @@ function setPW(bid,role,pw){localStorage.setItem(`pw_${bid}_${role}`,pw);}
 // ═══════════════════════════════════════════════
 async function loadFromSupa(bid) {
   bid=bid||curBid;
+  _busAllBranchCache = null; // Invalidate bus report cache on data reload
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
     const [c,r,a,e,sa,vis] = await Promise.all([
@@ -2211,6 +2212,7 @@ async function loadFromSupa(bid) {
     const {data:allStaff} = await sb.from('staff').select('*');
     DB.staff = (allStaff||[]).map(x=>({
       id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      workDays:x.work_days||'0,1,2,3,4',
       name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
       contact:x.contact||'', address:x.address||'',
       emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'',
@@ -5403,15 +5405,26 @@ async function printStaffAttReport(exportType='print'){
   const dayNamesEn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayNames = isAr ? dayNamesAr : dayNamesEn;
 
-  // Smart status: unregistered day = present if prev or next day is present
+  // Smart status: considers work schedule
+  // - Work day + no record + neighbor is present → infer present
+  // - Off day → 'off' (not absent, not present)
   const getSmartStatus=(staffId, dayIdx)=>{
+    const s = staffList.find(x=>String(x.id)===String(staffId));
+    const workDays = (s?.workDays||'0,1,2,3,4').split(',').map(Number);
+    const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
+    const isWorkDay = workDays.includes(dow);
+
     const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
-    if(raw) return {status:raw, smart:false};
-    // Check neighbors
+    if(raw) return {status:raw, smart:false, isWorkDay};
+
+    // Off day — don't count as absent or present
+    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
+
+    // Work day + unregistered → check neighbors
     const prev=(attMap[staffId]||{})[days[dayIdx-1]]||'';
     const next=(attMap[staffId]||{})[days[dayIdx+1]]||'';
-    if(prev==='حضور'||next==='حضور') return {status:'حضور', smart:true};
-    return {status:'', smart:false};
+    if(prev==='حضور'||next==='حضور') return {status:'حضور', smart:true, isWorkDay};
+    return {status:'', smart:false, isWorkDay};
   };
 
   if(exportType==='excel'){
@@ -5453,13 +5466,17 @@ async function printStaffAttReport(exportType='print'){
     const deductReason = document.getElementById('adj-deduct-reason-'+s.id)?.value||'';
 
     const rows = days.map((d,i)=>{
-      const dow=new Date(d).getDay();
-      const {status, smart}=getSmartStatus(s.id,i);
+      const dow=new Date(d+'T00:00:00').getDay();
+      const {status, smart, isWorkDay}=getSmartStatus(s.id,i);
       const day=d.split('-')[2];
       const dayName=dayNames[dow];
-      const isFri=dow===5, isSat=dow===6;
+      const isFri=dow===5, isSat=dow===6, isSun=dow===0;
       let statusHtml='', rowBg='#fff';
-      if(status==='حضور'){
+      if(status==='off'){
+        // Day off — grey background, don't count
+        statusHtml=`<span style="color:#d1d5db;font-size:.75rem">— ${isAr?'إجازة':'Day Off'}`;
+        rowBg='#f3f4f6';
+      } else if(status==='حضور'){
         present++;
         statusHtml=`<span style="color:#059669;font-weight:900">✓ ${isAr?'حضور':'Present'}${smart?` <span style="font-size:.65rem;color:#6b7280">(${isAr?'تلقائي':'auto'})</span>`:''}`;
         rowBg=smart?'#f9fafb':'#f0fdf4';
@@ -5473,8 +5490,9 @@ async function printStaffAttReport(exportType='print'){
         statusHtml=`<span style="color:#d97706;font-weight:900">½ ${isAr?'نص يوم':'Half Day'}`;
         rowBg='#fffbeb';
       } else {
+        // Work day but not recorded
         statusHtml=`<span style="color:#9ca3af">— ${isAr?'غير مسجل':'Not recorded'}`;
-        rowBg=isFri?'#fef9c3':isSat?'#fdf2f8':'#fff';
+        rowBg=isFri?'#fef9c3':isSat||isSun?'#fdf2f8':'#fff';
       }
       return `<tr style="background:${rowBg}">
         <td style="padding:6px 10px;font-weight:700;text-align:center;color:#374151">${day}</td>
@@ -7802,25 +7820,57 @@ function togglePickDropEdit(dir){
 }
 
 // ── Bus Children Report ───────────────────────
-function openBusChildrenReport(){
+// Cache for all-branches bus data
+let _busAllBranchCache = null;
+
+async function openBusChildrenReport(){
   const mon = el('efmon')?.value || today().slice(0,7);
   el('bus-ch-rpt-mon').value = mon;
-  renderBusChildrenReport();
+  // Pre-select current branch
+  const bsel = el('bus-ch-branch-filter');
+  if(bsel && bsel.value==='') bsel.value = curBid;
   el('bus-ch-rpt-modal').style.display='flex';
+  await loadBusAllBranchData();
+  renderBusChildrenReport();
+}
+
+async function loadBusAllBranchData(forceReload){
+  if(_busAllBranchCache && !forceReload) return;
+  if(el('bus-ch-rpt-loading')) el('bus-ch-rpt-loading').style.display='block';
+  if(el('bus-ch-rpt-body')) el('bus-ch-rpt-body').innerHTML='';
+  const result={};
+  for(const b of BRANCHES){
+    const [c, r] = await Promise.all([
+      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id').eq('branch_id',b.id).limit(5000),
+      sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id).limit(5000),
+    ]);
+    result[b.id]={
+      children:(c.data||[]).map(x=>({
+        id:x.id, name:x.name||'', className:x.class_name||'',
+        bus:x.bus||'No', busFee:Number(x.bus_fee||0),
+        busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
+        leaveDate:x.leave_date||null, branchId:x.branch_id
+      })),
+      receipts:(r.data||[]).map(x=>({id:x.id,childId:x.child_id,date:x.date||'',bus:Number(x.bus||0)}))
+    };
+  }
+  _busAllBranchCache=result;
+  if(el('bus-ch-rpt-loading')) el('bus-ch-rpt-loading').style.display='none';
 }
 
 function renderBusChildrenReport(){
+  if(!_busAllBranchCache){ el('bus-ch-rpt-body').innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>'; return; }
   const mon = el('bus-ch-rpt-mon')?.value || today().slice(0,7);
   const dirFilter = el('bus-ch-dir-filter')?.value||'all';
+  const branchFilter = el('bus-ch-branch-filter')?.value||'all';
 
-  let children = DB.children.filter(c=>c.bus==='Yes'||c.bus==='نعم');
-  if(dirFilter==='two_way') children=children.filter(c=>c.busDirection==='two_way');
-  else if(dirFilter==='one_way') children=children.filter(c=>c.busDirection==='one_way');
-  else if(dirFilter==='pick') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='pick');
-  else if(dirFilter==='drop') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='drop');
-
-  // Get receipts for that month
-  const monReceipts = DB.receipts.filter(r=>monthOf(r.date)===mon);
+  const applyDirFilter = list =>{
+    if(dirFilter==='two_way') return list.filter(c=>c.busDirection==='two_way');
+    if(dirFilter==='one_way') return list.filter(c=>c.busDirection==='one_way');
+    if(dirFilter==='pick') return list.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='pick');
+    if(dirFilter==='drop') return list.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='drop');
+    return list;
+  };
 
   const dirLabel = v=>{
     if(v==='two_way') return '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700">🔄 اتجاهين</span>';
@@ -7833,38 +7883,30 @@ function renderBusChildrenReport(){
     if(pd==='drop') return '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;margin-right:4px">🔴 Drop</span>';
     return '';
   };
-
-  const monLabel = new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'});
-  const b = CB();
-  const totalBusFees = children.reduce((s,c)=>s+(c.busFee||0),0);
-  // Paid this month
-  const totalPaid = monReceipts.filter(r=>children.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
-
-  if(!children.length){
-    el('bus-ch-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا يوجد أطفال يستخدمون الباص</div>`;
-    return;
-  }
-
-  let html=`
-    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div style="font-weight:800">${b.ar||b.en} — ${monLabel}</div>
-      <div style="display:flex;gap:14px;font-size:.82rem">
+  const buildTable = (children, monReceipts, branchLabel, branchColor)=>{
+    if(!children.length) return `<div style="padding:10px 14px;color:#9ca3af;font-size:.8rem">— لا يوجد أطفال باص في هذا الفرع</div>`;
+    const totalBusFees = children.reduce((s,c)=>s+(c.busFee||0),0);
+    const totalPaid = monReceipts.filter(r=>children.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    return`
+    <div style="background:${branchColor||'#fef3c7'};border-radius:10px;padding:9px 14px;margin-bottom:8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center">
+      <div style="font-weight:800;font-size:.9rem">${branchLabel}</div>
+      <div style="display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap">
         <span>👶 <b>${children.length}</b> طفل</span>
-        <span>💰 رسوم شهرية: <b style="color:#b45309">${fmtNum(totalBusFees)} AED</b></span>
-        <span>✅ مدفوع هذا الشهر: <b style="color:#059669">${fmtNum(totalPaid)} AED</b></span>
+        <span>💰 <b style="color:#b45309">${fmtNum(totalBusFees)} AED</b></span>
+        <span>✅ مدفوع: <b style="color:#059669">${fmtNum(totalPaid)} AED</b></span>
       </div>
     </div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+    <div style="overflow-x:auto;margin-bottom:16px">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem">
       <thead>
         <tr style="background:#fbbf24;color:#1c1917">
-          <th style="padding:8px 10px;text-align:right">#</th>
-          <th style="padding:8px 10px;text-align:right">اسم الطفل</th>
-          <th style="padding:8px 10px;text-align:right">الفصل</th>
-          <th style="padding:8px 10px;text-align:right">الاتجاه</th>
-          <th style="padding:8px 10px;text-align:right">المنطقة</th>
-          <th style="padding:8px 10px;text-align:left">رسوم الباص</th>
-          <th style="padding:8px 10px;text-align:left">مدفوع (${mon})</th>
+          <th style="padding:7px 9px;text-align:right">#</th>
+          <th style="padding:7px 9px;text-align:right">اسم الطفل</th>
+          <th style="padding:7px 9px;text-align:right">الفصل</th>
+          <th style="padding:7px 9px;text-align:right">الاتجاه</th>
+          <th style="padding:7px 9px;text-align:right">المنطقة</th>
+          <th style="padding:7px 9px;text-align:left">رسوم الباص</th>
+          <th style="padding:7px 9px;text-align:left">مدفوع (${mon})</th>
         </tr>
       </thead>
       <tbody>
@@ -7872,31 +7914,74 @@ function renderBusChildrenReport(){
           const rec = monReceipts.find(r=>String(r.childId)===String(c.id));
           const paid = rec ? (rec.bus||0) : 0;
           return`<tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
-            <td style="padding:7px 10px;color:#9ca3af">${i+1}</td>
-            <td style="padding:7px 10px;font-weight:700">${c.name}</td>
-            <td style="padding:7px 10px;color:#6b7280">${c.className||'—'}</td>
-            <td style="padding:7px 10px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
-            <td style="padding:7px 10px;color:#374151">${c.busArea||'—'}</td>
-            <td style="padding:7px 10px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
-            <td style="padding:7px 10px;text-align:left;font-weight:700;color:${paid?'#059669':'#9ca3af'}">${paid?fmtNum(paid)+' AED':'—'}</td>
+            <td style="padding:6px 9px;color:#9ca3af">${i+1}</td>
+            <td style="padding:6px 9px;font-weight:700">${c.name}</td>
+            <td style="padding:6px 9px;color:#6b7280">${c.className||'—'}</td>
+            <td style="padding:6px 9px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
+            <td style="padding:6px 9px;color:#374151">${c.busArea||'—'}</td>
+            <td style="padding:6px 9px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
+            <td style="padding:6px 9px;text-align:left;font-weight:700;color:${paid?'#059669':'#9ca3af'}">${paid?fmtNum(paid)+' AED':'—'}</td>
           </tr>`;
         }).join('')}
         <tr style="background:#fef3c7;font-weight:900;border-top:2px solid #fbbf24">
-          <td colspan="5" style="padding:8px 10px;text-align:right">الإجمالي</td>
-          <td style="padding:8px 10px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
-          <td style="padding:8px 10px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
+          <td colspan="5" style="padding:7px 9px;text-align:right">الإجمالي</td>
+          <td style="padding:7px 9px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
+          <td style="padding:7px 9px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
         </tr>
       </tbody>
     </table></div>`;
+  };
+
+  const monLabel = new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+  let html='';
+  let allExportData=[];
+
+  // Branches to show
+  const targetBranches = branchFilter==='all' ? BRANCHES : BRANCHES.filter(b=>b.id===branchFilter);
+
+  let grandTotal=0, grandPaid=0, grandKids=0;
+
+  for(const br of targetBranches){
+    const bdata = _busAllBranchCache[br.id]||{children:[],receipts:[]};
+    let kids = bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate);
+    kids = applyDirFilter(kids);
+    const monRecs = bdata.receipts.filter(r=>monthOf(r.date)===mon);
+    const brLabel = `${br.icon} ${br.ar}`;
+    const bgColor = br.l ? `linear-gradient(135deg,${br.l},${br.l}cc)` : '#fef3c7';
+    html += `<div style="margin-bottom:4px">${buildTable(kids, monRecs, brLabel, bgColor)}</div>`;
+    grandTotal += kids.reduce((s,c)=>s+(c.busFee||0),0);
+    grandPaid  += monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    grandKids  += kids.length;
+    allExportData.push({br, kids, monRecs});
+  }
+
+  // Grand total bar (only when all branches shown)
+  if(branchFilter==='all' && targetBranches.length>1){
+    html = `<div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#fff">
+      <div style="font-weight:800;font-size:.95rem">🌐 كل الفروع — ${monLabel}</div>
+      <div style="display:flex;gap:14px;font-size:.83rem;flex-wrap:wrap">
+        <span>👶 <b>${grandKids}</b> طفل</span>
+        <span>💰 <b>${fmtNum(grandTotal)} AED</b></span>
+        <span>✅ مدفوع: <b>${fmtNum(grandPaid)} AED</b></span>
+      </div>
+    </div>` + html;
+  }
+
+  if(!grandKids){
+    el('bus-ch-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا يوجد أطفال يستخدمون الباص في الفروع المحددة</div>`;
+    return;
+  }
 
   el('bus-ch-rpt-body').innerHTML=html;
-  window._busChRptData={children,mon:monLabel,branchName:b.ar||b.en,monReceipts};
+  window._busChRptData={allExportData, mon, monLabel, branchFilter, grandKids, grandTotal, grandPaid};
 }
 
 function printBusChildrenReport(){
   const b=el('bus-ch-rpt-body')?.innerHTML||'';
+  const d=window._busChRptData;
+  const title = d ? `تقرير أطفال الباص — ${d.monLabel||d.mon}` : 'Bus Children Report';
   const w=window.open('','_blank');
-  w.document.write(`<html><head><title>Bus Children Report</title>
+  w.document.write(`<html><head><title>${title}</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
     <style>body{font-family:'Tajawal',sans-serif;padding:20px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e5e7eb;padding:6px 8px}@media print{body{padding:0}}</style>
     </head><body>${b}<script>window.onload=function(){window.print()}<\/script></body></html>`);
@@ -7904,18 +7989,39 @@ function printBusChildrenReport(){
 }
 
 function exportBusChildrenExcel(){
-  const d=window._busChRptData;if(!d)return;
+  const d=window._busChRptData;if(!d||!d.allExportData)return;
   const dirMap={'two_way':'اتجاهين','one_way':'اتجاه واحد','':'غير محدد'};
   const pdMap={'pick':'Pick استقبال','drop':'Drop إيصال','':'—'};
-  const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع هذا الشهر']];
-  d.children.forEach((c,i)=>{
-    const rec=d.monReceipts.find(r=>String(r.childId)===String(c.id));
-    rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Bus Children');
-  XLSX.writeFile(wb,`Bus_Children_${d.mon||''}.xlsx`);
+  // One sheet per branch (or single sheet if one branch)
+  d.allExportData.forEach(({br,kids,monRecs})=>{
+    if(!kids.length) return;
+    const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع '+d.mon]];
+    kids.forEach((c,i)=>{
+      const rec=monRecs.find(r=>String(r.childId)===String(c.id));
+      rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
+    });
+    // Totals row
+    const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
+    const totPaid=monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    rows.push(['','','','','','الإجمالي',totFee,totPaid]);
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const sheetName=(br.en||br.ar).replace(/[:\\/?*\[\]]/g,'').substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  });
+  // Summary sheet if multiple branches
+  if(d.allExportData.length>1){
+    const sumRows=[['الفرع','عدد الأطفال','إجمالي رسوم الباص','المدفوع '+d.mon]];
+    d.allExportData.forEach(({br,kids,monRecs})=>{
+      const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
+      const totPaid=monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+      sumRows.push([br.ar, kids.length, totFee, totPaid]);
+    });
+    sumRows.push(['المجموع الكلي', d.grandKids, d.grandTotal, d.grandPaid]);
+    const wsSummary=XLSX.utils.aoa_to_sheet(sumRows);
+    XLSX.utils.book_append_sheet(wb,wsSummary,'ملخص كل الفروع');
+  }
+  XLSX.writeFile(wb,`Bus_Children_${d.monLabel||d.mon||''}.xlsx`);
 }
 
 async function deleteChild(){
@@ -8296,6 +8402,7 @@ async function loadStaff(){
   const {data} = await sb.from('staff').select('*');
   DB.staff = (data||[]).map(x=>({
     id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      workDays:x.work_days||'0,1,2,3,4',
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
     emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
@@ -8466,6 +8573,19 @@ function openStaffForm(id){
       <div class="fg"><label>Position / الوظيفة</label><input id="sf_pos" value="${s?.position||''}" placeholder="e.g. Teacher, Driver..."></div>
       <div class="fg"><label>Contract Branch — فرع التعاقد 📄</label><select id="sf_branch">${branchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع المسؤول عن الراتب والمصاريف</div></div>
       <div class="fg"><label>Work Branch — فرع العمل الفعلي 🏢</label><select id="sf_work_branch"><option value="">Same as Contract Branch</option>${workBranchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع اللي بيشتغل فيه فعلياً — الحضور بيتسجل عليه</div></div>
+      <div class="fg" style="grid-column:1/-1">
+        <label>📅 Work Days — أيام العمل</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          ${['Sun أحد','Mon إث','Tue ثلا','Wed أرب','Thu خمس','Fri جمع','Sat سبت'].map((d,i)=>{
+            const checked=(s?.workDays||'0,1,2,3,4').split(',').map(Number).includes(i)?'checked':'';
+            return`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;font-weight:700;background:${checked?'#1e3a8a':'#fff'};color:${checked?'#fff':'#374151'}">
+              <input type="checkbox" id="sf_wd_${i}" value="${i}" ${checked} style="display:none" onchange="updateWorkDayLabel(${i})">
+              ${d}
+            </label>`;
+          }).join('')}
+        </div>
+        <div style="font-size:.68rem;color:#6b7280;margin-top:3px">اختاري أيام الدوام الفعلية — الأيام اللي مش مختارة مش هتتحسب غياب</div>
+      </div>
       <div class="fg"><label>Nationality</label><input id="sf_nat" value="${s?.nationality||''}"></div>
       <div class="fg"><label>Date of Birth</label><input type="date" id="sf_dob" value="${s?.dob||''}"></div>
       <div class="fg"><label>Contact Number</label><input id="sf_contact" value="${s?.contact||''}" placeholder="+971..."></div>
@@ -8541,12 +8661,32 @@ function openStaffForm(id){
 }
 function closeStaffModal(){ el('staff-modal').classList.remove('on'); }
 
+function updateWorkDayLabel(i){
+  const cb = document.getElementById('sf_wd_'+i);
+  if(!cb) return;
+  const lbl = cb.closest('label');
+  if(lbl){
+    lbl.style.background = cb.checked ? '#1e3a8a' : '#fff';
+    lbl.style.color = cb.checked ? '#fff' : '#374151';
+  }
+}
+
+function getSelectedWorkDays(){
+  const days=[];
+  for(let i=0;i<7;i++){
+    const cb=document.getElementById('sf_wd_'+i);
+    if(cb&&cb.checked) days.push(i);
+  }
+  return days.length ? days.join(',') : '0,1,2,3,4';
+}
+
 async function saveStaff(id){
   const name = document.getElementById('sf_name')?.value?.trim();
   if(!name){ showAlert('staff-save-alert','⚠️ Name is required',true); return; }
   const row = {
     branch_id: document.getElementById('sf_branch')?.value||curBid,
     work_branch: document.getElementById('sf_work_branch')?.value||null,
+    work_days: getSelectedWorkDays(),
     name, position: document.getElementById('sf_pos')?.value||'',
     nationality: document.getElementById('sf_nat')?.value||'',
     dob: document.getElementById('sf_dob')?.value||null,
@@ -16099,6 +16239,15 @@ boot();
       </div>
     </div>
     <div style="padding:14px 16px 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:.8rem;font-weight:700">🏢 الفرع:</label>
+      <select id="bus-ch-branch-filter" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
+        <option value="all">🌐 كل الفروع — All Branches</option>
+        <option value="b1">🌸 حضانة الفرحة</option>
+        <option value="b2">⭐ حضانة السعادة</option>
+        <option value="b3">🐬 حضانة الدولفين</option>
+        <option value="b4">🌿 السعادة للأطفال</option>
+        <option value="b5">🦸 أبطال البراعم</option>
+      </select>
       <label style="font-size:.8rem;font-weight:700">📅 الشهر:</label>
       <input type="month" id="bus-ch-rpt-mon" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
       <label style="font-size:.8rem;font-weight:700">🔄 الاتجاه:</label>
@@ -16110,6 +16259,7 @@ boot();
         <option value="drop">🔴 Drop فقط</option>
       </select>
     </div>
+    <div id="bus-ch-rpt-loading" style="display:none;text-align:center;padding:20px;color:#6b7280;font-size:.85rem">⏳ جاري تحميل بيانات الفروع...</div>
     <div id="bus-ch-rpt-body" style="padding:0 16px 16px"></div>
   </div>
 </div>
