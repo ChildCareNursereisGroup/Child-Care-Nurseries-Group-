@@ -725,24 +725,41 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 <!-- Staff Attendance Report Modal -->
 <div class="mover" id="staff-att-report-modal">
-  <div class="mbox" style="max-width:500px">
+  <div class="mbox" style="max-width:520px">
     <div class="mh">
-      <div class="mt">📊 تقرير الغياب الشهري</div>
+      <div class="mt">📊 Staff Attendance Report — تقرير الغياب</div>
       <button class="xb" onclick="el('staff-att-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg"><label>الشهر — Month</label>
+        <div class="fg"><label>Month — الشهر</label>
           <input type="month" id="att-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
-        <div class="fg"><label>الموظف — Staff</label>
+        <div class="fg"><label>Staff — الموظف</label>
           <select id="att-rep-staff" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-            <option value="all">👥 كل الموظفين</option>
+            <option value="all">👥 All Staff — كل الموظفين</option>
           </select>
         </div>
       </div>
+      <!-- Language -->
+      <div class="fg">
+        <label>Language — اللغة</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="att-rep-lang" value="en" ${lang==='en'?'checked':''}> 🇬🇧 English
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="att-rep-lang" value="ar" ${lang==='ar'?'checked':''}> 🇦🇪 العربية
+          </label>
+        </div>
+      </div>
+      <!-- Bonus / Warning per staff -->
+      <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
+        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 Bonus / Warning — بونص / تحذير (اختياري لكل موظف)</div>
+        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ طباعة PDF</button>
+        <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ Print PDF</button>
         <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">📊 Excel</button>
       </div>
     </div>
@@ -5290,21 +5307,72 @@ async function confirmBulkSalaryImport(){
 function openStaffAttReportModal(){
   const mon = (el('staffattdate')?.value||today()).substring(0,7);
   if(!el('att-rep-month').value) el('att-rep-month').value = mon;
-  // Populate staff dropdown - current branch only
+  // Set language radio
+  const langRadios = document.querySelectorAll('input[name="att-rep-lang"]');
+  langRadios.forEach(r=>{ r.checked = r.value===lang; });
+  // Populate staff dropdown
   const sel = el('att-rep-staff');
   const branchStaff = (DB.staff||[]).filter(s=>{
     const wb = s.workBranch||s.branchId;
-    return String(wb)===String(curBid);
+    return String(wb)===String(curBid) && (!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
   });
-  sel.innerHTML = '<option value="all">👥 كل الموظفين</option>' +
+  sel.innerHTML = `<option value="all">👥 ${lang==='ar'?'كل الموظفين':'All Staff'}</option>` +
     branchStaff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  // Populate bonus/warning fields
+  const adjList = el('att-rep-adj-list');
+  if(adjList){
+    adjList.innerHTML = branchStaff.map(s=>`
+      <div style="background:#fff;border-radius:8px;padding:8px;border:1px solid #e5e7eb">
+        <div style="font-weight:700;font-size:.78rem;margin-bottom:6px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div>
+            <div style="font-size:.68rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 Bonus (AED)</div>
+            <input type="number" min="0" placeholder="0" id="adj-bonus-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <input type="text" placeholder="${lang==='ar'?'السبب':'Reason'}" id="adj-bonus-reason-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.75rem;box-sizing:border-box;margin-top:3px">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ Warning / Deduction (AED)</div>
+            <input type="number" min="0" placeholder="0" id="adj-deduct-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <input type="text" placeholder="${lang==='ar'?'السبب':'Reason'}" id="adj-deduct-reason-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.75rem;box-sizing:border-box;margin-top:3px">
+          </div>
+        </div>
+      </div>`).join('');
+  }
   el('staff-att-report-modal').classList.add('on');
+}
+
+function buildAdjSection(bonus,bonusReason,deduct,deductReason,isAr){
+  if(!bonus && !deduct) return '';
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  if(bonus>0){
+    html += `<div style="background:#d1fae5;border-radius:8px;padding:10px">
+      <div style="font-size:.7rem;font-weight:700;color:#065f46;margin-bottom:3px">🎁 ${isAr?'بونص':'Bonus'}</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#059669">+${bonus} AED</div>
+      ${bonusReason?`<div style="font-size:.72rem;color:#6b7280;margin-top:2px">${bonusReason}</div>`:''}
+    </div>`;
+  }
+  if(deduct>0){
+    html += `<div style="background:#fee2e2;border-radius:8px;padding:10px">
+      <div style="font-size:.7rem;font-weight:700;color:#7f1d1d;margin-bottom:3px">⚠️ ${isAr?'خصم / تحذير':'Warning / Deduction'}</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#dc2626">-${deduct} AED</div>
+      ${deductReason?`<div style="font-size:.72rem;color:#6b7280;margin-top:2px">${deductReason}</div>`:''}
+    </div>`;
+  }
+  html += '</div>';
+  return html;
 }
 
 async function printStaffAttReport(exportType='print'){
   const mon = el('att-rep-month').value;
   const staffFilter = el('att-rep-staff').value;
-  if(!mon){ alert('اختاري الشهر'); return; }
+  const repLang = document.querySelector('input[name="att-rep-lang"]:checked')?.value || lang;
+  const isAr = repLang==='ar';
+  const dir = isAr?'rtl':'ltr';
+  if(!mon){ alert(isAr?'اختاري الشهر':'Select month'); return; }
 
   const b = CB();
   const [yr,mo] = mon.split('-').map(Number);
@@ -5314,14 +5382,12 @@ async function printStaffAttReport(exportType='print'){
     return `${yr}-${String(mo).padStart(2,'0')}-${d}`;
   });
 
-  // Get staff for this branch
   let staffList = (DB.staff||[]).filter(s=>{
     const wb = s.workBranch||s.branchId;
     return String(wb)===String(curBid) && (!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
   });
   if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
 
-  // Load attendance from Supabase for this month
   const {data:attData} = await sb.from('staff_attendance').select('*')
     .gte('date', mon+'-01').lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'));
   const attMap = {};
@@ -5331,22 +5397,38 @@ async function printStaffAttReport(exportType='print'){
   });
 
   const fmt = n => Number(n).toFixed(1);
-  const monthLabel = new Date(mon+'-01').toLocaleDateString('ar-AE',{month:'long',year:'numeric'});
+  const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+
+  const dayNamesAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dayNamesEn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayNames = isAr ? dayNamesAr : dayNamesEn;
+
+  // Smart status: unregistered day = present if prev or next day is present
+  const getSmartStatus=(staffId, dayIdx)=>{
+    const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
+    if(raw) return {status:raw, smart:false};
+    // Check neighbors
+    const prev=(attMap[staffId]||{})[days[dayIdx-1]]||'';
+    const next=(attMap[staffId]||{})[days[dayIdx+1]]||'';
+    if(prev==='حضور'||next==='حضور') return {status:'حضور', smart:true};
+    return {status:'', smart:false};
+  };
 
   if(exportType==='excel'){
-    const wsData = [
-      ['تقرير الحضور والغياب', b.en||b.ar, monthLabel],
+    const wsData=[
+      [isAr?'تقرير الحضور والغياب':'Attendance Report', b.en||b.ar, monthLabel],
       [],
-      ['الموظف', 'الوظيفة', ...days.map(d=>d.split('-')[2]), 'أيام حضور', 'أيام غياب', 'نص يوم'],
+      [isAr?'الموظف':'Staff', isAr?'الوظيفة':'Position', ...days.map(d=>d.split('-')[2]),
+       isAr?'حضور':'Present', isAr?'غياب':'Absent', isAr?'نص يوم':'Half'],
     ];
     staffList.forEach(s=>{
-      let present=0, absent=0, half=0;
-      const row=[s.name, s.position||''];
-      days.forEach(d=>{
-        const st=(attMap[s.id]||{})[d]||'';
-        if(st==='حضور'){row.push('✓');present++;}
-        else if(st==='غياب'){row.push('✕');absent++;}
-        else if(st==='نص يوم'){row.push('½');half++;present+=0.5;absent+=0.5;}
+      let present=0,absent=0,half=0;
+      const row=[s.name,s.position||''];
+      days.forEach((_,i)=>{
+        const {status}=getSmartStatus(s.id,i);
+        if(status==='حضور'){row.push('✓');present++;}
+        else if(status==='غياب'){row.push('✕');absent++;}
+        else if(status==='نص يوم'){row.push('½');half++;present+=0.5;absent+=0.5;}
         else row.push('');
       });
       row.push(present,absent,half);
@@ -5354,35 +5436,50 @@ async function printStaffAttReport(exportType='print'){
     });
     const ws=XLSX.utils.aoa_to_sheet(wsData);
     const wb2=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb2,ws,'الحضور');
+    XLSX.utils.book_append_sheet(wb2,ws,isAr?'الحضور':'Attendance');
     XLSX.writeFile(wb2,`Staff_Attendance_${mon}.xlsx`);
     el('staff-att-report-modal').classList.remove('on');
     return;
   }
 
-  // Print HTML — Portrait, per-staff page with employee info header
-  const dayNames=['أح','إث','ثل','أر','خم','جم','سب'];
-  const dayNamesAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-
+  // Print — one page per staff, portrait
   const staffPages = staffList.map(s=>{
     let present=0, absent=0, half=0;
     const absences=[];
-    const rows = days.map(d=>{
+    // Read bonus/warning from modal fields
+    const bonus = Number(document.getElementById('adj-bonus-'+s.id)?.value||0);
+    const bonusReason = document.getElementById('adj-bonus-reason-'+s.id)?.value||'';
+    const deduct = Number(document.getElementById('adj-deduct-'+s.id)?.value||0);
+    const deductReason = document.getElementById('adj-deduct-reason-'+s.id)?.value||'';
+
+    const rows = days.map((d,i)=>{
       const dow=new Date(d).getDay();
-      const st=(attMap[s.id]||{})[d]||'';
+      const {status, smart}=getSmartStatus(s.id,i);
       const day=d.split('-')[2];
-      const dayName=dayNamesAr[dow];
+      const dayName=dayNames[dow];
       const isFri=dow===5, isSat=dow===6;
-      let statusHtml='', statusClass='';
-      if(st==='حضور'){present++;statusHtml='✓ حضور';statusClass='p';}
-      else if(st==='غياب'){absent++;absences.push(`${day} ${dayName}`);statusHtml='✕ غياب';statusClass='a';}
-      else if(st==='نص يوم'){half++;present+=0.5;absent+=0.5;statusHtml='½ نص يوم';statusClass='h';}
-      else{statusHtml='—';statusClass='';}
-      const rowBg=isFri?'#fef9c3':isSat?'#fdf2f8':st==='حضور'?'#f0fdf4':st==='غياب'?'#fff5f5':st==='نص يوم'?'#fffbeb':'#fff';
+      let statusHtml='', rowBg='#fff';
+      if(status==='حضور'){
+        present++;
+        statusHtml=`<span style="color:#059669;font-weight:900">✓ ${isAr?'حضور':'Present'}${smart?` <span style="font-size:.65rem;color:#6b7280">(${isAr?'تلقائي':'auto'})</span>`:''}`;
+        rowBg=smart?'#f9fafb':'#f0fdf4';
+      } else if(status==='غياب'){
+        absent++;
+        absences.push(`${day} ${dayName}`);
+        statusHtml=`<span style="color:#dc2626;font-weight:900">✕ ${isAr?'غياب':'Absent'}`;
+        rowBg='#fff5f5';
+      } else if(status==='نص يوم'){
+        half++;present+=0.5;absent+=0.5;
+        statusHtml=`<span style="color:#d97706;font-weight:900">½ ${isAr?'نص يوم':'Half Day'}`;
+        rowBg='#fffbeb';
+      } else {
+        statusHtml=`<span style="color:#9ca3af">— ${isAr?'غير مسجل':'Not recorded'}`;
+        rowBg=isFri?'#fef9c3':isSat?'#fdf2f8':'#fff';
+      }
       return `<tr style="background:${rowBg}">
-        <td style="padding:7px 12px;font-weight:700;font-size:.85rem">${day}</td>
-        <td style="padding:7px 12px;color:#6b7280">${dayName}</td>
-        <td style="padding:7px 12px;text-align:center;font-weight:900;font-size:.9rem" class="${statusClass}">${statusHtml}</td>
+        <td style="padding:6px 10px;font-weight:700;text-align:center;color:#374151">${day}</td>
+        <td style="padding:6px 10px;color:#6b7280">${dayName}</td>
+        <td style="padding:6px 10px">${statusHtml}</span></td>
       </tr>`;
     }).join('');
 
@@ -5390,81 +5487,75 @@ async function printStaffAttReport(exportType='print'){
     const dailyRate=basic>0?(basic/30).toFixed(2):0;
     const deduction=absent>0&&basic>0?(absent*(basic/30)).toFixed(2):0;
 
-    return `
-    <div class="page-break">
-      <!-- Employee Info Header -->
-      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:16px">
+    return `<div class="page">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div>
-            <div style="font-size:1.1rem;font-weight:900;margin-bottom:4px">${s.name}</div>
+            <div style="font-size:1.1rem;font-weight:900;margin-bottom:3px">${s.name}</div>
             <div style="font-size:.82rem;opacity:.85">${s.position||'—'} &nbsp;|&nbsp; ${b.icon} ${b.ar||b.en}</div>
-            <div style="font-size:.78rem;opacity:.75;margin-top:2px">${s.nationality||''} ${s.contact?'· '+s.contact:''}</div>
+            <div style="font-size:.75rem;opacity:.7;margin-top:2px">
+              ${s.nationality||''}${s.contact?' · '+s.contact:''}
+            </div>
           </div>
-          <div style="text-align:left">
-            <div style="font-size:.78rem;opacity:.75">تقرير شهر</div>
+          <div style="text-align:${isAr?'left':'right'}">
+            <div style="font-size:.72rem;opacity:.75">${isAr?'تقرير شهر':'Monthly Report'}</div>
             <div style="font-size:1rem;font-weight:800">${monthLabel}</div>
           </div>
         </div>
       </div>
 
-      <!-- Summary Cards -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <!-- Summary -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
         <div style="background:#d1fae5;border-radius:10px;padding:10px;text-align:center">
           <div style="font-size:1.4rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
-          <div style="font-size:.72rem;color:#065f46;font-weight:700">أيام حضور</div>
+          <div style="font-size:.7rem;color:#065f46;font-weight:700">${isAr?'حضور':'Present'}</div>
         </div>
         <div style="background:#fee2e2;border-radius:10px;padding:10px;text-align:center">
           <div style="font-size:1.4rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
-          <div style="font-size:.72rem;color:#7f1d1d;font-weight:700">أيام غياب</div>
+          <div style="font-size:.7rem;color:#7f1d1d;font-weight:700">${isAr?'غياب':'Absent'}</div>
         </div>
         <div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center">
           <div style="font-size:1.4rem;font-weight:900;color:#d97706">${half}</div>
-          <div style="font-size:.72rem;color:#78350f;font-weight:700">نص يوم</div>
+          <div style="font-size:.7rem;color:#78350f;font-weight:700">${isAr?'نص يوم':'Half Day'}</div>
         </div>
         <div style="background:#ede9fe;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:900;color:#7c3aed">${days.length - present - absent}</div>
-          <div style="font-size:.72rem;color:#4c1d95;font-weight:700">غير مسجل</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#7c3aed">${days.filter((_,i)=>!getSmartStatus(s.id,i).status).length}</div>
+          <div style="font-size:.7rem;color:#4c1d95;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
         </div>
       </div>
 
-      ${basic>0?`<div style="background:#fff7ed;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:.78rem;display:flex;gap:16px">
-        <span>💰 الراتب الأساسي: <b>${basic} AED</b></span>
-        <span>📅 اليومية: <b>${dailyRate} AED</b></span>
-        ${absent>0?`<span style="color:#dc2626">✂️ خصم الغياب: <b>${deduction} AED</b></span>`:''}
-      </div>`:''}
 
-      ${absences.length?`<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.78rem">
-        <span style="color:#dc2626;font-weight:700">📋 أيام الغياب: </span>${absences.join(' ، ')}
-      </div>`:''}
+      ${buildAdjSection(bonus,bonusReason,deduct,deductReason,isAr)}
 
-      <!-- Attendance Table -->
+
+      <!-- Table -->
       <table style="width:100%;border-collapse:collapse;font-size:.82rem">
         <thead>
           <tr style="background:#1e3a8a;color:#fff">
-            <th style="padding:8px 12px;text-align:right">اليوم</th>
-            <th style="padding:8px 12px;text-align:right">اليوم بالاسم</th>
-            <th style="padding:8px 12px;text-align:center">الحالة</th>
+            <th style="padding:7px 10px;text-align:center;width:60px">${isAr?'يوم':'Day'}</th>
+            <th style="padding:7px 10px;text-align:${isAr?'right':'left'}">${isAr?'اليوم':'Weekday'}</th>
+            <th style="padding:7px 10px;text-align:${isAr?'right':'left'}">${isAr?'الحالة':'Status'}</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
 
-      <div style="margin-top:14px;border-top:1px dashed #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;font-size:.72rem;color:#9ca3af">
-        <span>🟢 حضور ✓ &nbsp; 🔴 غياب ✕ &nbsp; 🟡 نص يوم ½</span>
-        <span>طُبع: ${new Date().toLocaleDateString('ar-AE')}</span>
+      <div style="margin-top:12px;border-top:1px dashed #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;font-size:.7rem;color:#9ca3af">
+        <span>✓ ${isAr?'حضور':'Present'} &nbsp; ✕ ${isAr?'غياب':'Absent'} &nbsp; ½ ${isAr?'نص يوم':'Half Day'} &nbsp; (${isAr?'تلقائي':'auto'}) = ${isAr?'محسوب من الجيران':'inferred from neighbors'}</span>
+        <span>${isAr?'طُبع':'Printed'}: ${new Date().toLocaleDateString(isAr?'ar-AE':'en-GB')}</span>
       </div>
     </div>`;
   }).join('');
 
-  const html=`<!DOCTYPE html><html dir="rtl" lang="ar">
+  const html=`<!DOCTYPE html><html dir="${dir}" lang="${isAr?'ar':'en'}">
 <head><meta charset="UTF-8">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Tajawal',Arial,sans-serif;padding:16px;color:#111;font-size:.82rem}
-  .page-break{page-break-after:always;margin-bottom:20px}
-  .page-break:last-child{page-break-after:auto}
-  .p{color:#059669;font-weight:900}.a{color:#dc2626;font-weight:900}.h{color:#d97706;font-weight:900}
+  .page{page-break-after:always;margin-bottom:20px}
+  .page:last-child{page-break-after:auto}
   @media print{body{padding:8px}@page{margin:10mm;size:A4 portrait}}
 </style></head><body>
 ${staffPages}
