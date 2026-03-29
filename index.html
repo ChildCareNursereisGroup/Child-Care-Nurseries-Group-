@@ -707,16 +707,48 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div id="att-tab-staff" style="display:none">
 <div class="card">
   <div class="ch">
-    <div class="ct">👷 Staff Daily Attendance</div>
+    <div class="ct">👷 Staff Attendance — الحضور والغياب</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <!-- View Toggle -->
+      <div style="display:flex;border:1.5px solid var(--border);border-radius:9px;overflow:hidden">
+        <button id="att-view-day-btn" onclick="setAttView('day')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#1e3a8a;color:#fff">📅 يوم</button>
+        <button id="att-view-week-btn" onclick="setAttView('week')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#fff;color:#374151">📆 أسبوع</button>
+      </div>
       <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
       <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()">📋 إدخال جماعي</button>
+      <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()">📊 تقرير الغياب</button>
     </div>
   </div>
   <div id="staffattlist"></div>
   <div id="staffattsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:.8rem"></div>
 </div>
+<!-- Staff Attendance Report Modal -->
+<div class="mover" id="staff-att-report-modal">
+  <div class="mbox" style="max-width:500px">
+    <div class="mh">
+      <div class="mt">📊 تقرير الغياب الشهري</div>
+      <button class="xb" onclick="el('staff-att-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>الشهر — Month</label>
+          <input type="month" id="att-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg"><label>الموظف — Staff</label>
+          <select id="att-rep-staff" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">👥 كل الموظفين</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ طباعة PDF</button>
+        <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">📊 Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Active Staff List -->
 <div class="card" id="active-staff-card" style="margin-top:10px;display:none">
   <div class="ch"><div class="ct">👷 Active Staff — الموظفون النشطون</div><span id="active-staff-count" style="font-size:.78rem;font-weight:800;background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:10px"></span></div>
@@ -2002,6 +2034,19 @@ const EXP_CATS = [
 // ═══════════════════════════════════════════════
 let lang='ar', curBid='b1', curRole='admin', selBid='b1', selRole='admin';
 let curChild=null, chFilter='all', srchQ='', expCat='bus', expFilt='all';
+let attView='day'; // 'day' or 'week'
+
+function setAttView(v){
+  attView=v;
+  const db=el('att-view-day-btn'), wb=el('att-view-week-btn');
+  if(db&&wb){
+    db.style.background=v==='day'?'#1e3a8a':'#fff';
+    db.style.color=v==='day'?'#fff':'#374151';
+    wb.style.background=v==='week'?'#1e3a8a':'#fff';
+    wb.style.color=v==='week'?'#fff':'#374151';
+  }
+  renderStaffAtt();
+}
 // In-memory cache
 let DB = {children:[],receipts:[],attendance:{},expenses:[]};
 
@@ -4211,13 +4256,18 @@ function setStaffDayData(staffId, date, data){
 }
 
 function renderStaffAtt(){
+  if(attView==='week') return renderStaffAttWeek();
+  renderStaffAttDay();
+}
+
+function renderStaffAttDay(){
   const dateEl=el('staffattdate');
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
   // Show staff in their WORK branch only (if set), else contract branch
   const staff=(DB.staff||[]).filter(s=>{
-    if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
+    if(s.lastWorkingDay && s.lastWorkingDay<=date) return false;
     if(s.workBranch){
       // Work branch set → show ONLY in work branch
       return String(s.workBranch)===String(curBid);
@@ -5237,6 +5287,147 @@ async function confirmBulkSalaryImport(){
 }
 
 
+function openStaffAttReportModal(){
+  const mon = (el('staffattdate')?.value||today()).substring(0,7);
+  if(!el('att-rep-month').value) el('att-rep-month').value = mon;
+  // Populate staff dropdown - current branch only
+  const sel = el('att-rep-staff');
+  const branchStaff = (DB.staff||[]).filter(s=>{
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(curBid);
+  });
+  sel.innerHTML = '<option value="all">👥 كل الموظفين</option>' +
+    branchStaff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  el('staff-att-report-modal').classList.add('on');
+}
+
+async function printStaffAttReport(exportType='print'){
+  const mon = el('att-rep-month').value;
+  const staffFilter = el('att-rep-staff').value;
+  if(!mon){ alert('اختاري الشهر'); return; }
+
+  const b = CB();
+  const [yr,mo] = mon.split('-').map(Number);
+  const daysInMonth = new Date(yr,mo,0).getDate();
+  const days = Array.from({length:daysInMonth},(_,i)=>{
+    const d = String(i+1).padStart(2,'0');
+    return `${yr}-${String(mo).padStart(2,'0')}-${d}`;
+  });
+
+  // Get staff for this branch
+  let staffList = (DB.staff||[]).filter(s=>{
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(curBid) && (!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
+  });
+  if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
+
+  // Load attendance from Supabase for this month
+  const {data:attData} = await sb.from('staff_attendance').select('*')
+    .gte('date', mon+'-01').lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'));
+  const attMap = {};
+  (attData||[]).forEach(x=>{
+    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
+    attMap[x.staff_id][x.date]=x.status;
+  });
+
+  const fmt = n => Number(n).toFixed(1);
+  const monthLabel = new Date(mon+'-01').toLocaleDateString('ar-AE',{month:'long',year:'numeric'});
+
+  if(exportType==='excel'){
+    const wsData = [
+      ['تقرير الحضور والغياب', b.en||b.ar, monthLabel],
+      [],
+      ['الموظف', 'الوظيفة', ...days.map(d=>d.split('-')[2]), 'أيام حضور', 'أيام غياب', 'نص يوم'],
+    ];
+    staffList.forEach(s=>{
+      let present=0, absent=0, half=0;
+      const row=[s.name, s.position||''];
+      days.forEach(d=>{
+        const st=(attMap[s.id]||{})[d]||'';
+        if(st==='حضور'){row.push('✓');present++;}
+        else if(st==='غياب'){row.push('✕');absent++;}
+        else if(st==='نص يوم'){row.push('½');half++;present+=0.5;absent+=0.5;}
+        else row.push('');
+      });
+      row.push(present,absent,half);
+      wsData.push(row);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(wsData);
+    const wb2=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2,ws,'الحضور');
+    XLSX.writeFile(wb2,`Staff_Attendance_${mon}.xlsx`);
+    el('staff-att-report-modal').classList.remove('on');
+    return;
+  }
+
+  // Print HTML
+  const dayNames=['أح','إث','ثل','أر','خم','جم','سب'];
+  const html=`<!DOCTYPE html><html dir="rtl" lang="ar">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:12px;font-size:.72rem;color:#111}
+  h1{font-size:1rem;color:#1e3a8a;margin-bottom:4px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.65rem}
+  th{background:#1e3a8a;color:#fff;padding:4px 3px;text-align:center;white-space:nowrap}
+  td{padding:3px;border:1px solid #e5e7eb;text-align:center}
+  td.name{text-align:right;padding:3px 6px;font-weight:700;white-space:nowrap}
+  .p{color:#059669;font-weight:900}.a{color:#dc2626;font-weight:900}.h{color:#f59e0b;font-weight:900}
+  .fri{background:#fef9c3}.sat{background:#fdf2f8}
+  .total{background:#eff6ff;font-weight:900}
+  @media print{body{padding:5px}@page{margin:6mm;size:A4 landscape}}
+</style></head><body>
+  <h1>📊 تقرير الحضور والغياب — ${monthLabel}</h1>
+  <div style="font-size:.8rem;color:#6b7280;margin-bottom:8px">${b.icon} ${b.en||b.ar} | ${staffList.length} موظف</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:right;min-width:120px">الموظف</th>
+        ${days.map(d=>{
+          const dow=new Date(d).getDay();
+          const cls=dow===5?'fri':dow===6?'sat':'';
+          return`<th class="${cls}">${d.split('-')[2]}<br><span style="font-size:.55rem;opacity:.8">${dayNames[dow]}</span></th>`;
+        }).join('')}
+        <th class="total">✓<br>حضور</th>
+        <th class="total">✕<br>غياب</th>
+        <th class="total">½<br>نص</th>
+      </tr>
+    </thead>
+    <tbody>
+    ${staffList.map(s=>{
+      let present=0,absent=0,half=0;
+      const cells=days.map(d=>{
+        const dow=new Date(d).getDay();
+        const cls=dow===5?'fri':dow===6?'sat':'';
+        const st=(attMap[s.id]||{})[d]||'';
+        if(st==='حضور'){present++;return`<td class="${cls} p">✓</td>`;}
+        if(st==='غياب'){absent++;return`<td class="${cls} a">✕</td>`;}
+        if(st==='نص يوم'){half++;present+=0.5;absent+=0.5;return`<td class="${cls} h">½</td>`;}
+        return`<td class="${cls}"></td>`;
+      }).join('');
+      return`<tr>
+        <td class="name">${s.name}<br><span style="font-size:.6rem;color:#6b7280">${s.position||''}</span></td>
+        ${cells}
+        <td class="total p">${fmt(present)}</td>
+        <td class="total a">${fmt(absent)}</td>
+        <td class="total h">${half}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>
+  <div style="margin-top:10px;font-size:.72rem;color:#6b7280">
+    🟢 حضور ✓ &nbsp;|&nbsp; 🔴 غياب ✕ &nbsp;|&nbsp; 🟡 نص يوم ½ &nbsp;|&nbsp; 🟡 جمعة &nbsp;|&nbsp; 🩷 سبت
+  </div>
+</body></html>`;
+
+  el('staff-att-report-modal').classList.remove('on');
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
+}
+
 function openBulkAttModal(){
   const mon = (el('staffattdate')?.value||today()).substring(0,7);
   el('bulk-att-month').value = mon;
@@ -5456,47 +5647,195 @@ async function toggleStaffAtt(staffId, date){
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
 
+  const sum=el('staffattsum');
+  const showMsg=(ok,msg)=>{
+    if(!sum) return;
+    const d=document.createElement('div');
+    d.style.cssText=`background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#dc2626'};border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block`;
+    d.textContent=msg;
+    sum.appendChild(d);
+    setTimeout(()=>d.remove(),3000);
+  };
+
   if(!newSt){
-    // Cleared → delete record from Supabase
-    await sb.from('staff_attendance')
-      .delete()
-      .eq('branch_id', curBid)
-      .eq('staff_id',  Number(staffId))
-      .eq('date',      date);
+    const {error}=await sb.from('staff_attendance').delete()
+      .eq('branch_id', curBid).eq('staff_id', Number(staffId)).eq('date', date);
+    if(error) showMsg(false,'❌ خطأ في المسح');
+    else showMsg(true,'🗑️ تم المسح');
     return;
   }
 
-  // Save to Supabase — delete old then insert fresh (most reliable)
-  const payload={branch_id:curBid, staff_id:Number(staffId), date:date, status:newSt};
-  console.log('Saving staff att:', payload);
-  
-  await sb.from('staff_attendance')
-    .delete()
-    .eq('branch_id', curBid)
-    .eq('staff_id',  Number(staffId))
-    .eq('date',      date);
-    
-  const {error}=await sb.from('staff_attendance').insert(payload);
-  const sum=el('staffattsum');
+  // Use upsert — most reliable, handles both insert and update
+  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+  const {error}=await sb.from('staff_attendance')
+    .upsert(payload, {onConflict:'branch_id,staff_id,date'});
+
   if(error){
-    console.error('StaffAtt save error:', error);
-    if(sum){
-      const errDiv=document.createElement('div');
-      errDiv.style.cssText='background:#fee2e2;color:#dc2626;border-radius:8px;padding:8px 14px;font-size:.8rem;margin-top:6px;font-family:Tajawal,sans-serif;cursor:pointer';
-      errDiv.innerHTML='❌ خطأ في الحفظ (اضغط للإغلاق):<br><b>'+error.message+'</b><br><small>code: '+(error.code||'?')+' | details: '+(error.details||'?')+'</small>';
-      errDiv.onclick=()=>errDiv.remove();
-      sum.appendChild(errDiv);
-    }
+    // Fallback: delete then insert
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+    const {error:err2}=await sb.from('staff_attendance').insert(payload);
+    if(err2) showMsg(false,'❌ خطأ: '+err2.message);
+    else showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
   } else {
-    console.log('StaffAtt saved OK → '+newSt);
-    if(sum){
-      const okDiv=document.createElement('div');
-      okDiv.style.cssText='background:#d1fae5;color:#065f46;border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block';
-      okDiv.textContent='✅ تم الحفظ — '+(newSt==='حضور'?'حضور ✓':'غياب ✕');
-      sum.appendChild(okDiv);
-      setTimeout(()=>okDiv.remove(),2500);
-    }
+    showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
   }
+}
+
+async function renderStaffAttWeek(){
+  const dateEl=el('staffattdate');
+  if(!dateEl) return;
+  if(!dateEl.value) dateEl.value=today();
+  const selDate = new Date(dateEl.value+'T00:00:00');
+  
+  // Get week start (Saturday) and end (Friday)
+  const dow = selDate.getDay(); // 0=Sun...6=Sat
+  const diffToSat = (dow - 6 + 7) % 7;
+  const weekStart = new Date(selDate); weekStart.setDate(selDate.getDate() - diffToSat);
+  const weekDays = Array.from({length:7},(_,i)=>{
+    const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
+    return d.toISOString().split('T')[0];
+  });
+
+  // Get staff
+  const staff=(DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay<=today()) return false;
+    const wb=s.workBranch||s.branchId;
+    return String(wb)===String(curBid) || (!s.workBranch && String(s.branchId)===String(curBid));
+  });
+
+  // Load attendance from Supabase for this week
+  const {data:attData} = await sb.from('staff_attendance').select('*')
+    .gte('date', weekDays[0]).lte('date', weekDays[6]);
+  // Update DB.staffAtt
+  (attData||[]).forEach(x=>{
+    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+  });
+
+  const dayLabels=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
+  const dayColors=['#fdf2f8','#ecfdf5','#eff6ff','#fdf4ff','#fffbeb','#f0f9ff','#fef9c3'];
+  const container=el('staffattlist');
+  if(!container) return;
+
+  if(!staff.length){
+    container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>لا يوجد موظفون</p></div>`;
+    return;
+  }
+
+  // Week label
+  const fmtD=d=>`${d.split('-')[2]}/${d.split('-')[1]}`;
+  const weekLabel=`${fmtD(weekDays[0])} — ${fmtD(weekDays[6])}`;
+  const badge=el('staff-day-badge');
+  if(badge){ badge.textContent='📆 أسبوع '+weekLabel; badge.style.background='#eff6ff'; badge.style.color='#1e3a8a'; }
+
+  let html=`<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:600px">
+      <thead>
+        <tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:8px 10px;text-align:right;min-width:140px">الموظف</th>
+          ${weekDays.map((d,i)=>{
+            const isToday=d===today();
+            return`<th style="padding:6px 4px;text-align:center;background:${isToday?'#3b82f6':'#1e3a8a'};min-width:60px">
+              <div>${dayLabels[i]}</div>
+              <div style="font-size:.65rem;opacity:.8">${fmtD(d)}</div>
+            </th>`;
+          }).join('')}
+          <th style="padding:6px 4px;text-align:center;background:#065f46;min-width:45px">✓</th>
+          <th style="padding:6px 4px;text-align:center;background:#7f1d1d;min-width:45px">✕</th>
+          <th style="padding:6px 4px;text-align:center;min-width:45px">💬</th>
+        </tr>
+      </thead>
+      <tbody>
+      ${staff.map((s,si)=>{
+        let present=0, absent=0;
+        const cells=weekDays.map((d,i)=>{
+          const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
+          const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
+          if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
+          const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':dayColors[i];
+          const icon=isP?'✓':isA?'✕':isH?'½':'';
+          const color=isP?'#065f46':isA?'#dc2626':isH?'#92400e':'#9ca3af';
+          return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
+            <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
+              style="width:32px;height:32px;border-radius:7px;border:2px solid ${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db'};
+              background:${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff'};
+              display:flex;align-items:center;justify-content:center;cursor:pointer;
+              font-weight:900;font-size:.85rem;color:#fff;margin:auto;user-select:none">
+              ${icon}
+            </div>
+          </td>`;
+        }).join('');
+        const phone=s.contact||'';
+        const absentDays=weekDays.filter(d=>(DB.staffAtt[d]||{})[String(s.id)]==='غياب');
+        const waBtn=phone&&absentDays.length?`<button onclick="sendWeekAbsenceWA('${s.id}','${absentDays.join(',')}')"
+          style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`:'—';
+        return`<tr style="background:${si%2?'#fff':'#fafafa'}">
+          <td style="padding:7px 10px;border:1px solid #e5e7eb">
+            <div style="font-weight:800;font-size:.82rem">${s.name}</div>
+            <div style="font-size:.65rem;color:#9ca3af">${s.position||''}</div>
+          </td>
+          ${cells}
+          <td style="text-align:center;font-weight:900;color:#059669;border:1px solid #e5e7eb">${present%1===0?present:present.toFixed(1)}</td>
+          <td style="text-align:center;font-weight:900;color:#dc2626;border:1px solid #e5e7eb">${absent%1===0?absent:absent.toFixed(1)}</td>
+          <td style="text-align:center;border:1px solid #e5e7eb">${waBtn}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+
+  container.innerHTML=html;
+  
+  // Summary
+  const allPresent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='حضور'?1:v==='نص يوم'?0.5:0);},0),0);
+  const allAbsent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='غياب'?1:v==='نص يوم'?0.5:0);},0),0);
+  el('staffattsum').innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    <span style="color:#059669;font-weight:800">✅ إجمالي حضور: ${allPresent}</span>
+    <span style="color:#dc2626;font-weight:800">❌ إجمالي غياب: ${allAbsent}</span>
+    <span style="color:#6b7280;font-size:.72rem">اضغط على المربع للتغيير: فارغ ← حضور ✓ ← نص يوم ½ ← غياب ✕</span>
+  </div>`;
+}
+
+async function toggleStaffAttWeek(staffId, date){
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  const sid=String(staffId);
+  const cur=DB.staffAtt[date][sid]||'';
+  const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
+  DB.staffAtt[date][sid]=newSt;
+  
+  // Update cell visually immediately
+  const cell=document.querySelector(`[onclick="toggleStaffAttWeek('${staffId}','${date}')"]`);
+  if(cell){
+    const isP=newSt==='حضور',isA=newSt==='غياب',isH=newSt==='نص يوم';
+    cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    cell.style.borderColor=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+    cell.textContent=isP?'✓':isA?'✕':isH?'½':'';
+    // Update parent cell bg
+    const td=cell.closest('td');
+    if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
+  }
+  
+  // Save to Supabase
+  if(!newSt){
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+  } else {
+    await sb.from('staff_attendance')
+      .upsert({branch_id:curBid,staff_id:Number(staffId),date,status:newSt},{onConflict:'branch_id,staff_id,date'});
+  }
+}
+
+function sendWeekAbsenceWA(staffId, datesStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s||!s.contact) return;
+  const phone=formatWANum(s.contact);
+  const b=CB();
+  const dates=datesStr.split(',').map(d=>{
+    const p=d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`;
+  }).join('، ');
+  const msg=`🔔 *تنبيه غياب*\n\nالموظف/ة العزيز/ة *${s.name}*\n\nنود إخطاركم بتسجيل غيابكم في الأيام التالية:\n📅 ${dates}\n\nيرجى التواصل مع الإدارة.\n\n${b.ar||b.en}\nمجموعة رعاية الطفل`;
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 function sendStaffAbsenceWA(staffId, date){
@@ -9474,6 +9813,14 @@ async function confirmImportReceipts(rows){
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
+      // Duplicate check: same receipt_num + same branch only
+      if(r.receipt_num){
+        const {data:dup} = await sb.from('receipts').select('id')
+          .eq('branch_id', curBid)
+          .eq('receipt_num', r.receipt_num)
+          .limit(1);
+        if(dup && dup.length > 0){ err++; continue; } // skip duplicate
+      }
       await sb.from('receipts').insert(r); ok++;
       if(!child && cname) notFound.push(cname);
     }catch(e){ err++; }
