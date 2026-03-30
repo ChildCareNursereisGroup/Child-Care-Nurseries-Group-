@@ -10093,13 +10093,17 @@ async function confirmImportReceipts(rows){
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
-      // Duplicate check: same receipt_num + same branch only
+      // Duplicate check: same receipt_num + same branch + same month only
       if(r.receipt_num){
+        const monthStart = r.date.substring(0,7) + '-01';
+        const monthEnd   = r.date.substring(0,7) + '-31';
         const {data:dup} = await sb.from('receipts').select('id')
           .eq('branch_id', curBid)
           .eq('receipt_num', r.receipt_num)
+          .gte('date', monthStart)
+          .lte('date', monthEnd)
           .limit(1);
-        if(dup && dup.length > 0){ err++; continue; } // skip duplicate
+        if(dup && dup.length > 0){ err++; continue; } // skip duplicate within same month
       }
       await sb.from('receipts').insert(r); ok++;
       if(!child && cname) notFound.push(cname);
