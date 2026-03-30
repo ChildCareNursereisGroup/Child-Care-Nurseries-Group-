@@ -707,16 +707,87 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div id="att-tab-staff" style="display:none">
 <div class="card">
   <div class="ch">
-    <div class="ct">👷 Staff Daily Attendance</div>
+    <div class="ct">👷 Staff Attendance — الحضور والغياب</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <!-- View Toggle -->
+      <div style="display:flex;border:1.5px solid var(--border);border-radius:9px;overflow:hidden">
+        <button id="att-view-day-btn" onclick="setAttView('day')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#1e3a8a;color:#fff">📅 يوم</button>
+        <button id="att-view-week-btn" onclick="setAttView('week')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#fff;color:#374151">📆 أسبوع</button>
+      </div>
       <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
       <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()">📋 إدخال جماعي</button>
+      <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()">📊 تقرير الغياب</button>
     </div>
   </div>
   <div id="staffattlist"></div>
   <div id="staffattsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:.8rem"></div>
 </div>
+<!-- Staff Attendance Report Modal -->
+<div class="mover" id="staff-att-report-modal">
+  <div class="mbox" style="max-width:520px">
+    <div class="mh">
+      <div class="mt">📊 Staff Attendance Report — تقرير الغياب</div>
+      <button class="xb" onclick="el('staff-att-report-modal').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>Month — الشهر</label>
+          <input type="month" id="att-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg"><label>Staff — الموظف</label>
+          <select id="att-rep-staff" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+            <option value="all">👥 All Staff — كل الموظفين</option>
+          </select>
+        </div>
+      </div>
+      <!-- Language -->
+      <div class="fg">
+        <label>Language — اللغة</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="att-rep-lang" value="en" ${lang==='en'?'checked':''}> 🇬🇧 English
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="att-rep-lang" value="ar" ${lang==='ar'?'checked':''}> 🇦🇪 العربية
+          </label>
+        </div>
+      </div>
+      <!-- Bonus / Warning / Loan per staff -->
+      <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
+        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 تعديلات الراتب — Salary Adjustments (اختياري)</div>
+        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+      </div>
+      <!-- Signatures section -->
+      <div style="background:#f8faff;border-radius:10px;padding:12px;border:1.5px solid #c7d2fe">
+        <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">✍️ التوقيعات الإلكترونية — Electronic Signatures</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع الموظف / Employee Signature</div>
+            <canvas id="sig-employee-canvas" width="200" height="80"
+              style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button onclick="clearSig('sig-employee-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع المدير / Manager Signature</div>
+            <canvas id="sig-manager-canvas" width="200" height="80"
+              style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button onclick="clearSig('sig-manager-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ Print PDF</button>
+        <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">📊 Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Active Staff List -->
 <div class="card" id="active-staff-card" style="margin-top:10px;display:none">
   <div class="ch"><div class="ct">👷 Active Staff — الموظفون النشطون</div><span id="active-staff-count" style="font-size:.78rem;font-weight:800;background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:10px"></span></div>
@@ -2002,6 +2073,19 @@ const EXP_CATS = [
 // ═══════════════════════════════════════════════
 let lang='ar', curBid='b1', curRole='admin', selBid='b1', selRole='admin';
 let curChild=null, chFilter='all', srchQ='', expCat='bus', expFilt='all';
+let attView='day'; // 'day' or 'week'
+
+function setAttView(v){
+  attView=v;
+  const db=el('att-view-day-btn'), wb=el('att-view-week-btn');
+  if(db&&wb){
+    db.style.background=v==='day'?'#1e3a8a':'#fff';
+    db.style.color=v==='day'?'#fff':'#374151';
+    wb.style.background=v==='week'?'#1e3a8a':'#fff';
+    wb.style.color=v==='week'?'#fff':'#374151';
+  }
+  renderStaffAtt();
+}
 // In-memory cache
 let DB = {children:[],receipts:[],attendance:{},expenses:[]};
 
@@ -2061,6 +2145,7 @@ function setPW(bid,role,pw){localStorage.setItem(`pw_${bid}_${role}`,pw);}
 // ═══════════════════════════════════════════════
 async function loadFromSupa(bid) {
   bid=bid||curBid;
+  _busAllBranchCache = null; // Invalidate bus report cache on data reload
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
     const [c,r,a,e,sa,vis] = await Promise.all([
@@ -2149,6 +2234,7 @@ async function loadFromSupa(bid) {
     const {data:allStaff} = await sb.from('staff').select('*');
     DB.staff = (allStaff||[]).map(x=>({
       id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      workDays:x.work_days||'0,1,2,3,4',
       name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
       contact:x.contact||'', address:x.address||'',
       emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'',
@@ -4211,13 +4297,18 @@ function setStaffDayData(staffId, date, data){
 }
 
 function renderStaffAtt(){
+  if(attView==='week') return renderStaffAttWeek();
+  renderStaffAttDay();
+}
+
+function renderStaffAttDay(){
   const dateEl=el('staffattdate');
   if(!dateEl) return;
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
   // Show staff in their WORK branch only (if set), else contract branch
   const staff=(DB.staff||[]).filter(s=>{
-    if(s.lastWorkingDay && s.lastWorkingDay<date) return false;
+    if(s.lastWorkingDay && s.lastWorkingDay<=date) return false;
     if(s.workBranch){
       // Work branch set → show ONLY in work branch
       return String(s.workBranch)===String(curBid);
@@ -5237,6 +5328,459 @@ async function confirmBulkSalaryImport(){
 }
 
 
+function openStaffAttReportModal(){
+  const mon = (el('staffattdate')?.value||today()).substring(0,7);
+  if(!el('att-rep-month').value) el('att-rep-month').value = mon;
+  // Set language radio
+  const langRadios = document.querySelectorAll('input[name="att-rep-lang"]');
+  langRadios.forEach(r=>{ r.checked = r.value===lang; });
+  // Populate staff dropdown
+  const sel = el('att-rep-staff');
+  const branchStaff = (DB.staff||[]).filter(s=>{
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(curBid) && (!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
+  });
+  sel.innerHTML = `<option value="all">👥 ${lang==='ar'?'كل الموظفين':'All Staff'}</option>` +
+    branchStaff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  // Populate bonus/warning/loan fields
+  const adjList = el('att-rep-adj-list');
+  if(adjList){
+    adjList.innerHTML = branchStaff.map(s=>{
+      const gross = Number(s.grossSalary||s.basicSalary||0);
+      const dailyRate = gross>0 ? (gross/30).toFixed(2) : 0;
+      return `
+      <div style="background:#fff;border-radius:8px;padding:8px;border:1px solid #e5e7eb">
+        <div style="font-weight:700;font-size:.78rem;margin-bottom:2px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
+        ${gross>0?`<div style="font-size:.68rem;color:#6b7280;margin-bottom:6px">الراتب الإجمالي: <b>${fmtNum(gross)} AED</b> — معدل يوم: <b style="color:#1d4ed8">${dailyRate} AED</b></div>`:'<div style="font-size:.68rem;color:#f59e0b;margin-bottom:6px">⚠️ لم يُسجَّل الراتب الإجمالي</div>'}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
+          <div>
+            <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 بونص (أيام عمل)</div>
+            <input type="number" min="0" step="0.5" placeholder="0" id="adj-bonus-${s.id}"
+              oninput="updateAdjCalc('${s.id}',${gross})"
+              style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <div id="adj-bonus-aed-${s.id}" style="font-size:.65rem;color:#059669;margin-top:1px;min-height:12px"></div>
+            <input type="text" placeholder="السبب / Reason" id="adj-bonus-reason-${s.id}"
+              style="width:100%;padding:3px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ خصم / تحذير (أيام عمل)</div>
+            <input type="number" min="0" step="0.5" placeholder="0" id="adj-deduct-${s.id}"
+              oninput="updateAdjCalc('${s.id}',${gross})"
+              style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <div id="adj-deduct-aed-${s.id}" style="font-size:.65rem;color:#dc2626;margin-top:1px;min-height:12px"></div>
+            <input type="text" placeholder="السبب / Reason" id="adj-deduct-reason-${s.id}"
+              style="width:100%;padding:3px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 خصم قرض / Loan Deduction (AED)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <input type="number" min="0" placeholder="0" id="adj-loan-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <input type="text" placeholder="السبب / Reason" id="adj-loan-reason-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box">
+          </div>
+        </div>
+      </div>`}).join('');
+  }
+  el('staff-att-report-modal').classList.add('on');
+  // Init signature canvases after modal is visible
+  setTimeout(()=>{
+    initSigCanvas('sig-employee-canvas');
+    initSigCanvas('sig-manager-canvas');
+  }, 100);
+}
+
+function updateAdjCalc(staffId, grossSalary){
+  const daily = grossSalary > 0 ? grossSalary/30 : 0;
+  const bonusDays  = Number(document.getElementById('adj-bonus-'+staffId)?.value||0);
+  const deductDays = Number(document.getElementById('adj-deduct-'+staffId)?.value||0);
+  const bonusAed   = (bonusDays * daily).toFixed(2);
+  const deductAed  = (deductDays * daily).toFixed(2);
+  const bonusEl  = document.getElementById('adj-bonus-aed-'+staffId);
+  const deductEl = document.getElementById('adj-deduct-aed-'+staffId);
+  if(bonusEl)  bonusEl.innerHTML  = bonusDays>0  ? `= <b>${bonusAed} AED</b>` : '';
+  if(deductEl) deductEl.innerHTML = deductDays>0 ? `= <b>${deductAed} AED</b>` : '';
+}
+
+// ── Signature Canvas helpers ──────────────────────────────
+function initSigCanvas(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas || canvas._sigInited) return;
+  canvas._sigInited = true;
+  let drawing = false;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1e3a8a';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x:(src.clientX-r.left)*scaleX, y:(src.clientY-r.top)*scaleY };
+  };
+  const start = e=>{ drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+  const move  = e=>{ if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); };
+  const stop  = ()=>{ drawing=false; };
+  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move);
+  canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
+  canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',stop);
+}
+function clearSig(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+function getSigDataURL(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return '';
+  // Check if canvas has any drawing
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const hasContent = data.some((v,i)=> i%4===3 && v>0);
+  return hasContent ? canvas.toDataURL('image/png') : '';
+}
+
+function buildAdjSection(bonusDays,bonusReason,deductDays,deductReason,isAr,grossSalary){
+  if(!bonusDays && !deductDays) return '';
+  const daily = grossSalary>0 ? grossSalary/30 : 0;
+  const bonusAed  = (bonusDays*daily).toFixed(2);
+  const deductAed = (deductDays*daily).toFixed(2);
+  let html = `<div style="display:grid;grid-template-columns:${bonusDays&&deductDays?'1fr 1fr':'1fr'};gap:8px;margin-bottom:14px">`;
+  if(bonusDays>0){
+    html += `<div style="background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:10px;padding:12px">
+      <div style="font-size:.68rem;font-weight:700;color:#065f46;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">🎁 ${isAr?'مكافأة / بونص':'Bonus'}</div>
+      <div style="font-size:.95rem;font-weight:900;color:#059669">+ ${bonusDays} ${isAr?'يوم':'days'}</div>
+      <div style="font-size:.8rem;font-weight:700;color:#059669">= ${bonusAed} AED</div>
+      ${bonusReason?`<div style="font-size:.72rem;color:#374151;margin-top:4px;padding-top:4px;border-top:1px dashed #6ee7b7">${bonusReason}</div>`:''}
+    </div>`;
+  }
+  if(deductDays>0){
+    html += `<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px">
+      <div style="font-size:.68rem;font-weight:700;color:#7f1d1d;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">⚠️ ${isAr?'خصم / تحذير':'Warning / Deduction'}</div>
+      <div style="font-size:.95rem;font-weight:900;color:#dc2626">- ${deductDays} ${isAr?'يوم':'days'}</div>
+      <div style="font-size:.8rem;font-weight:700;color:#dc2626">= ${deductAed} AED</div>
+      ${deductReason?`<div style="font-size:.72rem;color:#374151;margin-top:4px;padding-top:4px;border-top:1px dashed #fca5a5">${deductReason}</div>`:''}
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+async function printStaffAttReport(exportType='print'){
+  const mon = el('att-rep-month').value;
+  const staffFilter = el('att-rep-staff').value;
+  const repLang = document.querySelector('input[name="att-rep-lang"]:checked')?.value || lang;
+  const isAr = repLang==='ar';
+  const dir = isAr?'rtl':'ltr';
+  if(!mon){ alert(isAr?'اختاري الشهر':'Select month'); return; }
+
+  const b = CB();
+  const [yr,mo] = mon.split('-').map(Number);
+  const daysInMonth = new Date(yr,mo,0).getDate();
+  const days = Array.from({length:daysInMonth},(_,i)=>{
+    const d = String(i+1).padStart(2,'0');
+    return `${yr}-${String(mo).padStart(2,'0')}-${d}`;
+  });
+
+  let staffList = (DB.staff||[]).filter(s=>{
+    const wb = s.workBranch||s.branchId;
+    return String(wb)===String(curBid) && (!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
+  });
+  if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
+
+  const {data:attData} = await sb.from('staff_attendance').select('*')
+    .gte('date', mon+'-01').lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'));
+  const attMap = {};
+  (attData||[]).forEach(x=>{
+    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
+    attMap[x.staff_id][x.date]=x.status;
+  });
+
+  const fmt = n => Number(n).toFixed(1);
+  const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+
+  const dayNamesAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dayNamesEn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayNames = isAr ? dayNamesAr : dayNamesEn;
+
+  // Smart status: considers work schedule
+  // - Work day + no record + neighbor is present → infer present
+  // - Off day → 'off' (not absent, not present)
+  const getSmartStatus=(staffId, dayIdx)=>{
+    const s = staffList.find(x=>String(x.id)===String(staffId));
+    const workDays = (s?.workDays||'0,1,2,3,4').split(',').map(Number);
+    const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
+    const isWorkDay = workDays.includes(dow);
+
+    const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
+    if(raw) return {status:raw, smart:false, isWorkDay};
+
+    // Off day — don't count as absent or present
+    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
+
+    // Work day + unregistered → check neighbors
+    const prev=(attMap[staffId]||{})[days[dayIdx-1]]||'';
+    const next=(attMap[staffId]||{})[days[dayIdx+1]]||'';
+    if(prev==='حضور'||next==='حضور') return {status:'حضور', smart:true, isWorkDay};
+    return {status:'', smart:false, isWorkDay};
+  };
+
+  if(exportType==='excel'){
+    const wsData=[
+      [isAr?'تقرير الحضور والغياب':'Attendance Report', b.en||b.ar, monthLabel],
+      [],
+      [isAr?'الموظف':'Staff', isAr?'الوظيفة':'Position', ...days.map(d=>d.split('-')[2]),
+       isAr?'حضور':'Present', isAr?'غياب':'Absent', isAr?'نص يوم':'Half'],
+    ];
+    staffList.forEach(s=>{
+      let present=0,absent=0,half=0;
+      const row=[s.name,s.position||''];
+      days.forEach((_,i)=>{
+        const {status}=getSmartStatus(s.id,i);
+        if(status==='حضور'){row.push('✓');present++;}
+        else if(status==='غياب'){row.push('✕');absent++;}
+        else if(status==='نص يوم'){row.push('½');half++;present+=0.5;absent+=0.5;}
+        else row.push('');
+      });
+      row.push(present,absent,half);
+      wsData.push(row);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(wsData);
+    const wb2=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2,ws,isAr?'الحضور':'Attendance');
+    XLSX.writeFile(wb2,`Staff_Attendance_${mon}.xlsx`);
+    el('staff-att-report-modal').classList.remove('on');
+    return;
+  }
+
+  // Get signatures as data URLs
+  const empSigURL = getSigDataURL('sig-employee-canvas');
+  const mgrSigURL = getSigDataURL('sig-manager-canvas');
+
+  // Print — one page per staff, portrait
+  const staffPages = staffList.map(s=>{
+    let present=0, absent=0, half=0;
+    const absences=[];
+    // Read adjustments from modal (bonus/deduct in DAYS, loan in AED)
+    const bonusDays   = Number(document.getElementById('adj-bonus-'+s.id)?.value||0);
+    const bonusReason = document.getElementById('adj-bonus-reason-'+s.id)?.value||'';
+    const deductDays  = Number(document.getElementById('adj-deduct-'+s.id)?.value||0);
+    const deductReason= document.getElementById('adj-deduct-reason-'+s.id)?.value||'';
+    const loanAed     = Number(document.getElementById('adj-loan-'+s.id)?.value||0);
+    const loanReason  = document.getElementById('adj-loan-reason-'+s.id)?.value||'';
+
+    // Use CONTRACT branch (branchId), not work branch
+    const contractBranch = BRANCHES.find(x=>x.id===s.branchId)||b;
+    const contractBranchName = contractBranch.ar||contractBranch.en||'';
+
+    const rows = days.map((d,i)=>{
+      const dow=new Date(d+'T00:00:00').getDay();
+      const {status, smart, isWorkDay}=getSmartStatus(s.id,i);
+      const day=d.split('-')[2];
+      const dayName=dayNames[dow];
+      let statusCell='', rowBg='#ffffff', statusColor='#374151';
+      if(status==='off'){
+        statusCell=isAr?'إجازة / يوم راحة':'Day Off';
+        rowBg='#f3f4f6'; statusColor='#9ca3af';
+      } else if(status==='حضور'){
+        present++;
+        statusCell=(isAr?'✓ حضور':'✓ Present')+(smart?` <span style="font-size:.6rem;color:#9ca3af">(${isAr?'تلقائي':'auto'})</span>`:'');
+        rowBg=smart?'#f9fafb':'#f0fdf4'; statusColor='#059669';
+      } else if(status==='غياب'){
+        absent++;
+        absences.push(`${day}/${String(mo).padStart(2,'0')}`);
+        statusCell=isAr?'✕ غياب':'✕ Absent';
+        rowBg='#fff5f5'; statusColor='#dc2626';
+      } else if(status==='نص يوم'){
+        half++;present+=0.5;absent+=0.5;
+        statusCell=isAr?'½ نصف يوم':'½ Half Day';
+        rowBg='#fffbeb'; statusColor='#d97706';
+      } else {
+        statusCell=isAr?'غير مسجل':'—';
+        statusColor='#9ca3af';
+      }
+      return `<tr style="background:${rowBg}">
+        <td style="padding:5px 8px;text-align:center;font-weight:700;border:1px solid #e5e7eb;color:#1e3a8a">${day}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:#374151">${dayName}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;font-weight:700;color:${statusColor}">${statusCell}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:#6b7280;font-size:.7rem"></td>
+      </tr>`;
+    }).join('');
+
+    // Use GROSS salary for all calculations
+    const gross     = Number(s.grossSalary||s.basicSalary||0);
+    const daily     = gross>0 ? gross/30 : 0;
+    const absentDed = absent>0&&gross>0 ? absent*daily : 0;
+    const bonusAed  = bonusDays>0  ? bonusDays*daily  : 0;
+    const deductAed = deductDays>0 ? deductDays*daily : 0;
+    const netSalary = gross - absentDed - deductAed - loanAed + bonusAed;
+    const fmt2 = v => Number(v).toFixed(2);
+    const printDate = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+    return `<div class="page">
+      <div style="border:2.5px solid #1e3a8a;padding:0;margin-bottom:0">
+
+        <!-- Top bar: company + contract branch -->
+        <div style="background:#1e3a8a;color:#fff;padding:10px 18px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:1rem;font-weight:900;letter-spacing:.5px">مجموعة رعاية الطفل للحضانات</div>
+            <div style="font-size:.73rem;opacity:.88;margin-top:1px">Child Care Group — ${contractBranchName} — UAE</div>
+          </div>
+          <div style="text-align:${isAr?'left':'right'}">
+            <div style="font-size:.67rem;opacity:.75">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
+            <div style="font-size:.9rem;font-weight:800">${monthLabel}</div>
+            <div style="font-size:.62rem;opacity:.7">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
+          </div>
+        </div>
+
+        <!-- Employee Info — NO salary in header -->
+        <div style="padding:10px 18px;background:#f8faff;border-bottom:1.5px solid #c7d2fe">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.74rem">
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'اسم الموظف':'Employee Name'}:</span><br><b style="font-size:.9rem;color:#1e3a8a">${s.name}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'المسمى الوظيفي':'Position'}:</span><br><b>${s.position||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'الجنسية':'Nationality'}:</span><br><b>${s.nationality||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'جهة التعاقد':'Contract Branch'}:</span><br><b>${contractBranchName}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم التواصل':'Contact'}:</span><br><b>${s.contact||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم الإقامة / الوثيقة':'ID / Residency No.'}:</span><br><b>${s.idNumber||s.passportNum||'—'}</b></div>
+          </div>
+        </div>
+
+        <!-- Summary boxes -->
+        <div style="padding:10px 18px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;border-bottom:1.5px solid #e5e7eb">
+          <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#1e40af">${daysInMonth}</div>
+            <div style="font-size:.6rem;color:#1e40af;font-weight:700">${isAr?'أيام الشهر':'Month Days'}</div>
+          </div>
+          <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+            <div style="font-size:.6rem;color:#059669;font-weight:700">${isAr?'أيام الحضور':'Present Days'}</div>
+          </div>
+          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+            <div style="font-size:.6rem;color:#dc2626;font-weight:700">${isAr?'أيام الغياب':'Absent Days'}</div>
+          </div>
+          <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#d97706">${half}</div>
+            <div style="font-size:.6rem;color:#d97706;font-weight:700">${isAr?'نصف يوم':'Half Days'}</div>
+          </div>
+          <div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#374151">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status}).length}</div>
+            <div style="font-size:.6rem;color:#374151;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
+          </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <div style="padding:10px 18px">
+          <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+            <thead>
+              <tr style="background:#1e3a8a;color:#fff">
+                <th style="padding:6px 8px;text-align:center;border:1px solid #3b5998;width:48px">${isAr?'اليوم':'Day'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998;width:88px">${isAr?'اليوم (أسبوعي)':'Weekday'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998">${isAr?'الحالة':'Status'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998;width:130px">${isAr?'ملاحظات':'Notes'}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+
+        <!-- Financial Summary (only if gross salary set) -->
+        ${gross>0?`
+        <div style="padding:10px 18px;background:#f0f9ff;border-top:1.5px solid #bae6fd">
+          <div style="font-size:.78rem;font-weight:900;color:#0369a1;margin-bottom:7px;border-bottom:1px dashed #7dd3fc;padding-bottom:4px">
+            💰 ${isAr?'ملخص الراتب':'Salary Summary'}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.74rem">
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #e0f2fe">
+              <span style="color:#374151">${isAr?'الراتب الإجمالي':'Gross Salary'}</span>
+              <b>${fmtNum(gross)} AED</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #e0f2fe">
+              <span style="color:#374151">${isAr?'معدل اليوم (÷30)':'Daily Rate (÷30)'}</span>
+              <b>${fmt2(daily)} AED</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
+              <span style="color:#dc2626">${isAr?`خصم الغياب (${Number(absent).toFixed(absent%1?1:0)} يوم)`:`Absence Deduction (${Number(absent).toFixed(absent%1?1:0)} days)`}</span>
+              <b style="color:#dc2626">- ${fmt2(absentDed)} AED</b>
+            </div>
+            ${bonusDays>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#f0fdf4;border-radius:5px;border:1px solid #86efac">
+              <span style="color:#059669">${isAr?`مكافأة (${bonusDays} يوم)`:`Bonus (${bonusDays} days)`}${bonusReason?` — <i style="font-weight:400">${bonusReason}</i>`:''}</span>
+              <b style="color:#059669">+ ${fmt2(bonusAed)} AED</b>
+            </div>`:''}
+            ${deductDays>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
+              <span style="color:#dc2626">${isAr?`خصم إضافي (${deductDays} يوم)`:`Extra Deduction (${deductDays} days)`}${deductReason?` — <i style="font-weight:400">${deductReason}</i>`:''}</span>
+              <b style="color:#dc2626">- ${fmt2(deductAed)} AED</b>
+            </div>`:''}
+            ${loanAed>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#faf5ff;border-radius:5px;border:1px solid #ddd6fe">
+              <span style="color:#7c3aed">${isAr?'خصم قرض / سلفة':'Loan / Advance Deduction'}${loanReason?` — <i style="font-weight:400">${loanReason}</i>`:''}</span>
+              <b style="color:#7c3aed">- ${fmtNum(loanAed)} AED</b>
+            </div>`:''}
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;padding:9px 12px;background:#1e3a8a;border-radius:8px;color:#fff">
+            <span style="font-weight:800;font-size:.85rem">${isAr?'صافي الراتب المستحق':'Net Salary Due'}</span>
+            <span style="font-size:1.05rem;font-weight:900">${fmt2(netSalary)} AED</span>
+          </div>
+        </div>`:''}
+
+        <!-- Signatures with embedded images -->
+        <div style="padding:14px 18px;border-top:1.5px solid #e5e7eb;background:#fafafa">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:.72rem">
+            <div style="text-align:center">
+              <div style="height:65px;border-bottom:1.5px solid #1e3a8a;margin-bottom:5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">
+                ${empSigURL?`<img src="${empSigURL}" style="max-height:58px;max-width:100%;object-fit:contain" alt="sig">`:'<span style="color:#d1d5db;font-size:.65rem">${isAr?"(توقيع الموظف)":"(Employee Signature)"}</span>'}
+              </div>
+              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع الموظف':'Employee Signature'}</div>
+              <div style="color:#6b7280;margin-top:2px">${s.name}</div>
+            </div>
+            <div style="text-align:center">
+              <div style="height:65px;border-bottom:1.5px solid #1e3a8a;margin-bottom:5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">
+                ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:58px;max-width:100%;object-fit:contain" alt="sig">`:'<span style="color:#d1d5db;font-size:.65rem">${isAr?"(توقيع المدير)":"(Manager Signature)"}</span>'}
+              </div>
+              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع المدير المسؤول':'Manager Signature'}</div>
+              <div style="color:#9ca3af;margin-top:2px">${contractBranchName}</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:.6rem;color:#9ca3af;text-align:center;border-top:1px dashed #e5e7eb;padding-top:6px">
+            ${isAr
+              ? `هذا التقرير صادر عن نظام إدارة مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — تاريخ الطباعة: ${printDate}`
+              : `Issued by Child Care Group Management System — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`
+            }
+          </div>
+        </div>
+
+      </div>
+    </div>`; // end page
+  }).join('');
+
+  const html=`<!DOCTYPE html><html dir="${dir}" lang="${isAr?'ar':'en'}">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:10px;color:#111;font-size:.8rem;background:#fff}
+  .page{page-break-after:always;margin-bottom:24px;border:2.5px solid #1e3a8a}
+  .page:last-child{page-break-after:auto}
+  table{border-collapse:collapse}
+  @media print{
+    body{padding:0;margin:0}
+    .page{page-break-after:always;border:2px solid #1e3a8a;margin:0}
+    .page:last-child{page-break-after:auto}
+    @page{margin:8mm;size:A4 portrait}
+  }
+</style></head><body>
+${staffPages}
+</body></html>`;
+
+  el('staff-att-report-modal').classList.remove('on');
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
+}
+
 function openBulkAttModal(){
   const mon = (el('staffattdate')?.value||today()).substring(0,7);
   el('bulk-att-month').value = mon;
@@ -5456,47 +6000,195 @@ async function toggleStaffAtt(staffId, date){
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
 
+  const sum=el('staffattsum');
+  const showMsg=(ok,msg)=>{
+    if(!sum) return;
+    const d=document.createElement('div');
+    d.style.cssText=`background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#dc2626'};border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block`;
+    d.textContent=msg;
+    sum.appendChild(d);
+    setTimeout(()=>d.remove(),3000);
+  };
+
   if(!newSt){
-    // Cleared → delete record from Supabase
-    await sb.from('staff_attendance')
-      .delete()
-      .eq('branch_id', curBid)
-      .eq('staff_id',  Number(staffId))
-      .eq('date',      date);
+    const {error}=await sb.from('staff_attendance').delete()
+      .eq('branch_id', curBid).eq('staff_id', Number(staffId)).eq('date', date);
+    if(error) showMsg(false,'❌ خطأ في المسح');
+    else showMsg(true,'🗑️ تم المسح');
     return;
   }
 
-  // Save to Supabase — delete old then insert fresh (most reliable)
-  const payload={branch_id:curBid, staff_id:Number(staffId), date:date, status:newSt};
-  console.log('Saving staff att:', payload);
-  
-  await sb.from('staff_attendance')
-    .delete()
-    .eq('branch_id', curBid)
-    .eq('staff_id',  Number(staffId))
-    .eq('date',      date);
-    
-  const {error}=await sb.from('staff_attendance').insert(payload);
-  const sum=el('staffattsum');
+  // Use upsert — most reliable, handles both insert and update
+  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+  const {error}=await sb.from('staff_attendance')
+    .upsert(payload, {onConflict:'branch_id,staff_id,date'});
+
   if(error){
-    console.error('StaffAtt save error:', error);
-    if(sum){
-      const errDiv=document.createElement('div');
-      errDiv.style.cssText='background:#fee2e2;color:#dc2626;border-radius:8px;padding:8px 14px;font-size:.8rem;margin-top:6px;font-family:Tajawal,sans-serif;cursor:pointer';
-      errDiv.innerHTML='❌ خطأ في الحفظ (اضغط للإغلاق):<br><b>'+error.message+'</b><br><small>code: '+(error.code||'?')+' | details: '+(error.details||'?')+'</small>';
-      errDiv.onclick=()=>errDiv.remove();
-      sum.appendChild(errDiv);
-    }
+    // Fallback: delete then insert
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+    const {error:err2}=await sb.from('staff_attendance').insert(payload);
+    if(err2) showMsg(false,'❌ خطأ: '+err2.message);
+    else showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
   } else {
-    console.log('StaffAtt saved OK → '+newSt);
-    if(sum){
-      const okDiv=document.createElement('div');
-      okDiv.style.cssText='background:#d1fae5;color:#065f46;border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block';
-      okDiv.textContent='✅ تم الحفظ — '+(newSt==='حضور'?'حضور ✓':'غياب ✕');
-      sum.appendChild(okDiv);
-      setTimeout(()=>okDiv.remove(),2500);
-    }
+    showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
   }
+}
+
+async function renderStaffAttWeek(){
+  const dateEl=el('staffattdate');
+  if(!dateEl) return;
+  if(!dateEl.value) dateEl.value=today();
+  const selDate = new Date(dateEl.value+'T00:00:00');
+  
+  // Get week start (Saturday) and end (Friday)
+  const dow = selDate.getDay(); // 0=Sun...6=Sat
+  const diffToSat = (dow - 6 + 7) % 7;
+  const weekStart = new Date(selDate); weekStart.setDate(selDate.getDate() - diffToSat);
+  const weekDays = Array.from({length:7},(_,i)=>{
+    const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
+    return d.toISOString().split('T')[0];
+  });
+
+  // Get staff
+  const staff=(DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay<=today()) return false;
+    const wb=s.workBranch||s.branchId;
+    return String(wb)===String(curBid) || (!s.workBranch && String(s.branchId)===String(curBid));
+  });
+
+  // Load attendance from Supabase for this week
+  const {data:attData} = await sb.from('staff_attendance').select('*')
+    .gte('date', weekDays[0]).lte('date', weekDays[6]);
+  // Update DB.staffAtt
+  (attData||[]).forEach(x=>{
+    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+  });
+
+  const dayLabels=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
+  const dayColors=['#fdf2f8','#ecfdf5','#eff6ff','#fdf4ff','#fffbeb','#f0f9ff','#fef9c3'];
+  const container=el('staffattlist');
+  if(!container) return;
+
+  if(!staff.length){
+    container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>لا يوجد موظفون</p></div>`;
+    return;
+  }
+
+  // Week label
+  const fmtD=d=>`${d.split('-')[2]}/${d.split('-')[1]}`;
+  const weekLabel=`${fmtD(weekDays[0])} — ${fmtD(weekDays[6])}`;
+  const badge=el('staff-day-badge');
+  if(badge){ badge.textContent='📆 أسبوع '+weekLabel; badge.style.background='#eff6ff'; badge.style.color='#1e3a8a'; }
+
+  let html=`<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:600px">
+      <thead>
+        <tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:8px 10px;text-align:right;min-width:140px">الموظف</th>
+          ${weekDays.map((d,i)=>{
+            const isToday=d===today();
+            return`<th style="padding:6px 4px;text-align:center;background:${isToday?'#3b82f6':'#1e3a8a'};min-width:60px">
+              <div>${dayLabels[i]}</div>
+              <div style="font-size:.65rem;opacity:.8">${fmtD(d)}</div>
+            </th>`;
+          }).join('')}
+          <th style="padding:6px 4px;text-align:center;background:#065f46;min-width:45px">✓</th>
+          <th style="padding:6px 4px;text-align:center;background:#7f1d1d;min-width:45px">✕</th>
+          <th style="padding:6px 4px;text-align:center;min-width:45px">💬</th>
+        </tr>
+      </thead>
+      <tbody>
+      ${staff.map((s,si)=>{
+        let present=0, absent=0;
+        const cells=weekDays.map((d,i)=>{
+          const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
+          const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
+          if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
+          const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':dayColors[i];
+          const icon=isP?'✓':isA?'✕':isH?'½':'';
+          const color=isP?'#065f46':isA?'#dc2626':isH?'#92400e':'#9ca3af';
+          return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
+            <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
+              style="width:32px;height:32px;border-radius:7px;border:2px solid ${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db'};
+              background:${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff'};
+              display:flex;align-items:center;justify-content:center;cursor:pointer;
+              font-weight:900;font-size:.85rem;color:#fff;margin:auto;user-select:none">
+              ${icon}
+            </div>
+          </td>`;
+        }).join('');
+        const phone=s.contact||'';
+        const absentDays=weekDays.filter(d=>(DB.staffAtt[d]||{})[String(s.id)]==='غياب');
+        const waBtn=phone&&absentDays.length?`<button onclick="sendWeekAbsenceWA('${s.id}','${absentDays.join(',')}')"
+          style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`:'—';
+        return`<tr style="background:${si%2?'#fff':'#fafafa'}">
+          <td style="padding:7px 10px;border:1px solid #e5e7eb">
+            <div style="font-weight:800;font-size:.82rem">${s.name}</div>
+            <div style="font-size:.65rem;color:#9ca3af">${s.position||''}</div>
+          </td>
+          ${cells}
+          <td style="text-align:center;font-weight:900;color:#059669;border:1px solid #e5e7eb">${present%1===0?present:present.toFixed(1)}</td>
+          <td style="text-align:center;font-weight:900;color:#dc2626;border:1px solid #e5e7eb">${absent%1===0?absent:absent.toFixed(1)}</td>
+          <td style="text-align:center;border:1px solid #e5e7eb">${waBtn}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+
+  container.innerHTML=html;
+  
+  // Summary
+  const allPresent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='حضور'?1:v==='نص يوم'?0.5:0);},0),0);
+  const allAbsent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='غياب'?1:v==='نص يوم'?0.5:0);},0),0);
+  el('staffattsum').innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    <span style="color:#059669;font-weight:800">✅ إجمالي حضور: ${allPresent}</span>
+    <span style="color:#dc2626;font-weight:800">❌ إجمالي غياب: ${allAbsent}</span>
+    <span style="color:#6b7280;font-size:.72rem">اضغط على المربع للتغيير: فارغ ← حضور ✓ ← نص يوم ½ ← غياب ✕</span>
+  </div>`;
+}
+
+async function toggleStaffAttWeek(staffId, date){
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  const sid=String(staffId);
+  const cur=DB.staffAtt[date][sid]||'';
+  const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
+  DB.staffAtt[date][sid]=newSt;
+  
+  // Update cell visually immediately
+  const cell=document.querySelector(`[onclick="toggleStaffAttWeek('${staffId}','${date}')"]`);
+  if(cell){
+    const isP=newSt==='حضور',isA=newSt==='غياب',isH=newSt==='نص يوم';
+    cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
+    cell.style.borderColor=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
+    cell.textContent=isP?'✓':isA?'✕':isH?'½':'';
+    // Update parent cell bg
+    const td=cell.closest('td');
+    if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
+  }
+  
+  // Save to Supabase
+  if(!newSt){
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+  } else {
+    await sb.from('staff_attendance')
+      .upsert({branch_id:curBid,staff_id:Number(staffId),date,status:newSt},{onConflict:'branch_id,staff_id,date'});
+  }
+}
+
+function sendWeekAbsenceWA(staffId, datesStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s||!s.contact) return;
+  const phone=formatWANum(s.contact);
+  const b=CB();
+  const dates=datesStr.split(',').map(d=>{
+    const p=d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`;
+  }).join('، ');
+  const msg=`🔔 *تنبيه غياب*\n\nالموظف/ة العزيز/ة *${s.name}*\n\nنود إخطاركم بتسجيل غيابكم في الأيام التالية:\n📅 ${dates}\n\nيرجى التواصل مع الإدارة.\n\n${b.ar||b.en}\nمجموعة رعاية الطفل`;
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 function sendStaffAbsenceWA(staffId, date){
@@ -7323,25 +8015,57 @@ function togglePickDropEdit(dir){
 }
 
 // ── Bus Children Report ───────────────────────
-function openBusChildrenReport(){
+// Cache for all-branches bus data
+let _busAllBranchCache = null;
+
+async function openBusChildrenReport(){
   const mon = el('efmon')?.value || today().slice(0,7);
   el('bus-ch-rpt-mon').value = mon;
-  renderBusChildrenReport();
+  // Pre-select current branch
+  const bsel = el('bus-ch-branch-filter');
+  if(bsel && bsel.value==='') bsel.value = curBid;
   el('bus-ch-rpt-modal').style.display='flex';
+  await loadBusAllBranchData();
+  renderBusChildrenReport();
+}
+
+async function loadBusAllBranchData(forceReload){
+  if(_busAllBranchCache && !forceReload) return;
+  if(el('bus-ch-rpt-loading')) el('bus-ch-rpt-loading').style.display='block';
+  if(el('bus-ch-rpt-body')) el('bus-ch-rpt-body').innerHTML='';
+  const result={};
+  for(const b of BRANCHES){
+    const [c, r] = await Promise.all([
+      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id').eq('branch_id',b.id).limit(5000),
+      sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id).limit(5000),
+    ]);
+    result[b.id]={
+      children:(c.data||[]).map(x=>({
+        id:x.id, name:x.name||'', className:x.class_name||'',
+        bus:x.bus||'No', busFee:Number(x.bus_fee||0),
+        busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
+        leaveDate:x.leave_date||null, branchId:x.branch_id
+      })),
+      receipts:(r.data||[]).map(x=>({id:x.id,childId:x.child_id,date:x.date||'',bus:Number(x.bus||0)}))
+    };
+  }
+  _busAllBranchCache=result;
+  if(el('bus-ch-rpt-loading')) el('bus-ch-rpt-loading').style.display='none';
 }
 
 function renderBusChildrenReport(){
+  if(!_busAllBranchCache){ el('bus-ch-rpt-body').innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>'; return; }
   const mon = el('bus-ch-rpt-mon')?.value || today().slice(0,7);
   const dirFilter = el('bus-ch-dir-filter')?.value||'all';
+  const branchFilter = el('bus-ch-branch-filter')?.value||'all';
 
-  let children = DB.children.filter(c=>c.bus==='Yes'||c.bus==='نعم');
-  if(dirFilter==='two_way') children=children.filter(c=>c.busDirection==='two_way');
-  else if(dirFilter==='one_way') children=children.filter(c=>c.busDirection==='one_way');
-  else if(dirFilter==='pick') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='pick');
-  else if(dirFilter==='drop') children=children.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='drop');
-
-  // Get receipts for that month
-  const monReceipts = DB.receipts.filter(r=>monthOf(r.date)===mon);
+  const applyDirFilter = list =>{
+    if(dirFilter==='two_way') return list.filter(c=>c.busDirection==='two_way');
+    if(dirFilter==='one_way') return list.filter(c=>c.busDirection==='one_way');
+    if(dirFilter==='pick') return list.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='pick');
+    if(dirFilter==='drop') return list.filter(c=>c.busDirection==='one_way'&&c.busPickDrop==='drop');
+    return list;
+  };
 
   const dirLabel = v=>{
     if(v==='two_way') return '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700">🔄 اتجاهين</span>';
@@ -7354,38 +8078,30 @@ function renderBusChildrenReport(){
     if(pd==='drop') return '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;margin-right:4px">🔴 Drop</span>';
     return '';
   };
-
-  const monLabel = new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'});
-  const b = CB();
-  const totalBusFees = children.reduce((s,c)=>s+(c.busFee||0),0);
-  // Paid this month
-  const totalPaid = monReceipts.filter(r=>children.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
-
-  if(!children.length){
-    el('bus-ch-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا يوجد أطفال يستخدمون الباص</div>`;
-    return;
-  }
-
-  let html=`
-    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div style="font-weight:800">${b.ar||b.en} — ${monLabel}</div>
-      <div style="display:flex;gap:14px;font-size:.82rem">
+  const buildTable = (children, monReceipts, branchLabel, branchColor)=>{
+    if(!children.length) return `<div style="padding:10px 14px;color:#9ca3af;font-size:.8rem">— لا يوجد أطفال باص في هذا الفرع</div>`;
+    const totalBusFees = children.reduce((s,c)=>s+(c.busFee||0),0);
+    const totalPaid = monReceipts.filter(r=>children.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    return`
+    <div style="background:${branchColor||'#fef3c7'};border-radius:10px;padding:9px 14px;margin-bottom:8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center">
+      <div style="font-weight:800;font-size:.9rem">${branchLabel}</div>
+      <div style="display:flex;gap:12px;font-size:.8rem;flex-wrap:wrap">
         <span>👶 <b>${children.length}</b> طفل</span>
-        <span>💰 رسوم شهرية: <b style="color:#b45309">${fmtNum(totalBusFees)} AED</b></span>
-        <span>✅ مدفوع هذا الشهر: <b style="color:#059669">${fmtNum(totalPaid)} AED</b></span>
+        <span>💰 <b style="color:#b45309">${fmtNum(totalBusFees)} AED</b></span>
+        <span>✅ مدفوع: <b style="color:#059669">${fmtNum(totalPaid)} AED</b></span>
       </div>
     </div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+    <div style="overflow-x:auto;margin-bottom:16px">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem">
       <thead>
         <tr style="background:#fbbf24;color:#1c1917">
-          <th style="padding:8px 10px;text-align:right">#</th>
-          <th style="padding:8px 10px;text-align:right">اسم الطفل</th>
-          <th style="padding:8px 10px;text-align:right">الفصل</th>
-          <th style="padding:8px 10px;text-align:right">الاتجاه</th>
-          <th style="padding:8px 10px;text-align:right">المنطقة</th>
-          <th style="padding:8px 10px;text-align:left">رسوم الباص</th>
-          <th style="padding:8px 10px;text-align:left">مدفوع (${mon})</th>
+          <th style="padding:7px 9px;text-align:right">#</th>
+          <th style="padding:7px 9px;text-align:right">اسم الطفل</th>
+          <th style="padding:7px 9px;text-align:right">الفصل</th>
+          <th style="padding:7px 9px;text-align:right">الاتجاه</th>
+          <th style="padding:7px 9px;text-align:right">المنطقة</th>
+          <th style="padding:7px 9px;text-align:left">رسوم الباص</th>
+          <th style="padding:7px 9px;text-align:left">مدفوع (${mon})</th>
         </tr>
       </thead>
       <tbody>
@@ -7393,31 +8109,74 @@ function renderBusChildrenReport(){
           const rec = monReceipts.find(r=>String(r.childId)===String(c.id));
           const paid = rec ? (rec.bus||0) : 0;
           return`<tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
-            <td style="padding:7px 10px;color:#9ca3af">${i+1}</td>
-            <td style="padding:7px 10px;font-weight:700">${c.name}</td>
-            <td style="padding:7px 10px;color:#6b7280">${c.className||'—'}</td>
-            <td style="padding:7px 10px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
-            <td style="padding:7px 10px;color:#374151">${c.busArea||'—'}</td>
-            <td style="padding:7px 10px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
-            <td style="padding:7px 10px;text-align:left;font-weight:700;color:${paid?'#059669':'#9ca3af'}">${paid?fmtNum(paid)+' AED':'—'}</td>
+            <td style="padding:6px 9px;color:#9ca3af">${i+1}</td>
+            <td style="padding:6px 9px;font-weight:700">${c.name}</td>
+            <td style="padding:6px 9px;color:#6b7280">${c.className||'—'}</td>
+            <td style="padding:6px 9px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
+            <td style="padding:6px 9px;color:#374151">${c.busArea||'—'}</td>
+            <td style="padding:6px 9px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
+            <td style="padding:6px 9px;text-align:left;font-weight:700;color:${paid?'#059669':'#9ca3af'}">${paid?fmtNum(paid)+' AED':'—'}</td>
           </tr>`;
         }).join('')}
         <tr style="background:#fef3c7;font-weight:900;border-top:2px solid #fbbf24">
-          <td colspan="5" style="padding:8px 10px;text-align:right">الإجمالي</td>
-          <td style="padding:8px 10px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
-          <td style="padding:8px 10px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
+          <td colspan="5" style="padding:7px 9px;text-align:right">الإجمالي</td>
+          <td style="padding:7px 9px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
+          <td style="padding:7px 9px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
         </tr>
       </tbody>
     </table></div>`;
+  };
+
+  const monLabel = new Date(mon+'-01').toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+  let html='';
+  let allExportData=[];
+
+  // Branches to show
+  const targetBranches = branchFilter==='all' ? BRANCHES : BRANCHES.filter(b=>b.id===branchFilter);
+
+  let grandTotal=0, grandPaid=0, grandKids=0;
+
+  for(const br of targetBranches){
+    const bdata = _busAllBranchCache[br.id]||{children:[],receipts:[]};
+    let kids = bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate);
+    kids = applyDirFilter(kids);
+    const monRecs = bdata.receipts.filter(r=>monthOf(r.date)===mon);
+    const brLabel = `${br.icon} ${br.ar}`;
+    const bgColor = br.l ? `linear-gradient(135deg,${br.l},${br.l}cc)` : '#fef3c7';
+    html += `<div style="margin-bottom:4px">${buildTable(kids, monRecs, brLabel, bgColor)}</div>`;
+    grandTotal += kids.reduce((s,c)=>s+(c.busFee||0),0);
+    grandPaid  += monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    grandKids  += kids.length;
+    allExportData.push({br, kids, monRecs});
+  }
+
+  // Grand total bar (only when all branches shown)
+  if(branchFilter==='all' && targetBranches.length>1){
+    html = `<div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#fff">
+      <div style="font-weight:800;font-size:.95rem">🌐 كل الفروع — ${monLabel}</div>
+      <div style="display:flex;gap:14px;font-size:.83rem;flex-wrap:wrap">
+        <span>👶 <b>${grandKids}</b> طفل</span>
+        <span>💰 <b>${fmtNum(grandTotal)} AED</b></span>
+        <span>✅ مدفوع: <b>${fmtNum(grandPaid)} AED</b></span>
+      </div>
+    </div>` + html;
+  }
+
+  if(!grandKids){
+    el('bus-ch-rpt-body').innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">🚌 لا يوجد أطفال يستخدمون الباص في الفروع المحددة</div>`;
+    return;
+  }
 
   el('bus-ch-rpt-body').innerHTML=html;
-  window._busChRptData={children,mon:monLabel,branchName:b.ar||b.en,monReceipts};
+  window._busChRptData={allExportData, mon, monLabel, branchFilter, grandKids, grandTotal, grandPaid};
 }
 
 function printBusChildrenReport(){
   const b=el('bus-ch-rpt-body')?.innerHTML||'';
+  const d=window._busChRptData;
+  const title = d ? `تقرير أطفال الباص — ${d.monLabel||d.mon}` : 'Bus Children Report';
   const w=window.open('','_blank');
-  w.document.write(`<html><head><title>Bus Children Report</title>
+  w.document.write(`<html><head><title>${title}</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
     <style>body{font-family:'Tajawal',sans-serif;padding:20px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e5e7eb;padding:6px 8px}@media print{body{padding:0}}</style>
     </head><body>${b}<script>window.onload=function(){window.print()}<\/script></body></html>`);
@@ -7425,18 +8184,39 @@ function printBusChildrenReport(){
 }
 
 function exportBusChildrenExcel(){
-  const d=window._busChRptData;if(!d)return;
+  const d=window._busChRptData;if(!d||!d.allExportData)return;
   const dirMap={'two_way':'اتجاهين','one_way':'اتجاه واحد','':'غير محدد'};
   const pdMap={'pick':'Pick استقبال','drop':'Drop إيصال','':'—'};
-  const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع هذا الشهر']];
-  d.children.forEach((c,i)=>{
-    const rec=d.monReceipts.find(r=>String(r.childId)===String(c.id));
-    rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Bus Children');
-  XLSX.writeFile(wb,`Bus_Children_${d.mon||''}.xlsx`);
+  // One sheet per branch (or single sheet if one branch)
+  d.allExportData.forEach(({br,kids,monRecs})=>{
+    if(!kids.length) return;
+    const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع '+d.mon]];
+    kids.forEach((c,i)=>{
+      const rec=monRecs.find(r=>String(r.childId)===String(c.id));
+      rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
+    });
+    // Totals row
+    const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
+    const totPaid=monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+    rows.push(['','','','','','الإجمالي',totFee,totPaid]);
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const sheetName=(br.en||br.ar).replace(/[:\\/?*\[\]]/g,'').substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  });
+  // Summary sheet if multiple branches
+  if(d.allExportData.length>1){
+    const sumRows=[['الفرع','عدد الأطفال','إجمالي رسوم الباص','المدفوع '+d.mon]];
+    d.allExportData.forEach(({br,kids,monRecs})=>{
+      const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
+      const totPaid=monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
+      sumRows.push([br.ar, kids.length, totFee, totPaid]);
+    });
+    sumRows.push(['المجموع الكلي', d.grandKids, d.grandTotal, d.grandPaid]);
+    const wsSummary=XLSX.utils.aoa_to_sheet(sumRows);
+    XLSX.utils.book_append_sheet(wb,wsSummary,'ملخص كل الفروع');
+  }
+  XLSX.writeFile(wb,`Bus_Children_${d.monLabel||d.mon||''}.xlsx`);
 }
 
 async function deleteChild(){
@@ -7817,6 +8597,7 @@ async function loadStaff(){
   const {data} = await sb.from('staff').select('*');
   DB.staff = (data||[]).map(x=>({
     id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
+      workDays:x.work_days||'0,1,2,3,4',
     name:x.name||'', nationality:x.nationality||'', dob:x.dob||'',
     contact:x.contact||'', address:x.address||'',
     emergencyContact:x.emergency_contact||'', emergencyPhone:x.emergency_phone||'', workingPlace:x.working_place||'',
@@ -7987,6 +8768,19 @@ function openStaffForm(id){
       <div class="fg"><label>Position / الوظيفة</label><input id="sf_pos" value="${s?.position||''}" placeholder="e.g. Teacher, Driver..."></div>
       <div class="fg"><label>Contract Branch — فرع التعاقد 📄</label><select id="sf_branch">${branchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع المسؤول عن الراتب والمصاريف</div></div>
       <div class="fg"><label>Work Branch — فرع العمل الفعلي 🏢</label><select id="sf_work_branch"><option value="">Same as Contract Branch</option>${workBranchOpts}</select><div style="font-size:.68rem;color:#6b7280;margin-top:2px">الفرع اللي بيشتغل فيه فعلياً — الحضور بيتسجل عليه</div></div>
+      <div class="fg" style="grid-column:1/-1">
+        <label>📅 Work Days — أيام العمل</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          ${['Sun أحد','Mon إث','Tue ثلا','Wed أرب','Thu خمس','Fri جمع','Sat سبت'].map((d,i)=>{
+            const checked=(s?.workDays||'0,1,2,3,4').split(',').map(Number).includes(i)?'checked':'';
+            return`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.78rem;font-weight:700;background:${checked?'#1e3a8a':'#fff'};color:${checked?'#fff':'#374151'}">
+              <input type="checkbox" id="sf_wd_${i}" value="${i}" ${checked} style="display:none" onchange="updateWorkDayLabel(${i})">
+              ${d}
+            </label>`;
+          }).join('')}
+        </div>
+        <div style="font-size:.68rem;color:#6b7280;margin-top:3px">اختاري أيام الدوام الفعلية — الأيام اللي مش مختارة مش هتتحسب غياب</div>
+      </div>
       <div class="fg"><label>Nationality</label><input id="sf_nat" value="${s?.nationality||''}"></div>
       <div class="fg"><label>Date of Birth</label><input type="date" id="sf_dob" value="${s?.dob||''}"></div>
       <div class="fg"><label>Contact Number</label><input id="sf_contact" value="${s?.contact||''}" placeholder="+971..."></div>
@@ -8062,12 +8856,32 @@ function openStaffForm(id){
 }
 function closeStaffModal(){ el('staff-modal').classList.remove('on'); }
 
+function updateWorkDayLabel(i){
+  const cb = document.getElementById('sf_wd_'+i);
+  if(!cb) return;
+  const lbl = cb.closest('label');
+  if(lbl){
+    lbl.style.background = cb.checked ? '#1e3a8a' : '#fff';
+    lbl.style.color = cb.checked ? '#fff' : '#374151';
+  }
+}
+
+function getSelectedWorkDays(){
+  const days=[];
+  for(let i=0;i<7;i++){
+    const cb=document.getElementById('sf_wd_'+i);
+    if(cb&&cb.checked) days.push(i);
+  }
+  return days.length ? days.join(',') : '0,1,2,3,4';
+}
+
 async function saveStaff(id){
   const name = document.getElementById('sf_name')?.value?.trim();
   if(!name){ showAlert('staff-save-alert','⚠️ Name is required',true); return; }
   const row = {
     branch_id: document.getElementById('sf_branch')?.value||curBid,
     work_branch: document.getElementById('sf_work_branch')?.value||null,
+    work_days: getSelectedWorkDays(),
     name, position: document.getElementById('sf_pos')?.value||'',
     nationality: document.getElementById('sf_nat')?.value||'',
     dob: document.getElementById('sf_dob')?.value||null,
@@ -9474,13 +10288,17 @@ async function confirmImportReceipts(rows){
         notes:  String(row['Notes']||row['notes']||''),
       };
       if(!r.date) continue;
-      // Duplicate check: same receipt_num + same branch only
+      // Duplicate check: same receipt_num + same branch + same month only
       if(r.receipt_num){
+        const monthStart = r.date.substring(0,7) + '-01';
+        const monthEnd   = r.date.substring(0,7) + '-31';
         const {data:dup} = await sb.from('receipts').select('id')
           .eq('branch_id', curBid)
           .eq('receipt_num', r.receipt_num)
+          .gte('date', monthStart)
+          .lte('date', monthEnd)
           .limit(1);
-        if(dup && dup.length > 0){ err++; continue; } // skip duplicate
+        if(dup && dup.length > 0){ err++; continue; } // skip duplicate within same month
       }
       await sb.from('receipts').insert(r); ok++;
       if(!child && cname) notFound.push(cname);
@@ -15620,6 +16438,15 @@ boot();
       </div>
     </div>
     <div style="padding:14px 16px 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:.8rem;font-weight:700">🏢 الفرع:</label>
+      <select id="bus-ch-branch-filter" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
+        <option value="all">🌐 كل الفروع — All Branches</option>
+        <option value="b1">🌸 حضانة الفرحة</option>
+        <option value="b2">⭐ حضانة السعادة</option>
+        <option value="b3">🐬 حضانة الدولفين</option>
+        <option value="b4">🌿 السعادة للأطفال</option>
+        <option value="b5">🦸 أبطال البراعم</option>
+      </select>
       <label style="font-size:.8rem;font-weight:700">📅 الشهر:</label>
       <input type="month" id="bus-ch-rpt-mon" style="padding:5px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif" onchange="renderBusChildrenReport()">
       <label style="font-size:.8rem;font-weight:700">🔄 الاتجاه:</label>
@@ -15631,6 +16458,7 @@ boot();
         <option value="drop">🔴 Drop فقط</option>
       </select>
     </div>
+    <div id="bus-ch-rpt-loading" style="display:none;text-align:center;padding:20px;color:#6b7280;font-size:.85rem">⏳ جاري تحميل بيانات الفروع...</div>
     <div id="bus-ch-rpt-body" style="padding:0 16px 16px"></div>
   </div>
 </div>
