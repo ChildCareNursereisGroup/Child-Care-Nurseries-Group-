@@ -707,17 +707,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div id="att-tab-staff" style="display:none">
 <div class="card">
   <div class="ch">
-    <div class="ct">👷 Staff Attendance — الحضور والغياب</div>
+    <div class="ct" id="staff-att-title">👷 Staff Attendance — الحضور والغياب</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <!-- View Toggle -->
       <div style="display:flex;border:1.5px solid var(--border);border-radius:9px;overflow:hidden">
-        <button id="att-view-day-btn" onclick="setAttView('day')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#1e3a8a;color:#fff">📅 يوم</button>
-        <button id="att-view-week-btn" onclick="setAttView('week')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#fff;color:#374151">📆 أسبوع</button>
+        <button id="att-view-day-btn" onclick="setAttView('day')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#1e3a8a;color:#fff" data-ar="📅 يوم" data-en="📅 Day">📅 يوم</button>
+        <button id="att-view-week-btn" onclick="setAttView('week')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#fff;color:#374151" data-ar="📆 أسبوع" data-en="📆 Week">📆 أسبوع</button>
       </div>
       <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
       <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
-      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()">📋 إدخال جماعي</button>
-      <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()">📊 تقرير الغياب</button>
+      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()" id="bulk-att-btn">📋 إدخال جماعي</button>
+      <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()" id="att-report-btn">📊 تقرير الغياب</button>
     </div>
   </div>
   <div id="staffattlist"></div>
@@ -742,18 +742,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
           </select>
         </div>
       </div>
-      <!-- Language -->
-      <div class="fg">
-        <label>Language — اللغة</label>
-        <div style="display:flex;gap:8px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="att-rep-lang" value="en"> 🇬🇧 English
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="att-rep-lang" value="ar" checked> 🇦🇪 العربية
-          </label>
-        </div>
-      </div>
+      <!-- Language auto-follows app language -->
+
       <!-- Bonus / Warning / Loan per staff -->
       <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
         <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 تعديلات الراتب — Salary Adjustments (اختياري)</div>
@@ -2609,6 +2599,27 @@ function setLang(l){
   renderLoginBranches();renderLoginRoles();
   // Refresh modal tabs if open
   if(el('cmodal')?.classList.contains('on')) renderModalTabs();
+  // Update staff attendance page labels
+  updateStaffAttLang();
+}
+
+function updateStaffAttLang(){
+  const isAr = lang==='ar';
+  const title = el('staff-att-title');
+  if(title) title.textContent = isAr ? '👷 الحضور والغياب — Staff Attendance' : '👷 Staff Attendance';
+  const dayBtn = el('att-view-day-btn');
+  if(dayBtn) dayBtn.textContent = isAr ? '📅 يوم' : '📅 Day';
+  const weekBtn = el('att-view-week-btn');
+  if(weekBtn) weekBtn.textContent = isAr ? '📆 أسبوع' : '📆 Week';
+  const bulkBtn = el('bulk-att-btn');
+  if(bulkBtn) bulkBtn.textContent = isAr ? '📋 إدخال جماعي' : '📋 Bulk Entry';
+  const rptBtn = el('att-report-btn');
+  if(rptBtn) rptBtn.textContent = isAr ? '📊 تقرير الغياب' : '📊 Absence Report';
+  const modal = el('staff-att-report-modal');
+  if(modal){
+    const mt = modal.querySelector('.mt');
+    if(mt) mt.textContent = isAr ? '📊 تقرير الغياب — Staff Attendance Report' : '📊 Staff Attendance Report';
+  }
 }
 function toggleLang(){setLang(lang==='ar'?'en':'ar');renderNav();refreshCurrentPage();}
 
@@ -2730,7 +2741,7 @@ function initApp(){
   const frEl=el('fr');
   if(frEl&&!frEl.value){ const next=(Math.max(0,...DB.children.map(c=>parseInt(c.regNum)||0))+1); frEl.value=String(next).padStart(4,'0'); }
   el('abr').innerHTML='<option value="all">All Branches — كل الفروع</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
-  renderNav();applyTranslations();
+  renderNav();applyTranslations();updateStaffAttLang();
   // Go to role's natural home page
   if(curRole==='manager')     showPage('dashboard',null);
   else if(curRole==='attendance'){
@@ -4390,7 +4401,7 @@ function renderStaffAttDay(){
             ${chkIcon}
           </div>
           <div style="font-size:.7rem;font-weight:800;min-width:36px;text-align:center;color:${isP?'#059669':isA?'#dc2626':'#9ca3af'}">
-            ${isP?'حضور':isA?'غياب':isH?'نص يوم':'—'}
+            ${isP?(lang==='ar'?'حضور':'Present'):isA?(lang==='ar'?'غياب':'Absent'):isH?(lang==='ar'?'نص يوم':'Half'):'—'}
           </div>
           <button onclick="toggleStaffExpand('${s.id}','${date}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:.72rem;color:#6b7280">⚙️</button>
         </div>
@@ -4438,11 +4449,11 @@ function renderStaffAttDay(){
 
   el('staffattsum').innerHTML=`
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-      <span style="color:#059669;font-weight:800">✅ حضور: ${present}</span>
-      <span style="color:#dc2626;font-weight:800">❌ غياب: ${absent}</span>
-      ${unset?`<span style="color:#f59e0b;font-weight:800">⬜ لم يُسجَّل: ${unset}</span>`:''}
-      ${totalBonus?`<span style="color:#059669;font-weight:700">🎁 بونص: ${fmtNum(totalBonus)}</span>`:''}
-      ${totalDeduct?`<span style="color:#dc2626;font-weight:700">✂️ خصم: ${fmtNum(totalDeduct)}</span>`:''}
+      <span style="color:#059669;font-weight:800">✅ ${lang==='ar'?'حضور':'Present'}: ${present}</span>
+      <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'غياب':'Absent'}: ${absent}</span>
+      ${unset?`<span style="color:#f59e0b;font-weight:800">⬜ ${lang==='ar'?'لم يُسجَّل':'Unrecorded'}: ${unset}</span>`:''}
+      ${totalBonus?`<span style="color:#059669;font-weight:700">🎁 ${lang==='ar'?'بونص':'Bonus'}: ${fmtNum(totalBonus)}</span>`:''}
+      ${totalDeduct?`<span style="color:#dc2626;font-weight:700">✂️ ${lang==='ar'?'خصم':'Deduction'}: ${fmtNum(totalDeduct)}</span>`:''}
     </div>`;
 }
 
@@ -5522,7 +5533,7 @@ function buildAdjSection(bonusDays,bonusReason,deductDays,deductReason,isAr,gros
 async function printStaffAttReport(exportType='print'){
   const mon = el('att-rep-month').value;
   const staffFilter = el('att-rep-staff').value;
-  const repLang = document.querySelector('input[name="att-rep-lang"]:checked')?.value || lang;
+  const repLang = lang; // always follow app language
   const isAr = repLang==='ar';
   const dir = isAr?'rtl':'ltr';
   if(!mon){ alert(isAr?'اختاري الشهر':'Select month'); return; }
@@ -5749,44 +5760,6 @@ async function printStaffAttReport(exportType='print'){
             ✓=${isAr?'حضور':'Present'} &nbsp; ✕=${isAr?'غياب':'Absent'} &nbsp; ½=${isAr?'نصف يوم':'Half'} &nbsp; —=${isAr?'غير مسجل':'Unrecorded'} &nbsp; ${isAr?'راحة':'Off'}=${isAr?'يوم راحة':'Day Off'}
           </div>
         </div>
-
-        <!-- Financial Summary (only if gross salary set) -->
-        ${gross>0?`
-        <div style="padding:7px 14px;background:#f0f9ff;border-top:1.5px solid #bae6fd">
-          <div style="font-size:.72rem;font-weight:900;color:#0369a1;margin-bottom:5px;border-bottom:1px dashed #7dd3fc;padding-bottom:3px">
-            💰 ${isAr?'ملخص الراتب':'Salary Summary'}
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:.68rem">
-            <div style="display:flex;justify-content:space-between;padding:3px 6px;background:#fff;border-radius:5px;border:1px solid #e0f2fe">
-              <span style="color:#374151">${isAr?'الراتب الإجمالي':'Gross Salary'}</span>
-              <b>${fmtNum(gross)} AED</b>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:3px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
-              <span style="color:#dc2626">${isAr?`خصم الغياب (${Number(absent).toFixed(absent%1?1:0)} يوم)`:`Absence (${Number(absent).toFixed(absent%1?1:0)} days)`}</span>
-              <b style="color:#dc2626">- ${fmt2(absentDed)} AED</b>
-            </div>
-            ${regCount>0?`<div style="display:flex;justify-content:space-between;padding:3px 6px;background:#eff6ff;border-radius:5px;border:1px solid #bae6fd">
-              <span style="color:#0369a1">📋 ${isAr?`تسجيلات (${regCount} × 50)`:`Reg. (${regCount} × 50)`}</span>
-              <b style="color:#0369a1">+ ${fmtNum(regBonus)} AED</b>
-            </div>`:''}
-            ${bonusDays>0?`<div style="display:flex;justify-content:space-between;padding:3px 6px;background:#f0fdf4;border-radius:5px;border:1px solid #86efac">
-              <span style="color:#059669">${isAr?`مكافأة (${bonusDays} يوم)`:`Bonus (${bonusDays}d)`}${bonusReason?` — ${bonusReason}`:''}</span>
-              <b style="color:#059669">+ ${fmt2(bonusAed)} AED</b>
-            </div>`:''}
-            ${deductDays>0?`<div style="display:flex;justify-content:space-between;padding:3px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
-              <span style="color:#dc2626">${isAr?`خصم (${deductDays} يوم)`:`Deduct (${deductDays}d)`}${deductReason?` — ${deductReason}`:''}</span>
-              <b style="color:#dc2626">- ${fmt2(deductAed)} AED</b>
-            </div>`:''}
-            ${loanAed>0?`<div style="display:flex;justify-content:space-between;padding:3px 6px;background:#faf5ff;border-radius:5px;border:1px solid #ddd6fe">
-              <span style="color:#7c3aed">${isAr?'قرض / سلفة':'Loan'}${loanReason?` — ${loanReason}`:''}</span>
-              <b style="color:#7c3aed">- ${fmtNum(loanAed)} AED</b>
-            </div>`:''}
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px;padding:7px 12px;background:#1e3a8a;border-radius:7px;color:#fff">
-            <span style="font-weight:800;font-size:.78rem">${isAr?'صافي الراتب المستحق':'Net Salary Due'}</span>
-            <span style="font-size:.95rem;font-weight:900">${fmt2(netSalary)} AED</span>
-          </div>
-        </div>`:''}
 
         <!-- Signatures with embedded images -->
         <div style="padding:10px 14px;border-top:1.5px solid #e5e7eb;background:#fafafa">
@@ -6145,27 +6118,29 @@ async function renderStaffAttWeek(){
     DB.staffAtt[x.date][String(x.staff_id)]=x.status;
   });
 
-  const dayLabels=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
+  const dayNamesArShort=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
+  const dayNamesEnShort=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+  const dayLabels = lang==='ar' ? dayNamesArShort : dayNamesEnShort;
   const dayColors=['#fdf2f8','#ecfdf5','#eff6ff','#fdf4ff','#fffbeb','#f0f9ff','#fef9c3'];
+  const staffHeader = lang==='ar' ? 'الموظف' : 'Staff';
+
   const container=el('staffattlist');
   if(!container) return;
-
   if(!staff.length){
-    container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>لا يوجد موظفون</p></div>`;
+    container.innerHTML=`<div class="empty"><div class="ei">👷</div><p>${lang==='ar'?'لا يوجد موظفون':'No staff found'}</p></div>`;
     return;
   }
 
-  // Week label
   const fmtD=d=>`${d.split('-')[2]}/${d.split('-')[1]}`;
   const weekLabel=`${fmtD(weekDays[0])} — ${fmtD(weekDays[6])}`;
   const badge=el('staff-day-badge');
-  if(badge){ badge.textContent='📆 أسبوع '+weekLabel; badge.style.background='#eff6ff'; badge.style.color='#1e3a8a'; }
+  if(badge){ badge.textContent=(lang==='ar'?'📆 أسبوع ':'📆 Week ')+weekLabel; badge.style.background='#eff6ff'; badge.style.color='#1e3a8a'; }
 
   let html=`<div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:600px">
       <thead>
         <tr style="background:#1e3a8a;color:#fff">
-          <th style="padding:8px 10px;text-align:right;min-width:140px">الموظف</th>
+          <th style="padding:8px 10px;text-align:right;min-width:140px">${staffHeader}</th>
           ${weekDays.map((d,i)=>{
             const isToday=d===today();
             return`<th style="padding:6px 4px;text-align:center;background:${isToday?'#3b82f6':'#1e3a8a'};min-width:60px">
@@ -6180,8 +6155,6 @@ async function renderStaffAttWeek(){
       </thead>
       <tbody>
       ${staff.map((s,si)=>{
-        let present=0, absent=0;
-        const cells=weekDays.map((d,i)=>{
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
           const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
           if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
@@ -6223,9 +6196,9 @@ async function renderStaffAttWeek(){
   const allPresent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='حضور'?1:v==='نص يوم'?0.5:0);},0),0);
   const allAbsent=staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{const v=(DB.staffAtt[d]||{})[String(st.id)];return ss+(v==='غياب'?1:v==='نص يوم'?0.5:0);},0),0);
   el('staffattsum').innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-    <span style="color:#059669;font-weight:800">✅ إجمالي حضور: ${allPresent}</span>
-    <span style="color:#dc2626;font-weight:800">❌ إجمالي غياب: ${allAbsent}</span>
-    <span style="color:#6b7280;font-size:.72rem">اضغط على المربع للتغيير: فارغ ← حضور ✓ ← نص يوم ½ ← غياب ✕</span>
+    <span style="color:#059669;font-weight:800">✅ ${lang==='ar'?'إجمالي حضور':'Total Present'}: ${allPresent}</span>
+    <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'إجمالي غياب':'Total Absent'}: ${allAbsent}</span>
+    <span style="color:#6b7280;font-size:.72rem">${lang==='ar'?'اضغط على المربع للتغيير: فارغ ← حضور ✓ ← نص يوم ½ ← غياب ✕':'Click cell to cycle: empty → Present ✓ → Half ½ → Absent ✕'}</span>
   </div>`;
 }
 
