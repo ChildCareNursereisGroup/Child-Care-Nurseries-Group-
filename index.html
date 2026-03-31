@@ -6155,6 +6155,8 @@ async function renderStaffAttWeek(){
       </thead>
       <tbody>
       ${staff.map((s,si)=>{
+        let present=0, absent=0;
+        const cells=weekDays.map((d,i)=>{
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
           const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
           if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
