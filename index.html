@@ -753,10 +753,32 @@ main{padding:12px;max-width:960px;margin:0 auto}
           </label>
         </div>
       </div>
-      <!-- Bonus / Warning per staff -->
+      <!-- Bonus / Warning / Loan per staff -->
       <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
-        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 Bonus / Warning — بونص / تحذير (اختياري لكل موظف)</div>
-        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 تعديلات الراتب — Salary Adjustments (اختياري)</div>
+        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+      </div>
+      <!-- Signatures section -->
+      <div style="background:#f8faff;border-radius:10px;padding:12px;border:1.5px solid #c7d2fe">
+        <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">✍️ التوقيعات الإلكترونية — Electronic Signatures</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع الموظف / Employee Signature</div>
+            <canvas id="sig-employee-canvas" width="200" height="80"
+              style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button onclick="clearSig('sig-employee-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع المدير / Manager Signature</div>
+            <canvas id="sig-manager-canvas" width="200" height="80"
+              style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button onclick="clearSig('sig-manager-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ Print PDF</button>
@@ -5320,48 +5342,127 @@ function openStaffAttReportModal(){
   });
   sel.innerHTML = `<option value="all">👥 ${lang==='ar'?'كل الموظفين':'All Staff'}</option>` +
     branchStaff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  // Populate bonus/warning fields
+  // Populate bonus/warning/loan fields
   const adjList = el('att-rep-adj-list');
   if(adjList){
-    adjList.innerHTML = branchStaff.map(s=>`
+    adjList.innerHTML = branchStaff.map(s=>{
+      const gross = Number(s.grossSalary||s.basicSalary||0);
+      const dailyRate = gross>0 ? (gross/30).toFixed(2) : 0;
+      return `
       <div style="background:#fff;border-radius:8px;padding:8px;border:1px solid #e5e7eb">
-        <div style="font-weight:700;font-size:.78rem;margin-bottom:6px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="font-weight:700;font-size:.78rem;margin-bottom:2px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
+        ${gross>0?`<div style="font-size:.68rem;color:#6b7280;margin-bottom:6px">الراتب الإجمالي: <b>${fmtNum(gross)} AED</b> — معدل يوم: <b style="color:#1d4ed8">${dailyRate} AED</b></div>`:'<div style="font-size:.68rem;color:#f59e0b;margin-bottom:6px">⚠️ لم يُسجَّل الراتب الإجمالي</div>'}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
           <div>
-            <div style="font-size:.68rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 Bonus (AED)</div>
-            <input type="number" min="0" placeholder="0" id="adj-bonus-${s.id}"
+            <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 بونص (أيام عمل)</div>
+            <input type="number" min="0" step="0.5" placeholder="0" id="adj-bonus-${s.id}"
+              oninput="updateAdjCalc('${s.id}',${gross})"
               style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-            <input type="text" placeholder="${lang==='ar'?'السبب':'Reason'}" id="adj-bonus-reason-${s.id}"
-              style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.75rem;box-sizing:border-box;margin-top:3px">
+            <div id="adj-bonus-aed-${s.id}" style="font-size:.65rem;color:#059669;margin-top:1px;min-height:12px"></div>
+            <input type="text" placeholder="السبب / Reason" id="adj-bonus-reason-${s.id}"
+              style="width:100%;padding:3px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
           </div>
           <div>
-            <div style="font-size:.68rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ Warning / Deduction (AED)</div>
-            <input type="number" min="0" placeholder="0" id="adj-deduct-${s.id}"
+            <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ خصم / تحذير (أيام عمل)</div>
+            <input type="number" min="0" step="0.5" placeholder="0" id="adj-deduct-${s.id}"
+              oninput="updateAdjCalc('${s.id}',${gross})"
               style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-            <input type="text" placeholder="${lang==='ar'?'السبب':'Reason'}" id="adj-deduct-reason-${s.id}"
-              style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.75rem;box-sizing:border-box;margin-top:3px">
+            <div id="adj-deduct-aed-${s.id}" style="font-size:.65rem;color:#dc2626;margin-top:1px;min-height:12px"></div>
+            <input type="text" placeholder="السبب / Reason" id="adj-deduct-reason-${s.id}"
+              style="width:100%;padding:3px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
           </div>
         </div>
-      </div>`).join('');
+        <div>
+          <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 خصم قرض / Loan Deduction (AED)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <input type="number" min="0" placeholder="0" id="adj-loan-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+            <input type="text" placeholder="السبب / Reason" id="adj-loan-reason-${s.id}"
+              style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box">
+          </div>
+        </div>
+      </div>`}).join('');
   }
   el('staff-att-report-modal').classList.add('on');
+  // Init signature canvases after modal is visible
+  setTimeout(()=>{
+    initSigCanvas('sig-employee-canvas');
+    initSigCanvas('sig-manager-canvas');
+  }, 100);
 }
 
-function buildAdjSection(bonus,bonusReason,deduct,deductReason,isAr){
-  if(!bonus && !deduct) return '';
-  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
-  if(bonus>0){
-    html += `<div style="background:#d1fae5;border-radius:8px;padding:10px">
-      <div style="font-size:.7rem;font-weight:700;color:#065f46;margin-bottom:3px">🎁 ${isAr?'بونص':'Bonus'}</div>
-      <div style="font-size:1.1rem;font-weight:900;color:#059669">+${bonus} AED</div>
-      ${bonusReason?`<div style="font-size:.72rem;color:#6b7280;margin-top:2px">${bonusReason}</div>`:''}
+function updateAdjCalc(staffId, grossSalary){
+  const daily = grossSalary > 0 ? grossSalary/30 : 0;
+  const bonusDays  = Number(document.getElementById('adj-bonus-'+staffId)?.value||0);
+  const deductDays = Number(document.getElementById('adj-deduct-'+staffId)?.value||0);
+  const bonusAed   = (bonusDays * daily).toFixed(2);
+  const deductAed  = (deductDays * daily).toFixed(2);
+  const bonusEl  = document.getElementById('adj-bonus-aed-'+staffId);
+  const deductEl = document.getElementById('adj-deduct-aed-'+staffId);
+  if(bonusEl)  bonusEl.innerHTML  = bonusDays>0  ? `= <b>${bonusAed} AED</b>` : '';
+  if(deductEl) deductEl.innerHTML = deductDays>0 ? `= <b>${deductAed} AED</b>` : '';
+}
+
+// ── Signature Canvas helpers ──────────────────────────────
+function initSigCanvas(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas || canvas._sigInited) return;
+  canvas._sigInited = true;
+  let drawing = false;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1e3a8a';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x:(src.clientX-r.left)*scaleX, y:(src.clientY-r.top)*scaleY };
+  };
+  const start = e=>{ drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+  const move  = e=>{ if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); };
+  const stop  = ()=>{ drawing=false; };
+  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move);
+  canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
+  canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',stop);
+}
+function clearSig(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+function getSigDataURL(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return '';
+  // Check if canvas has any drawing
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const hasContent = data.some((v,i)=> i%4===3 && v>0);
+  return hasContent ? canvas.toDataURL('image/png') : '';
+}
+
+function buildAdjSection(bonusDays,bonusReason,deductDays,deductReason,isAr,grossSalary){
+  if(!bonusDays && !deductDays) return '';
+  const daily = grossSalary>0 ? grossSalary/30 : 0;
+  const bonusAed  = (bonusDays*daily).toFixed(2);
+  const deductAed = (deductDays*daily).toFixed(2);
+  let html = `<div style="display:grid;grid-template-columns:${bonusDays&&deductDays?'1fr 1fr':'1fr'};gap:8px;margin-bottom:14px">`;
+  if(bonusDays>0){
+    html += `<div style="background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:10px;padding:12px">
+      <div style="font-size:.68rem;font-weight:700;color:#065f46;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">🎁 ${isAr?'مكافأة / بونص':'Bonus'}</div>
+      <div style="font-size:.95rem;font-weight:900;color:#059669">+ ${bonusDays} ${isAr?'يوم':'days'}</div>
+      <div style="font-size:.8rem;font-weight:700;color:#059669">= ${bonusAed} AED</div>
+      ${bonusReason?`<div style="font-size:.72rem;color:#374151;margin-top:4px;padding-top:4px;border-top:1px dashed #6ee7b7">${bonusReason}</div>`:''}
     </div>`;
   }
-  if(deduct>0){
-    html += `<div style="background:#fee2e2;border-radius:8px;padding:10px">
-      <div style="font-size:.7rem;font-weight:700;color:#7f1d1d;margin-bottom:3px">⚠️ ${isAr?'خصم / تحذير':'Warning / Deduction'}</div>
-      <div style="font-size:1.1rem;font-weight:900;color:#dc2626">-${deduct} AED</div>
-      ${deductReason?`<div style="font-size:.72rem;color:#6b7280;margin-top:2px">${deductReason}</div>`:''}
+  if(deductDays>0){
+    html += `<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px">
+      <div style="font-size:.68rem;font-weight:700;color:#7f1d1d;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">⚠️ ${isAr?'خصم / تحذير':'Warning / Deduction'}</div>
+      <div style="font-size:.95rem;font-weight:900;color:#dc2626">- ${deductDays} ${isAr?'يوم':'days'}</div>
+      <div style="font-size:.8rem;font-weight:700;color:#dc2626">= ${deductAed} AED</div>
+      ${deductReason?`<div style="font-size:.72rem;color:#374151;margin-top:4px;padding-top:4px;border-top:1px dashed #fca5a5">${deductReason}</div>`:''}
     </div>`;
   }
   html += '</div>';
@@ -5455,126 +5556,220 @@ async function printStaffAttReport(exportType='print'){
     return;
   }
 
+  // Get signatures as data URLs
+  const empSigURL = getSigDataURL('sig-employee-canvas');
+  const mgrSigURL = getSigDataURL('sig-manager-canvas');
+
   // Print — one page per staff, portrait
   const staffPages = staffList.map(s=>{
     let present=0, absent=0, half=0;
     const absences=[];
-    // Read bonus/warning from modal fields
-    const bonus = Number(document.getElementById('adj-bonus-'+s.id)?.value||0);
+    // Read adjustments from modal (bonus/deduct in DAYS, loan in AED)
+    const bonusDays   = Number(document.getElementById('adj-bonus-'+s.id)?.value||0);
     const bonusReason = document.getElementById('adj-bonus-reason-'+s.id)?.value||'';
-    const deduct = Number(document.getElementById('adj-deduct-'+s.id)?.value||0);
-    const deductReason = document.getElementById('adj-deduct-reason-'+s.id)?.value||'';
+    const deductDays  = Number(document.getElementById('adj-deduct-'+s.id)?.value||0);
+    const deductReason= document.getElementById('adj-deduct-reason-'+s.id)?.value||'';
+    const loanAed     = Number(document.getElementById('adj-loan-'+s.id)?.value||0);
+    const loanReason  = document.getElementById('adj-loan-reason-'+s.id)?.value||'';
+
+    // Use CONTRACT branch (branchId), not work branch
+    const contractBranch = BRANCHES.find(x=>x.id===s.branchId)||b;
+    const contractBranchName = contractBranch.ar||contractBranch.en||'';
 
     const rows = days.map((d,i)=>{
       const dow=new Date(d+'T00:00:00').getDay();
       const {status, smart, isWorkDay}=getSmartStatus(s.id,i);
       const day=d.split('-')[2];
       const dayName=dayNames[dow];
-      const isFri=dow===5, isSat=dow===6, isSun=dow===0;
-      let statusHtml='', rowBg='#fff';
+      let statusCell='', rowBg='#ffffff', statusColor='#374151';
       if(status==='off'){
-        // Day off — grey background, don't count
-        statusHtml=`<span style="color:#d1d5db;font-size:.75rem">— ${isAr?'إجازة':'Day Off'}`;
-        rowBg='#f3f4f6';
+        statusCell=isAr?'إجازة / يوم راحة':'Day Off';
+        rowBg='#f3f4f6'; statusColor='#9ca3af';
       } else if(status==='حضور'){
         present++;
-        statusHtml=`<span style="color:#059669;font-weight:900">✓ ${isAr?'حضور':'Present'}${smart?` <span style="font-size:.65rem;color:#6b7280">(${isAr?'تلقائي':'auto'})</span>`:''}`;
-        rowBg=smart?'#f9fafb':'#f0fdf4';
+        statusCell=(isAr?'✓ حضور':'✓ Present')+(smart?` <span style="font-size:.6rem;color:#9ca3af">(${isAr?'تلقائي':'auto'})</span>`:'');
+        rowBg=smart?'#f9fafb':'#f0fdf4'; statusColor='#059669';
       } else if(status==='غياب'){
         absent++;
-        absences.push(`${day} ${dayName}`);
-        statusHtml=`<span style="color:#dc2626;font-weight:900">✕ ${isAr?'غياب':'Absent'}`;
-        rowBg='#fff5f5';
+        absences.push(`${day}/${String(mo).padStart(2,'0')}`);
+        statusCell=isAr?'✕ غياب':'✕ Absent';
+        rowBg='#fff5f5'; statusColor='#dc2626';
       } else if(status==='نص يوم'){
         half++;present+=0.5;absent+=0.5;
-        statusHtml=`<span style="color:#d97706;font-weight:900">½ ${isAr?'نص يوم':'Half Day'}`;
-        rowBg='#fffbeb';
+        statusCell=isAr?'½ نصف يوم':'½ Half Day';
+        rowBg='#fffbeb'; statusColor='#d97706';
       } else {
-        // Work day but not recorded
-        statusHtml=`<span style="color:#9ca3af">— ${isAr?'غير مسجل':'Not recorded'}`;
-        rowBg=isFri?'#fef9c3':isSat||isSun?'#fdf2f8':'#fff';
+        statusCell=isAr?'غير مسجل':'—';
+        statusColor='#9ca3af';
       }
       return `<tr style="background:${rowBg}">
-        <td style="padding:6px 10px;font-weight:700;text-align:center;color:#374151">${day}</td>
-        <td style="padding:6px 10px;color:#6b7280">${dayName}</td>
-        <td style="padding:6px 10px">${statusHtml}</span></td>
+        <td style="padding:5px 8px;text-align:center;font-weight:700;border:1px solid #e5e7eb;color:#1e3a8a">${day}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:#374151">${dayName}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;font-weight:700;color:${statusColor}">${statusCell}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;color:#6b7280;font-size:.7rem"></td>
       </tr>`;
     }).join('');
 
-    const basic=Number(s.basicSalary||0);
-    const dailyRate=basic>0?(basic/30).toFixed(2):0;
-    const deduction=absent>0&&basic>0?(absent*(basic/30)).toFixed(2):0;
+    // Use GROSS salary for all calculations
+    const gross     = Number(s.grossSalary||s.basicSalary||0);
+    const daily     = gross>0 ? gross/30 : 0;
+    const absentDed = absent>0&&gross>0 ? absent*daily : 0;
+    const bonusAed  = bonusDays>0  ? bonusDays*daily  : 0;
+    const deductAed = deductDays>0 ? deductDays*daily : 0;
+    const netSalary = gross - absentDed - deductAed - loanAed + bonusAed;
+    const fmt2 = v => Number(v).toFixed(2);
+    const printDate = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 
     return `<div class="page">
-      <!-- Header -->
-      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div style="border:2.5px solid #1e3a8a;padding:0;margin-bottom:0">
+
+        <!-- Top bar: company + contract branch -->
+        <div style="background:#1e3a8a;color:#fff;padding:10px 18px;display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-size:1.1rem;font-weight:900;margin-bottom:3px">${s.name}</div>
-            <div style="font-size:.82rem;opacity:.85">${s.position||'—'} &nbsp;|&nbsp; ${b.icon} ${b.ar||b.en}</div>
-            <div style="font-size:.75rem;opacity:.7;margin-top:2px">
-              ${s.nationality||''}${s.contact?' · '+s.contact:''}
-            </div>
+            <div style="font-size:1rem;font-weight:900;letter-spacing:.5px">مجموعة رعاية الطفل للحضانات</div>
+            <div style="font-size:.73rem;opacity:.88;margin-top:1px">Child Care Group — ${contractBranchName} — UAE</div>
           </div>
           <div style="text-align:${isAr?'left':'right'}">
-            <div style="font-size:.72rem;opacity:.75">${isAr?'تقرير شهر':'Monthly Report'}</div>
-            <div style="font-size:1rem;font-weight:800">${monthLabel}</div>
+            <div style="font-size:.67rem;opacity:.75">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
+            <div style="font-size:.9rem;font-weight:800">${monthLabel}</div>
+            <div style="font-size:.62rem;opacity:.7">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
           </div>
         </div>
+
+        <!-- Employee Info — NO salary in header -->
+        <div style="padding:10px 18px;background:#f8faff;border-bottom:1.5px solid #c7d2fe">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.74rem">
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'اسم الموظف':'Employee Name'}:</span><br><b style="font-size:.9rem;color:#1e3a8a">${s.name}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'المسمى الوظيفي':'Position'}:</span><br><b>${s.position||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'الجنسية':'Nationality'}:</span><br><b>${s.nationality||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'جهة التعاقد':'Contract Branch'}:</span><br><b>${contractBranchName}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم التواصل':'Contact'}:</span><br><b>${s.contact||'—'}</b></div>
+            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم الإقامة / الوثيقة':'ID / Residency No.'}:</span><br><b>${s.idNumber||s.passportNum||'—'}</b></div>
+          </div>
+        </div>
+
+        <!-- Summary boxes -->
+        <div style="padding:10px 18px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;border-bottom:1.5px solid #e5e7eb">
+          <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#1e40af">${daysInMonth}</div>
+            <div style="font-size:.6rem;color:#1e40af;font-weight:700">${isAr?'أيام الشهر':'Month Days'}</div>
+          </div>
+          <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+            <div style="font-size:.6rem;color:#059669;font-weight:700">${isAr?'أيام الحضور':'Present Days'}</div>
+          </div>
+          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+            <div style="font-size:.6rem;color:#dc2626;font-weight:700">${isAr?'أيام الغياب':'Absent Days'}</div>
+          </div>
+          <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#d97706">${half}</div>
+            <div style="font-size:.6rem;color:#d97706;font-weight:700">${isAr?'نصف يوم':'Half Days'}</div>
+          </div>
+          <div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:7px;padding:7px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:#374151">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status}).length}</div>
+            <div style="font-size:.6rem;color:#374151;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
+          </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <div style="padding:10px 18px">
+          <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+            <thead>
+              <tr style="background:#1e3a8a;color:#fff">
+                <th style="padding:6px 8px;text-align:center;border:1px solid #3b5998;width:48px">${isAr?'اليوم':'Day'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998;width:88px">${isAr?'اليوم (أسبوعي)':'Weekday'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998">${isAr?'الحالة':'Status'}</th>
+                <th style="padding:6px 8px;text-align:${isAr?'right':'left'};border:1px solid #3b5998;width:130px">${isAr?'ملاحظات':'Notes'}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+
+        <!-- Financial Summary (only if gross salary set) -->
+        ${gross>0?`
+        <div style="padding:10px 18px;background:#f0f9ff;border-top:1.5px solid #bae6fd">
+          <div style="font-size:.78rem;font-weight:900;color:#0369a1;margin-bottom:7px;border-bottom:1px dashed #7dd3fc;padding-bottom:4px">
+            💰 ${isAr?'ملخص الراتب':'Salary Summary'}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.74rem">
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #e0f2fe">
+              <span style="color:#374151">${isAr?'الراتب الإجمالي':'Gross Salary'}</span>
+              <b>${fmtNum(gross)} AED</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #e0f2fe">
+              <span style="color:#374151">${isAr?'معدل اليوم (÷30)':'Daily Rate (÷30)'}</span>
+              <b>${fmt2(daily)} AED</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
+              <span style="color:#dc2626">${isAr?`خصم الغياب (${Number(absent).toFixed(absent%1?1:0)} يوم)`:`Absence Deduction (${Number(absent).toFixed(absent%1?1:0)} days)`}</span>
+              <b style="color:#dc2626">- ${fmt2(absentDed)} AED</b>
+            </div>
+            ${bonusDays>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#f0fdf4;border-radius:5px;border:1px solid #86efac">
+              <span style="color:#059669">${isAr?`مكافأة (${bonusDays} يوم)`:`Bonus (${bonusDays} days)`}${bonusReason?` — <i style="font-weight:400">${bonusReason}</i>`:''}</span>
+              <b style="color:#059669">+ ${fmt2(bonusAed)} AED</b>
+            </div>`:''}
+            ${deductDays>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#fff;border-radius:5px;border:1px solid #fecaca">
+              <span style="color:#dc2626">${isAr?`خصم إضافي (${deductDays} يوم)`:`Extra Deduction (${deductDays} days)`}${deductReason?` — <i style="font-weight:400">${deductReason}</i>`:''}</span>
+              <b style="color:#dc2626">- ${fmt2(deductAed)} AED</b>
+            </div>`:''}
+            ${loanAed>0?`<div style="display:flex;justify-content:space-between;padding:4px 6px;background:#faf5ff;border-radius:5px;border:1px solid #ddd6fe">
+              <span style="color:#7c3aed">${isAr?'خصم قرض / سلفة':'Loan / Advance Deduction'}${loanReason?` — <i style="font-weight:400">${loanReason}</i>`:''}</span>
+              <b style="color:#7c3aed">- ${fmtNum(loanAed)} AED</b>
+            </div>`:''}
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;padding:9px 12px;background:#1e3a8a;border-radius:8px;color:#fff">
+            <span style="font-weight:800;font-size:.85rem">${isAr?'صافي الراتب المستحق':'Net Salary Due'}</span>
+            <span style="font-size:1.05rem;font-weight:900">${fmt2(netSalary)} AED</span>
+          </div>
+        </div>`:''}
+
+        <!-- Signatures with embedded images -->
+        <div style="padding:14px 18px;border-top:1.5px solid #e5e7eb;background:#fafafa">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:.72rem">
+            <div style="text-align:center">
+              <div style="height:65px;border-bottom:1.5px solid #1e3a8a;margin-bottom:5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">
+                ${empSigURL?`<img src="${empSigURL}" style="max-height:58px;max-width:100%;object-fit:contain" alt="sig">`:'<span style="color:#d1d5db;font-size:.65rem">${isAr?"(توقيع الموظف)":"(Employee Signature)"}</span>'}
+              </div>
+              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع الموظف':'Employee Signature'}</div>
+              <div style="color:#6b7280;margin-top:2px">${s.name}</div>
+            </div>
+            <div style="text-align:center">
+              <div style="height:65px;border-bottom:1.5px solid #1e3a8a;margin-bottom:5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">
+                ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:58px;max-width:100%;object-fit:contain" alt="sig">`:'<span style="color:#d1d5db;font-size:.65rem">${isAr?"(توقيع المدير)":"(Manager Signature)"}</span>'}
+              </div>
+              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع المدير المسؤول':'Manager Signature'}</div>
+              <div style="color:#9ca3af;margin-top:2px">${contractBranchName}</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:.6rem;color:#9ca3af;text-align:center;border-top:1px dashed #e5e7eb;padding-top:6px">
+            ${isAr
+              ? `هذا التقرير صادر عن نظام إدارة مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — تاريخ الطباعة: ${printDate}`
+              : `Issued by Child Care Group Management System — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`
+            }
+          </div>
+        </div>
+
       </div>
-
-      <!-- Summary -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-        <div style="background:#d1fae5;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
-          <div style="font-size:.7rem;color:#065f46;font-weight:700">${isAr?'حضور':'Present'}</div>
-        </div>
-        <div style="background:#fee2e2;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
-          <div style="font-size:.7rem;color:#7f1d1d;font-weight:700">${isAr?'غياب':'Absent'}</div>
-        </div>
-        <div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:900;color:#d97706">${half}</div>
-          <div style="font-size:.7rem;color:#78350f;font-weight:700">${isAr?'نص يوم':'Half Day'}</div>
-        </div>
-        <div style="background:#ede9fe;border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:900;color:#7c3aed">${days.filter((_,i)=>!getSmartStatus(s.id,i).status).length}</div>
-          <div style="font-size:.7rem;color:#4c1d95;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
-        </div>
-      </div>
-
-
-      ${buildAdjSection(bonus,bonusReason,deduct,deductReason,isAr)}
-
-
-      <!-- Table -->
-      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
-        <thead>
-          <tr style="background:#1e3a8a;color:#fff">
-            <th style="padding:7px 10px;text-align:center;width:60px">${isAr?'يوم':'Day'}</th>
-            <th style="padding:7px 10px;text-align:${isAr?'right':'left'}">${isAr?'اليوم':'Weekday'}</th>
-            <th style="padding:7px 10px;text-align:${isAr?'right':'left'}">${isAr?'الحالة':'Status'}</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-
-      <div style="margin-top:12px;border-top:1px dashed #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;font-size:.7rem;color:#9ca3af">
-        <span>✓ ${isAr?'حضور':'Present'} &nbsp; ✕ ${isAr?'غياب':'Absent'} &nbsp; ½ ${isAr?'نص يوم':'Half Day'} &nbsp; (${isAr?'تلقائي':'auto'}) = ${isAr?'محسوب من الجيران':'inferred from neighbors'}</span>
-        <span>${isAr?'طُبع':'Printed'}: ${new Date().toLocaleDateString(isAr?'ar-AE':'en-GB')}</span>
-      </div>
-    </div>`;
+    </div>`; // end page
   }).join('');
 
   const html=`<!DOCTYPE html><html dir="${dir}" lang="${isAr?'ar':'en'}">
 <head><meta charset="UTF-8">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Tajawal',Arial,sans-serif;padding:16px;color:#111;font-size:.82rem}
-  .page{page-break-after:always;margin-bottom:20px}
+  body{font-family:'Tajawal',Arial,sans-serif;padding:10px;color:#111;font-size:.8rem;background:#fff}
+  .page{page-break-after:always;margin-bottom:24px;border:2.5px solid #1e3a8a}
   .page:last-child{page-break-after:auto}
-  @media print{body{padding:8px}@page{margin:10mm;size:A4 portrait}}
+  table{border-collapse:collapse}
+  @media print{
+    body{padding:0;margin:0}
+    .page{page-break-after:always;border:2px solid #1e3a8a;margin:0}
+    .page:last-child{page-break-after:auto}
+    @page{margin:8mm;size:A4 portrait}
+  }
 </style></head><body>
 ${staffPages}
 </body></html>`;
