@@ -725,12 +725,13 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 <!-- Staff Attendance Report Modal -->
 <div class="mover" id="staff-att-report-modal">
-  <div class="mbox" style="max-width:520px">
-    <div class="mh">
+  <div style="background:#fff;border-radius:17px;width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div class="mh" style="padding:14px 16px;border-bottom:1.5px solid #e5e7eb;flex-shrink:0">
       <div class="mt">📊 Staff Attendance Report — تقرير الغياب</div>
       <button class="xb" onclick="el('staff-att-report-modal').classList.remove('on')">✕</button>
     </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+    <!-- Scrollable body -->
+    <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="fg"><label>Month — الشهر</label>
           <input type="month" id="att-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
@@ -746,17 +747,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <label>Language — اللغة</label>
         <div style="display:flex;gap:8px;margin-top:4px">
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="att-rep-lang" value="en" ${lang==='en'?'checked':''}> 🇬🇧 English
+            <input type="radio" name="att-rep-lang" value="en"> 🇬🇧 English
           </label>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="att-rep-lang" value="ar" ${lang==='ar'?'checked':''}> 🇦🇪 العربية
+            <input type="radio" name="att-rep-lang" value="ar" checked> 🇦🇪 العربية
           </label>
         </div>
       </div>
       <!-- Bonus / Warning / Loan per staff -->
       <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
         <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 تعديلات الراتب — Salary Adjustments (اختياري)</div>
-        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+        <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
       </div>
       <!-- Signatures section -->
       <div style="background:#f8faff;border-radius:10px;padding:12px;border:1.5px solid #c7d2fe">
@@ -766,24 +767,21 @@ main{padding:12px;max-width:960px;margin:0 auto}
             <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع الموظف / Employee Signature</div>
             <canvas id="sig-employee-canvas" width="200" height="80"
               style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <button onclick="clearSig('sig-employee-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
-            </div>
+            <button onclick="clearSig('sig-employee-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
           </div>
           <div>
             <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع المدير / Manager Signature</div>
             <canvas id="sig-manager-canvas" width="200" height="80"
               style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <button onclick="clearSig('sig-manager-canvas')" style="flex:1;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
-            </div>
+            <button onclick="clearSig('sig-manager-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
           </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">🖨️ Print PDF</button>
-        <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.85rem">📊 Excel</button>
-      </div>
+    </div>
+    <!-- Sticky buttons at bottom — always visible -->
+    <div style="padding:12px 16px;border-top:1.5px solid #e5e7eb;background:#fff;border-radius:0 0 17px 17px;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">🖨️ Print PDF</button>
+      <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">📊 Excel</button>
     </div>
   </div>
 </div>
@@ -6236,6 +6234,8 @@ async function toggleStaffAttWeek(staffId, date){
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
+  
+  // Update local state immediately for snappy UI
   DB.staffAtt[date][sid]=newSt;
   
   // Update cell visually immediately
@@ -6245,18 +6245,56 @@ async function toggleStaffAttWeek(staffId, date){
     cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
     cell.style.borderColor=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
     cell.textContent=isP?'✓':isA?'✕':isH?'½':'';
-    // Update parent cell bg
+    cell.style.opacity='0.6'; // dim while saving
     const td=cell.closest('td');
     if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
   }
   
   // Save to Supabase
-  if(!newSt){
-    await sb.from('staff_attendance').delete()
-      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
-  } else {
-    await sb.from('staff_attendance')
-      .upsert({branch_id:curBid,staff_id:Number(staffId),date,status:newSt},{onConflict:'branch_id,staff_id,date'});
+  let saveOk = false;
+  try {
+    if(!newSt){
+      const {error}=await sb.from('staff_attendance').delete()
+        .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+      saveOk = !error;
+    } else {
+      const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+      const {error}=await sb.from('staff_attendance')
+        .upsert(payload,{onConflict:'branch_id,staff_id,date'});
+      if(error){
+        // Fallback: delete then insert
+        await sb.from('staff_attendance').delete()
+          .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+        const {error:err2}=await sb.from('staff_attendance').insert(payload);
+        saveOk = !err2;
+        if(err2) console.error('Staff att save error:', err2);
+      } else {
+        saveOk = true;
+      }
+    }
+  } catch(e){
+    console.error('Staff att exception:', e);
+    saveOk = false;
+  }
+
+  // Restore cell opacity — show error if failed
+  if(cell){
+    cell.style.opacity='1';
+    if(!saveOk){
+      // Revert local state on failure
+      DB.staffAtt[date][sid]=cur;
+      cell.style.background=cur==='حضور'?'#059669':cur==='غياب'?'#dc2626':cur==='نص يوم'?'#f59e0b':'#fff';
+      cell.style.borderColor=cur==='حضور'?'#059669':cur==='غياب'?'#dc2626':cur==='نص يوم'?'#f59e0b':'#d1d5db';
+      cell.textContent=cur==='حضور'?'✓':cur==='غياب'?'✕':cur==='نص يوم'?'½':'';
+      const td=cell.closest('td');
+      if(td) td.style.background=cur==='حضور'?'#d1fae5':cur==='غياب'?'#fee2e2':cur==='نص يوم'?'#fef3c7':'#fff';
+      // Show error toast
+      const toast=document.createElement('div');
+      toast.textContent='❌ فشل الحفظ — تأكدي من الاتصال بالإنترنت';
+      toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:8px 18px;border-radius:10px;font-family:Tajawal,sans-serif;font-size:.82rem;z-index:9999;font-weight:700';
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(),3000);
+    }
   }
 }
 
