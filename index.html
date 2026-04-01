@@ -6077,35 +6077,50 @@ async function saveBulkAtt(){
   const alertEl = el('bulk-att-alert');
   alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.8rem">⏳ جاري الحفظ...</div>`;
 
-  // Build rows to upsert
-  const rows=[];
+  // Separate into: records to upsert, and records to delete (cleared)
+  const upsertRows=[];
+  const deleteKeys=[]; // {staffId, date}
+
   Object.keys(_bulkAttData).forEach(date=>{
     if(!date.startsWith(mon)) return;
     Object.keys(_bulkAttData[date]).forEach(staffId=>{
       const status=_bulkAttData[date][staffId];
-      if(!status) return; // skip unset
-      rows.push({branch_id:bid, staff_id:Number(staffId), date, status});
+      if(status){
+        upsertRows.push({branch_id:bid, staff_id:Number(staffId), date, status});
+      } else {
+        // Empty = user cleared it → delete from Supabase
+        deleteKeys.push({staffId:Number(staffId), date});
+      }
     });
   });
 
-  if(!rows.length){
+  if(!upsertRows.length && !deleteKeys.length){
     alertEl.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px 12px;font-size:.8rem">⚠️ لا يوجد تغييرات للحفظ</div>`;
     return;
   }
 
+  let saved=0, deleted=0, errors=0;
+
   // Upsert in batches of 50
-  let saved=0, errors=0;
-  for(let i=0;i<rows.length;i+=50){
-    const batch=rows.slice(i,i+50);
+  for(let i=0;i<upsertRows.length;i+=50){
+    const batch=upsertRows.slice(i,i+50);
     const {error}=await sb.from('staff_attendance').upsert(batch,{onConflict:'branch_id,staff_id,date'});
-    if(error){ errors++; console.error('bulk att error:',error); }
+    if(error){ errors++; console.error('bulk att upsert error:',error); }
     else saved+=batch.length;
+  }
+
+  // Delete cleared records one by one (no bulk delete by multiple keys)
+  for(const {staffId,date} of deleteKeys){
+    const {error}=await sb.from('staff_attendance').delete()
+      .eq('branch_id',bid).eq('staff_id',staffId).eq('date',date);
+    if(error){ errors++; console.error('bulk att delete error:',error); }
+    else deleted++;
   }
 
   if(errors){
     alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#dc2626">❌ بعض السجلات لم تُحفظ (${errors} أخطاء)</div>`;
   } else {
-    alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل بنجاح!</div>`;
+    alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل${deleted?' وحذف '+deleted:''} بنجاح!</div>`;
     _bulkAttData={};
     // Refresh local DB cache
     if(bid===curBid) await loadFromSupa(curBid);
