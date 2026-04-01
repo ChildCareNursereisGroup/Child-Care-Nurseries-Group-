@@ -12956,6 +12956,7 @@ function openEditExp(id){
   el('eedit-invoice-num').value=e.invoiceNumber||'';
   el('eedit-reason').value=e.note||'';
   el('eedit-alert').innerHTML='';
+  if(el('eedit-branch')) el('eedit-branch').value=''; // reset transfer field
   el('exp-edit-modal').style.display='flex';
   setTimeout(()=>el('eedit-amount').focus(),200);
 }
@@ -12985,6 +12986,9 @@ async function saveEditExp(){
     invoice_number:el('eedit-invoice-num')?.value||null,
     note:el('eedit-reason')?.value||null,
   };
+  // Transfer to different branch if selected
+  const transferBranch = el('eedit-branch')?.value;
+  if(transferBranch) row.branch_id = transferBranch;
   setSyncing(true);
   const {error}=await sb.from('expenses').update(row).eq('id',id);
   setSyncing(false);
@@ -16771,6 +16775,17 @@ boot();
         <div>
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🔢 الرقم الضريبي / Tax No.</label>
           <input id="eedit-taxnum" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:.75rem;font-weight:700;color:#7c3aed;display:block;margin-bottom:4px">🏢 نقل إلى فرع / Transfer to Branch</label>
+          <select id="eedit-branch" style="width:100%;padding:8px 10px;border:2px solid #7c3aed;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box;background:#faf5ff">
+            <option value="">— نفس الفرع الحالي / Keep Current Branch —</option>
+            <option value="b1">🌟 الفرحة</option>
+            <option value="b2">😊 السعادة</option>
+            <option value="b3">🐬 الدولفين</option>
+            <option value="b4">🌈 السعادة للأطفال</option>
+            <option value="b5">🏆 أبطال البراعم</option>
+          </select>
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 سبب الصرف / Reason</label>
