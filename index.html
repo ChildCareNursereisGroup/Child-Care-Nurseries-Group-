@@ -4333,15 +4333,16 @@ function renderStaffAttDay(){
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
   // Show staff in their WORK branch only (if set), else contract branch
-  const staff=(DB.staff||[]).filter(s=>{
+  const staffRaw=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<=date) return false;
     if(s.workBranch){
-      // Work branch set → show ONLY in work branch
       return String(s.workBranch)===String(curBid);
     }
-    // No work branch → show in contract branch
     return String(s.branchId)===String(curBid);
   });
+  // Deduplicate by staff id (prevent double-entry if workBranch === branchId)
+  const seenIds = new Set();
+  const staff = staffRaw.filter(s=>{ if(seenIds.has(s.id)) return false; seenIds.add(s.id); return true; });
   const b=CB();
 
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -4369,13 +4370,17 @@ function renderStaffAttDay(){
   let html='';
 
   staff.forEach((s,i)=>{
-    // '' = not recorded yet (checkbox empty), 'حضور' = present ✅, 'غياب' = absent ❌
-    const st=DB.staffAtt[date][String(s.id)];
+    // Check if off day first
+    const dowDay = new Date(date+'T00:00:00').getDay();
+    const workDaysArr = (s.workDays||'0,1,2,3,4').split(',').map(Number);
+    const isOffDayView = !workDaysArr.includes(dowDay);
+    // '' = not recorded yet, 'حضور' = present, 'غياب' = absent
+    const st = isOffDayView ? 'off' : (DB.staffAtt[date][String(s.id)]||'');
     const isP = st==='حضور';
     const isA = st==='غياب';
     const isH = st==='نص يوم';
-    const isEmpty = !st;
-    if(isP) present++; else if(isA) absent++; else if(isH){ present+=0.5; absent+=0.5; } else unset++;
+    const isEmpty = !st || st==='off';
+    if(isP) present++; else if(isA) absent++; else if(isH){ present+=0.5; absent+=0.5; } else if(st!=='off') unset++;
     const phone=s.contact||'';
     const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+s.id;
     const sentTime=localStorage.getItem(sentKey);
@@ -5611,11 +5616,12 @@ async function printStaffAttReport(exportType='print'){
     const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
     const isWorkDay = workDays.includes(dow);
 
+    // Off day ALWAYS returns 'off' — ignore any saved records
+    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
+
+    // Work day — check saved record
     const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
     if(raw) return {status:raw, smart:false, isWorkDay};
-
-    // Off day — don't count as absent or present
-    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
 
     // Work day + unregistered → check neighbors
     const prev=(attMap[staffId]||{})[days[dayIdx-1]]||'';
@@ -5918,13 +5924,15 @@ async function renderBulkAtt(){
   const [yr,mo] = mon.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
 
-  // Load staff for selected branch - show ONLY in work branch if set, else contract branch
-  let staffList = DB.staff.filter(s=>{
+  // Load staff for selected branch - deduplicated
+  const staffListRaw = DB.staff.filter(s=>{
     if(s.workBranch){
       return String(s.workBranch)===String(bid);
     }
     return String(s.branchId)===String(bid);
   });
+  const seenB=new Set();
+  let staffList = staffListRaw.filter(s=>{ if(seenB.has(s.id)) return false; seenB.add(s.id); return true; });
   if(!staffList.length){
     // Try loading from supabase
     const {data} = await sb.from('staff').select('*').eq('branch_id',bid);
@@ -6105,10 +6113,13 @@ async function saveBulkAtt(){
       if(!wdays.includes(dow)) return;
 
       const status=_bulkAttData[date][staffId];
+      // Use staff's contract branchId for saving
+      const staffRec=DB.staff.find(x=>String(x.id)===staffId);
+      const sBid=staffRec?.branchId||bid;
       if(status){
-        upsertRows.push({branch_id:bid, staff_id:Number(staffId), date, status});
+        upsertRows.push({branch_id:sBid, staff_id:Number(staffId), date, status});
       } else {
-        deleteKeys.push({staffId:Number(staffId), date});
+        deleteKeys.push({staffId:Number(staffId), date, bid:sBid});
       }
     });
   });
@@ -6129,9 +6140,9 @@ async function saveBulkAtt(){
   }
 
   // Delete cleared records one by one (no bulk delete by multiple keys)
-  for(const {staffId,date} of deleteKeys){
+  for(const {staffId,date,bid:sBidDel} of deleteKeys){
     const {error}=await sb.from('staff_attendance').delete()
-      .eq('branch_id',bid).eq('staff_id',staffId).eq('date',date);
+      .eq('staff_id',staffId).eq('date',date);
     if(error){ errors++; console.error('bulk att delete error:',error); }
     else deleted++;
   }
@@ -6182,22 +6193,21 @@ async function toggleStaffAtt(staffId, date){
   };
 
   if(!newSt){
-    const {error}=await sb.from('staff_attendance').delete()
-      .eq('branch_id', curBid).eq('staff_id', Number(staffId)).eq('date', date);
-    if(error) showMsg(false,'❌ خطأ في المسح');
-    else showMsg(true,'🗑️ تم المسح');
+    // Delete from all branches for this staff+date (safe cleanup)
+    await sb.from('staff_attendance').delete()
+      .eq('staff_id', Number(staffId)).eq('date', date);
+    showMsg(true,'🗑️ تم المسح');
     return;
   }
 
-  // Use upsert — most reliable, handles both insert and update
-  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+  // Save: use staff contract branchId (not curBid) so records are always found
+  const staffBid = s?.branchId || curBid;
+  const payload={branch_id:staffBid, staff_id:Number(staffId), date, status:newSt};
   const {error}=await sb.from('staff_attendance')
     .upsert(payload, {onConflict:'branch_id,staff_id,date'});
-
   if(error){
-    // Fallback: delete then insert
     await sb.from('staff_attendance').delete()
-      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+      .eq('branch_id',staffBid).eq('staff_id',Number(staffId)).eq('date',date);
     const {error:err2}=await sb.from('staff_attendance').insert(payload);
     if(err2) showMsg(false,'❌ خطأ: '+err2.message);
     else showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
@@ -6221,12 +6231,14 @@ async function renderStaffAttWeek(){
     return d.toISOString().split('T')[0];
   });
 
-  // Get staff
-  const staff=(DB.staff||[]).filter(s=>{
+  // Get staff - deduplicated
+  const staffRawW=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<=today()) return false;
     const wb=s.workBranch||s.branchId;
     return String(wb)===String(curBid) || (!s.workBranch && String(s.branchId)===String(curBid));
   });
+  const seenW=new Set();
+  const staff=staffRawW.filter(s=>{ if(seenW.has(s.id)) return false; seenW.add(s.id); return true; });
 
   // Use DB.staffAtt as single source of truth (loaded on startup)
   // No extra query needed - already loaded with full data
@@ -6350,21 +6362,22 @@ async function toggleStaffAttWeek(staffId, date){
     if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
   }
   
-  // Save to Supabase
+  // Save to Supabase using staff's contract branchId
+  const sWeek=DB.staff.find(x=>String(x.id)===String(staffId));
+  const weekBid=sWeek?.branchId||curBid;
   let saveOk = false;
   try {
     if(!newSt){
       const {error}=await sb.from('staff_attendance').delete()
-        .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+        .eq('staff_id',Number(staffId)).eq('date',date);
       saveOk = !error;
     } else {
-      const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+      const payload={branch_id:weekBid, staff_id:Number(staffId), date, status:newSt};
       const {error}=await sb.from('staff_attendance')
         .upsert(payload,{onConflict:'branch_id,staff_id,date'});
       if(error){
-        // Fallback: delete then insert
         await sb.from('staff_attendance').delete()
-          .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+          .eq('staff_id',Number(staffId)).eq('date',date);
         const {error:err2}=await sb.from('staff_attendance').insert(payload);
         saveOk = !err2;
         if(err2) console.error('Staff att save error:', err2);
