@@ -681,13 +681,15 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div id="att-tab-kids" style="display:block">
 <div class="card">
   <div class="ch">
-    <div class="ct" data-t="dailyAtt">👧 Kids Daily Attendance</div>
+    <div class="ct" data-t="dailyAtt">👧 Kids Attendance</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <!-- Week view only -->
+      <div style="background:#1e3a8a;color:#fff;border-radius:9px;padding:4px 12px;font-size:.75rem;font-weight:700;font-family:'Tajawal',sans-serif">📆 Week</div>
       <input type="date" id="attdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderAtt()">
       <span id="att-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#e0e7ff;color:#3730a3"></span>
-      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import Excel</button>
+      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
-      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 تقرير الغياب</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAttReport()">📊 Report</button>
       <button class="btn bp bsm np" onclick="printAtt()">🖨️</button>
     </div>
     <input type="file" id="xl-att-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importAttendanceExcel(this.files[0])">
@@ -4113,7 +4115,111 @@ async function delRec(id){
 // ═══════════════════════════════════════════════
 //  ATTENDANCE
 // ═══════════════════════════════════════════════
+let kidsAttView='day';
+function setKidsAttView(v){
+  kidsAttView=v;
+  const db=el('kids-att-day-btn'), wb=el('kids-att-week-btn');
+  if(db){db.style.background=v==='day'?'#1e3a8a':'#fff';db.style.color=v==='day'?'#fff':'#374151';}
+  if(wb){wb.style.background=v==='week'?'#1e3a8a':'#fff';wb.style.color=v==='week'?'#fff':'#374151';}
+  renderAtt();
+}
+
+function renderKidsWeek(){
+  const dateEl=el('attdate');
+  if(!dateEl.value) dateEl.value=today();
+  const selDate=new Date(dateEl.value+'T00:00:00');
+  // Week Sun→Sat
+  const diffToSun=selDate.getDay();
+  const weekStart=new Date(selDate); weekStart.setDate(selDate.getDate()-diffToSun);
+  const weekDays=Array.from({length:7},(_,i)=>{
+    const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
+    return d.toISOString().split('T')[0];
+  });
+  const fmtD=d=>`${d.split('-')[2]}/${d.split('-')[1]}`;
+  const badge=el('att-day-badge');
+  if(badge){badge.textContent=`📆 ${fmtD(weekDays[0])} — ${fmtD(weekDays[6])}`;badge.style.background='#eff6ff';badge.style.color='#1e3a8a';}
+  el('att-day-label').innerHTML='';
+
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayAr=['أحد','اثن','ثلا','أرب','خمس','جمع','سبت'];
+  const dayLabels=lang==='ar'?dayAr:dayNames;
+
+  // All active children
+  const active=DB.children.filter(c=>!c.leaveDate);
+  if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👧</div><p>No children</p></div>`;return;}
+
+  // Group by class
+  const classMap={};
+  active.forEach(c=>{const cls=c.className||'—';if(!classMap[cls])classMap[cls]=[];classMap[cls].push(c);});
+  const classes=Object.keys(classMap).sort();
+
+  let totalPresent=0,totalAbsent=0;
+  const html=classes.map(cls=>{
+    const kids=classMap[cls];
+    const rows=kids.map((c,ci)=>{
+      let wkPresent=0,wkAbsent=0;
+      const cells=weekDays.map((d,di)=>{
+        const attDay=DB.attendance[d]||{};
+        const st=attDay[c.id]||attDay[String(c.id)]||'';
+        const isP=st==='حضور';
+        const isA=st==='غياب';
+        if(isP)wkPresent++;else if(isA)wkAbsent++;
+        const bg=isP?'#059669':isA?'#dc2626':'#e5e7eb';
+        const icon=isP?'✓':isA?'✕':'';
+        const color=isP||isA?'#fff':'#9ca3af';
+        return`<td style="padding:3px;text-align:center;border:1px solid #f3f4f6">
+          <div style="width:28px;height:28px;border-radius:6px;background:${bg};color:${color};
+            display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;margin:auto">${icon}</div>
+        </td>`;
+      }).join('');
+      if(wkPresent>0) totalPresent++;
+      if(wkAbsent>0) totalAbsent++;
+      return`<tr style="background:${ci%2?'#f8fafc':'#fff'}">
+        <td style="padding:5px 8px;font-weight:700;font-size:.78rem;border:1px solid #e5e7eb">${c.name}</td>
+        ${cells}
+        <td style="padding:5px;text-align:center;border:1px solid #e5e7eb">
+          <span style="background:${wkAbsent>2?'#fee2e2':wkAbsent>0?'#fef3c7':'#d1fae5'};color:${wkAbsent>2?'#dc2626':wkAbsent>0?'#d97706':'#059669'};
+            border-radius:8px;padding:2px 8px;font-size:.72rem;font-weight:800">${wkAbsent}✕</span>
+        </td>
+      </tr>`;
+    }).join('');
+
+    return`<div style="margin-bottom:14px;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">
+      <div style="background:#1e3a8a;color:#fff;padding:8px 12px;font-weight:800;font-size:.82rem">
+        🎓 ${cls} <span style="font-weight:400;opacity:.8;font-size:.72rem">(${kids.length} ${lang==='ar'?'طفل':'children'})</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.75rem;min-width:500px">
+          <thead>
+            <tr style="background:#f1f5f9">
+              <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;min-width:130px">${lang==='ar'?'الاسم':'Name'}</th>
+              ${weekDays.map((d,i)=>{
+                const isToday=d===today();
+                const dowIdx=new Date(d+'T00:00:00').getDay();
+                return`<th style="padding:4px;text-align:center;border:1px solid #e5e7eb;background:${isToday?'#dbeafe':'#f1f5f9'};min-width:38px">
+                  <div style="font-size:.6rem;color:#6b7280">${dayLabels[dowIdx]}</div>
+                  <div style="font-size:.68rem;font-weight:700">${d.split('-')[2]}</div>
+                </th>`;
+              }).join('')}
+              <th style="padding:4px;text-align:center;border:1px solid #e5e7eb;background:#fef3c7;min-width:42px">✕</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  el('attlist').innerHTML=html;
+  el('attsum').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+    <span style="color:#059669;font-weight:800">✅ ${lang==='ar'?'حضر هذا الأسبوع':'Attended this week'}: ${totalPresent}</span>
+    <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'غياب هذا الأسبوع':'Had absence this week'}: ${totalAbsent}</span>
+    <span style="color:#6b7280;font-size:.72rem">${lang==='ar'?'الخلية الحمراء = غياب':'Red = Absent | Green = Present | Grey = Not recorded'}</span>
+  </div>`;
+}
+
 function renderAtt(){
+  return renderKidsWeek(); // Always week view
   // Set default date if empty
   if(!el('attdate').value) el('attdate').value=today();
   const date=el('attdate').value||today();
@@ -5980,9 +6086,9 @@ async function renderBulkAtt(){
     <thead>
       <tr style="background:#1e3a8a;color:#fff">
         <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">${lang==='ar'?'الموظف':'Staff'}</th>
-        ${days.map(({d,dow,isFri})=>`<th style="padding:6px 4px;min-width:30px;text-align:center;background:${isFri?'#374151':'#1e3a8a'};opacity:${isFri?'.6':'1'}">
+        ${days.map(({d,dow,isFri})=>`<th style="padding:6px 4px;min-width:30px;text-align:center;background:${isFri?'#374151':dow===0?'#1e4f8a':'#1e3a8a'};opacity:${isFri?'.6':'1'}">
           <div style="font-size:.65rem;opacity:.8">${dayNames[dow]}</div>
-          <div>${d}</div>
+          <div style="font-weight:800">${d}</div>
         </th>`).join('')}
         <th style="padding:8px;white-space:nowrap">${lang==='ar'?'غياب':'Absent'}</th>
       </tr>
@@ -6282,10 +6388,25 @@ async function renderStaffAttWeek(){
           const dow=new Date(d+'T00:00:00').getDay();
           const isOffDay=!workDays.includes(dow);
           if(isOffDay){
-            return`<td style="padding:4px;text-align:center;background:#f3f4f6;border:1px solid #e5e7eb">
-              <div style="width:32px;height:32px;border-radius:7px;border:2px solid #e5e7eb;background:#f3f4f6;
-              display:flex;align-items:center;justify-content:center;cursor:default;
-              font-size:.6rem;color:#9ca3af;margin:auto;user-select:none">Off</div>
+            // Off day is clickable - manager can override if staff came in
+            const overrideSt=(DB.staffAtt[d]||{})[String(s.id)]||'';
+            const isOvP=overrideSt==='حضور', isOvA=overrideSt==='غياب';
+            if(isOvP) present++;
+            if(isOvA) absent++;
+            const ovBg=isOvP?'#d1fae5':isOvA?'#fee2e2':'#f3f4f6';
+            const ovIcon=isOvP?'✓':isOvA?'✕':'';
+            const ovBord=isOvP?'#059669':isOvA?'#dc2626':'#e5e7eb';
+            const ovBoxBg=isOvP?'#059669':isOvA?'#dc2626':'#f3f4f6';
+            const ovColor=isOvP?'#fff':isOvA?'#fff':'#9ca3af';
+            return`<td style="padding:4px;text-align:center;background:${ovBg};border:1px solid #e5e7eb">
+              <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
+                data-wid="${s.id}" data-wdate="${d}"
+                title="Off Day — click to override"
+                style="width:32px;height:32px;border-radius:7px;border:2px dashed ${ovBord};background:${ovBoxBg};
+                display:flex;align-items:center;justify-content:center;cursor:pointer;
+                font-size:${ovIcon?'.85rem':'.55rem'};font-weight:900;color:${ovColor};margin:auto;user-select:none">
+                ${ovIcon||'Off'}
+              </div>
             </td>`;
           }
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
@@ -6335,19 +6456,23 @@ async function renderStaffAttWeek(){
 }
 
 async function toggleStaffAttWeek(staffId, date){
-  // Off day guard
-  const sObj2=DB.staff.find(x=>String(x.id)===String(staffId));
-  const wdays2=(sObj2?.workDays||'0,1,2,3,4').split(',').map(Number);
-  if(!wdays2.includes(new Date(date+'T00:00:00').getDay())) return;
+  const sObjCyc=DB.staff.find(x=>String(x.id)===String(staffId));
+  const wdCyc=(sObjCyc?.workDays||'0,1,2,3,4').split(',').map(Number);
+  const isOffDayCyc=!wdCyc.includes(new Date(date+'T00:00:00').getDay());
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
-  const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
+  // Off days: '' → حضور → غياب → '' (no half day on off day)
+  // Work days: '' → حضور → نص يوم → غياب → ''
+  const newSt=isOffDayCyc
+    ? (cur===''?'حضور':cur==='حضور'?'غياب':'')
+    : (cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'');
   
   // Update local state immediately for snappy UI
   DB.staffAtt[date][sid]=newSt;
   
-  // Update cell visually immediately
-  const cell=document.querySelector(`[onclick="toggleStaffAttWeek('${staffId}','${date}')"]`);
+  // Update cell visually immediately using data attributes
+  const cell=document.querySelector(`[data-wid="${staffId}"][data-wdate="${date}"]`);
   if(cell){
     const isP=newSt==='حضور',isA=newSt==='غياب',isH=newSt==='نص يوم';
     cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
@@ -6556,14 +6681,116 @@ async function toggleAtt(childId,date){
   }
 }
 function printAtt(){
-  const date=el('attdate').value||today();const active=DB.children.filter(c=>!c.leaveDate);const b=CB();
-  let html=`<html dir="rtl"><head><meta charset="UTF-8"><style>body{font-family:sans-serif;padding:18px}table{width:100%;border-collapse:collapse}th{background:${b.c};color:#fff;padding:7px}td{padding:6px;border-bottom:1px solid #ddd}</style></head><body>
-    <h2>مجموعة رعاية الطفل — ${tBN(b)}</h2><p>${new Date(date).toLocaleDateString('ar-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
-    <table><tr><th>#</th><th>الاسم</th><th>الفصل</th><th>الحضور</th><th style="width:100px">توقيع</th></tr>`;
-  active.forEach((c,i)=>{const st=(DB.attendance[date]||{})[c.id]||'غياب';html+=`<tr><td>${i+1}</td><td>${c.name}</td><td>${c.className||''}</td><td style="color:${st==='حضور'?'green':'red'}">${st==='حضور'?'✅ حضور':'❌ غياب'}</td><td></td></tr>`;});
-  const present=Object.values(DB.attendance[date]||{}).filter(v=>v==='حضور').length;
-  html+=`</table><p style="margin-top:10px;font-weight:bold">الحضور: ${present} / ${active.length}</p></body></html>`;
-  const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+  const date=el('attdate').value||today();
+  const b=CB();
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayAr=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dateObj=new Date(date+'T00:00:00');
+  const dayName=lang==='ar'?dayAr[dateObj.getDay()]:dayNames[dateObj.getDay()];
+  const dateLabel=dateObj.toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{year:'numeric',month:'long',day:'numeric'});
+  const branchName=lang==='ar'?(b.ar||b.en):b.en||b.ar;
+  const printDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  // Get active children for this date
+  const dayMap={'Sun':'Sunday','Mon':'Monday','Tue':'Tuesday','Wed':'Wednesday','Thu':'Thursday','Fri':'Friday','Sat':'Saturday'};
+  const fullDay=dayMap[dayNames[dateObj.getDay()]];
+  const active=DB.children.filter(c=>{
+    if(c.leaveDate) return false;
+    const duty=(c.dutyDays||'').split(',').map(d=>d.trim()).filter(Boolean);
+    if(!duty.length) return true;
+    return duty.some(d=>d.toLowerCase()===fullDay.toLowerCase()||d.toLowerCase()===dayNames[dateObj.getDay()].toLowerCase());
+  });
+
+  // Group by class
+  const classMap={};
+  active.forEach(c=>{
+    const cls=c.className||(lang==='ar'?'بدون فصل':'No Class');
+    if(!classMap[cls])classMap[cls]=[];
+    classMap[cls].push(c);
+  });
+  const classes=Object.keys(classMap).sort();
+
+  const pages=classes.map(cls=>{
+    const kids=classMap[cls];
+    const attData=DB.attendance[date]||{};
+    let present=0,absent=0;
+    const rows=kids.map((c,i)=>{
+      const st=attData[c.id]||attData[String(c.id)]||'';
+      const isP=st==='حضور';
+      if(isP) present++; else absent++;
+      return`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+        <td style="padding:6px 10px;text-align:center;border:1px solid #e5e7eb;color:#6b7280;font-weight:600">${i+1}</td>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700">${c.name}</td>
+        <td style="padding:6px 10px;text-align:center;border:1px solid #e5e7eb">
+          <span style="padding:3px 14px;border-radius:20px;font-weight:800;font-size:.82rem;
+            background:${isP?'#d1fae5':'#fee2e2'};color:${isP?'#065f46':'#dc2626'}">
+            ${isP?(lang==='ar'?'✓ حضور':'✓ Present'):(lang==='ar'?'✕ غياب':'✕ Absent')}
+          </span>
+        </td>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;width:80px"></td>
+      </tr>`;
+    }).join('');
+
+    return`<div class="page">
+      <div style="height:5px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
+      <div style="padding:10px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #e5e7eb">
+        <div>
+          <div style="font-size:.95rem;font-weight:900;color:#1e3a8a">مجموعة رعاية الطفل للحضانات</div>
+          <div style="font-size:.65rem;color:#6b7280">Child Care Group — ${branchName}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;color:#6b7280">${lang==='ar'?'كشف الحضور اليومي':'Daily Attendance Sheet'}</div>
+          <div style="font-size:.85rem;font-weight:800;color:#1e3a8a">${dayName} — ${dateLabel}</div>
+          <div style="font-size:.55rem;color:#9ca3af">${lang==='ar'?'طبع':'Printed'}: ${printDate}</div>
+        </div>
+      </div>
+
+      <div style="padding:8px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:.88rem;font-weight:900;color:#1e3a8a">🎓 ${lang==='ar'?'الفصل':'Class'}: ${cls}</div>
+        <div style="display:flex;gap:10px">
+          <span style="background:#d1fae5;color:#065f46;border-radius:20px;padding:3px 14px;font-size:.75rem;font-weight:800">✓ ${lang==='ar'?'حضور':'Present'}: ${present}</span>
+          <span style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:3px 14px;font-size:.75rem;font-weight:800">✕ ${lang==='ar'?'غياب':'Absent'}: ${absent}</span>
+          <span style="background:#dbeafe;color:#1e40af;border-radius:20px;padding:3px 14px;font-size:.75rem;font-weight:800">${lang==='ar'?'المجموع':'Total'}: ${kids.length}</span>
+        </div>
+      </div>
+
+      <div style="padding:10px 18px">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead>
+            <tr style="background:#1e3a8a;color:#fff">
+              <th style="padding:7px 10px;text-align:center;border:1px solid #3b5998;width:40px">#</th>
+              <th style="padding:7px 10px;text-align:${lang==='ar'?'right':'left'};border:1px solid #3b5998">${lang==='ar'?'اسم الطفل':'Child Name'}</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid #3b5998;width:120px">${lang==='ar'?'الحضور':'Attendance'}</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid #3b5998;width:80px">${lang==='ar'?'توقيع':'Signature'}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <div style="padding:10px 18px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;font-size:.65rem;color:#9ca3af">
+        <span>${branchName} — ${cls} — ${dateLabel}</span>
+        <span>${lang==='ar'?'توقيع المعلمة':'Teacher Signature'}: ___________________</span>
+      </div>
+      <div style="height:4px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
+    </div>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html dir="${lang==='ar'?'rtl':'ltr'}" lang="${lang==='ar'?'ar':'en'}">
+<head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',Arial,sans-serif;background:#e5e7eb;color:#111}
+  .page{background:#fff;margin:12px auto;max-width:780px;box-shadow:0 4px 24px rgba(0,0,0,.15);page-break-after:always}
+  .page:last-child{page-break-after:auto}
+  @media print{body{background:#fff}.page{margin:0;max-width:100%;box-shadow:none;border:none}@page{margin:8mm;size:A4 portrait}}
+</style></head><body>${pages}</body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
 }
 
 // ═══════════════════════════════════════════════
