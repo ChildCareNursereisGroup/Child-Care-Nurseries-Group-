@@ -2140,9 +2140,10 @@ async function loadFromSupa(bid) {
       sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}).limit(5000),
       // Receipts loaded separately with pagination below
       Promise.resolve({data:[],error:null}),
-      sb.from('attendance').select('*').eq('branch_id',bid),
+      // attendance loaded separately with pagination below
+      Promise.resolve({data:[],error:null}),
       sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(5000),
-      sb.from('staff_attendance').select('*'), // Load from ALL branches - staff may work in different branch
+      sb.from('staff_attendance').select('*').limit(1), // placeholder - loaded separately below
       sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
     ]);
     if(c.error)throw c.error;
@@ -2160,20 +2161,22 @@ async function loadFromSupa(bid) {
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id
     }));
-    // Load ALL receipts with pagination (Supabase default limit is 1000)
+    // Load ALL receipts with pagination
     {
       let allRecs = [];
-      let page = 0;
-      const pageSize = 1000;
-      while(true){
-        const {data:pg} = await sb.from('receipts').select('*')
+      let rPage = 0;
+      const rPageSize = 1000;
+      let rKeepGoing = true;
+      while(rKeepGoing){
+        const {data:pg, error:pgErr} = await sb.from('receipts').select('*')
           .eq('branch_id',bid)
           .order('date',{ascending:true})
-          .range(page*pageSize, (page+1)*pageSize-1);
-        if(!pg || pg.length===0) break;
+          .range(rPage*rPageSize, (rPage+1)*rPageSize-1);
+        if(pgErr || !pg || pg.length===0){ rKeepGoing=false; break; }
         allRecs = allRecs.concat(pg);
-        if(pg.length < pageSize) break;
-        page++;
+        if(pg.length < rPageSize) rKeepGoing=false;
+        rPage++;
+        if(rPage > 20) rKeepGoing=false; // safety cap at 20k receipts
       }
       DB.receipts = allRecs.map(x=>({
         id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
@@ -2189,10 +2192,19 @@ async function loadFromSupa(bid) {
       }));
     }
     DB.attendance={};
-    (a.data||[]).forEach(x=>{
-      const d=x.date;if(!DB.attendance[d])DB.attendance[d]={};
-      DB.attendance[d][x.child_id]=x.status;
-    });
+    // Load children attendance - last 3 months
+    {
+      const now2 = new Date();
+      const from3mo = new Date(now2.getFullYear(), now2.getMonth()-2, 1).toISOString().split('T')[0];
+      const {data:attPg} = await sb.from('attendance').select('child_id,date,status')
+        .eq('branch_id',bid)
+        .gte('date', from3mo)
+        .limit(3000);
+      (attPg||[]).forEach(x=>{
+        const d=x.date; if(!DB.attendance[d]) DB.attendance[d]={};
+        DB.attendance[d][x.child_id]=x.status;
+      });
+    }
     DB.expenses = (e.data||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
       return{id:x.id,category:x.category||'',type:x.type||'',
@@ -2204,17 +2216,22 @@ async function loadFromSupa(bid) {
         branchId:x.branch_id||'',extra};
     });
     DB.staffAtt={};
-    if(sa.error){
-      console.error('staff_attendance load error:',sa.error);
-    } else {
-      // Sort by id ascending so the LATEST record (highest id) wins
-      const sorted=(sa.data||[]).slice().sort((a,b)=>a.id-b.id);
-      sorted.forEach(x=>{
-        const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
-        // Latest record always wins (sorted by id asc = last one overwrites)
-        DB.staffAtt[d][String(x.staff_id)]=x.status;
-      });
-      console.log('staff_attendance loaded:',sa.data?.length,'records');
+    // Load staff_attendance - last 6 months (fast, focused)
+    {
+      const now = new Date();
+      const from6mo = new Date(now.getFullYear(), now.getMonth()-5, 1).toISOString().split('T')[0];
+      const {data:saData, error:saErr} = await sb.from('staff_attendance')
+        .select('staff_id,date,status,id')
+        .gte('date', from6mo)
+        .order('id',{ascending:true})
+        .limit(3000);
+      if(!saErr && saData){
+        saData.forEach(x=>{
+          const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
+          DB.staffAtt[d][String(x.staff_id)]=x.status;
+        });
+        console.log('staff_attendance loaded:',saData.length,'records (6mo)');
+      }
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
 
@@ -4316,15 +4333,16 @@ function renderStaffAttDay(){
   if(!dateEl.value) dateEl.value=today();
   const date=dateEl.value||today();
   // Show staff in their WORK branch only (if set), else contract branch
-  const staff=(DB.staff||[]).filter(s=>{
+  const staffRaw=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<=date) return false;
     if(s.workBranch){
-      // Work branch set → show ONLY in work branch
       return String(s.workBranch)===String(curBid);
     }
-    // No work branch → show in contract branch
     return String(s.branchId)===String(curBid);
   });
+  // Deduplicate by staff id (prevent double-entry if workBranch === branchId)
+  const seenIds = new Set();
+  const staff = staffRaw.filter(s=>{ if(seenIds.has(s.id)) return false; seenIds.add(s.id); return true; });
   const b=CB();
 
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -5552,13 +5570,31 @@ async function printStaffAttReport(exportType='print'){
   });
   if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
 
-  const {data:attData} = await sb.from('staff_attendance').select('*')
-    .gte('date', mon+'-01').lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'));
+  // Build attMap for report month
   const attMap = {};
-  (attData||[]).forEach(x=>{
-    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
-    attMap[x.staff_id][x.date]=x.status;
-  });
+  const monPrefix = mon+'-';
+  // Check if we have this month in DB.staffAtt
+  const hasMonth = Object.keys(DB.staffAtt).some(d=>d.startsWith(monPrefix));
+  if(hasMonth){
+    Object.keys(DB.staffAtt).forEach(date=>{
+      if(!date.startsWith(monPrefix)) return;
+      Object.keys(DB.staffAtt[date]).forEach(staffId=>{
+        if(!attMap[staffId]) attMap[staffId]={};
+        attMap[staffId][date]=DB.staffAtt[date][staffId];
+      });
+    });
+  } else {
+    // Month not in cache - fetch directly
+    const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(2000);
+    (rptAtt||[]).forEach(x=>{
+      if(!attMap[x.staff_id]) attMap[x.staff_id]={};
+      attMap[x.staff_id][x.date]=x.status;
+      // Also cache it
+      if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+      DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+    });
+  }
 
   const fmt = n => Number(n).toFixed(1);
   const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
@@ -5684,110 +5720,141 @@ async function printStaffAttReport(exportType='print'){
     const printDate = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 
     return `<div class="page">
-      <div style="border:2.5px solid #1e3a8a;padding:0;margin-bottom:0">
+      <!-- TOP BORDER -->
+      <div style="height:5px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
 
-        <!-- Top bar: company + contract branch -->
-        <div style="background:#1e3a8a;color:#fff;padding:7px 14px;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:.88rem;font-weight:900;letter-spacing:.5px">مجموعة رعاية الطفل للحضانات</div>
-            <div style="font-size:.65rem;opacity:.88;margin-top:1px">Child Care Group — ${contractBranchName} — UAE</div>
-          </div>
-          <div style="text-align:${isAr?'left':'right'}">
-            <div style="font-size:.62rem;opacity:.75">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
-            <div style="font-size:.82rem;font-weight:800">${monthLabel}</div>
-            <div style="font-size:.58rem;opacity:.7">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
-          </div>
+      <!-- HEADER -->
+      <div style="padding:10px 18px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #e5e7eb">
+        <div>
+          <div style="font-size:.95rem;font-weight:900;color:#1e3a8a">مجموعة رعاية الطفل للحضانات</div>
+          <div style="font-size:.65rem;color:#6b7280;margin-top:1px">Child Care Group — ${contractBranchName} — UAE</div>
         </div>
-
-        <!-- Employee Info — NO salary in header -->
-        <div style="padding:7px 14px;background:#f8faff;border-bottom:1.5px solid #c7d2fe">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:.68rem">
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'اسم الموظف':'Employee Name'}:</span><br><b style="font-size:.82rem;color:#1e3a8a">${s.name}</b></div>
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'المسمى الوظيفي':'Position'}:</span><br><b>${s.position||'—'}</b></div>
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'الجنسية':'Nationality'}:</span><br><b>${s.nationality||'—'}</b></div>
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'جهة التعاقد':'Contract Branch'}:</span><br><b>${contractBranchName}</b></div>
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم التواصل':'Contact'}:</span><br><b>${s.contact||'—'}</b></div>
-            <div><span style="color:#6b7280;font-weight:600">${isAr?'رقم الإقامة / الوثيقة':'ID / Residency No.'}:</span><br><b>${s.idNumber||s.passportNum||'—'}</b></div>
-          </div>
+        <div style="text-align:right">
+          <div style="font-size:.62rem;color:#6b7280">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
+          <div style="font-size:.9rem;font-weight:900;color:#1e3a8a">${monthLabel}</div>
+          <div style="font-size:.55rem;color:#9ca3af">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
         </div>
-
-        <!-- Summary boxes -->
-        <div style="padding:6px 14px;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;border-bottom:1.5px solid #e5e7eb">
-          <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:6px;padding:5px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:900;color:#1e40af">${daysInMonth}</div>
-            <div style="font-size:.58rem;color:#1e40af;font-weight:700">${isAr?'أيام الشهر':'Month Days'}</div>
-          </div>
-          <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:6px;padding:5px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
-            <div style="font-size:.58rem;color:#059669;font-weight:700">${isAr?'أيام الحضور':'Present Days'}</div>
-          </div>
-          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:5px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
-            <div style="font-size:.58rem;color:#dc2626;font-weight:700">${isAr?'أيام الغياب':'Absent Days'}</div>
-          </div>
-          <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:5px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:900;color:#d97706">${half}</div>
-            <div style="font-size:.58rem;color:#d97706;font-weight:700">${isAr?'نصف يوم':'Half Days'}</div>
-          </div>
-          <div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;padding:5px;text-align:center">
-            <div style="font-size:1.1rem;font-weight:900;color:#374151">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status}).length}</div>
-            <div style="font-size:.58rem;color:#374151;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
-          </div>
-        </div>
-
-        <!-- Attendance Table — 3 columns side by side to save space -->
-        <div style="padding:6px 14px">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
-            ${days.map((d,i)=>{
-              const dow=new Date(d+'T00:00:00').getDay();
-              const {status,smart,isWorkDay}=getSmartStatus(s.id,i);
-              const day=d.split('-')[2];
-              const dayName=dayNames[dow];
-              let statusCell='', bg='#fff', col='#374151';
-              if(status==='off'){statusCell=isAr?'راحة':'Off';bg='#f3f4f6';col='#9ca3af';}
-              else if(status==='حضور'){present;statusCell='✓';bg=smart?'#f9fafb':'#f0fdf4';col='#059669';}
-              else if(status==='غياب'){statusCell='✕';bg='#fff5f5';col='#dc2626';}
-              else if(status==='نص يوم'){statusCell='½';bg='#fffbeb';col='#d97706';}
-              else{statusCell='—';col='#d1d5db';}
-              return `<div style="display:flex;align-items:center;gap:4px;padding:3px 5px;background:${bg};border-radius:4px;border:1px solid #e5e7eb">
-                <span style="font-weight:800;color:#1e3a8a;font-size:.7rem;min-width:18px">${day}</span>
-                <span style="color:#9ca3af;font-size:.6rem;flex:1">${dayName.substring(0,3)}</span>
-                <span style="font-weight:800;color:${col};font-size:.72rem">${statusCell}</span>
-              </div>`;
-            }).join('')}
-          </div>
-          <div style="margin-top:5px;font-size:.58rem;color:#9ca3af">
-            ✓=${isAr?'حضور':'Present'} &nbsp; ✕=${isAr?'غياب':'Absent'} &nbsp; ½=${isAr?'نصف يوم':'Half'} &nbsp; —=${isAr?'غير مسجل':'Unrecorded'} &nbsp; ${isAr?'راحة':'Off'}=${isAr?'يوم راحة':'Day Off'}
-          </div>
-        </div>
-
-        <!-- Signatures with embedded images -->
-        <div style="padding:10px 14px;border-top:1.5px solid #e5e7eb;background:#fafafa">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:.68rem">
-            <div style="text-align:center">
-              <div style="height:52px;border-bottom:1.5px solid #1e3a8a;margin-bottom:4px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px">
-                ${empSigURL?`<img src="${empSigURL}" style="max-height:46px;max-width:100%;object-fit:contain" alt="sig">`:''}
-              </div>
-              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع الموظف':'Employee Signature'}</div>
-              <div style="color:#6b7280;margin-top:1px">${s.name}</div>
-            </div>
-            <div style="text-align:center">
-              <div style="height:52px;border-bottom:1.5px solid #1e3a8a;margin-bottom:4px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px">
-                ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:46px;max-width:100%;object-fit:contain" alt="sig">`:''}
-              </div>
-              <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع المدير المسؤول':'Manager Signature'}</div>
-              <div style="color:#9ca3af;margin-top:1px">${contractBranchName}</div>
-            </div>
-          </div>
-          <div style="margin-top:7px;font-size:.56rem;color:#9ca3af;text-align:center;border-top:1px dashed #e5e7eb;padding-top:5px">
-            ${isAr
-              ? `هذا التقرير صادر عن نظام إدارة مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — تاريخ الطباعة: ${printDate}`
-              : `Issued by Child Care Group Management System — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`
-            }
-          </div>
-        </div>
-
       </div>
+
+      <!-- EMPLOYEE INFO -->
+      <div style="padding:8px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;font-size:.7rem">
+          <div><span style="color:#6b7280">${isAr?'اسم الموظف':'Employee Name'}:</span><br><b style="color:#1e3a8a;font-size:.8rem">${s.name}</b></div>
+          <div><span style="color:#6b7280">${isAr?'المسمى الوظيفي':'Position'}:</span><br><b>${s.position||'—'}</b></div>
+          <div><span style="color:#6b7280">${isAr?'الجنسية':'Nationality'}:</span><br><b>${s.nationality||'—'}</b></div>
+          <div><span style="color:#6b7280">${isAr?'جهة التعاقد':'Contract Branch'}:</span><br><b>${contractBranchName}</b></div>
+          <div><span style="color:#6b7280">${isAr?'رقم التواصل':'Contact'}:</span><br><b>${s.contact||'—'}</b></div>
+          <div><span style="color:#6b7280">${isAr?'رقم الإقامة':'ID / Residency'}:</span><br><b>${s.idNumber||s.passportNum||'—'}</b></div>
+        </div>
+      </div>
+
+      <!-- SUMMARY BOXES -->
+      <div style="padding:7px 18px;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;border-bottom:1px solid #e5e7eb">
+        <div style="text-align:center;padding:5px 3px;background:#dbeafe;border-radius:6px">
+          <div style="font-size:1.15rem;font-weight:900;color:#1e40af">${daysInMonth}</div>
+          <div style="font-size:.52rem;color:#1e40af;font-weight:700">${isAr?'أيام الشهر':'Month Days'}</div>
+        </div>
+        <div style="text-align:center;padding:5px 3px;background:#d1fae5;border-radius:6px">
+          <div style="font-size:1.15rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+          <div style="font-size:.52rem;color:#059669;font-weight:700">${isAr?'أيام الحضور':'Present'}</div>
+        </div>
+        <div style="text-align:center;padding:5px 3px;background:#fee2e2;border-radius:6px">
+          <div style="font-size:1.15rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+          <div style="font-size:.52rem;color:#dc2626;font-weight:700">${isAr?'أيام الغياب':'Absent'}</div>
+        </div>
+        <div style="text-align:center;padding:5px 3px;background:#fef3c7;border-radius:6px">
+          <div style="font-size:1.15rem;font-weight:900;color:#d97706">${half}</div>
+          <div style="font-size:.52rem;color:#d97706;font-weight:700">${isAr?'نصف يوم':'Half Day'}</div>
+        </div>
+        <div style="text-align:center;padding:5px 3px;background:#f3f4f6;border-radius:6px">
+          <div style="font-size:1.15rem;font-weight:900;color:#6b7280">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status&&r.status!=='off'}).length}</div>
+          <div style="font-size:.52rem;color:#6b7280;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
+        </div>
+      </div>
+
+      <!-- ATTENDANCE TABLE: 3 columns, full month -->
+      <div style="padding:7px 18px">
+        <table style="width:100%;border-collapse:collapse;font-size:.7rem">
+          <thead>
+            <tr style="background:#1e3a8a;color:#fff">
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
+              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(()=>{
+              const cols=3;
+              const perCol=Math.ceil(days.length/cols);
+              let tRows='';
+              for(let row=0;row<perCol;row++){
+                tRows+='<tr>';
+                for(let col=0;col<cols;col++){
+                  const idx=col*perCol+row;
+                  if(idx>=days.length){
+                    tRows+='<td colspan="3" style="border:1px solid #e5e7eb"></td>';
+                    continue;
+                  }
+                  const d=days[idx];
+                  const dayNum=d.split('-')[2];
+                  const dow=new Date(d+'T00:00:00').getDay();
+                  const dayName=dayNames[dow];
+                  const {status,smart}=getSmartStatus(s.id,idx);
+                  let statusTxt='',bg='#fff',color='#374151',symbol='';
+                  if(status==='off'){statusTxt=isAr?'راحة':'Off';bg='#f3f4f6';color='#9ca3af';}
+                  else if(status==='حضور'){statusTxt=isAr?'حضور':'Present';bg=smart?'#f9fafb':'#f0fdf4';color='#059669';symbol='✓';}
+                  else if(status==='غياب'){statusTxt=isAr?'غياب':'Absent';bg='#fff5f5';color='#dc2626';symbol='✕';}
+                  else if(status==='نص يوم'){statusTxt=isAr?'نصف':'Half';bg='#fffbeb';color='#d97706';symbol='½';}
+                  else{statusTxt='—';color='#d1d5db';}
+                  tRows+=`<td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;background:${bg};font-weight:800;color:#1e3a8a;font-size:.68rem">${dayNum}</td>`;
+                  tRows+=`<td style="padding:3px 5px;border:1px solid #e5e7eb;background:${bg};color:#6b7280;font-size:.65rem">${dayName.substring(0,3)}</td>`;
+                  tRows+=`<td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;background:${bg};font-weight:800;color:${color};font-size:.68rem">${symbol?symbol+' ':''}<span style="font-size:.6rem">${statusTxt}</span></td>`;
+                }
+                tRows+='</tr>';
+              }
+              return tRows;
+            })()}
+          </tbody>
+        </table>
+        <div style="margin-top:3px;font-size:.52rem;color:#9ca3af">
+          ✓=${isAr?'حضور':'Present'} &nbsp; ✕=${isAr?'غياب':'Absent'} &nbsp; ½=${isAr?'نصف':'Half'} &nbsp; —=${isAr?'غير مسجل':'Unrecorded'} &nbsp; ${isAr?'راحة':'Off'}=${isAr?'يوم راحة':'Day Off'}
+        </div>
+      </div>
+
+      <!-- SIGNATURES -->
+      <div style="padding:8px 18px;border-top:1px solid #e5e7eb;background:#fafafa">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:.65rem">
+          <div style="text-align:center">
+            <div style="height:48px;border-bottom:1.5px solid #1e3a8a;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px">
+              ${empSigURL?`<img src="${empSigURL}" style="max-height:42px;max-width:100%;object-fit:contain" alt="sig">`:''}
+            </div>
+            <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع الموظف':'Employee Signature'}</div>
+            <div style="color:#6b7280;margin-top:1px">${s.name}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="height:48px;border-bottom:1.5px solid #1e3a8a;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px">
+              ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:42px;max-width:100%;object-fit:contain" alt="sig">`:''}
+            </div>
+            <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع المدير المسؤول':'Manager Signature'}</div>
+            <div style="color:#9ca3af;margin-top:1px">${contractBranchName}</div>
+          </div>
+        </div>
+        <div style="margin-top:5px;font-size:.5rem;color:#9ca3af;text-align:center;border-top:1px dashed #e5e7eb;padding-top:4px">
+          ${isAr
+            ? `هذا التقرير صادر عن نظام إدارة مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — تاريخ الطباعة: ${printDate}`
+            : `Issued by Child Care Group Management System — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`
+          }
+        </div>
+      </div>
+
+      <!-- BOTTOM BORDER -->
+      <div style="height:4px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
     </div>`; // end page
   }).join('');
 
@@ -5852,13 +5919,15 @@ async function renderBulkAtt(){
   const [yr,mo] = mon.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
 
-  // Load staff for selected branch - show ONLY in work branch if set, else contract branch
-  let staffList = DB.staff.filter(s=>{
+  // Load staff for selected branch - deduplicated
+  const staffListRaw = DB.staff.filter(s=>{
     if(s.workBranch){
       return String(s.workBranch)===String(bid);
     }
     return String(s.branchId)===String(bid);
   });
+  const seenB=new Set();
+  let staffList = staffListRaw.filter(s=>{ if(seenB.has(s.id)) return false; seenB.add(s.id); return true; });
   if(!staffList.length){
     // Try loading from supabase
     const {data} = await sb.from('staff').select('*').eq('branch_id',bid);
@@ -5866,18 +5935,26 @@ async function renderBulkAtt(){
   }
   staffList = staffList.filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
 
-  // Load existing attendance for this month+branch
-  const {data:attData} = await sb.from('staff_attendance').select('*')
-    .eq('branch_id',bid)
-    .gte('date',mon+'-01')
-    .lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'));
-
-  // Build local lookup: {date:{staffId:status}}
+  // Build existing from DB.staffAtt
   const existing = {};
-  (attData||[]).forEach(r=>{
-    if(!existing[r.date]) existing[r.date]={};
-    existing[r.date][String(r.staff_id)] = r.status;
-  });
+  const monPfx = mon+'-';
+  const hasMonthBulk = Object.keys(DB.staffAtt).some(d=>d.startsWith(monPfx));
+  if(hasMonthBulk){
+    Object.keys(DB.staffAtt).forEach(date=>{
+      if(!date.startsWith(monPfx)) return;
+      existing[date] = {...DB.staffAtt[date]};
+    });
+  } else {
+    // Not in cache - fetch
+    const {data:bAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(2000);
+    (bAtt||[]).forEach(r=>{
+      if(!existing[r.date]) existing[r.date]={};
+      existing[r.date][String(r.staff_id)]=r.status;
+      if(!DB.staffAtt[r.date]) DB.staffAtt[r.date]={};
+      DB.staffAtt[r.date][String(r.staff_id)]=r.status;
+    });
+  }
 
   // Merge with any unsaved bulk edits
   Object.keys(_bulkAttData).forEach(date=>{
@@ -5897,25 +5974,34 @@ async function renderBulkAtt(){
   let html = `<table style="border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.78rem;min-width:600px">
     <thead>
       <tr style="background:#1e3a8a;color:#fff">
-        <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">الموظف</th>
+        <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">${lang==='ar'?'الموظف':'Staff'}</th>
         ${days.map(({d,dow,isFri})=>`<th style="padding:6px 4px;min-width:30px;text-align:center;background:${isFri?'#374151':'#1e3a8a'};opacity:${isFri?'.6':'1'}">
           <div style="font-size:.65rem;opacity:.8">${dayNames[dow]}</div>
           <div>${d}</div>
         </th>`).join('')}
-        <th style="padding:8px;white-space:nowrap">غياب</th>
+        <th style="padding:8px;white-space:nowrap">${lang==='ar'?'غياب':'Absent'}</th>
       </tr>
     </thead>
     <tbody>
     ${staffList.map((s,si)=>{
+      // Get this staff member's work days
+      const workDays = (s.workDays||'0,1,2,3,4').split(',').map(Number);
       let absCount=0;
-      const cells = days.map(({dd,isFri})=>{
+      const cells = days.map(({dd,dow,isFri})=>{
+        const isOffDay = !workDays.includes(dow);
+        if(isOffDay){
+          // Show grey "Off" — not clickable, never save
+          return `<td style="padding:3px;text-align:center;background:#f3f4f6">
+            <div style="width:26px;height:26px;border:2px solid #e5e7eb;border-radius:6px;background:#f3f4f6;color:#9ca3af;display:flex;align-items:center;justify-content:center;font-size:.6rem;margin:auto;cursor:default">Off</div>
+          </td>`;
+        }
         const st = (existing[dd]||{})[String(s.id)]||(_bulkAttData[dd]||{})[String(s.id)]||'';
         const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
         if(isA) absCount++; else if(isH) absCount+=0.5;
         const bg = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
         const bord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
         const icon = isP?'✓':isA?'✕':isH?'½':'';
-        return `<td style="padding:3px;text-align:center;background:${isFri?'#f9fafb':'#fff'}">
+        return `<td style="padding:3px;text-align:center">
           <div onclick="toggleBulkCell('${s.id}','${dd}')" data-sid="${s.id}" data-date="${dd}"
             style="width:26px;height:26px;border:2px solid ${bord};border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;font-weight:900;margin:auto;user-select:none">
             ${icon}
@@ -6005,50 +6091,89 @@ async function saveBulkAtt(){
   const alertEl = el('bulk-att-alert');
   alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.8rem">⏳ جاري الحفظ...</div>`;
 
-  // Build rows to upsert
-  const rows=[];
+  // Separate into: records to upsert, and records to delete (cleared)
+  const upsertRows=[];
+  const deleteKeys=[]; // {staffId, date}
+
+  // Build a quick lookup of workDays per staff
+  const staffWorkDays={};
+  (DB.staff||[]).forEach(s=>{ staffWorkDays[String(s.id)]=(s.workDays||'0,1,2,3,4').split(',').map(Number); });
+
   Object.keys(_bulkAttData).forEach(date=>{
     if(!date.startsWith(mon)) return;
+    const dow = new Date(date+'T00:00:00').getDay();
     Object.keys(_bulkAttData[date]).forEach(staffId=>{
+      // Skip off days — never save attendance on a staff member's day off
+      const wdays = staffWorkDays[staffId]||[0,1,2,3,4];
+      if(!wdays.includes(dow)) return;
+
       const status=_bulkAttData[date][staffId];
-      if(!status) return; // skip unset
-      rows.push({branch_id:bid, staff_id:Number(staffId), date, status});
+      // Use staff's contract branchId for saving
+      const staffRec=DB.staff.find(x=>String(x.id)===staffId);
+      const sBid=staffRec?.branchId||bid;
+      if(status){
+        upsertRows.push({branch_id:sBid, staff_id:Number(staffId), date, status});
+      } else {
+        deleteKeys.push({staffId:Number(staffId), date, bid:sBid});
+      }
     });
   });
 
-  if(!rows.length){
+  if(!upsertRows.length && !deleteKeys.length){
     alertEl.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px 12px;font-size:.8rem">⚠️ لا يوجد تغييرات للحفظ</div>`;
     return;
   }
 
+  let saved=0, deleted=0, errors=0;
+
   // Upsert in batches of 50
-  let saved=0, errors=0;
-  for(let i=0;i<rows.length;i+=50){
-    const batch=rows.slice(i,i+50);
+  for(let i=0;i<upsertRows.length;i+=50){
+    const batch=upsertRows.slice(i,i+50);
     const {error}=await sb.from('staff_attendance').upsert(batch,{onConflict:'branch_id,staff_id,date'});
-    if(error){ errors++; console.error('bulk att error:',error); }
+    if(error){ errors++; console.error('bulk att upsert error:',error); }
     else saved+=batch.length;
+  }
+
+  // Delete cleared records one by one (no bulk delete by multiple keys)
+  for(const {staffId,date,bid:sBidDel} of deleteKeys){
+    const {error}=await sb.from('staff_attendance').delete()
+      .eq('staff_id',staffId).eq('date',date);
+    if(error){ errors++; console.error('bulk att delete error:',error); }
+    else deleted++;
   }
 
   if(errors){
     alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#dc2626">❌ بعض السجلات لم تُحفظ (${errors} أخطاء)</div>`;
   } else {
-    alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل بنجاح!</div>`;
+    alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل${deleted?' وحذف '+deleted:''} بنجاح!</div>`;
+    // Update DB.staffAtt immediately (no need to reload from server)
+    upsertRows.forEach(r=>{ 
+      if(!DB.staffAtt[r.date]) DB.staffAtt[r.date]={};
+      DB.staffAtt[r.date][String(r.staff_id)]=r.status;
+    });
+    deleteKeys.forEach(({staffId,date})=>{
+      if(DB.staffAtt[date]) delete DB.staffAtt[date][String(staffId)];
+    });
     _bulkAttData={};
-    // Refresh local DB cache
-    if(bid===curBid) await loadFromSupa(curBid);
-    setTimeout(()=>renderBulkAtt(),500);
+    setTimeout(()=>renderBulkAtt(),100);
   }
 }
 
 async function toggleStaffAtt(staffId, date){
+  // Check if this is a work day for this staff member
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
+  const dow=new Date(date+'T00:00:00').getDay();
+  if(!workDays.includes(dow)){
+    // Off day — don't allow recording
+    return;
+  }
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
   const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
-  const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
 
@@ -6063,22 +6188,21 @@ async function toggleStaffAtt(staffId, date){
   };
 
   if(!newSt){
-    const {error}=await sb.from('staff_attendance').delete()
-      .eq('branch_id', curBid).eq('staff_id', Number(staffId)).eq('date', date);
-    if(error) showMsg(false,'❌ خطأ في المسح');
-    else showMsg(true,'🗑️ تم المسح');
+    // Delete from all branches for this staff+date (safe cleanup)
+    await sb.from('staff_attendance').delete()
+      .eq('staff_id', Number(staffId)).eq('date', date);
+    showMsg(true,'🗑️ تم المسح');
     return;
   }
 
-  // Use upsert — most reliable, handles both insert and update
-  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+  // Save: use staff contract branchId (not curBid) so records are always found
+  const staffBid = s?.branchId || curBid;
+  const payload={branch_id:staffBid, staff_id:Number(staffId), date, status:newSt};
   const {error}=await sb.from('staff_attendance')
     .upsert(payload, {onConflict:'branch_id,staff_id,date'});
-
   if(error){
-    // Fallback: delete then insert
     await sb.from('staff_attendance').delete()
-      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+      .eq('branch_id',staffBid).eq('staff_id',Number(staffId)).eq('date',date);
     const {error:err2}=await sb.from('staff_attendance').insert(payload);
     if(err2) showMsg(false,'❌ خطأ: '+err2.message);
     else showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
@@ -6102,21 +6226,17 @@ async function renderStaffAttWeek(){
     return d.toISOString().split('T')[0];
   });
 
-  // Get staff
-  const staff=(DB.staff||[]).filter(s=>{
+  // Get staff - deduplicated
+  const staffRawW=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay && s.lastWorkingDay<=today()) return false;
     const wb=s.workBranch||s.branchId;
     return String(wb)===String(curBid) || (!s.workBranch && String(s.branchId)===String(curBid));
   });
+  const seenW=new Set();
+  const staff=staffRawW.filter(s=>{ if(seenW.has(s.id)) return false; seenW.add(s.id); return true; });
 
-  // Load attendance from Supabase for this week
-  const {data:attData} = await sb.from('staff_attendance').select('*')
-    .gte('date', weekDays[0]).lte('date', weekDays[6]);
-  // Update DB.staffAtt
-  (attData||[]).forEach(x=>{
-    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
-  });
+  // Use DB.staffAtt as single source of truth (loaded on startup)
+  // No extra query needed - already loaded with full data
 
   const dayNamesArShort=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
   const dayNamesEnShort=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
@@ -6156,13 +6276,22 @@ async function renderStaffAttWeek(){
       <tbody>
       ${staff.map((s,si)=>{
         let present=0, absent=0;
+        const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
         const cells=weekDays.map((d,i)=>{
+          const dow=new Date(d+'T00:00:00').getDay();
+          const isOffDay=!workDays.includes(dow);
+          if(isOffDay){
+            return`<td style="padding:4px;text-align:center;background:#f3f4f6;border:1px solid #e5e7eb">
+              <div style="width:32px;height:32px;border-radius:7px;border:2px solid #e5e7eb;background:#f3f4f6;
+              display:flex;align-items:center;justify-content:center;cursor:default;
+              font-size:.6rem;color:#9ca3af;margin:auto;user-select:none">Off</div>
+            </td>`;
+          }
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
           const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
           if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
           const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':dayColors[i];
           const icon=isP?'✓':isA?'✕':isH?'½':'';
-          const color=isP?'#065f46':isA?'#dc2626':isH?'#92400e':'#9ca3af';
           return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
             <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
               style="width:32px;height:32px;border-radius:7px;border:2px solid ${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db'};
@@ -6205,7 +6334,10 @@ async function renderStaffAttWeek(){
 }
 
 async function toggleStaffAttWeek(staffId, date){
-  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  // Off day guard
+  const sObj2=DB.staff.find(x=>String(x.id)===String(staffId));
+  const wdays2=(sObj2?.workDays||'0,1,2,3,4').split(',').map(Number);
+  if(!wdays2.includes(new Date(date+'T00:00:00').getDay())) return;
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
@@ -6225,21 +6357,22 @@ async function toggleStaffAttWeek(staffId, date){
     if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
   }
   
-  // Save to Supabase
+  // Save to Supabase using staff's contract branchId
+  const sWeek=DB.staff.find(x=>String(x.id)===String(staffId));
+  const weekBid=sWeek?.branchId||curBid;
   let saveOk = false;
   try {
     if(!newSt){
       const {error}=await sb.from('staff_attendance').delete()
-        .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+        .eq('staff_id',Number(staffId)).eq('date',date);
       saveOk = !error;
     } else {
-      const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+      const payload={branch_id:weekBid, staff_id:Number(staffId), date, status:newSt};
       const {error}=await sb.from('staff_attendance')
         .upsert(payload,{onConflict:'branch_id,staff_id,date'});
       if(error){
-        // Fallback: delete then insert
         await sb.from('staff_attendance').delete()
-          .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+          .eq('staff_id',Number(staffId)).eq('date',date);
         const {error:err2}=await sb.from('staff_attendance').insert(payload);
         saveOk = !err2;
         if(err2) console.error('Staff att save error:', err2);
