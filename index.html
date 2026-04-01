@@ -2161,13 +2161,24 @@ async function loadFromSupa(bid) {
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id
     }));
-    // Load receipts
+    // Load ALL receipts with pagination
     {
-      const {data:allRecs} = await sb.from('receipts').select('*')
-        .eq('branch_id',bid)
-        .order('date',{ascending:true})
-        .limit(5000);
-      DB.receipts = (allRecs||[]).map(x=>({
+      let allRecs = [];
+      let rPage = 0;
+      const rPageSize = 1000;
+      let rKeepGoing = true;
+      while(rKeepGoing){
+        const {data:pg, error:pgErr} = await sb.from('receipts').select('*')
+          .eq('branch_id',bid)
+          .order('date',{ascending:true})
+          .range(rPage*rPageSize, (rPage+1)*rPageSize-1);
+        if(pgErr || !pg || pg.length===0){ rKeepGoing=false; break; }
+        allRecs = allRecs.concat(pg);
+        if(pg.length < rPageSize) rKeepGoing=false;
+        rPage++;
+        if(rPage > 20) rKeepGoing=false; // safety cap at 20k receipts
+      }
+      DB.receipts = allRecs.map(x=>({
         id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
         receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
         fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
