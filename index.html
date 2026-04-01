@@ -2161,22 +2161,13 @@ async function loadFromSupa(bid) {
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id
     }));
-    // Load ALL receipts with pagination (Supabase default limit is 1000)
+    // Load receipts
     {
-      let allRecs = [];
-      let page = 0;
-      const pageSize = 1000;
-      while(true){
-        const {data:pg} = await sb.from('receipts').select('*')
-          .eq('branch_id',bid)
-          .order('date',{ascending:true})
-          .range(page*pageSize, (page+1)*pageSize-1);
-        if(!pg || pg.length===0) break;
-        allRecs = allRecs.concat(pg);
-        if(pg.length < pageSize) break;
-        page++;
-      }
-      DB.receipts = allRecs.map(x=>({
+      const {data:allRecs} = await sb.from('receipts').select('*')
+        .eq('branch_id',bid)
+        .order('date',{ascending:true})
+        .limit(5000);
+      DB.receipts = (allRecs||[]).map(x=>({
         id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
         receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
         fee:Number(x.fee||0), bus:Number(x.bus||0), clothes:Number(x.clothes||0),
@@ -2190,21 +2181,15 @@ async function loadFromSupa(bid) {
       }));
     }
     DB.attendance={};
-    // Load children attendance with pagination
+    // Load children attendance - last 3 months
     {
-      let allAtt = [];
-      let page = 0;
-      const pageSize = 1000;
-      while(true){
-        const {data:pg} = await sb.from('attendance').select('*')
-          .eq('branch_id',bid)
-          .range(page*pageSize, (page+1)*pageSize-1);
-        if(!pg || pg.length===0) break;
-        allAtt = allAtt.concat(pg);
-        if(pg.length < pageSize) break;
-        page++;
-      }
-      allAtt.forEach(x=>{
+      const now2 = new Date();
+      const from3mo = new Date(now2.getFullYear(), now2.getMonth()-2, 1).toISOString().split('T')[0];
+      const {data:attPg} = await sb.from('attendance').select('child_id,date,status')
+        .eq('branch_id',bid)
+        .gte('date', from3mo)
+        .limit(3000);
+      (attPg||[]).forEach(x=>{
         const d=x.date; if(!DB.attendance[d]) DB.attendance[d]={};
         DB.attendance[d][x.child_id]=x.status;
       });
@@ -2220,28 +2205,22 @@ async function loadFromSupa(bid) {
         branchId:x.branch_id||'',extra};
     });
     DB.staffAtt={};
-    // Load staff_attendance with pagination (same as receipts - no default limit)
+    // Load staff_attendance - last 6 months (fast, focused)
     {
-      let allSA = [];
-      let page = 0;
-      const pageSize = 1000;
-      while(true){
-        const {data:pg, error:pgErr} = await sb.from('staff_attendance').select('*')
-          .order('id',{ascending:true})
-          .range(page*pageSize, (page+1)*pageSize-1);
-        if(pgErr){ console.error('staff_att page error:',pgErr); break; }
-        if(!pg || pg.length===0) break;
-        allSA = allSA.concat(pg);
-        if(pg.length < pageSize) break;
-        page++;
+      const now = new Date();
+      const from6mo = new Date(now.getFullYear(), now.getMonth()-5, 1).toISOString().split('T')[0];
+      const {data:saData, error:saErr} = await sb.from('staff_attendance')
+        .select('staff_id,date,status,id')
+        .gte('date', from6mo)
+        .order('id',{ascending:true})
+        .limit(3000);
+      if(!saErr && saData){
+        saData.forEach(x=>{
+          const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
+          DB.staffAtt[d][String(x.staff_id)]=x.status;
+        });
+        console.log('staff_attendance loaded:',saData.length,'records (6mo)');
       }
-      // Sort by id asc so latest record wins on duplicate
-      allSA.sort((a,b)=>a.id-b.id);
-      allSA.forEach(x=>{
-        const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
-        DB.staffAtt[d][String(x.staff_id)]=x.status;
-      });
-      console.log('staff_attendance loaded:',allSA.length,'records (paginated)');
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
 
@@ -5579,27 +5558,31 @@ async function printStaffAttReport(exportType='print'){
   });
   if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
 
-  // Load attendance for this month with pagination (no 1000 limit issue)
-  let allAttData = [];
-  {
-    let page = 0;
-    const pageSize = 1000;
-    while(true){
-      const {data:pg} = await sb.from('staff_attendance').select('*')
-        .gte('date', mon+'-01')
-        .lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'))
-        .range(page*pageSize,(page+1)*pageSize-1);
-      if(!pg||pg.length===0) break;
-      allAttData = allAttData.concat(pg);
-      if(pg.length < pageSize) break;
-      page++;
-    }
-  }
+  // Build attMap for report month
   const attMap = {};
-  allAttData.forEach(x=>{
-    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
-    attMap[x.staff_id][x.date]=x.status;
-  });
+  const monPrefix = mon+'-';
+  // Check if we have this month in DB.staffAtt
+  const hasMonth = Object.keys(DB.staffAtt).some(d=>d.startsWith(monPrefix));
+  if(hasMonth){
+    Object.keys(DB.staffAtt).forEach(date=>{
+      if(!date.startsWith(monPrefix)) return;
+      Object.keys(DB.staffAtt[date]).forEach(staffId=>{
+        if(!attMap[staffId]) attMap[staffId]={};
+        attMap[staffId][date]=DB.staffAtt[date][staffId];
+      });
+    });
+  } else {
+    // Month not in cache - fetch directly
+    const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(2000);
+    (rptAtt||[]).forEach(x=>{
+      if(!attMap[x.staff_id]) attMap[x.staff_id]={};
+      attMap[x.staff_id][x.date]=x.status;
+      // Also cache it
+      if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+      DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+    });
+  }
 
   const fmt = n => Number(n).toFixed(1);
   const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
@@ -5938,18 +5921,26 @@ async function renderBulkAtt(){
   }
   staffList = staffList.filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=mon+'-01');
 
-  // Load existing attendance for this month+branch
-  const {data:attData} = await sb.from('staff_attendance').select('*')
-    .eq('branch_id',bid)
-    .gte('date',mon+'-01')
-    .lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'));
-
-  // Build local lookup: {date:{staffId:status}}
+  // Build existing from DB.staffAtt
   const existing = {};
-  (attData||[]).forEach(r=>{
-    if(!existing[r.date]) existing[r.date]={};
-    existing[r.date][String(r.staff_id)] = r.status;
-  });
+  const monPfx = mon+'-';
+  const hasMonthBulk = Object.keys(DB.staffAtt).some(d=>d.startsWith(monPfx));
+  if(hasMonthBulk){
+    Object.keys(DB.staffAtt).forEach(date=>{
+      if(!date.startsWith(monPfx)) return;
+      existing[date] = {...DB.staffAtt[date]};
+    });
+  } else {
+    // Not in cache - fetch
+    const {data:bAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(2000);
+    (bAtt||[]).forEach(r=>{
+      if(!existing[r.date]) existing[r.date]={};
+      existing[r.date][String(r.staff_id)]=r.status;
+      if(!DB.staffAtt[r.date]) DB.staffAtt[r.date]={};
+      DB.staffAtt[r.date][String(r.staff_id)]=r.status;
+    });
+  }
 
   // Merge with any unsaved bulk edits
   Object.keys(_bulkAttData).forEach(date=>{
@@ -5969,25 +5960,34 @@ async function renderBulkAtt(){
   let html = `<table style="border-collapse:collapse;font-family:'Tajawal',sans-serif;font-size:.78rem;min-width:600px">
     <thead>
       <tr style="background:#1e3a8a;color:#fff">
-        <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">الموظف</th>
+        <th style="padding:8px 12px;text-align:right;white-space:nowrap;position:sticky;left:0;background:#1e3a8a;z-index:2">${lang==='ar'?'الموظف':'Staff'}</th>
         ${days.map(({d,dow,isFri})=>`<th style="padding:6px 4px;min-width:30px;text-align:center;background:${isFri?'#374151':'#1e3a8a'};opacity:${isFri?'.6':'1'}">
           <div style="font-size:.65rem;opacity:.8">${dayNames[dow]}</div>
           <div>${d}</div>
         </th>`).join('')}
-        <th style="padding:8px;white-space:nowrap">غياب</th>
+        <th style="padding:8px;white-space:nowrap">${lang==='ar'?'غياب':'Absent'}</th>
       </tr>
     </thead>
     <tbody>
     ${staffList.map((s,si)=>{
+      // Get this staff member's work days
+      const workDays = (s.workDays||'0,1,2,3,4').split(',').map(Number);
       let absCount=0;
-      const cells = days.map(({dd,isFri})=>{
+      const cells = days.map(({dd,dow,isFri})=>{
+        const isOffDay = !workDays.includes(dow);
+        if(isOffDay){
+          // Show grey "Off" — not clickable, never save
+          return `<td style="padding:3px;text-align:center;background:#f3f4f6">
+            <div style="width:26px;height:26px;border:2px solid #e5e7eb;border-radius:6px;background:#f3f4f6;color:#9ca3af;display:flex;align-items:center;justify-content:center;font-size:.6rem;margin:auto;cursor:default">Off</div>
+          </td>`;
+        }
         const st = (existing[dd]||{})[String(s.id)]||(_bulkAttData[dd]||{})[String(s.id)]||'';
         const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
         if(isA) absCount++; else if(isH) absCount+=0.5;
         const bg = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#fff';
         const bord = isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db';
         const icon = isP?'✓':isA?'✕':isH?'½':'';
-        return `<td style="padding:3px;text-align:center;background:${isFri?'#f9fafb':'#fff'}">
+        return `<td style="padding:3px;text-align:center">
           <div onclick="toggleBulkCell('${s.id}','${dd}')" data-sid="${s.id}" data-date="${dd}"
             style="width:26px;height:26px;border:2px solid ${bord};border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;font-weight:900;margin:auto;user-select:none">
             ${icon}
@@ -6081,14 +6081,22 @@ async function saveBulkAtt(){
   const upsertRows=[];
   const deleteKeys=[]; // {staffId, date}
 
+  // Build a quick lookup of workDays per staff
+  const staffWorkDays={};
+  (DB.staff||[]).forEach(s=>{ staffWorkDays[String(s.id)]=(s.workDays||'0,1,2,3,4').split(',').map(Number); });
+
   Object.keys(_bulkAttData).forEach(date=>{
     if(!date.startsWith(mon)) return;
+    const dow = new Date(date+'T00:00:00').getDay();
     Object.keys(_bulkAttData[date]).forEach(staffId=>{
+      // Skip off days — never save attendance on a staff member's day off
+      const wdays = staffWorkDays[staffId]||[0,1,2,3,4];
+      if(!wdays.includes(dow)) return;
+
       const status=_bulkAttData[date][staffId];
       if(status){
         upsertRows.push({branch_id:bid, staff_id:Number(staffId), date, status});
       } else {
-        // Empty = user cleared it → delete from Supabase
         deleteKeys.push({staffId:Number(staffId), date});
       }
     });
@@ -6121,21 +6129,34 @@ async function saveBulkAtt(){
     alertEl.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#dc2626">❌ بعض السجلات لم تُحفظ (${errors} أخطاء)</div>`;
   } else {
     alertEl.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#065f46">✅ تم حفظ ${saved} سجل${deleted?' وحذف '+deleted:''} بنجاح!</div>`;
+    // Update DB.staffAtt immediately (no need to reload from server)
+    upsertRows.forEach(r=>{ 
+      if(!DB.staffAtt[r.date]) DB.staffAtt[r.date]={};
+      DB.staffAtt[r.date][String(r.staff_id)]=r.status;
+    });
+    deleteKeys.forEach(({staffId,date})=>{
+      if(DB.staffAtt[date]) delete DB.staffAtt[date][String(staffId)];
+    });
     _bulkAttData={};
-    // Refresh local DB cache
-    if(bid===curBid) await loadFromSupa(curBid);
-    setTimeout(()=>renderBulkAtt(),500);
+    setTimeout(()=>renderBulkAtt(),100);
   }
 }
 
 async function toggleStaffAtt(staffId, date){
+  // Check if this is a work day for this staff member
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
+  const dow=new Date(date+'T00:00:00').getDay();
+  if(!workDays.includes(dow)){
+    // Off day — don't allow recording
+    return;
+  }
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
   const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
-  const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
 
@@ -6196,14 +6217,8 @@ async function renderStaffAttWeek(){
     return String(wb)===String(curBid) || (!s.workBranch && String(s.branchId)===String(curBid));
   });
 
-  // Load attendance from Supabase for this week
-  const {data:attData} = await sb.from('staff_attendance').select('*')
-    .gte('date', weekDays[0]).lte('date', weekDays[6]);
-  // Update DB.staffAtt
-  (attData||[]).forEach(x=>{
-    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
-  });
+  // Use DB.staffAtt as single source of truth (loaded on startup)
+  // No extra query needed - already loaded with full data
 
   const dayNamesArShort=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
   const dayNamesEnShort=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
@@ -6243,13 +6258,22 @@ async function renderStaffAttWeek(){
       <tbody>
       ${staff.map((s,si)=>{
         let present=0, absent=0;
+        const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
         const cells=weekDays.map((d,i)=>{
+          const dow=new Date(d+'T00:00:00').getDay();
+          const isOffDay=!workDays.includes(dow);
+          if(isOffDay){
+            return`<td style="padding:4px;text-align:center;background:#f3f4f6;border:1px solid #e5e7eb">
+              <div style="width:32px;height:32px;border-radius:7px;border:2px solid #e5e7eb;background:#f3f4f6;
+              display:flex;align-items:center;justify-content:center;cursor:default;
+              font-size:.6rem;color:#9ca3af;margin:auto;user-select:none">Off</div>
+            </td>`;
+          }
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
           const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم';
           if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
           const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':dayColors[i];
           const icon=isP?'✓':isA?'✕':isH?'½':'';
-          const color=isP?'#065f46':isA?'#dc2626':isH?'#92400e':'#9ca3af';
           return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
             <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
               style="width:32px;height:32px;border-radius:7px;border:2px solid ${isP?'#059669':isA?'#dc2626':isH?'#f59e0b':'#d1d5db'};
@@ -6292,7 +6316,10 @@ async function renderStaffAttWeek(){
 }
 
 async function toggleStaffAttWeek(staffId, date){
-  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  // Off day guard
+  const sObj2=DB.staff.find(x=>String(x.id)===String(staffId));
+  const wdays2=(sObj2?.workDays||'0,1,2,3,4').split(',').map(Number);
+  if(!wdays2.includes(new Date(date+'T00:00:00').getDay())) return;
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   const newSt=cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':'';
