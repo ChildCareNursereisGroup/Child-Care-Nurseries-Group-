@@ -2216,22 +2216,18 @@ async function loadFromSupa(bid) {
         branchId:x.branch_id||'',extra};
     });
     DB.staffAtt={};
-    // Load staff_attendance - last 6 months (fast, focused)
     {
       const now = new Date();
-      const from6mo = new Date(now.getFullYear(), now.getMonth()-5, 1).toISOString().split('T')[0];
-      const {data:saData, error:saErr} = await sb.from('staff_attendance')
-        .select('staff_id,date,status,id')
-        .gte('date', from6mo)
-        .order('id',{ascending:true})
-        .limit(3000);
-      if(!saErr && saData){
-        saData.forEach(x=>{
-          const d=x.date; if(!DB.staffAtt[d]) DB.staffAtt[d]={};
-          DB.staffAtt[d][String(x.staff_id)]=x.status;
-        });
-        console.log('staff_attendance loaded:',saData.length,'records (6mo)');
-      }
+      const from = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().split('T')[0];
+      const {data:saData} = await sb.from('staff_attendance')
+        .select('staff_id,date,status')
+        .gte('date', from)
+        .limit(10000);
+      (saData||[]).forEach(x=>{
+        if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+        DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+      });
+      console.log('staffAtt loaded:', (saData||[]).length);
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
 
@@ -6113,13 +6109,10 @@ async function saveBulkAtt(){
       if(!wdays.includes(dow)) return;
 
       const status=_bulkAttData[date][staffId];
-      // Use staff's contract branchId for saving
-      const staffRec=DB.staff.find(x=>String(x.id)===staffId);
-      const sBid=staffRec?.branchId||bid;
       if(status){
-        upsertRows.push({branch_id:sBid, staff_id:Number(staffId), date, status});
+        upsertRows.push({branch_id:bid, staff_id:Number(staffId), date, status});
       } else {
-        deleteKeys.push({staffId:Number(staffId), date, bid:sBid});
+        deleteKeys.push({staffId:Number(staffId), date});
       }
     });
   });
@@ -6140,9 +6133,9 @@ async function saveBulkAtt(){
   }
 
   // Delete cleared records one by one (no bulk delete by multiple keys)
-  for(const {staffId,date,bid:sBidDel} of deleteKeys){
+  for(const {staffId,date} of deleteKeys){
     const {error}=await sb.from('staff_attendance').delete()
-      .eq('staff_id',staffId).eq('date',date);
+      .eq('branch_id',bid).eq('staff_id',staffId).eq('date',date);
     if(error){ errors++; console.error('bulk att delete error:',error); }
     else deleted++;
   }
@@ -6193,21 +6186,19 @@ async function toggleStaffAtt(staffId, date){
   };
 
   if(!newSt){
-    // Delete from all branches for this staff+date (safe cleanup)
     await sb.from('staff_attendance').delete()
-      .eq('staff_id', Number(staffId)).eq('date', date);
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
     showMsg(true,'🗑️ تم المسح');
     return;
   }
 
-  // Save: use staff contract branchId (not curBid) so records are always found
-  const staffBid = s?.branchId || curBid;
-  const payload={branch_id:staffBid, staff_id:Number(staffId), date, status:newSt};
+  // Save attendance
+  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
   const {error}=await sb.from('staff_attendance')
     .upsert(payload, {onConflict:'branch_id,staff_id,date'});
   if(error){
     await sb.from('staff_attendance').delete()
-      .eq('branch_id',staffBid).eq('staff_id',Number(staffId)).eq('date',date);
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
     const {error:err2}=await sb.from('staff_attendance').insert(payload);
     if(err2) showMsg(false,'❌ خطأ: '+err2.message);
     else showMsg(true,'✅ '+(newSt==='حضور'?'حضور ✓':newSt==='نص يوم'?'نص يوم ½':'غياب ✕'));
@@ -6362,22 +6353,20 @@ async function toggleStaffAttWeek(staffId, date){
     if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
   }
   
-  // Save to Supabase using staff's contract branchId
-  const sWeek=DB.staff.find(x=>String(x.id)===String(staffId));
-  const weekBid=sWeek?.branchId||curBid;
+  // Save to Supabase
   let saveOk = false;
   try {
     if(!newSt){
       const {error}=await sb.from('staff_attendance').delete()
-        .eq('staff_id',Number(staffId)).eq('date',date);
+        .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
       saveOk = !error;
     } else {
-      const payload={branch_id:weekBid, staff_id:Number(staffId), date, status:newSt};
+      const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
       const {error}=await sb.from('staff_attendance')
         .upsert(payload,{onConflict:'branch_id,staff_id,date'});
       if(error){
         await sb.from('staff_attendance').delete()
-          .eq('staff_id',Number(staffId)).eq('date',date);
+          .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
         const {error:err2}=await sb.from('staff_attendance').insert(payload);
         saveOk = !err2;
         if(err2) console.error('Staff att save error:', err2);
