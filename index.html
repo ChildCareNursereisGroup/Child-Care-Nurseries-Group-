@@ -709,11 +709,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div class="ch">
     <div class="ct" id="staff-att-title">👷 Staff Attendance — الحضور والغياب</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <!-- View Toggle -->
-      <div style="display:flex;border:1.5px solid var(--border);border-radius:9px;overflow:hidden">
-        <button id="att-view-day-btn" onclick="setAttView('day')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#1e3a8a;color:#fff" data-ar="📅 يوم" data-en="📅 Day">📅 يوم</button>
-        <button id="att-view-week-btn" onclick="setAttView('week')" style="padding:4px 10px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.75rem;font-weight:700;background:#fff;color:#374151" data-ar="📆 أسبوع" data-en="📆 Week">📆 أسبوع</button>
-      </div>
+      <!-- Week view only -->
+      <div id="att-view-week-btn" style="background:#1e3a8a;color:#fff;border-radius:9px;padding:4px 12px;font-size:.75rem;font-weight:700;font-family:'Tajawal',sans-serif">📆 Week</div>
       <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
       <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()" id="bulk-att-btn">📋 إدخال جماعي</button>
@@ -2064,14 +2061,7 @@ let curChild=null, chFilter='all', srchQ='', expCat='bus', expFilt='all';
 let attView='day'; // 'day' or 'week'
 
 function setAttView(v){
-  attView=v;
-  const db=el('att-view-day-btn'), wb=el('att-view-week-btn');
-  if(db&&wb){
-    db.style.background=v==='day'?'#1e3a8a':'#fff';
-    db.style.color=v==='day'?'#fff':'#374151';
-    wb.style.background=v==='week'?'#1e3a8a':'#fff';
-    wb.style.color=v==='week'?'#fff':'#374151';
-  }
+  attView='week'; // always week view
   renderStaffAtt();
 }
 // In-memory cache
@@ -4333,8 +4323,7 @@ function setStaffDayData(staffId, date, data){
 }
 
 function renderStaffAtt(){
-  if(attView==='week') return renderStaffAttWeek();
-  renderStaffAttDay();
+  renderStaffAttWeek();
 }
 
 function renderStaffAttDay(){
@@ -6228,10 +6217,10 @@ async function renderStaffAttWeek(){
   if(!dateEl.value) dateEl.value=today();
   const selDate = new Date(dateEl.value+'T00:00:00');
   
-  // Get week start (Saturday) and end (Friday)
+  // Get week start (Sunday) and end (Saturday) - standard UAE work week display
   const dow = selDate.getDay(); // 0=Sun...6=Sat
-  const diffToSat = (dow - 6 + 7) % 7;
-  const weekStart = new Date(selDate); weekStart.setDate(selDate.getDate() - diffToSat);
+  const diffToSun = dow; // days back to Sunday
+  const weekStart = new Date(selDate); weekStart.setDate(selDate.getDate() - diffToSun);
   const weekDays = Array.from({length:7},(_,i)=>{
     const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
     return d.toISOString().split('T')[0];
@@ -6249,8 +6238,8 @@ async function renderStaffAttWeek(){
   // Use DB.staffAtt as single source of truth (loaded on startup)
   // No extra query needed - already loaded with full data
 
-  const dayNamesArShort=['سبت','أحد','اثن','ثلا','أرب','خمس','جمع'];
-  const dayNamesEnShort=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+  const dayNamesArShort=['أحد','اثن','ثلا','أرب','خمس','جمع','سبت'];
+  const dayNamesEnShort=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayLabels = lang==='ar' ? dayNamesArShort : dayNamesEnShort;
   const dayColors=['#fdf2f8','#ecfdf5','#eff6ff','#fdf4ff','#fffbeb','#f0f9ff','#fef9c3'];
   const staffHeader = lang==='ar' ? 'الموظف' : 'Staff';
@@ -6274,8 +6263,9 @@ async function renderStaffAttWeek(){
           <th style="padding:8px 10px;text-align:right;min-width:140px">${staffHeader}</th>
           ${weekDays.map((d,i)=>{
             const isToday=d===today();
+            const dowIdx=new Date(d+'T00:00:00').getDay(); // 0=Sun..6=Sat
             return`<th style="padding:6px 4px;text-align:center;background:${isToday?'#3b82f6':'#1e3a8a'};min-width:60px">
-              <div>${dayLabels[i]}</div>
+              <div>${dayLabels[dowIdx]}</div>
               <div style="font-size:.65rem;opacity:.8">${fmtD(d)}</div>
             </th>`;
           }).join('')}
