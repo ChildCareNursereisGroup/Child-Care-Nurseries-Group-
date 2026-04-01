@@ -5743,6 +5743,7 @@ async function printStaffAttReport(exportType='print'){
 
     // Work day — check saved record
     const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
+    if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false}; // Manual off = not absent
     if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay}; // Comp off = not absent
     if(raw) return {status:raw, smart:false, isWorkDay};
 
@@ -6414,10 +6415,11 @@ async function renderStaffAttWeek(){
             const isOvP=overrideSt==='حضور', isOvA=overrideSt==='غياب';
             if(isOvP) present++;
             if(isOvA) absent++;
-            const ovBg=isOvP?'#d1fae5':isOvA?'#fee2e2':'#f3f4f6';
-            const ovIcon=isOvP?'✓':isOvA?'✕':'';
-            const ovBord=isOvP?'#059669':isOvA?'#dc2626':'#e5e7eb';
-            const ovBoxBg=isOvP?'#059669':isOvA?'#dc2626':'#f3f4f6';
+            const isOvOff=overrideSt==='إجازة';
+            const ovBg=isOvP?'#d1fae5':isOvA?'#fee2e2':isOvOff?'#f3f4f6':'#f3f4f6';
+            const ovIcon=isOvP?'✓':isOvA?'✕':isOvOff?'Off':'';
+            const ovBord=isOvP?'#059669':isOvA?'#dc2626':isOvOff?'#6b7280':'#e5e7eb';
+            const ovBoxBg=isOvP?'#059669':isOvA?'#dc2626':isOvOff?'#6b7280':'#f3f4f6';
             const ovColor=isOvP?'#fff':isOvA?'#fff':'#9ca3af';
             return`<td style="padding:4px;text-align:center;background:${ovBg};border:1px solid #e5e7eb">
               <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
@@ -6431,20 +6433,19 @@ async function renderStaffAttWeek(){
             </td>`;
           }
           const st=(DB.staffAtt[d]||{})[String(s.id)]||'';
-          const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم', isC=st==='تعويض';
+          const isP=st==='حضور', isA=st==='غياب', isH=st==='نص يوم', isOff2=st==='إجازة';
           if(isP) present++; else if(isA) absent++; else if(isH){present+=0.5;absent+=0.5;}
-          const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':isC?'#f3e8ff':dayColors[i];
-          const icon=isP?'✓':isA?'✕':isH?'½':isC?'🔄':'';
-          const bord=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isC?'#9333ea':'#d1d5db';
-          const boxBg=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isC?'#9333ea':'#fff';
+          const bg=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':isOff2?'#f3f4f6':dayColors[i];
+          const icon=isP?'✓':isA?'✕':isH?'½':isOff2?'Off':'';
+          const bord=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isOff2?'#6b7280':'#d1d5db';
+          const boxBg=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isOff2?'#6b7280':'#fff';
           return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
             <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
               data-wid="${s.id}" data-wdate="${d}"
-              title="${isC?(lang==='ar'?'تعويض — اضغط للمسح':'Comp Off — click to clear'):''}"
               style="width:32px;height:32px;border-radius:7px;border:2px solid ${bord};
               background:${boxBg};
               display:flex;align-items:center;justify-content:center;cursor:pointer;
-              font-weight:900;font-size:${isC?'.75rem':'.85rem'};color:#fff;margin:auto;user-select:none">
+              font-weight:900;font-size:${isOff2?'.55rem':'.85rem'};color:#fff;margin:auto;user-select:none">
               ${icon}
             </div>
           </td>`;
@@ -6477,7 +6478,7 @@ async function renderStaffAttWeek(){
     <span style="color:#059669;font-weight:800">✅ ${lang==='ar'?'إجمالي حضور':'Total Present'}: ${allPresent}</span>
     <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'إجمالي غياب':'Total Absent'}: ${allAbsent}</span>
     <span style="color:#9333ea;font-weight:800">🔄 ${lang==='ar'?'تعويض':'Comp Off'}: ${staff.reduce((s,st)=>s+weekDays.reduce((ss,d)=>{return ss+((DB.staffAtt[d]||{})[String(st.id)]==='تعويض'?1:0);},0),0)}</span>
-    <span style="color:#6b7280;font-size:.72rem">${lang==='ar'?'الدورة: فارغ ← ✓ حضور ← ½ نصف ← ✕ غياب ← 🔄 تعويض':'Cycle: empty → ✓ Present → ½ Half → ✕ Absent → 🔄 Comp Off'}</span>
+    <span style="color:#6b7280;font-size:.72rem">${lang==='ar'?'الدورة: فارغ ← ✓ حضور ← ½ نصف ← ✕ غياب ← Off إجازة':'Cycle: empty → ✓ Present → ½ Half → ✕ Absent → Off Day'}</span>
   </div>`;
 }
 
@@ -6492,7 +6493,7 @@ async function toggleStaffAttWeek(staffId, date){
   // Work days: '' → حضور → نص يوم → غياب → ''
   const newSt=isOffDayCyc
     ? (cur===''?'حضور':cur==='حضور'?'غياب':'')
-    : (cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':cur==='غياب'?'تعويض':'');
+    : (cur===''?'حضور':cur==='حضور'?'نص يوم':cur==='نص يوم'?'غياب':cur==='غياب'?'إجازة':'');
   
   // Update local state immediately for snappy UI
   DB.staffAtt[date][sid]=newSt;
@@ -6500,10 +6501,11 @@ async function toggleStaffAttWeek(staffId, date){
   // Update cell visually immediately using data attributes
   const cell=document.querySelector(`[data-wid="${staffId}"][data-wdate="${date}"]`);
   if(cell){
-    const isP=newSt==='حضور',isA=newSt==='غياب',isH=newSt==='نص يوم',isC=newSt==='تعويض';
-    cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isC?'#9333ea':'#fff';
-    cell.style.borderColor=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isC?'#9333ea':'#d1d5db';
-    cell.textContent=isP?'✓':isA?'✕':isH?'½':isC?'🔄':'';
+    const isP=newSt==='حضور',isA=newSt==='غياب',isH=newSt==='نص يوم',isOff=newSt==='إجازة';
+    cell.style.background=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isOff?'#6b7280':'#fff';
+    cell.style.borderColor=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isOff?'#6b7280':'#d1d5db';
+    cell.textContent=isP?'✓':isA?'✕':isH?'½':isOff?'Off':'';
+    cell.style.fontSize=isOff?'.55rem':'.85rem';
     cell.style.opacity='0.6'; // dim while saving
     const td=cell.closest('td');
     if(td) td.style.background=isP?'#d1fae5':isA?'#fee2e2':isH?'#fef3c7':'#fff';
