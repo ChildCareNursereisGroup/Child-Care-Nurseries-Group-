@@ -5842,27 +5842,23 @@ async function printStaffAttReport(exportType='print'){
   const dayNames = isAr ? dayNamesAr : dayNamesEn;
 
   // Smart status: considers work schedule
-  // - Work day + no record + neighbor is present → infer present
-  // - Off day → 'off' (not absent, not present)
+  // Status based ONLY on actual saved records - no inference
   const getSmartStatus=(staffId, dayIdx)=>{
     const s = staffList.find(x=>String(x.id)===String(staffId));
     const workDays = (s?.workDays||'0,1,2,3,4').split(',').map(Number);
     const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
     const isWorkDay = workDays.includes(dow);
 
-    // Off day ALWAYS returns 'off' — ignore any saved records
+    // Off day (scheduled) → always 'off'
     if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
 
-    // Work day — check saved record
+    // Check actual saved record only
     const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
-    if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false}; // Manual off = not absent
-    if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay}; // Comp off = not absent
+    if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false};
+    if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay};
     if(raw) return {status:raw, smart:false, isWorkDay};
 
-    // Work day + unregistered → check neighbors
-    const prev=(attMap[staffId]||{})[days[dayIdx-1]]||'';
-    const next=(attMap[staffId]||{})[days[dayIdx+1]]||'';
-    if(prev==='حضور'||next==='حضور') return {status:'حضور', smart:true, isWorkDay};
+    // Not recorded = blank (no inference)
     return {status:'', smart:false, isWorkDay};
   };
 
@@ -5927,8 +5923,8 @@ async function printStaffAttReport(exportType='print'){
         rowBg='#f3f4f6'; statusColor='#9ca3af';
       } else if(status==='حضور'){
         present++;
-        statusCell=(isAr?'✓ حضور':'✓ Present')+(smart?` <span style="font-size:.6rem;color:#9ca3af">(${isAr?'تلقائي':'auto'})</span>`:'');
-        rowBg=smart?'#f9fafb':'#f0fdf4'; statusColor='#059669';
+        statusCell=isAr?'✓ حضور':'✓ Present';
+        rowBg='#f0fdf4'; statusColor='#059669';
       } else if(status==='غياب'){
         absent++;
         absences.push(`${day}/${String(mo).padStart(2,'0')}`);
