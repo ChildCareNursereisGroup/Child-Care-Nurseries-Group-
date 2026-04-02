@@ -6502,8 +6502,9 @@ async function renderStaffAttWeek(){
               <div style="font-size:.65rem;opacity:.8">${fmtD(d)}</div>
             </th>`;
           }).join('')}
-          <th style="padding:6px 4px;text-align:center;background:#065f46;min-width:45px">✓</th>
-          <th style="padding:6px 4px;text-align:center;background:#7f1d1d;min-width:45px">✕</th>
+          <th style="padding:6px 4px;text-align:center;background:#065f46;min-width:45px" title="This week present">W✓</th>
+          <th style="padding:6px 4px;text-align:center;background:#7f1d1d;min-width:45px" title="This week absent">W✕</th>
+          <th style="padding:6px 4px;text-align:center;background:#0369a1;min-width:50px;font-size:.65rem" title="Month present/absent">Month</th>
           <th style="padding:6px 4px;text-align:center;min-width:45px">💬</th>
         </tr>
       </thead>
@@ -6559,6 +6560,21 @@ async function renderStaffAttWeek(){
         const absentDays=weekDays.filter(d=>(DB.staffAtt[d]||{})[String(s.id)]==='غياب');
         const waBtn=phone&&absentDays.length?`<button onclick="sendWeekAbsenceWA('${s.id}','${absentDays.join(',')}')"
           style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`:'—';
+        // Month totals from DB.staffAtt
+        const selD2=new Date(dateEl.value+'T00:00:00');
+        const yrM=selD2.getFullYear(), moM=selD2.getMonth();
+        const daysInMo=new Date(yrM,moM+1,0).getDate();
+        const monPrefix=`${yrM}-${String(moM+1).padStart(2,'0')}-`;
+        let monPresent=0, monAbsent=0;
+        for(let d2=1;d2<=daysInMo;d2++){
+          const dd=monPrefix+String(d2).padStart(2,'0');
+          const dow2=new Date(dd+'T00:00:00').getDay();
+          const isWD=workDays.includes(dow2);
+          const st2=(DB.staffAtt[dd]||{})[String(s.id)]||'';
+          if(st2==='حضور') monPresent++;
+          else if(st2==='غياب') monAbsent++;
+          else if(st2==='نص يوم'){monPresent+=0.5;monAbsent+=0.5;}
+        }
         return`<tr style="background:${si%2?'#fff':'#fafafa'}">
           <td style="padding:7px 10px;border:1px solid #e5e7eb">
             <div style="font-weight:800;font-size:.82rem">${s.name}</div>
@@ -6567,6 +6583,11 @@ async function renderStaffAttWeek(){
           ${cells}
           <td style="text-align:center;font-weight:900;color:#059669;border:1px solid #e5e7eb">${present%1===0?present:present.toFixed(1)}</td>
           <td style="text-align:center;font-weight:900;color:#dc2626;border:1px solid #e5e7eb">${absent%1===0?absent:absent.toFixed(1)}</td>
+          <td style="text-align:center;border:1px solid #e5e7eb;background:#eff6ff;font-size:.72rem">
+            <span style="color:#059669;font-weight:800">${monPresent%1===0?monPresent:monPresent.toFixed(1)}</span>
+            <span style="color:#9ca3af;font-size:.6rem">/</span>
+            <span style="color:#dc2626;font-weight:800">${monAbsent%1===0?monAbsent:monAbsent.toFixed(1)}</span>
+          </td>
           <td style="text-align:center;border:1px solid #e5e7eb">${waBtn}</td>
         </tr>`;
       }).join('')}
