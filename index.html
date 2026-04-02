@@ -5808,31 +5808,19 @@ async function printStaffAttReport(exportType='print'){
   });
   if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
 
-  // Build attMap for report month
+  // Always fetch fresh from Supabase for accurate report
   const attMap = {};
-  const monPrefix = mon+'-';
-  // Check if we have this month in DB.staffAtt
-  const hasMonth = Object.keys(DB.staffAtt).some(d=>d.startsWith(monPrefix));
-  if(hasMonth){
-    Object.keys(DB.staffAtt).forEach(date=>{
-      if(!date.startsWith(monPrefix)) return;
-      Object.keys(DB.staffAtt[date]).forEach(staffId=>{
-        if(!attMap[staffId]) attMap[staffId]={};
-        attMap[staffId][date]=DB.staffAtt[date][staffId];
-      });
-    });
-  } else {
-    // Month not in cache - fetch directly (no branch filter)
-    const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
-      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(5000);
-    (rptAtt||[]).forEach(x=>{
-      if(!attMap[x.staff_id]) attMap[x.staff_id]={};
-      attMap[x.staff_id][x.date]=x.status;
-      // Also cache it
-      if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-      DB.staffAtt[x.date][String(x.staff_id)]=x.status;
-    });
-  }
+  const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
+    .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'))
+    .limit(5000);
+  (rptAtt||[]).forEach(x=>{
+    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
+    attMap[x.staff_id][x.date]=x.status;
+    // Update cache too
+    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+  });
+  console.log('Report attMap loaded:', (rptAtt||[]).length, 'records');
 
   const fmt = n => Number(n).toFixed(1);
   const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
@@ -5842,23 +5830,23 @@ async function printStaffAttReport(exportType='print'){
   const dayNames = isAr ? dayNamesAr : dayNamesEn;
 
   // Smart status: considers work schedule
-  // Status based ONLY on actual saved records - no inference
+  // Status: saved record takes priority over workDays schedule
   const getSmartStatus=(staffId, dayIdx)=>{
     const s = staffList.find(x=>String(x.id)===String(staffId));
     const workDays = (s?.workDays||'0,1,2,3,4').split(',').map(Number);
     const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
     const isWorkDay = workDays.includes(dow);
 
-    // Off day (scheduled) → always 'off'
-    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
-
-    // Check actual saved record only
+    // Check saved record FIRST — manager override always wins
     const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
     if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false};
     if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay};
-    if(raw) return {status:raw, smart:false, isWorkDay};
+    if(raw) return {status:raw, smart:false, isWorkDay:true}; // saved = treat as work day
 
-    // Not recorded = blank (no inference)
+    // No saved record → check if scheduled off
+    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
+
+    // Work day, not recorded
     return {status:'', smart:false, isWorkDay};
   };
 
