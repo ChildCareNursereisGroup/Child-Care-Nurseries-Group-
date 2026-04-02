@@ -5494,14 +5494,13 @@ function printMonthlyStaffSummary(){
   const branchName=isAr?(b.ar||b.en):b.en||b.ar;
   const printDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 
-  // Get staff for this branch
+  // Get staff by WORK branch (where they actually work)
   const staff=(DB.staff||[]).filter(s=>{
     if(s.lastWorkingDay&&s.lastWorkingDay<monStr+'-01') return false;
-    const wb=s.workBranch||s.branchId;
-    const seenIds=new Set();
-    return String(wb)===String(curBid)||String(s.branchId)===String(curBid);
+    const wb=s.workBranch||s.branchId; // work branch takes priority
+    return String(wb)===String(curBid);
   });
-  // Dedup
+  // Dedup by id
   const seenIds=new Set();
   const staffList=staff.filter(s=>{if(seenIds.has(s.id))return false;seenIds.add(s.id);return true;});
 
