@@ -5948,72 +5948,71 @@ async function printStaffAttReport(exportType='print'){
     const printDate = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 
     return `<div class="page">
-      <!-- TOP BORDER -->
-      <div style="height:5px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
 
       <!-- HEADER -->
-      <div style="padding:10px 18px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #e5e7eb">
+      <div class="hdr">
         <div>
-          <div style="font-size:.95rem;font-weight:900;color:#1e3a8a">مجموعة رعاية الطفل للحضانات</div>
-          <div style="font-size:.65rem;color:#6b7280;margin-top:1px">Child Care Group — ${contractBranchName} — UAE</div>
+          <div style="font-size:1.1rem;font-weight:900;letter-spacing:.5px">مجموعة رعاية الطفل للحضانات</div>
+          <div style="font-size:.7rem;opacity:.85;margin-top:2px">Child Care Group — ${contractBranchName} — UAE</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:.7rem;opacity:.8">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
+          <div style="font-size:1.2rem;font-weight:900">${monthLabel}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:.62rem;color:#6b7280">${isAr?'تقرير الحضور والغياب الشهري':'Monthly Attendance Report'}</div>
-          <div style="font-size:.9rem;font-weight:900;color:#1e3a8a">${monthLabel}</div>
-          <div style="font-size:.55rem;color:#9ca3af">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
+          <div style="font-size:.62rem;opacity:.75">${isAr?'تاريخ الطباعة':'Printed'}: ${printDate}</div>
+          <div style="font-size:.62rem;opacity:.75;margin-top:2px">${contractBranchName}</div>
         </div>
       </div>
 
       <!-- EMPLOYEE INFO -->
-      <div style="padding:8px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;font-size:.7rem">
-          <div><span style="color:#6b7280">${isAr?'اسم الموظف':'Employee Name'}:</span><br><b style="color:#1e3a8a;font-size:.8rem">${s.name}</b></div>
-          <div><span style="color:#6b7280">${isAr?'المسمى الوظيفي':'Position'}:</span><br><b>${s.position||'—'}</b></div>
-          <div><span style="color:#6b7280">${isAr?'الجنسية':'Nationality'}:</span><br><b>${s.nationality||'—'}</b></div>
-          <div><span style="color:#6b7280">${isAr?'جهة التعاقد':'Contract Branch'}:</span><br><b>${contractBranchName}</b></div>
-          <div><span style="color:#6b7280">${isAr?'رقم التواصل':'Contact'}:</span><br><b>${s.contact||'—'}</b></div>
-          <div><span style="color:#6b7280">${isAr?'رقم الإقامة':'ID / Residency'}:</span><br><b>${s.idNumber||s.passportNum||'—'}</b></div>
-        </div>
+      <div class="emp-row">
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'اسم الموظف':'Employee'}</div><div class="emp-val" style="font-size:.85rem">${s.name}</div></div>
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'الوظيفة':'Position'}</div><div class="emp-val">${s.position||'—'}</div></div>
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'الجنسية':'Nationality'}</div><div class="emp-val">${s.nationality||'—'}</div></div>
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'جهة التعاقد':'Contract Branch'}</div><div class="emp-val">${contractBranchName}</div></div>
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'التواصل':'Contact'}</div><div class="emp-val">${s.contact||'—'}</div></div>
+        <div class="emp-cell"><div class="emp-lbl">${isAr?'رقم الإقامة':'ID / Residency'}</div><div class="emp-val">${s.idNumber||s.passportNum||'—'}</div></div>
       </div>
 
       <!-- SUMMARY BOXES -->
-      <div style="padding:7px 18px;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;border-bottom:1px solid #e5e7eb">
-        <div style="text-align:center;padding:5px 3px;background:#dbeafe;border-radius:6px">
-          <div style="font-size:1.15rem;font-weight:900;color:#1e40af">${daysInMonth}</div>
-          <div style="font-size:.52rem;color:#1e40af;font-weight:700">${isAr?'أيام الشهر':'Month Days'}</div>
+      <div class="sum-row">
+        <div class="sum-cell" style="background:#dbeafe">
+          <div class="sum-num" style="color:#1e40af">${daysInMonth}</div>
+          <div class="sum-lbl" style="color:#1e40af">${isAr?'أيام الشهر':'Month Days'}</div>
         </div>
-        <div style="text-align:center;padding:5px 3px;background:#d1fae5;border-radius:6px">
-          <div style="font-size:1.15rem;font-weight:900;color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
-          <div style="font-size:.52rem;color:#059669;font-weight:700">${isAr?'أيام الحضور':'Present'}</div>
+        <div class="sum-cell" style="background:#d1fae5">
+          <div class="sum-num" style="color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+          <div class="sum-lbl" style="color:#059669">${isAr?'أيام الحضور':'Present'}</div>
         </div>
-        <div style="text-align:center;padding:5px 3px;background:#fee2e2;border-radius:6px">
-          <div style="font-size:1.15rem;font-weight:900;color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
-          <div style="font-size:.52rem;color:#dc2626;font-weight:700">${isAr?'أيام الغياب':'Absent'}</div>
+        <div class="sum-cell" style="background:#fee2e2">
+          <div class="sum-num" style="color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+          <div class="sum-lbl" style="color:#dc2626">${isAr?'أيام الغياب':'Absent'}</div>
         </div>
-        <div style="text-align:center;padding:5px 3px;background:#fef3c7;border-radius:6px">
-          <div style="font-size:1.15rem;font-weight:900;color:#d97706">${half}</div>
-          <div style="font-size:.52rem;color:#d97706;font-weight:700">${isAr?'نصف يوم':'Half Day'}</div>
+        <div class="sum-cell" style="background:#fef3c7">
+          <div class="sum-num" style="color:#d97706">${half}</div>
+          <div class="sum-lbl" style="color:#d97706">${isAr?'نصف يوم':'Half Day'}</div>
         </div>
-        <div style="text-align:center;padding:5px 3px;background:#f3f4f6;border-radius:6px">
-          <div style="font-size:1.15rem;font-weight:900;color:#6b7280">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status&&r.status!=='off'}).length}</div>
-          <div style="font-size:.52rem;color:#6b7280;font-weight:700">${isAr?'غير مسجل':'Unrecorded'}</div>
+        <div class="sum-cell" style="background:#f3f4f6">
+          <div class="sum-num" style="color:#6b7280">${days.filter((_,i)=>{const r=getSmartStatus(s.id,i);return r.isWorkDay&&!r.status}).length}</div>
+          <div class="sum-lbl" style="color:#6b7280">${isAr?'غير مسجل':'Unrecorded'}</div>
         </div>
       </div>
 
-      <!-- ATTENDANCE TABLE: 3 columns, full month -->
-      <div style="padding:7px 18px">
-        <table style="width:100%;border-collapse:collapse;font-size:.7rem">
+      <!-- ATTENDANCE TABLE — 3 columns landscape -->
+      <div style="padding:8px 16px">
+        <table class="att-table">
           <thead>
-            <tr style="background:#1e3a8a;color:#fff">
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:28px;text-align:center">#</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;width:80px">${isAr?'اليوم':'Day'}</th>
-              <th style="padding:4px 6px;border:1px solid #3b5998;text-align:center">${isAr?'الحالة':'Status'}</th>
+            <tr>
+              <th class="name-col" style="width:28px">#</th>
+              <th style="width:60px">${isAr?'اليوم':'Day'}</th>
+              <th style="min-width:100px">${isAr?'الحالة':'Status'}</th>
+              <th class="name-col" style="width:28px">#</th>
+              <th style="width:60px">${isAr?'اليوم':'Day'}</th>
+              <th style="min-width:100px">${isAr?'الحالة':'Status'}</th>
+              <th class="name-col" style="width:28px">#</th>
+              <th style="width:60px">${isAr?'اليوم':'Day'}</th>
+              <th style="min-width:100px">${isAr?'الحالة':'Status'}</th>
             </tr>
           </thead>
           <tbody>
@@ -6025,24 +6024,21 @@ async function printStaffAttReport(exportType='print'){
                 tRows+='<tr>';
                 for(let col=0;col<cols;col++){
                   const idx=col*perCol+row;
-                  if(idx>=days.length){
-                    tRows+='<td colspan="3" style="border:1px solid #e5e7eb"></td>';
-                    continue;
-                  }
+                  if(idx>=days.length){tRows+='<td colspan="3" style="border:1px solid #e5e7eb"></td>';continue;}
                   const d=days[idx];
                   const dayNum=d.split('-')[2];
                   const dow=new Date(d+'T00:00:00').getDay();
                   const dayName=dayNames[dow];
-                  const {status,smart}=getSmartStatus(s.id,idx);
-                  let statusTxt='',bg='#fff',color='#374151',symbol='';
-                  if(status==='off'){statusTxt=isAr?'راحة':'Off';bg='#f3f4f6';color='#9ca3af';}
-                  else if(status==='حضور'){statusTxt=isAr?'حضور':'Present';bg=smart?'#f9fafb':'#f0fdf4';color='#059669';symbol='✓';}
-                  else if(status==='غياب'){statusTxt=isAr?'غياب':'Absent';bg='#fff5f5';color='#dc2626';symbol='✕';}
-                  else if(status==='نص يوم'){statusTxt=isAr?'نصف':'Half';bg='#fffbeb';color='#d97706';symbol='½';}
-                  else{statusTxt='—';color='#d1d5db';}
-                  tRows+=`<td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;background:${bg};font-weight:800;color:#1e3a8a;font-size:.68rem">${dayNum}</td>`;
-                  tRows+=`<td style="padding:3px 5px;border:1px solid #e5e7eb;background:${bg};color:#6b7280;font-size:.65rem">${dayName.substring(0,3)}</td>`;
-                  tRows+=`<td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;background:${bg};font-weight:800;color:${color};font-size:.68rem">${symbol?symbol+' ':''}<span style="font-size:.6rem">${statusTxt}</span></td>`;
+                  const {status}=getSmartStatus(s.id,idx);
+                  let cls='s-blank', sym='—', txt='';
+                  if(status==='حضور'){cls='s-present';sym='✓';txt=isAr?'حضور':'Present';}
+                  else if(status==='غياب'){cls='s-absent';sym='✕';txt=isAr?'غياب':'Absent';}
+                  else if(status==='نص يوم'){cls='s-half';sym='½';txt=isAr?'نصف':'Half';}
+                  else if(status==='off'){cls='s-off';sym='';txt=isAr?'راحة':'Off';}
+                  else if(status==='comp'){cls='s-comp';sym='🔄';txt=isAr?'تعويض':'Comp';}
+                  tRows+=`<td class="name-col" style="font-weight:800;color:#1e3a8a;font-size:.7rem">${dayNum}</td>`;
+                  tRows+=`<td style="color:#6b7280;font-size:.66rem">${dayName}</td>`;
+                  tRows+=`<td class="${cls}" style="font-size:.72rem">${sym}${sym&&txt?' ':''}${txt}</td>`;
                 }
                 tRows+='</tr>';
               }
@@ -6050,39 +6046,33 @@ async function printStaffAttReport(exportType='print'){
             })()}
           </tbody>
         </table>
-        <div style="margin-top:3px;font-size:.52rem;color:#9ca3af">
-          ✓=${isAr?'حضور':'Present'} &nbsp; ✕=${isAr?'غياب':'Absent'} &nbsp; ½=${isAr?'نصف':'Half'} &nbsp; —=${isAr?'غير مسجل':'Unrecorded'} &nbsp; ${isAr?'راحة':'Off'}=${isAr?'يوم راحة':'Day Off'}
+        <div style="margin-top:4px;font-size:.55rem;color:#9ca3af">
+          ✓ ${isAr?'حضور':'Present'} &nbsp;|&nbsp; ✕ ${isAr?'غياب':'Absent'} &nbsp;|&nbsp; ½ ${isAr?'نصف يوم':'Half Day'} &nbsp;|&nbsp; ${isAr?'راحة':'Off'} = ${isAr?'يوم راحة':'Day Off'} &nbsp;|&nbsp; — = ${isAr?'غير مسجل':'Unrecorded'}
         </div>
       </div>
 
       <!-- SIGNATURES -->
-      <div style="padding:8px 18px;border-top:1px solid #e5e7eb;background:#fafafa">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:.65rem">
-          <div style="text-align:center">
-            <div style="height:48px;border-bottom:1.5px solid #1e3a8a;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px">
-              ${empSigURL?`<img src="${empSigURL}" style="max-height:42px;max-width:100%;object-fit:contain" alt="sig">`:''}
-            </div>
-            <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع الموظف':'Employee Signature'}</div>
-            <div style="color:#6b7280;margin-top:1px">${s.name}</div>
+      <div style="padding:10px 16px;border-top:2px solid #1e3a8a;background:#f8faff;display:grid;grid-template-columns:1fr 1fr;gap:40px">
+        <div style="text-align:center">
+          <div class="sig-box">
+            ${empSigURL?`<img src="${empSigURL}" style="max-height:50px;max-width:100%;object-fit:contain" alt="sig">`:''}
           </div>
-          <div style="text-align:center">
-            <div style="height:48px;border-bottom:1.5px solid #1e3a8a;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px">
-              ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:42px;max-width:100%;object-fit:contain" alt="sig">`:''}
-            </div>
-            <div style="color:#1e3a8a;font-weight:700">${isAr?'توقيع المدير المسؤول':'Manager Signature'}</div>
-            <div style="color:#9ca3af;margin-top:1px">${contractBranchName}</div>
-          </div>
+          <div style="font-size:.72rem;font-weight:800;color:#1e3a8a;margin-top:4px">${isAr?'توقيع الموظف':'Employee Signature'}</div>
+          <div style="font-size:.65rem;color:#6b7280;margin-top:2px">${s.name}</div>
         </div>
-        <div style="margin-top:5px;font-size:.5rem;color:#9ca3af;text-align:center;border-top:1px dashed #e5e7eb;padding-top:4px">
-          ${isAr
-            ? `هذا التقرير صادر عن نظام إدارة مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — تاريخ الطباعة: ${printDate}`
-            : `Issued by Child Care Group Management System — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`
-          }
+        <div style="text-align:center">
+          <div class="sig-box">
+            ${mgrSigURL?`<img src="${mgrSigURL}" style="max-height:50px;max-width:100%;object-fit:contain" alt="sig">`:''}
+          </div>
+          <div style="font-size:.72rem;font-weight:800;color:#1e3a8a;margin-top:4px">${isAr?'توقيع المدير':'Manager Signature'}</div>
+          <div style="font-size:.65rem;color:#6b7280;margin-top:2px">${contractBranchName}</div>
         </div>
       </div>
+      <div style="background:#1e3a8a;color:rgba(255,255,255,.6);font-size:.5rem;text-align:center;padding:4px">
+        ${isAr?`مجموعة رعاية الطفل — ${contractBranchName} — ${monthLabel} — طبع: ${printDate}`:
+        `Child Care Group — ${contractBranchName} — ${monthLabel} — Printed: ${printDate}`}
+      </div>
 
-      <!-- BOTTOM BORDER -->
-      <div style="height:4px;background:linear-gradient(90deg,#1e3a8a,#3b82f6)"></div>
     </div>`; // end page
   }).join('');
 
@@ -6091,33 +6081,46 @@ async function printStaffAttReport(exportType='print'){
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Tajawal',Arial,sans-serif;color:#111;font-size:.72rem;background:#e5e7eb}
-  .page{
-    background:#fff;
-    page-break-after:always;
-    page-break-inside:avoid;
-    margin:12px auto;
-    max-width:780px;
-    box-shadow:0 4px 24px rgba(0,0,0,.18);
-  }
+  body{font-family:'Tajawal',Arial,sans-serif;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{background:#fff;page-break-after:always;page-break-inside:avoid;width:100%}
   .page:last-child{page-break-after:auto}
-  table{border-collapse:collapse;width:100%}
-  tr td,tr th{font-size:.68rem;padding:3px 6px}
   @media print{
-    body{background:#fff;padding:0;margin:0;font-size:.65rem}
-    .page{
-      page-break-after:always;
-      page-break-inside:avoid;
-      margin:0;
-      max-width:100%;
-      box-shadow:none;
-      border:1.5px solid #1e3a8a !important;
-    }
+    body{background:#fff;margin:0;padding:0}
+    .page{page-break-after:always;page-break-inside:avoid}
     .page:last-child{page-break-after:auto}
-    @page{margin:6mm;size:A4 portrait}
-    tr td,tr th{font-size:.6rem;padding:2px 5px}
+    @page{size:A4 landscape;margin:8mm}
   }
-</style></head><body>
+  @media screen{
+    body{background:#e5e7eb;padding:16px}
+    .page{max-width:1050px;margin:0 auto 20px;box-shadow:0 4px 30px rgba(0,0,0,.2)}
+  }
+  /* High-resolution color blocks */
+  .hdr{background:#1e3a8a;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+  .emp-row{display:grid;grid-template-columns:repeat(6,1fr);gap:0;background:#f0f4ff}
+  .emp-cell{padding:8px 12px;border-right:1px solid #d4dcf0;border-bottom:2px solid #1e3a8a}
+  .emp-cell:last-child{border-right:none}
+  .emp-lbl{font-size:.6rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .emp-val{font-size:.78rem;font-weight:800;color:#1e3a8a}
+  .sum-row{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:2px solid #1e3a8a}
+  .sum-cell{padding:8px;text-align:center;border-right:1px solid #e5e7eb}
+  .sum-cell:last-child{border-right:none}
+  .sum-num{font-size:1.6rem;font-weight:900;line-height:1}
+  .sum-lbl{font-size:.55rem;font-weight:700;margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+  /* Attendance table */
+  .att-table{width:100%;border-collapse:collapse;font-size:.72rem}
+  .att-table th{background:#1e3a8a;color:#fff;padding:6px 8px;text-align:center;font-weight:700;border:1px solid #3b5998}
+  .att-table th.name-col{text-align:${isAr?'right':'left'};min-width:40px}
+  .att-table td{padding:4px 6px;border:1px solid #e5e7eb;text-align:center}
+  .att-table td.name-col{text-align:${isAr?'right':'left'};font-weight:700}
+  .s-present{background:#d1fae5 !important;color:#065f46 !important;font-weight:900}
+  .s-absent{background:#fee2e2 !important;color:#b91c1c !important;font-weight:900}
+  .s-half{background:#fef3c7 !important;color:#92400e !important;font-weight:900}
+  .s-off{background:#f3f4f6 !important;color:#9ca3af !important}
+  .s-comp{background:#f3e8ff !important;color:#7c3aed !important;font-weight:700}
+  .s-blank{color:#d1d5db}
+  .sig-box{height:55px;border-bottom:2px solid #1e3a8a;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px}
+</style>
+</head><body>
 ${staffPages}
 </body></html>`;
 
