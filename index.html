@@ -2223,12 +2223,12 @@ async function loadFromSupa(bid) {
         const lastDay = new Date(yr, d.getMonth()+1, 0).getDate();
         months.push({from:`${yr}-${mo}-01`, to:`${yr}-${mo}-${lastDay}`});
       }
+      // Load WITHOUT branch filter — staff records may be in any branch
       const results = await Promise.all(months.map(({from,to})=>
         sb.from('staff_attendance')
           .select('staff_id,date,status')
-          .eq('branch_id', bid)
           .gte('date',from).lte('date',to)
-          .limit(1000)
+          .limit(2000)
       ));
       results.forEach(({data})=>{
         (data||[]).forEach(x=>{
@@ -2237,7 +2237,7 @@ async function loadFromSupa(bid) {
         });
       });
       const total = results.reduce((s,{data})=>s+(data||[]).length,0);
-      console.log('staffAtt loaded:', total, 'for branch', bid);
+      console.log('staffAtt loaded:', total, 'all branches');
     }
     if(!DB.salaryHistory) DB.salaryHistory={};
 
@@ -5822,9 +5822,9 @@ async function printStaffAttReport(exportType='print'){
       });
     });
   } else {
-    // Month not in cache - fetch directly
+    // Month not in cache - fetch directly (no branch filter)
     const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
-      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(2000);
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(5000);
     (rptAtt||[]).forEach(x=>{
       if(!attMap[x.staff_id]) attMap[x.staff_id]={};
       attMap[x.staff_id][x.date]=x.status;
@@ -6185,10 +6185,9 @@ async function renderBulkAtt(){
       existing[date] = {...DB.staffAtt[date]};
     });
   } else {
-    // Not in cache - fetch for this branch
+    // Not in cache - fetch for this month (no branch filter)
     const {data:bAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
-      .eq('branch_id',bid)
-      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(1000);
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(5000);
     (bAtt||[]).forEach(r=>{
       if(!existing[r.date]) existing[r.date]={};
       existing[r.date][String(r.staff_id)]=r.status;
