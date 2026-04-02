@@ -5814,11 +5814,12 @@ async function printStaffAttReport(exportType='print'){
     .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'))
     .limit(5000);
   (rptAtt||[]).forEach(x=>{
-    if(!attMap[x.staff_id]) attMap[x.staff_id]={};
-    attMap[x.staff_id][x.date]=x.status;
+    const sid=String(x.staff_id); // always string key
+    if(!attMap[sid]) attMap[sid]={};
+    attMap[sid][x.date]=x.status;
     // Update cache too
     if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-    DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+    DB.staffAtt[x.date][sid]=x.status;
   });
   console.log('Report attMap loaded:', (rptAtt||[]).length, 'records');
 
@@ -5838,7 +5839,7 @@ async function printStaffAttReport(exportType='print'){
     const isWorkDay = workDays.includes(dow);
 
     // Check saved record FIRST — manager override always wins
-    const raw=(attMap[staffId]||{})[days[dayIdx]]||'';
+    const raw=(attMap[String(staffId)]||{})[days[dayIdx]]||'';
     if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false};
     if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay};
     if(raw) return {status:raw, smart:false, isWorkDay:true}; // saved = treat as work day
