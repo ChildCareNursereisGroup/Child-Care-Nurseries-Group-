@@ -2211,37 +2211,7 @@ async function loadFromSupa(bid) {
         invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
         branchId:x.branch_id||'',extra};
     });
-    DB.staffAtt={};
-    {
-      // Load per-month for current branch only (20 staff × 31 days = ~620 max per month)
-      const now = new Date();
-      const months = [];
-      for(let i=2; i>=0; i--){
-        const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-        const yr = d.getFullYear();
-        const mo = String(d.getMonth()+1).padStart(2,'0');
-        const lastDay = new Date(yr, d.getMonth()+1, 0).getDate();
-        months.push({from:`${yr}-${mo}-01`, to:`${yr}-${mo}-${lastDay}`});
-      }
-      // Load WITHOUT branch filter — staff records may be in any branch
-      const results = await Promise.all(months.map(({from,to})=>
-        sb.from('staff_attendance')
-          .select('staff_id,date,status')
-          .gte('date',from).lte('date',to)
-          .limit(2000)
-      ));
-      results.forEach(({data})=>{
-        (data||[]).forEach(x=>{
-          if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-          DB.staffAtt[x.date][String(x.staff_id)]=x.status;
-        });
-      });
-      const total = results.reduce((s,{data})=>s+(data||[]).length,0);
-      console.log('staffAtt loaded:', total, 'all branches');
-    }
-    if(!DB.salaryHistory) DB.salaryHistory={};
-
-    // Load ALL staff (cross-branch) so work_branch filtering works correctly
+    // Load ALL staff FIRST (needed for staffAtt query)
     const {data:allStaff} = await sb.from('staff').select('*');
     DB.staff = (allStaff||[]).map(x=>({
       id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
@@ -2262,6 +2232,32 @@ async function loadFromSupa(bid) {
       daysWorkedBefore:Number(x.days_worked_before||0),
       notes:x.notes||''
     }));
+
+    // Load staffAtt using staff_id IN query (bypasses branch_id RLS)
+    DB.staffAtt={};
+    if(DB.staff.length > 0){
+      const now=new Date();
+      const months=[];
+      for(let i=2;i>=0;i--){
+        const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+        const yr=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0');
+        const lastDay=new Date(yr,d.getMonth()+1,0).getDate();
+        months.push({from:`${yr}-${mo}-01`,to:`${yr}-${mo}-${lastDay}`});
+      }
+      const allIds=DB.staff.map(s=>s.id).filter(Boolean);
+      for(let bi=0;bi<allIds.length;bi+=50){
+        const batch=allIds.slice(bi,bi+50);
+        const res=await Promise.all(months.map(({from,to})=>
+          sb.from('staff_attendance').select('staff_id,date,status')
+            .in('staff_id',batch).gte('date',from).lte('date',to).limit(3000)
+        ));
+        res.forEach(({data})=>{(data||[]).forEach(x=>{
+          if(!DB.staffAtt[x.date])DB.staffAtt[x.date]={};
+          DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+        });});
+      }
+      console.log('staffAtt loaded via staff_id IN, total keys:', Object.keys(DB.staffAtt).length);
+    }
 
     hideLoad();
 
@@ -5808,20 +5804,30 @@ async function printStaffAttReport(exportType='print'){
   });
   if(staffFilter!=='all') staffList = staffList.filter(s=>String(s.id)===staffFilter);
 
-  // Always fetch fresh from Supabase for accurate report
+  // Fetch fresh - query by staff_id list to bypass branch_id RLS issues
+  const staffIds = staffList.map(s=>s.id);
   const attMap = {};
-  const {data:rptAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
-    .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'))
-    .limit(5000);
-  (rptAtt||[]).forEach(x=>{
-    const sid=String(x.staff_id); // always string key
-    if(!attMap[sid]) attMap[sid]={};
-    attMap[sid][x.date]=x.status;
-    // Update cache too
-    if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
-    DB.staffAtt[x.date][sid]=x.status;
-  });
-  console.log('Report attMap loaded:', (rptAtt||[]).length, 'records');
+  if(staffIds.length > 0){
+    // Batch query by staff_id to get ALL records regardless of branch_id
+    const batchSize = 50;
+    for(let i=0; i<staffIds.length; i+=batchSize){
+      const batch = staffIds.slice(i, i+batchSize);
+      const {data:rptAtt} = await sb.from('staff_attendance')
+        .select('staff_id,date,status')
+        .in('staff_id', batch)
+        .gte('date', mon+'-01')
+        .lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'))
+        .limit(5000);
+      (rptAtt||[]).forEach(x=>{
+        const sid=String(x.staff_id);
+        if(!attMap[sid]) attMap[sid]={};
+        attMap[sid][x.date]=x.status;
+        if(!DB.staffAtt[x.date]) DB.staffAtt[x.date]={};
+        DB.staffAtt[x.date][sid]=x.status;
+      });
+    }
+    console.log('Report attMap loaded for', staffIds.length, 'staff');
+  }
 
   const fmt = n => Number(n).toFixed(1);
   const monthLabel = new Date(mon+'-01').toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
