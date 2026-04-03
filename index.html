@@ -2099,6 +2099,88 @@ function formatWANum(phone){
   // Otherwise use as-is (already has country code)
   return num;
 }
+
+/**
+ * openWA(phoneNum, message)
+ * Priority:
+ * 1. Meta WhatsApp Business API → sends directly, works from anywhere in the world
+ * 2. WhatsApp Web (web.whatsapp.com) → if nursery WA number set, opens in browser tab
+ * 3. wa.me → personal phone fallback
+ */
+async function openWA(phoneNum, message){
+  const bx=getBranchExtra(curBid);
+
+  // ── Option 1: Meta WhatsApp Business API ──────────────────────────
+  if(bx.waPhoneId && bx.waToken){
+    try{
+      const res=await fetch(`https://graph.facebook.com/v20.0/${bx.waPhoneId}/messages`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+bx.waToken,'Content-Type':'application/json'},
+        body:JSON.stringify({
+          messaging_product:'whatsapp',
+          to: phoneNum,
+          type:'text',
+          text:{body: message||''}
+        })
+      });
+      const data=await res.json();
+      if(res.ok && data.messages){
+        // Success toast
+        _showWAToast('✅ تم الإرسال من واتساب الحضانة — Sent from Nursery WhatsApp!','#22c55e');
+        return;
+      } else {
+        console.warn('Meta WA API error:', data);
+        _showWAToast('⚠️ API error — فتح واتساب ويب كبديل','#f59e0b');
+        // Fall through to web.whatsapp
+      }
+    }catch(err){
+      console.warn('Meta WA API failed:', err);
+      _showWAToast('⚠️ تعذّر الاتصال بـ API — فتح واتساب ويب','#f59e0b');
+      // Fall through
+    }
+  }
+
+  // ── Option 2: WhatsApp Web ─────────────────────────────────────────
+  const encoded=encodeURIComponent(message||'');
+  if(bx.nurseryWA){
+    window.open(`https://web.whatsapp.com/send?phone=${phoneNum}&text=${encoded}`,'_blank');
+    return;
+  }
+
+  // ── Option 3: wa.me fallback ───────────────────────────────────────
+  window.open(`https://wa.me/${phoneNum}?text=${encoded}`,'_blank');
+}
+
+function _showWAToast(msg, color){
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:10px 22px;border-radius:12px;font-family:Tajawal,sans-serif;font-weight:800;font-size:.85rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+async function testWhatsAppAPI(bid, safeId){
+  const btn=document.getElementById('wa_test_'+safeId);
+  const status=document.getElementById('wa_api_status_'+safeId);
+  const phoneId=document.getElementById('wa_phone_id_'+safeId)?.value?.trim();
+  const token=document.getElementById('wa_token_'+safeId)?.value?.trim();
+  if(!phoneId||!token){status.textContent='⚠️ أدخلي Phone ID و Token';status.style.color='#d97706';return;}
+  if(btn){btn.textContent='⏳ جاري الاختبار...';btn.disabled=true;}
+  try{
+    const res=await fetch(`https://graph.facebook.com/v20.0/${phoneId}`,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    const data=await res.json();
+    if(res.ok && data.id){
+      if(status){status.textContent=`✅ متصل! الرقم: ${data.display_phone_number||data.id}`;status.style.color='#22c55e';}
+    } else {
+      if(status){status.textContent=`❌ ${data.error?.message||'خطأ في البيانات'}`;status.style.color='#dc2626';}
+    }
+  }catch(e){
+    if(status){status.textContent='❌ خطأ في الشبكة — Network error';status.style.color='#dc2626';}
+  }
+  if(btn){btn.textContent='🧪 اختبار الاتصال — Test Connection';btn.disabled=false;}
+}
 const today=()=>new Date().toISOString().split('T')[0];
 const monthOf=d=>{if(!d)return'';const dt=new Date(d);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
 const fmtDate=d=>{
@@ -6777,7 +6859,7 @@ function sendWeekAbsenceWA(staffId, datesStr){
     const p=d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`;
   }).join('، ');
   const msg=`🔔 *تنبيه غياب*\n\nالموظف/ة العزيز/ة *${s.name}*\n\nنود إخطاركم بتسجيل غيابكم في الأيام التالية:\n📅 ${dates}\n\nيرجى التواصل مع الإدارة.\n\n${b.ar||b.en}\nمجموعة رعاية الطفل`;
-  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+  openWA(phone, msg);
 }
 
 function sendStaffAbsenceWA(staffId, date){
@@ -6791,7 +6873,7 @@ function sendStaffAbsenceWA(staffId, date){
   const msg=lang==='ar'
     ?`السلام عليكم ${s.name}،\n\nنتواصل معكم من ${b.ar}.\nلم يتم تسجيل حضوركم اليوم ${dateStr}.\nيرجى التواصل معنا لتوضيح السبب.\n\nشكراً 🌸`
     :`Dear ${s.name},\n\nThis is ${b.en}.\nYour attendance was not recorded today ${dateStr}.\nPlease let us know if there is any issue.\n\nBest regards 🌸`;
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
   const sentKey='wa_staff_sent_'+curBid+'_'+date+'_'+staffId;
   localStorage.setItem(sentKey, new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
   logActivity('whatsapp', s.name+' (staff) — Absence WA sent');
@@ -6879,8 +6961,7 @@ Warmest regards 🌟`;
 
   // If nursery WA configured — use click-to-chat which opens WA web with that number as sender context
   // (staff must be logged in as nursery WA on their device)
-  const waUrl=`https://wa.me/${targetNum}?text=${encodeURIComponent(msg)}`;
-  window.open(waUrl,'_blank');
+  openWA(targetNum, msg);
 
   logActivity('whatsapp', `${childName} — رسالة متابعة طفل سابق أُرسلت`);
 
@@ -6920,7 +7001,7 @@ Your child was absent today ${dateStr}.
 We hope everything is okay. Please let us know if there is any issue.
 
 Best regards 🌸`;
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
   // Mark as sent
   const sentKey='wa_sent_'+curBid+'_'+date+'_'+childId;
   localStorage.setItem(sentKey, new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
@@ -6954,7 +7035,7 @@ ${b.ar} — نتواصل معكم بخصوص *${c.name}*.
 لم يحضر/تحضر اليوم ${dateStr}. نرجو الاطمئنان وإعلامنا. 🌸`
       :`${b.en} — Regarding *${c.name}*: absent today ${dateStr}. Hope all is well! 🌸`;
     setTimeout(()=>{
-      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+      openWA(num, msg);
       const sk='wa_sent_'+curBid+'_'+date+'_'+c.id;
       localStorage.setItem(sk,new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
       logActivity('whatsapp', c.name+' — واتساب غياب أُرسل');
@@ -8205,7 +8286,7 @@ ${CB().ar}`;
 نقدر ثقتكم بنا 🌸
 ${CB().ar}`;
   }
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
 }
 
 function sendRenewalWhatsApp(c){
@@ -8218,7 +8299,7 @@ function sendRenewalWhatsApp(c){
 يُرجى التواصل مع الإدارة لتجديد التسجيل والاستمرار في الاستفادة من خدماتنا.
 
 شكراً 🌸`;
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
 }
 
 // ═══════════════════════════════════════════════
@@ -11882,7 +11963,7 @@ function sendReceiptWhatsApp(){
     `
 ✅ This receipt is electronically signed.
 مجموعة رعاية الطفل للحضانات`;
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
 }
 
 // ─── Email receipt sharing ─────────────────────
@@ -11915,31 +11996,61 @@ function renderBranchSettings(){
   const box=document.getElementById('branch-settings-body');
   if(!box) return;
   box.innerHTML=`
-  <!-- WhatsApp Branch Setup Guide -->
-  <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:14px;padding:14px 16px;margin-bottom:16px">
-    <div style="font-weight:900;color:#15803d;font-size:.9rem;margin-bottom:8px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:1.3rem">📱</span> إعداد واتساب الحضانة — Nursery WhatsApp Setup
+  <!-- WhatsApp Setup Guide -->
+  <div style="border:2px solid #0ea5e9;border-radius:14px;overflow:hidden;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,#0369a1,#0ea5e9);padding:12px 16px;color:#fff">
+      <div style="font-weight:900;font-size:.92rem;margin-bottom:2px">📱 كيف ترسلي من واتساب الحضانة وأنتِ في أمريكا؟</div>
+      <div style="font-size:.68rem;opacity:.9">How to send from nursery WhatsApp from anywhere in the world?</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.72rem;color:#166534">
-      <div style="background:#bbf7d0;border-radius:10px;padding:10px">
-        <div style="font-weight:800;margin-bottom:4px">📋 الخطوات:</div>
-        <div>١. أضيفي رقم واتساب الحضانة لكل فرع 👇</div>
-        <div>٢. احفظي الإعدادات 💾</div>
-        <div>٣. افتحي النظام على جهاز/هاتف الحضانة</div>
-        <div>٤. عند إرسال أي رسالة — ستُفتح واتساب ويب مباشرة</div>
-        <div style="margin-top:4px;color:#15803d;font-weight:700">⚡ يجب أن يكون واتساب الحضانة مُسجَّل دخوله على الجهاز</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+      <!-- Option 1 -->
+      <div style="padding:12px;border-right:1px solid #e5e7eb;background:#f0fdf4">
+        <div style="background:#22c55e;color:#fff;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;display:inline-block;margin-bottom:6px">⭐ الأفضل — Best</div>
+        <div style="font-weight:900;color:#15803d;font-size:.8rem;margin-bottom:5px">🔗 Meta WhatsApp Business API</div>
+        <div style="font-size:.68rem;color:#166534;line-height:1.5">
+          ✅ يرسل مباشرة من النظام<br>
+          ✅ يشتغل من أي مكان في العالم<br>
+          ✅ مجاني لـ 1000 محادثة/شهر<br>
+          ✅ بدون فتح واتساب خالص<br>
+          ⏱ الإعداد: 30 دقيقة (مرة واحدة)
+        </div>
+        <div style="margin-top:6px;font-size:.65rem;color:#15803d;background:#bbf7d0;border-radius:6px;padding:4px 7px">
+          أضيفي Phone ID + Token في كل فرع أدناه 👇
+        </div>
       </div>
-      <div style="background:#bbf7d0;border-radius:10px;padding:10px">
-        <div style="font-weight:800;margin-bottom:4px">📋 Steps:</div>
-        <div>1. Add nursery WhatsApp number per branch 👇</div>
-        <div>2. Save settings 💾</div>
-        <div>3. Open the system on the nursery phone/tablet</div>
-        <div>4. When sending any message — WhatsApp Web opens automatically</div>
-        <div style="margin-top:4px;color:#15803d;font-weight:700">⚡ Nursery WhatsApp must be logged in on that device</div>
+      <!-- Option 2 -->
+      <div style="padding:12px;border-right:1px solid #e5e7eb;background:#fefce8">
+        <div style="background:#d97706;color:#fff;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;display:inline-block;margin-bottom:6px">🟡 مجاني — Free</div>
+        <div style="font-weight:900;color:#92400e;font-size:.8rem;margin-bottom:5px">🖥️ Linked Devices</div>
+        <div style="font-size:.68rem;color:#78350f;line-height:1.5">
+          ✅ مجاني تماماً<br>
+          ✅ يشتغل من أمريكا<br>
+          ⚠️ محتاجة اتصال بموظفة على زوم<br>
+          📋 الخطوات:<br>
+          ١. كلّمي الموظفة على زوم<br>
+          ٢. افتحوا واتساب الحضانة<br>
+          ٣. الأجهزة المرتبطة → ربط جهاز<br>
+          ٤. امسحي الـ QR من شاشتك 🇺🇸
+        </div>
       </div>
-    </div>
-    <div style="font-size:.65rem;color:#166534;margin-top:8px;background:#a7f3d0;border-radius:7px;padding:5px 10px">
-      💡 صيغة الرقم: كود الدولة + الرقم بدون صفر أو + — مثال: <b>971501234567</b> (إمارات) | Format: country code + number, no + or 0 — e.g. <b>971501234567</b>
+      <!-- Option 3 -->
+      <div style="padding:12px;background:#fff5f5">
+        <div style="background:#6b7280;color:#fff;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;display:inline-block;margin-bottom:6px">🔘 بديل — Fallback</div>
+        <div style="font-weight:900;color:#374151;font-size:.8rem;margin-bottom:5px">🌐 WhatsApp Web</div>
+        <div style="font-size:.68rem;color:#374151;line-height:1.5">
+          ✅ مجاني<br>
+          ⚠️ محتاجة نفس المتصفح<br>
+          📋 الخطوات:<br>
+          ١. افتحي web.whatsapp.com<br>
+          ٢. سجّلي بحساب الحضانة<br>
+          ٣. اتركي التبويب مفتوح<br>
+          ٤ النظام يستخدمه تلقائياً
+        </div>
+        <a href="https://web.whatsapp.com" target="_blank"
+          style="display:inline-block;margin-top:6px;background:#25d366;color:#fff;padding:4px 10px;border-radius:7px;font-size:.68rem;font-weight:800;text-decoration:none">
+          🔗 فتح WA Web
+        </a>
+      </div>
     </div>
   </div>
   `+BRANCHES.map(b=>{
@@ -11986,13 +12097,51 @@ function renderBranchSettings(){
           <label style="color:#25d366;font-weight:800">📱 WhatsApp الحضانة — Nursery WhatsApp</label>
           <input id="wa_${safeId}" value="${bx.nurseryWA||''}" placeholder="971501234567 (بدون + )"
             style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #25d366;border-radius:8px;box-sizing:border-box;direction:ltr">
-          <div style="font-size:.65rem;color:#6b7280;margin-top:3px">رقم واتساب الحضانة — كود الدولة بدون + مثال: 971501234567 — يُستخدم لإرسال الرسائل من رقم الحضانة</div>
+          <div style="font-size:.65rem;color:#6b7280;margin-top:3px">رقم واتساب الحضانة — كود الدولة بدون + مثال: 971501234567</div>
         </div>
         <div class="fg">
           <label>Email — البريد الإلكتروني</label>
           <input id="email_${safeId}" value="${bx.email||''}" placeholder="info@nursery.com"
             style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
+      </div>
+      <!-- Meta WhatsApp Business API Section -->
+      <div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:12px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:1.2rem">🔗</span>
+          <div>
+            <div style="font-weight:900;color:#0369a1;font-size:.83rem">Meta WhatsApp Business API <span style="background:#dcfce7;color:#15803d;font-size:.65rem;padding:1px 7px;border-radius:10px;font-weight:800">مجاني 1000 محادثة/شهر</span></div>
+            <div style="font-size:.65rem;color:#0369a1">يرسل مباشرة من النظام — من أمريكا أو أي مكان في العالم بدون فتح واتساب</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg" style="margin:0">
+            <label style="font-size:.72rem;color:#0369a1;font-weight:800">Phone Number ID</label>
+            <input id="wa_phone_id_${safeId}" value="${bx.waPhoneId||''}" placeholder="من Meta Business → WhatsApp"
+              style="font-family:'Tajawal',sans-serif;width:100%;padding:6px 8px;border:1.5px solid #bae6fd;border-radius:7px;box-sizing:border-box;font-size:.78rem;direction:ltr">
+          </div>
+          <div class="fg" style="margin:0">
+            <label style="font-size:.72rem;color:#0369a1;font-weight:800">Access Token (Permanent)</label>
+            <input id="wa_token_${safeId}" type="password" value="${bx.waToken||''}" placeholder="EAAxxxxxxxx..."
+              style="font-family:'Tajawal',sans-serif;width:100%;padding:6px 8px;border:1.5px solid #bae6fd;border-radius:7px;box-sizing:border-box;font-size:.78rem;direction:ltr">
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button onclick="testWhatsAppAPI('${b.id}','${safeId}')" id="wa_test_${safeId}"
+            style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.75rem">
+            🧪 اختبار الاتصال — Test Connection
+          </button>
+          <a href="https://developers.facebook.com/apps/" target="_blank"
+            style="background:#1877f2;color:#fff;padding:6px 12px;border-radius:8px;font-size:.72rem;font-weight:800;text-decoration:none;font-family:'Tajawal',sans-serif">
+            📘 Meta Developers →
+          </a>
+          <span id="wa_api_status_${safeId}" style="font-size:.72rem;font-weight:700"></span>
+        </div>
+        <div style="font-size:.62rem;color:#0369a1;margin-top:6px;background:#e0f2fe;border-radius:7px;padding:5px 8px">
+          💡 للحصول على المفاتيح: developers.facebook.com ← Create App ← WhatsApp ← Getting Started
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
         <div class="fg">
           <label>Branch Logo — اللوجو</label>
           <div style="display:flex;gap:6px;align-items:center">
@@ -12024,7 +12173,9 @@ async function saveBranchSettings(bid, safeId){
   const email=get('email_'+safeId);
   const color=get('color_'+safeId)||'#1e3a8a';
   const nurseryWA=get('wa_'+safeId).replace(/\D/g,'');
-  saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color,nurseryWA});
+  const waPhoneId=get('wa_phone_id_'+safeId).trim();
+  const waToken=get('wa_token_'+safeId).trim();
+  saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color,nurseryWA,waPhoneId,waToken});
   const lbl=document.getElementById('bsave_'+safeId);
   if(lbl) lbl.textContent='⏳ Saving...';
   const ok = await saveBranchExtraToSupa(bid);
@@ -13884,7 +14035,7 @@ function visWA(id){
   let num=formatWANum(phone);
   const b=CB();
   const msg = 'السلام عليكم، من '+(b.ar||b.en)+'\nنرحب بزيارة *'+v.name+'* 🌸';
-  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
+  openWA(num, msg);
 }
 
 function makeReceiptForVisitor(id){
@@ -14215,7 +14366,7 @@ function sendFeeReminderWA(childId){
   lines.push(`\n❗ *Total Due: ${fmtNum(total)} AED*`);
   const breakdown = lines.join('\n');
   const msg = `Dear Parent,\n\nThis is a friendly reminder that the monthly fees for *${c.name}* for *${mon}* have not been received yet.\n\n` + breakdown + `\n\nPlease contact us to arrange payment at your earliest convenience.\n\nThank you,\n${b.en||b.ar}\nChild Care Nurseries Group`;
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');
+  openWA(num, msg);
   logActivity('whatsapp', `💸 Fee Reminder → ${c.name} (${phone}) — ${mon}`);
   addWALog('fee', c.name, phone, `Fee reminder ${mon}`);
 }
@@ -14568,7 +14719,7 @@ Wishing you a wonderful birthday and a fantastic year ahead!
 With warm regards,
 ${b.en||b.ar}
 Child Care Nurseries Group`;
-  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
+  openWA(num, msg);
   logActivity('whatsapp', `🎂 Birthday WA → ${person} (${type}) — ${phone}`);
   addWALog('birthday', person, phone, `${type} birthday`);
   const _bkey='bday_wa_'+curBid+'_'+id+'_'+new Date().getFullYear();
