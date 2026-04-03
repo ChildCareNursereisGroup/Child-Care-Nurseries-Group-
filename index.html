@@ -6829,6 +6829,72 @@ async function markAllClass(cls, date, status){
   renderAtt();
 }
 
+function sendReconnectMessage(childId, msgLang){
+  const c=DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return;
+  const phone=c.parentMom||c.parentDad||'';
+  if(!phone){ alert(lang==='ar'?'لا يوجد رقم هاتف للتواصل مع الأهل':'No parent phone number found'); return; }
+
+  const b=CB();
+  const branchAr=b.ar||'الحضانة';
+  const branchEn=b.en||'The Nursery';
+  const bx=getBranchExtra(curBid);
+  const nurseryWA=bx.nurseryWA||'';
+
+  // Build WhatsApp number — prefer nursery WA, fallback to parent's phone as sender (WA opens from device)
+  let targetNum=formatWANum(phone);
+
+  const childName=c.name||'طفلكم';
+  const leaveDate=c.leaveDate||'';
+
+  const msgAr=`السلام عليكم ورحمة الله وبركاته 🌸
+
+نتواصل معكم من ${branchAr}، ونأمل أن تكونوا بخير وصحة وعافية.
+
+لقد اشتقنا كثيراً للطفل/ة *${childName}* 💚
+وأردنا الاطمئنان عليكم والتساؤل إن كان لديكم أي نية للرجوع إلينا قريباً.
+
+نحن دائماً هنا لاستقبالكم بكل ترحيب، وأبوابنا مفتوحة في أي وقت.
+
+نتمنى للجميع الصحة والسعادة 🌟`;
+
+  const msgEn=`Dear Parent,
+
+Warm greetings from *${branchEn}* 🌸
+
+We hope you and your family are doing well!
+
+We truly miss *${childName}* 💚 and wanted to check in on you. We'd love to know if you're considering rejoining us soon.
+
+Our doors are always open, and we'd be delighted to welcome your child back anytime!
+
+Warmest regards 🌟`;
+
+  const msgBoth=msgAr+'\n\n──────────────────\n\n'+msgEn;
+
+  let msg='';
+  if(msgLang==='ar') msg=msgAr;
+  else if(msgLang==='en') msg=msgEn;
+  else msg=msgBoth;
+
+  // If nursery WA configured — use click-to-chat which opens WA web with that number as sender context
+  // (staff must be logged in as nursery WA on their device)
+  const waUrl=`https://wa.me/${targetNum}?text=${encodeURIComponent(msg)}`;
+  window.open(waUrl,'_blank');
+
+  logActivity('whatsapp', `${childName} — رسالة متابعة طفل سابق أُرسلت`);
+
+  // Show confirmation
+  const existingNote=document.querySelector('#reconnect-sent-note');
+  if(existingNote) existingNote.remove();
+  const note=document.createElement('div');
+  note.id='reconnect-sent-note';
+  note.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:10px 20px;border-radius:12px;font-family:Tajawal,sans-serif;font-weight:800;font-size:.85rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.2)';
+  note.textContent='✅ تم فتح واتساب — WhatsApp opened!';
+  document.body.appendChild(note);
+  setTimeout(()=>note.remove(),3500);
+}
+
 function sendAbsenceWhatsApp(childId, date){
   const c=DB.children.find(x=>String(x.id)===String(childId));
   if(!c)return;
@@ -7704,7 +7770,35 @@ function showDTab(tab,btn){
         </div>`;
       })()}
       <div class="fg" style="margin-bottom:9px"><label>Notes</label><textarea rows="2" onchange="updateField('notes',this.value)">${c.notes||''}</textarea></div>
-      ${curRole==='admin'?'<button class="btn bd bsm" onclick="deleteChild()">🗑 Delete Child</button>':''}`; 
+      ${c.leaveDate ? `
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="background:#22c55e;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">💚</div>
+          <div>
+            <div style="font-weight:900;color:#15803d;font-size:.85rem">متابعة طفل سابق — Follow Up Alumni</div>
+            <div style="font-size:.65rem;color:#166534">تاريخ المغادرة: ${c.leaveDate}</div>
+          </div>
+        </div>
+        <div style="font-size:.72rem;color:#166534;margin-bottom:10px;background:#bbf7d0;border-radius:8px;padding:7px 10px">
+          أرسلي رسالة ودية للأهل للاطمئنان والسؤال عن الرجوع — Send a warm check-in message and invite them to rejoin
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <button onclick="sendReconnectMessage('${c.id}','ar')"
+            style="flex:1;min-width:100px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:10px;padding:9px 10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">
+            💬 رسالة عربي
+          </button>
+          <button onclick="sendReconnectMessage('${c.id}','en')"
+            style="flex:1;min-width:100px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:10px;padding:9px 10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">
+            💬 English
+          </button>
+          <button onclick="sendReconnectMessage('${c.id}','both')"
+            style="flex:1;min-width:100px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:10px;padding:9px 10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem">
+            🌐 عربي+English
+          </button>
+        </div>
+        ${(()=>{const bx2=getBranchExtra(curBid);return bx2.nurseryWA?'<div style="font-size:.65rem;color:#15803d;background:#dcfce7;border-radius:7px;padding:5px 9px">✅ رقم الحضانة: <b>+'+bx2.nurseryWA+'</b></div>':'<div style="font-size:.65rem;color:#92400e;background:#fef3c7;border-radius:7px;padding:5px 9px">⚠️ أضيفي رقم واتساب الحضانة في: الإعدادات ← الفروع</div>';})()}
+      </div>` : ''}
+      ${curRole==='admin'?'<button class="btn bd bsm" onclick="deleteChild()">🗑 Delete Child</button>':''}`;
   }
   if(tab==='recs'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
@@ -11820,7 +11914,35 @@ function sendReceiptEmail(){
 function renderBranchSettings(){
   const box=document.getElementById('branch-settings-body');
   if(!box) return;
-  box.innerHTML=BRANCHES.map(b=>{
+  box.innerHTML=`
+  <!-- WhatsApp Branch Setup Guide -->
+  <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:14px;padding:14px 16px;margin-bottom:16px">
+    <div style="font-weight:900;color:#15803d;font-size:.9rem;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:1.3rem">📱</span> إعداد واتساب الحضانة — Nursery WhatsApp Setup
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.72rem;color:#166534">
+      <div style="background:#bbf7d0;border-radius:10px;padding:10px">
+        <div style="font-weight:800;margin-bottom:4px">📋 الخطوات:</div>
+        <div>١. أضيفي رقم واتساب الحضانة لكل فرع 👇</div>
+        <div>٢. احفظي الإعدادات 💾</div>
+        <div>٣. افتحي النظام على جهاز/هاتف الحضانة</div>
+        <div>٤. عند إرسال أي رسالة — ستُفتح واتساب ويب مباشرة</div>
+        <div style="margin-top:4px;color:#15803d;font-weight:700">⚡ يجب أن يكون واتساب الحضانة مُسجَّل دخوله على الجهاز</div>
+      </div>
+      <div style="background:#bbf7d0;border-radius:10px;padding:10px">
+        <div style="font-weight:800;margin-bottom:4px">📋 Steps:</div>
+        <div>1. Add nursery WhatsApp number per branch 👇</div>
+        <div>2. Save settings 💾</div>
+        <div>3. Open the system on the nursery phone/tablet</div>
+        <div>4. When sending any message — WhatsApp Web opens automatically</div>
+        <div style="margin-top:4px;color:#15803d;font-weight:700">⚡ Nursery WhatsApp must be logged in on that device</div>
+      </div>
+    </div>
+    <div style="font-size:.65rem;color:#166534;margin-top:8px;background:#a7f3d0;border-radius:7px;padding:5px 10px">
+      💡 صيغة الرقم: كود الدولة + الرقم بدون صفر أو + — مثال: <b>971501234567</b> (إمارات) | Format: country code + number, no + or 0 — e.g. <b>971501234567</b>
+    </div>
+  </div>
+  `+BRANCHES.map(b=>{
     const bx=getBranchExtra(b.id);
     const safeId=b.id.replace(/[^a-z0-9]/g,'_');
     const logoPreview=bx.logo
@@ -11861,6 +11983,12 @@ function renderBranchSettings(){
             style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
         <div class="fg">
+          <label style="color:#25d366;font-weight:800">📱 WhatsApp الحضانة — Nursery WhatsApp</label>
+          <input id="wa_${safeId}" value="${bx.nurseryWA||''}" placeholder="971501234567 (بدون + )"
+            style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #25d366;border-radius:8px;box-sizing:border-box;direction:ltr">
+          <div style="font-size:.65rem;color:#6b7280;margin-top:3px">رقم واتساب الحضانة — كود الدولة بدون + مثال: 971501234567 — يُستخدم لإرسال الرسائل من رقم الحضانة</div>
+        </div>
+        <div class="fg">
           <label>Email — البريد الإلكتروني</label>
           <input id="email_${safeId}" value="${bx.email||''}" placeholder="info@nursery.com"
             style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
@@ -11895,7 +12023,8 @@ async function saveBranchSettings(bid, safeId){
   const phone=get('phone_'+safeId);
   const email=get('email_'+safeId);
   const color=get('color_'+safeId)||'#1e3a8a';
-  saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color});
+  const nurseryWA=get('wa_'+safeId).replace(/\D/g,'');
+  saveBranchExtra(bid,{trn,address,phone,email,receipt_color:color,nurseryWA});
   const lbl=document.getElementById('bsave_'+safeId);
   if(lbl) lbl.textContent='⏳ Saving...';
   const ok = await saveBranchExtraToSupa(bid);
