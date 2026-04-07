@@ -899,12 +899,27 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="xb" onclick="el('rec-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg"><label>From Month — من</label>
-          <input type="month" id="rec-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+      <!-- Filter mode toggle -->
+      <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:10px">
+        <div style="font-weight:800;color:#0369a1;font-size:.8rem;margin-bottom:7px">📅 فلترة حسب — Filter By</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 12px;border:1.5px solid #bae6fd;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.78rem;font-weight:700">
+            <input type="radio" name="rec-date-mode" value="payment" checked onchange="toggleRecDateMode()"> 📆 تاريخ الدفع — Payment Date
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 12px;border:1.5px solid #bae6fd;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.78rem;font-weight:700">
+            <input type="radio" name="rec-date-mode" value="coverage" onchange="toggleRecDateMode()"> 📋 فترة الاشتراك — Coverage Period
+          </label>
         </div>
-        <div class="fg"><label>To Month — إلى</label>
-          <input type="month" id="rec-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        <div id="rec-date-mode-hint" style="font-size:.67rem;color:#0369a1;background:#e0f2fe;border-radius:6px;padding:4px 8px">
+          📆 <b>تاريخ الدفع:</b> يجيب الإيصالات اللي <b>اتدفعت</b> في هذه الفترة — بغض النظر عن شهر الاشتراك
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>From — من</label>
+          <input type="date" id="rec-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg"><label>To — إلى</label>
+          <input type="date" id="rec-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -943,12 +958,27 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="xb" onclick="el('exp-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg"><label>From Month — من</label>
-          <input type="month" id="exp-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+      <!-- Filter mode -->
+      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:10px;padding:10px">
+        <div style="font-weight:800;color:#92400e;font-size:.8rem;margin-bottom:7px">📅 فلترة حسب — Filter By</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid #fcd34d;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.76rem;font-weight:700">
+            <input type="radio" name="exp-date-mode" value="invoice" checked onchange="toggleExpDateMode()"> 🧾 تاريخ الفاتورة
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid #fcd34d;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.76rem;font-weight:700">
+            <input type="radio" name="exp-date-mode" value="entry" onchange="toggleExpDateMode()"> 📥 تاريخ الإدخال
+          </label>
         </div>
-        <div class="fg"><label>To Month — إلى</label>
-          <input type="month" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        <div id="exp-date-mode-hint" style="font-size:.67rem;color:#92400e;background:#fef9c3;border-radius:6px;padding:4px 8px">
+          🧾 <b>تاريخ الفاتورة:</b> يجيب المصاريف حسب تاريخ الفاتورة الأصلية
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label>From — من</label>
+          <input type="date" id="exp-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg"><label>To — إلى</label>
+          <input type="date" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1200,6 +1230,30 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </button>
   </div>
   <div id="fix-receipts-output" style="font-size:.78rem"></div>
+</div>
+
+<!-- AUTO CLASS ASSIGNMENT -->
+<div class="card" style="border:2px solid #0891b2">
+  <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
+  <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
+    <b>قواعد التوزيع:</b><br>
+    ☀️ <b>08:00-11:00</b> → S (أول 20) ثم C<br>
+    🕑 <b>11:00-03:00</b> → F (أول 20) ثم D<br>
+    🌙 <b>01:00-05:00</b> → N (أول 20) ثم M<br>
+    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:00 أو Full Day) → A (رضع <1 سنة) / C (1-2 سنة) / D (2-3 سنة) / E (3+ سنة)<br>
+    <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+    <button onclick="previewAutoClasses()"
+      style="background:#0891b2;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      🔍 معاينة التوزيع
+    </button>
+    <button onclick="applyAutoClasses()"
+      style="background:#0e7490;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      ✅ تطبيق التوزيع
+    </button>
+  </div>
+  <div id="auto-class-output"></div>
 </div>
 
 <!-- MERGE DUPLICATE CHILDREN -->
@@ -3105,6 +3159,8 @@ function renderChildren(){
   if(chFilter==='active')list=list.filter(c=>!c.leaveDate);
   if(chFilter==='inactive')list=list.filter(c=>!!c.leaveDate);
   if(chFilter==='bus')list=list.filter(c=>(c.bus==='نعم'||c.bus==='Yes')&&!c.leaveDate);
+  // Sort alphabetically by name
+  list.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
   if(!list.length){el('chlist').innerHTML=`<div class="empty"><div class="ei">👀</div><p>لا توجد نتائج</p></div>`;return;}
   const paid_map={};DB.receipts.forEach(r=>{paid_map[r.childId]=(paid_map[r.childId]||0)+r.total;});
   el('chlist').innerHTML=list.map(c=>`
@@ -4276,14 +4332,18 @@ function renderKidsWeek(){
   const active=DB.children.filter(c=>!c.leaveDate&&(!selClass||(c.className||'—')===selClass));
   if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👧</div><p>No children</p></div>`;return;}
 
-  // Group by class
+  // Group by class, sort alphabetically by class name
   const classMap={};
   active.forEach(c=>{const cls=c.className||'—';if(!classMap[cls])classMap[cls]=[];classMap[cls].push(c);});
-  const classes=Object.keys(classMap).sort();
+  const classes=Object.keys(classMap).sort((a,b)=>a.localeCompare(b,'ar'));
 
   let totalPresent=0,totalAbsent=0;
   const html=classes.map(cls=>{
-    const kids=classMap[cls];
+    const kids=classMap[cls].sort((a,b)=>{
+      if(!a.dob&&!b.dob) return (a.name||'').localeCompare(b.name||'','ar');
+      if(!a.dob) return 1; if(!b.dob) return -1;
+      return b.dob.localeCompare(a.dob); // youngest (most recent dob) first
+    });
     const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const rows=kids.map((c,ci)=>{
       let wkPresent=0,wkAbsent=0;
@@ -9369,6 +9429,146 @@ async function _findReceiptBranchIssues(){
   }
 }
 
+// ─── Auto Class Assignment ─────────────────────────────────────────────────
+function _getTimeGroup(kidsTime){
+  const t=(kidsTime||'').replace(/\s/g,'').toLowerCase();
+  // Full day variants: 08:00-01:00 through 08:00-05:00, or "full day"
+  if(/fullday|fulltime|full/.test(t)) return 'fullday';
+  if(/08:?00[-–]0?1:?00|08:?00[-–]13:?00/.test(t)) return 'fullday';
+  if(/08:?00[-–]0?2:?00|08:?00[-–]14:?00/.test(t)) return 'fullday';
+  if(/08:?00[-–]0?3:?00|08:?00[-–]15:?00/.test(t)) return 'fullday';
+  if(/08:?00[-–]0?4:?00|08:?00[-–]16:?00/.test(t)) return 'fullday';
+  if(/08:?00[-–]0?5:?00|08:?00[-–]17:?00/.test(t)) return 'fullday';
+  // Morning: 08:00-11:00
+  if(/08:?00[-–]11:?00/.test(t)) return 'morning';
+  // Midday: 11:00-03:00
+  if(/11:?00[-–]0?3:?00|11:?00[-–]15:?00/.test(t)) return 'midday';
+  // Afternoon: 01:00-05:00 / 13:00-17:00
+  if(/0?1:?00[-–]0?5:?00|13:?00[-–]17:?00/.test(t)) return 'afternoon';
+  return 'other';
+}
+
+function _ageMonths(dob){
+  if(!dob) return 999;
+  return Math.floor((Date.now()-new Date(dob))/(1000*60*60*24*30.44));
+}
+
+function _buildClassAssignments(){
+  const active=DB.children.filter(c=>!c.leaveDate);
+  const morning=[],midday=[],afternoon=[],fullday=[],other=[];
+  active.forEach(c=>{
+    const g=_getTimeGroup(c.kidsTime);
+    if(g==='morning') morning.push(c);
+    else if(g==='midday') midday.push(c);
+    else if(g==='afternoon') afternoon.push(c);
+    else if(g==='fullday') fullday.push(c);
+    else other.push(c);
+  });
+
+  // Sort each group by age: youngest first (largest DOB string = most recent)
+  const byAge=arr=>[...arr].sort((a,b)=>{
+    if(!a.dob&&!b.dob) return (a.name||'').localeCompare(b.name||'','ar');
+    if(!a.dob) return 1; if(!b.dob) return -1;
+    return b.dob.localeCompare(a.dob);
+  });
+
+  const assignments=[];
+
+  // Morning → S (0-19), C (20+)
+  byAge(morning).forEach((c,i)=>{
+    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'S':'C'});
+  });
+  // Midday → F (0-19), D (20+)
+  byAge(midday).forEach((c,i)=>{
+    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'F':'D'});
+  });
+  // Afternoon → N (0-19), M (20+)
+  byAge(afternoon).forEach((c,i)=>{
+    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'N':'M'});
+  });
+  // Full day → by age group
+  byAge(fullday).forEach(c=>{
+    const mo=_ageMonths(c.dob);
+    let cls='E';
+    if(mo<12) cls='A';
+    else if(mo<24) cls='C';
+    else if(mo<36) cls='D';
+    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:cls});
+  });
+  // Other: no change
+  other.forEach(c=>{
+    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className,noChange:true});
+  });
+
+  return assignments;
+}
+
+function previewAutoClasses(){
+  const box=el('auto-class-output');
+  const asgn=_buildClassAssignments();
+  // Group by newClass
+  const byClass={};
+  asgn.forEach(a=>{
+    if(a.noChange) return;
+    if(!byClass[a.newClass]) byClass[a.newClass]=[];
+    byClass[a.newClass].push(a);
+  });
+  const noTime=asgn.filter(a=>a.noChange);
+  const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
+
+  const classColors={A:'#7c3aed',C:'#0891b2',D:'#059669',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',M:'#9333ea'};
+
+  box.innerHTML=`
+  <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
+    📋 معاينة التوزيع — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} تغيير جديد
+  </div>
+  ${Object.entries(byClass).sort(([a],[b])=>a.localeCompare(b)).map(([cls,kids])=>`
+  <div style="border:1.5px solid ${classColors[cls]||'#e5e7eb'};border-radius:10px;margin-bottom:8px;overflow:hidden">
+    <div style="background:${classColors[cls]||'#6b7280'};color:#fff;padding:7px 12px;font-weight:800;font-size:.82rem;display:flex;justify-content:space-between;align-items:center">
+      <span>فصل ${cls} — Class ${cls}</span>
+      <span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 10px;font-size:.72rem">${kids.length} طفل</span>
+    </div>
+    <div style="padding:8px 12px">
+      ${kids.map((k,i)=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6;font-size:.75rem">
+        <span style="font-weight:700">${i+1}. ${k.name}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:#6b7280">${k.dob?calcAge(k.dob):'—'}</span>
+          <span style="font-size:.65rem;color:#9ca3af">${k.kidsTime||'—'}</span>
+          ${k.oldClass!==k.newClass?`<span style="background:#fef3c7;color:#92400e;font-size:.63rem;padding:1px 6px;border-radius:6px">${k.oldClass||'—'} → ${k.newClass}</span>`:'<span style="background:#d1fae5;color:#065f46;font-size:.63rem;padding:1px 6px;border-radius:6px">✓ كما هو</span>'}
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`).join('')}
+  ${noTime.length?`<div style="background:#f1f5f9;border-radius:8px;padding:8px 12px;font-size:.75rem;color:#6b7280">
+    ⚠️ ${noTime.length} طفل بدون وقت محدد — لن يتغير فصلهم: ${noTime.map(a=>a.name).join(' · ')}
+  </div>`:''}`;
+}
+
+async function applyAutoClasses(){
+  if(!confirm('تطبيق التوزيع التلقائي للفصول؟\n\nيمكنك تغيير أي فصل يدوياً بعد ذلك من بيانات الطفل.')) return;
+  const box=el('auto-class-output');
+  const asgn=_buildClassAssignments().filter(a=>!a.noChange&&a.oldClass!==a.newClass);
+  if(!asgn.length){box.innerHTML=`<div style="color:#059669;font-weight:700;padding:10px">✅ الكل في فصولهم الصحيحة</div>`;return;}
+
+  box.innerHTML=`<div style="color:#0891b2;font-weight:700">⏳ جاري التطبيق على ${asgn.length} طفل...</div>`;
+  let ok=0,err=0;
+  for(const a of asgn){
+    const {error}=await sb.from('children').update({class_name:a.newClass}).eq('id',a.id);
+    if(error){err++;console.error(error);}
+    else{
+      ok++;
+      const child=DB.children.find(c=>String(c.id)===String(a.id));
+      if(child) child.className=a.newClass;
+    }
+  }
+  box.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:10px;font-weight:700;color:#065f46">
+    ✅ تم! — ${ok} طفل تم توزيعهم على فصولهم${err?` | ❌ ${err} خطأ`:''}
+    <div style="font-weight:400;font-size:.75rem;margin-top:4px">يمكنك تغيير أي فصل يدوياً من تفاصيل الطفل (حقل Class Name)</div>
+  </div>`;
+  renderChildren();
+}
+
 // ─── Duplicate Children Merge ─────────────────────────────────────────────
 async function findDuplicateChildren(){
   const box=el('merge-dup-output');
@@ -12916,10 +13116,36 @@ function calcWeekendTotal(){
 }
 
 // ─── Expense Report ────────────────────────────
+function toggleRecDateMode(){
+  const mode=document.querySelector('input[name="rec-date-mode"]:checked')?.value||'payment';
+  const hint=el('rec-date-mode-hint');
+  if(hint){
+    if(mode==='payment'){
+      hint.innerHTML='📆 <b>تاريخ الدفع:</b> يجيب الإيصالات اللي <b>اتدفعت</b> في هذه الفترة — بغض النظر عن شهر الاشتراك';
+    } else {
+      hint.innerHTML='📋 <b>فترة الاشتراك:</b> يجيب الإيصالات اللي <b>تغطي</b> هذه الفترة — مثلاً اشتراك مارس حتى لو اتدفع في أبريل';
+    }
+  }
+}
+function toggleExpDateMode(){
+  const mode=document.querySelector('input[name="exp-date-mode"]:checked')?.value||'invoice';
+  const hint=el('exp-date-mode-hint');
+  if(hint){
+    if(mode==='invoice'){
+      hint.innerHTML='🧾 <b>تاريخ الفاتورة:</b> يجيب المصاريف حسب تاريخ الفاتورة الأصلية';
+    } else {
+      hint.innerHTML='📥 <b>تاريخ الإدخال:</b> يجيب المصاريف اللي <b>أُدخلت على النظام</b> في هذه الفترة — بغض النظر عن تاريخ الفاتورة';
+    }
+  }
+}
+
 function openRecReportModal(){
-  const now = el('rfmon')?.value || monthOf(new Date());
-  if(!el('rec-rep-from').value) el('rec-rep-from').value = now;
-  if(!el('rec-rep-to').value)   el('rec-rep-to').value   = now;
+  // Default: first and last day of current month
+  const now=new Date();
+  const firstDay=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  if(!el('rec-rep-from').value) el('rec-rep-from').value=firstDay;
+  if(!el('rec-rep-to').value)   el('rec-rep-to').value=lastDay;
   el('rec-report-modal').classList.add('on');
 }
 
@@ -12928,6 +13154,7 @@ function printRecReport(exportType='print'){
   const to    = el('rec-rep-to').value;
   const payF  = el('rec-rep-pay').value;
   const rLang = document.querySelector('input[name="rec-lang"]:checked')?.value||'en';
+  const dateMode = document.querySelector('input[name="rec-date-mode"]:checked')?.value||'payment';
   const isAr  = rLang==='ar';
   const dir   = isAr?'rtl':'ltr';
   const b     = CB();
@@ -12935,14 +13162,20 @@ function printRecReport(exportType='print'){
   if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
 
   let list = DB.receipts.filter(r=>{
-    const m = monthOf(r.date);
-    return m >= from && m <= to;
+    if(dateMode==='payment'){
+      // Filter by actual payment date (r.date)
+      return r.date >= from && r.date <= to;
+    } else {
+      // Filter by coverage period (fromDate / toDate of receipt)
+      const rf = r.fromDate || r.date;
+      const rt = r.toDate   || r.date;
+      return rf <= to && rt >= from;
+    }
   });
   if(payF!=='all') list = list.filter(r=>(r.payMethod||'cash')===payF);
   list = list.sort((a,b)=>{
     const dateDiff = new Date(a.date) - new Date(b.date);
     if(dateDiff !== 0) return dateDiff;
-    // Same date → sort by receipt number
     const rA = parseInt(String(a.receiptNum||'0').replace(/\D/g,''))||0;
     const rB = parseInt(String(b.receiptNum||'0').replace(/\D/g,''))||0;
     return rA - rB;
@@ -13081,9 +13314,11 @@ function printRecReport(exportType='print'){
 }
 
 function openExpReportModal(){
-  const now = el('efmon')?.value || monthOf(new Date());
-  if(!el('exp-rep-from').value) el('exp-rep-from').value = now;
-  if(!el('exp-rep-to').value)   el('exp-rep-to').value   = now;
+  const now=new Date();
+  const firstDay=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  if(!el('exp-rep-from').value) el('exp-rep-from').value=firstDay;
+  if(!el('exp-rep-to').value)   el('exp-rep-to').value=lastDay;
   // Populate categories
   const sel = el('exp-rep-cat');
   sel.innerHTML = '<option value="all">📋 All Categories — كل البنود</option>' +
@@ -13106,6 +13341,7 @@ function printExpReport(exportType='print'){
   const paidByF= el('exp-rep-paidby')?.value||'all';
   const branchF= el('exp-rep-branch')?.value||'current';
   const rLang  = document.querySelector('input[name="exp-lang"]:checked')?.value || 'en';
+  const dateMode= document.querySelector('input[name="exp-date-mode"]:checked')?.value||'invoice';
   const isAr   = rLang === 'ar';
   const dir    = isAr ? 'rtl' : 'ltr';
   const b      = CB();
@@ -13119,7 +13355,7 @@ function printExpReport(exportType='print'){
   if(branchF === 'all') targetBids = BRANCHES.map(b=>b.id);
   else if(branchF !== 'current') targetBids = [branchF];
 
-  // Filter expenses - use allBranchData if available, else DB.expenses
+  // Filter expenses
   let allExp = [];
   if(branchF === 'all' && DB.allBranchData){
     BRANCHES.forEach(br=>{ allExp = allExp.concat(DB.allBranchData[br.id]?.expenses||[]); });
@@ -13128,8 +13364,14 @@ function printExpReport(exportType='print'){
   }
 
   let list = allExp.filter(e => {
-    const m = monthOf(e.date);
-    return m >= from && m <= to;
+    if(dateMode==='entry'){
+      // Filter by entry/created date (created_at field)
+      const entryDate=(e.created_at||e.date||'').split('T')[0];
+      return entryDate >= from && entryDate <= to;
+    } else {
+      // Filter by invoice date
+      return e.date >= from && e.date <= to;
+    }
   });
   if(catF !== 'all') list = list.filter(e => e.category === catF);
   if(paidByF !== 'all') list = list.filter(e => (e.paidBy||'owner') === paidByF);
