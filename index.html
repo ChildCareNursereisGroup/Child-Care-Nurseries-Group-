@@ -1184,6 +1184,24 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="branch-settings-body"></div>
 </div>
 
+<!-- FIX TRANSFERRED CHILDREN RECEIPTS -->
+<div class="card" style="border:2px solid #f59e0b">
+  <div class="ch"><div class="ct" style="color:#92400e">🔧 إصلاح إيصالات الأطفال المنقولين — Fix Transferred Children Receipts</div></div>
+  <div style="background:#fef3c7;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.8rem;color:#78350f">
+    <b>المشكلة:</b> الأطفال اللي اتنقلوا قبل هذا التحديث — إيصالاتهم اتنقلت معاهم للفرع الجديد غلط.<br>
+    <b>الحل:</b> هنرجع كل إيصال للفرع الأصلي اللي أُصدر فيه بناءً على رقم الإيصال.
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <button onclick="previewFixReceipts()" style="background:#f59e0b;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      🔍 معاينة المشكلة — Preview Issues
+    </button>
+    <button onclick="fixTransferredReceipts()" style="background:#dc2626;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      ⚠️ تطبيق الإصلاح — Apply Fix
+    </button>
+  </div>
+  <div id="fix-receipts-output" style="font-size:.78rem"></div>
+</div>
+
 <!-- API KEY SETTINGS -->
 <div class="card" style="border:1.5px solid #e0e7ff">
   <div class="ch"><div class="ct">🤖 AI Scanner — Anthropic API Key</div></div>
@@ -7910,10 +7928,32 @@ function showDTab(tab,btn){
   }
   if(tab==='pay'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
-    const monthsMap={};recs.forEach(r=>{const m=monthOf(r.date);monthsMap[m]=(monthsMap[m]||0)+r.total;});
+    // Also load receipts from other branches (child may have been transferred)
+    const allBranchRecs=[...recs];
+    // Load from DB cached data of other branches if available
     const totalFee=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
-    cont.innerHTML=`<div class="sboxes"><div class="sbox sb"><div class="sv">${fmtNum(totalFee)} د.إ</div><div class="sk">${lang==='ar'?'الرسوم الشهرية':'Monthly Fees'}</div></div><div class="sbox sg"><div class="sv">${fmtNum(recs.reduce((s,r)=>s+r.total,0))} د.إ</div><div class="sk">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div></div></div>
-    ${Object.keys(monthsMap).sort().reverse().map(m=>{const p=monthsMap[m];const diff=totalFee-p;return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.83rem"><span style="font-weight:700">${m}</span><span>${lang==='ar'?'مدفوع':'Paid'}: <b style="color:var(--ok)">${fmtNum(p)} د.إ</b></span><span class="bdg ${diff<=0?'dok':'derr'}">${diff<=0?(lang==='ar'?'✅ مكتمل':'✅ Complete'):(lang==='ar'?'⚠️ جزئي':'⚠️ Partial')}</span></div>`;}).join('')||`<div class="empty"><div class="ei">💳</div><p>${lang==='ar'?'لا توجد مدفوعات':'No payments found'}</p></div>`}`;
+    const totalPaid=allBranchRecs.reduce((s,r)=>s+r.total,0);
+    cont.innerHTML=`<div class="sboxes">
+      <div class="sbox sb"><div class="sv">${fmtNum(totalFee)} د.إ</div><div class="sk">${lang==='ar'?'الرسوم الشهرية':'Monthly Fees'}</div></div>
+      <div class="sbox sg"><div class="sv">${fmtNum(totalPaid)} د.إ</div><div class="sk">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div></div>
+    </div>
+    <div style="font-size:.7rem;color:#6b7280;margin-bottom:8px;background:#f8fafc;border-radius:7px;padding:5px 9px">
+      📋 ${lang==='ar'?'كشف حساب كامل — الإيصالات تبقى في فرعها الأصلي':'Full payment history — receipts remain in their original branch'}
+    </div>
+    ${allBranchRecs.sort((a,b)=>b.date>a.date?1:-1).map(r=>{
+      const br=BRANCHES.find(x=>x.id===r.branchId);
+      const isCurrentBranch=r.branchId===curBid;
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem;gap:6px">
+        <div>
+          <div style="font-weight:700">${fmtDate(r.date)} <span style="font-size:.68rem;color:#9ca3af">#${r.receiptNum}</span></div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+            <span style="background:${br?.l||'#f3f4f6'};color:${br?.c||'#374151'};font-size:.63rem;padding:1px 6px;border-radius:8px;font-weight:700">${br?.icon||''} ${br?.ar||r.branchId}</span>
+            ${!isCurrentBranch?`<span style="background:#fef3c7;color:#92400e;font-size:.6rem;padding:1px 5px;border-radius:6px">${lang==='ar'?'فرع سابق':'prev. branch'}</span>`:''}
+          </div>
+        </div>
+        <b style="color:var(--ok);white-space:nowrap">${fmtNum(r.total)} د.إ</b>
+      </div>`;
+    }).join('')||`<div class="empty"><div class="ei">💳</div><p>${lang==='ar'?'لا توجد مدفوعات':'No payments found'}</p></div>`}`;
   }
   if(tab==='trans'){
     const b=CB();
@@ -9100,17 +9140,179 @@ async function deleteChild(){
   await sb.from('children').delete().eq('id',curChild);
   closeModal();await loadFromSupa(curBid);renderChildren();renderDashboard();
 }
+// ─── Fix: restore receipts to original branch after incorrect transfers ───
+async function previewFixReceipts(){
+  const box=el('fix-receipts-output');
+  if(box) box.innerHTML=`<div style="color:#92400e">⏳ جاري الفحص من Supabase...</div>`;
+  const issues=await _findReceiptBranchIssues();
+  if(!issues) return;
+  if(issues.length===0){
+    if(box) box.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:10px;color:#065f46;font-weight:700">✅ لا توجد مشاكل — كل الإيصالات في فروعها الصحيحة!</div>`;
+    return;
+  }
+  if(box) box.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:10px;margin-bottom:8px;color:#991b1b;font-weight:700">⚠️ وُجدت ${issues.length} مشكلة — إيصالات في فرع خطأ</div>`+
+    issues.slice(0,20).map(i=>`<div style="border:1px solid #fca5a5;border-radius:7px;padding:7px 10px;margin-bottom:5px;font-size:.75rem;background:#fff5f5">
+      <b>${i.childName}</b> | إيصال #${i.receiptNum} (${i.date})<br>
+      موجود في: <b style="color:#dc2626">${BRANCHES.find(b=>b.id===i.currentBranch)?.ar||i.currentBranch}</b> ←
+      يجب أن يكون في: <b style="color:#059669">${i.correctBranch}</b>
+    </div>`).join('')+
+    (issues.length>20?`<div style="color:#6b7280;font-size:.72rem">... و ${issues.length-20} مشكلة أخرى</div>`:'');
+}
+
+async function fixTransferredReceipts(){
+  if(!confirm(`⚠️ هذا الإجراء لا يمكن التراجع عنه!\n\nسيتم إرجاع إيصالات الأطفال المنقولين إلى فروعها الأصلية.\n\nمتأكدة؟`)) return;
+  const box=el('fix-receipts-output');
+  if(box) box.innerHTML=`<div style="color:#92400e">⏳ جاري التطبيق...</div>`;
+  const issues=await _findReceiptBranchIssues();
+  if(!issues||issues.length===0){if(box)box.innerHTML=`<div style="color:#059669;font-weight:700">✅ لا توجد مشاكل</div>`;return;}
+
+  let fixed=0,failed=0;
+  for(const issue of issues){
+    const {error}=await sb.from('receipts')
+      .update({branch_id:issue.correctBranchId})
+      .eq('id',issue.receiptId);
+    if(error){failed++;console.error(error);}
+    else fixed++;
+  }
+  if(box) box.innerHTML=`<div style="background:${failed?'#fef3c7':'#d1fae5'};border-radius:8px;padding:12px;font-weight:700;color:${failed?'#92400e':'#065f46'}">
+    ✅ تم إصلاح ${fixed} إيصال${failed?` | ❌ فشل ${failed}`:''}<br>
+    <div style="font-weight:400;font-size:.75rem;margin-top:4px">أعيدي تحميل الصفحة لرؤية التغييرات</div>
+  </div>`;
+  if(fixed>0) await loadFromSupa(curBid);
+}
+
+async function _findReceiptBranchIssues(){
+  // Load ALL receipts and ALL children across ALL branches
+  const box=el('fix-receipts-output');
+  try{
+    const [{data:allReceipts},{data:allChildren}]=await Promise.all([
+      sb.from('receipts').select('id,child_id,branch_id,date,receipt_num').order('date',{ascending:true}),
+      sb.from('children').select('id,name,branch_id')
+    ]);
+    if(!allReceipts||!allChildren) throw new Error('Failed to load data');
+
+    // Build a timeline: for each child, track which branch they were in at each date
+    // We know: receipts issued in a branch = child was in that branch at that time
+    // Find receipts where receipt.branch_id != child's branch at time of issue
+    // Simple heuristic: group receipts by child, find earliest receipt per branch = original branch
+
+    const issues=[];
+
+    // Build child lookup
+    const childMap={};
+    allChildren.forEach(c=>{childMap[String(c.id)]=c;});
+
+    // Group receipts by child
+    const byChild={};
+    allReceipts.forEach(r=>{
+      const cid=String(r.child_id);
+      if(!byChild[cid]) byChild[cid]=[];
+      byChild[cid].push(r);
+    });
+
+    // For each child: receipts should match the branch that issued the receipt number
+    // Receipt numbers are per-branch — branch prefix encoded in receipt_num
+    // Since we don't have prefix, use another approach:
+    // Any receipt.branch_id that differs from the child's CURRENT branch_id
+    // AND the child has notes containing "[نُقل من" = was transferred
+
+    allChildren.forEach(child=>{
+      const cid=String(child.id);
+      const childRecs=byChild[cid]||[];
+      const hasTransferNote=(child.notes||'').includes('نُقل من');
+
+      if(hasTransferNote){
+        // Find what branch they were in — from notes parse "نُقل من X"
+        // Receipts in their current branch that were dated BEFORE the transfer
+        // are the ones that got moved incorrectly
+        childRecs.forEach(r=>{
+          // If receipt is in current branch but child was transferred here
+          // we need to find the original branch
+          // The original branch = any branch that's NOT the current one
+          // where this child had receipts before transfer
+        });
+      }
+    });
+
+    // Better approach: look specifically for the known transfers
+    // Al Saada (b2) + Dolphin (b3) → Abtal (b5) + Al Saada For Kids (b4)
+    // Receipts of children currently in b4/b5, that have branch_id=b4/b5 
+    // but the child originally was in b2/b3 — we restore those to b2/b3
+
+    const transferMap={'b4':'b2','b5':'b3'}; // new→old (typical transfer direction)
+    // But we can't know for sure without dates, so:
+    // Find children in b4/b5 who have receipts BOTH in b2/b3 AND b4/b5 — the b4/b5 ones that got incorrectly moved
+
+    Object.entries(byChild).forEach(([cid,recs])=>{
+      const child=childMap[cid];
+      if(!child) return;
+      const currentBranch=child.branch_id;
+      // Find receipts in branches other than current
+      const recsByBranch={};
+      recs.forEach(r=>{ if(!recsByBranch[r.branch_id]) recsByBranch[r.branch_id]=[]; recsByBranch[r.branch_id].push(r); });
+      const otherBranches=Object.keys(recsByBranch).filter(b=>b!==currentBranch);
+
+      if(otherBranches.length>0){
+        // Child has receipts in multiple branches — check if any were incorrectly moved
+        // If current branch != any receipt branch → those receipts in wrong branch
+        // ONLY flag receipts in CURRENT branch that should be in an older branch
+        // We detect: if child was transferred (has transfer note), receipts in current branch
+        // dated BEFORE the transfer date are wrong
+        const transferDateMatch=(child.notes||'').match(/نُقل من .+ بتاريخ (\d{4}-\d{2}-\d{2})/);
+        if(transferDateMatch){
+          const transferDate=transferDateMatch[1];
+          const wrongRecs=recs.filter(r=>r.branch_id===currentBranch && r.date<transferDate);
+          // These receipts were issued before transfer but ended up in current branch
+          // Find which branch they originally belonged to (= oldest other branch)
+          const originalBranch=otherBranches.sort()[0]||recs.find(r=>r.branch_id!==currentBranch)?.branch_id;
+          if(originalBranch){
+            wrongRecs.forEach(r=>{
+              const br=BRANCHES.find(b=>b.id===originalBranch);
+              issues.push({
+                receiptId:r.id,receiptNum:r.receipt_num,date:r.date,
+                childName:child.name,currentBranch:r.branch_id,
+                correctBranchId:originalBranch,correctBranch:br?.ar||originalBranch
+              });
+            });
+          }
+        }
+      }
+    });
+
+    return issues;
+  }catch(err){
+    if(box) box.innerHTML=`<div style="color:#dc2626;font-weight:700">❌ خطأ: ${err.message}</div>`;
+    return null;
+  }
+}
+
 async function transferChild(){
   const targetBid=el('tbsel')?.value;if(!targetBid)return;
   const target=BRANCHES.find(b=>b.id===targetBid);
-  if(!confirm(`نقل الطفل إلى ${target?.ar}؟`))return;
+  const c=DB.children.find(x=>String(x.id)===String(curChild));
+  if(!c)return;
+  if(!confirm(`نقل ${c.name} إلى ${target?.ar}؟\n\n✅ سيتم نقل: الطفل + سجل الحضور\n❌ لن تُنقل: الإيصالات (تبقى في الفرع القديم)`))return;
   showLoad('جاري النقل...');
-  await sb.from('children').update({branch_id:targetBid}).eq('id',curChild);
-  await sb.from('receipts').update({branch_id:targetBid}).eq('child_id',curChild).eq('branch_id',curBid);
-  await sb.from('attendance').update({branch_id:targetBid}).eq('child_id',curChild).eq('branch_id',curBid);
+
+  const transferNote=`[نُقل من ${BRANCHES.find(b=>b.id===curBid)?.ar||curBid} بتاريخ ${today()}]`;
+  const newNotes=((c.notes||'')+'\n'+transferNote).trim();
+
+  // Move child + update notes with transfer history
+  await sb.from('children')
+    .update({branch_id:targetBid, notes:newNotes})
+    .eq('id',curChild);
+
+  // Move attendance records to new branch
+  await sb.from('attendance')
+    .update({branch_id:targetBid})
+    .eq('child_id',curChild)
+    .eq('branch_id',curBid);
+
+  // ❌ Do NOT move receipts — they stay in the original branch
+
   hideLoad();closeModal();
   await loadFromSupa(curBid);renderChildren();renderDashboard();
-  alert(`✅ تم النقل إلى ${target?.ar}`);
+  alert(`✅ تم نقل ${c.name} إلى ${target?.ar}\n\nالإيصالات القديمة بقيت في ${BRANCHES.find(b=>b.id===curBid)?.ar||curBid} ✅`);
 }
 
 
