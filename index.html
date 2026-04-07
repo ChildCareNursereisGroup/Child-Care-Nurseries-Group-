@@ -2355,7 +2355,9 @@ async function loadFromSupa(bid) {
         overtimeFee:Number(x.overtime_fee||0), overtimeDur:x.overtime_dur||'',
         vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
         payMethod:x.pay_method||'cash',
-        total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||''
+        total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||'',
+        isCancelled:x.is_cancelled||false, cancelReason:x.cancel_reason||'', cancelDate:x.cancel_date||null,
+        createdAt:x.created_at||null
       }));
     }
     DB.attendance={};
@@ -3018,7 +3020,7 @@ async function showPage(page,btn){
 // ═══════════════════════════════════════════════
 function renderDashboard(){
   const tot=DB.children.length;const act=DB.children.filter(c=>!c.leaveDate).length;
-  const income=DB.receipts.reduce((s,r)=>s+r.total,0);const bus=DB.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).length;
+  const income=DB.receipts.filter(r=>!r.isCancelled).reduce((s,r)=>s+r.total,0);const bus=DB.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).length;
   el('htot').textContent=tot;el('hact').textContent=act;
   el('dstats').innerHTML=`
     <div class="sc"><div class="si">👧</div><div class="sv">${tot}</div><div class="sk">${t('totalChildren')}</div></div>
@@ -3037,7 +3039,7 @@ function renderDashboard(){
 
       if(years.length){
         const cards = years.map(yr=>{
-          const rev = DB.receipts.filter(r=>(r.date||'').startsWith(yr)).reduce((s,r)=>s+(r.total||0),0);
+          const rev = DB.receipts.filter(r=>!r.isCancelled&&(r.date||'').startsWith(yr)).reduce((s,r)=>s+(r.total||0),0);
           const exp = DB.expenses.filter(e=>(e.date||'').startsWith(yr)).reduce((s,e)=>s+(e.totalAmount||e.total_amount||e.amount||0),0);
           const net = rev - exp;
           return `<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;min-width:200px">
@@ -3105,7 +3107,7 @@ function renderPV(){
   if(!active.length){el('pvcont').innerHTML=`<div class="empty"><div class="ei">👶</div><p>لا يوجد أطفال</p></div>`;return;}
   let ok=0,miss=0,part=0;
   const rows=active.map(c=>{
-    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
+    const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
     const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);const diff=exp-paid;
     let cls,txt;
     if(paid===0){cls='pmiss';txt=t('notPaid');miss++;}
@@ -3177,7 +3179,7 @@ function renderChildren(){
         ${(()=>{
           if(c.leaveDate||!(c.fee>0)) return '';
           const curMon=monthOf(new Date());
-          const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,curMon)).reduce((s,r)=>s+r.total,0);
+          const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,curMon)).reduce((s,r)=>s+r.total,0);
           const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
           if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">✅ Paid</span>';
           if(paid>0)    return '<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">⚡ Partial</span>';
@@ -3523,13 +3525,15 @@ function renderRecs(){
   list.sort((a,b)=>{
     const dd=new Date(b.date||0)-new Date(a.date||0);
     if(dd!==0) return dd;
-    // Same date? sort by receipt number
     const na=parseInt((String(a.receiptNum||'').match(/(\d+)$/)||[0,0])[1]);
     const nb=parseInt((String(b.receiptNum||'').match(/(\d+)$/)||[0,0])[1]);
     return nb-na;
   });
-  const tot=list.reduce((s,r)=>s+r.total,0);
-  const vatTot=list.reduce((s,r)=>s+(r.vatAmount||0),0);
+  // Totals: EXCLUDE cancelled receipts
+  const activeList=list.filter(r=>!r.isCancelled);
+  const cancelledList=list.filter(r=>r.isCancelled);
+  const tot=activeList.reduce((s,r)=>s+r.total,0);
+  const vatTot=activeList.reduce((s,r)=>s+(r.vatAmount||0),0);
   el('rectot').textContent=fmtNum(tot);
   const _adm = curRole==='admin';
   if(el('rectot-wrap'))   el('rectot-wrap').style.display   = _adm?'':'none';
@@ -3543,21 +3547,23 @@ function renderRecs(){
     ${curRole==='admin'?`<div style="background:#fef3c7;border-radius:9px;padding:9px 12px;margin-bottom:9px;display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem">
       <span>💰 ${ar?'إجمالي المحصّل':'Total Collected'}: <b>${fmtNum(tot)} ${ar?'د.إ':'AED'}</b></span>
       <span>🧾 ${ar?'إجمالي الضريبة':'Total VAT'}: <b style="color:var(--warn)">${fmtNum(vatTot)} ${ar?'د.إ':'AED'}</b></span>
-      <span>📄 ${ar?'عدد الإيصالات':'Receipts'}: <b>${list.length}</b></span>
+      <span>📄 ${ar?'عدد الإيصالات':'Receipts'}: <b>${activeList.length}</b></span>
+      ${cancelledList.length?`<span style="color:#dc2626">🚫 ${ar?'ملغي':'Cancelled'}: <b>${cancelledList.length}</b></span>`:''}
     </div>`:''}
   `+list.map(r=>`
-    <div style="border-bottom:1px solid var(--border);padding:7px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <div style="border-bottom:1px solid var(--border);padding:7px 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;${r.isCancelled?'opacity:.55;background:#fef2f2;border-radius:8px;':''}">
       <!-- Avatar -->
-      <div class="av" style="background:${chCol(r.childId||r.id)};width:32px;height:32px;font-size:.8rem;flex-shrink:0">${(r.childName||'؟')[0]}</div>
+      <div class="av" style="background:${r.isCancelled?'#9ca3af':chCol(r.childId||r.id)};width:32px;height:32px;font-size:.8rem;flex-shrink:0">${(r.childName||'؟')[0]}</div>
       <!-- Name + class -->
       <div style="flex:1;min-width:120px">
-        <div style="font-weight:800;font-size:.85rem">
+        <div style="font-weight:800;font-size:.85rem;${r.isCancelled?'text-decoration:line-through;color:#9ca3af;':''}">
           ${r.childName}
+          ${r.isCancelled?`<span style="background:#fee2e2;color:#dc2626;font-size:.62rem;padding:1px 6px;border-radius:5px;margin-right:3px">🚫 ملغي</span>`:''}
           ${r.hourFee>0&&!r.childId?'<span style="background:#d1fae5;color:#065f46;font-size:.62rem;padding:1px 6px;border-radius:5px;margin-right:3px">🕐 بالساعة</span>':''}
-          ${!r.childId&&!(r.hourFee>0)?'<span style="background:#fef3c7;color:#92400e;font-size:.62rem;padding:1px 5px;border-radius:5px;margin-right:3px">👶 زائر</span>':''}
-          ${r.childId?'':''}
+          ${!r.childId&&!(r.hourFee>0)&&!r.isCancelled?'<span style="background:#fef3c7;color:#92400e;font-size:.62rem;padding:1px 5px;border-radius:5px;margin-right:3px">👶 زائر</span>':''}
         </div>
         <div style="font-size:.68rem;color:var(--muted)">${r.className||''} · #${r.receiptNum}</div>
+        ${r.isCancelled&&r.cancelReason?`<div style="font-size:.62rem;color:#dc2626">سبب الإلغاء: ${r.cancelReason}</div>`:''}
       </div>
       <!-- Date -->
       <div style="text-align:center;min-width:70px">
@@ -3578,7 +3584,12 @@ function renderRecs(){
       <!-- Actions -->
       <div style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn bo bsm" onclick="prevRec('${r.id}')" title="${ar?'معاينة':'Preview'}">👁</button>
-        ${curRole==='admin'?`<button class="btn bsm" style="background:#f59e0b;color:#fff;border:none" onclick="openEditRec('${r.id}')" title="تعديل">✏️</button><button class="btn bd bsm" onclick="delRec('${r.id}')" title="حذف">🗑</button>`:''}
+        ${curRole==='admin'?`
+          <button class="btn bsm" style="background:#f59e0b;color:#fff;border:none" onclick="openEditRec('${r.id}')" title="تعديل" ${r.isCancelled?'disabled style="opacity:.4;cursor:not-allowed;background:#f59e0b;color:#fff;border:none"':''}>✏️</button>
+          ${r.isCancelled
+            ? `<button class="btn bsm" style="background:#6b7280;color:#fff;border:none;cursor:not-allowed;opacity:.7" title="ملغي — ${r.cancelReason||''}" disabled>🚫 ملغي</button>`
+            : `<button class="btn bd bsm" onclick="delRec('${r.id}')" title="إلغاء الإيصال">🚫</button>`
+          }`:''}
       </div>
     </div>`).join('');
 }
@@ -4278,9 +4289,44 @@ function numToWords(num){
 }
 function doPrint(){const w=window.open('','_blank');w.document.write(`<html><head><meta charset="UTF-8"><style>@page{size:A5;margin:8mm}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;background:#fff}#inv-print{width:100%!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important;border:none!important}</style></head><body>${el('pprev').innerHTML}</body></html>`);w.document.close();setTimeout(()=>w.print(),500);}
 async function delRec(id){
-  if(!confirm('حذف الإيصال؟'))return;
-  await sb.from('receipts').delete().eq('id',id);
-  await loadFromSupa(curBid);renderRecs();renderDashboard();
+  // Only admin can cancel receipts (no actual delete allowed)
+  if(curRole!=='admin'){
+    alert('❌ صلاحيات الإدارة فقط — Admin access required');
+    return;
+  }
+  const r=DB.receipts.find(x=>String(x.id)===String(id));
+  if(!r) return;
+
+  // Show cancel dialog
+  const reason=prompt(
+    `إلغاء الإيصال #${r.receiptNum}\nالطفل: ${r.childName}\nالمبلغ: ${r.total} د.إ\n\nاكتبي سبب الإلغاء (إلزامي):`,
+    ''
+  );
+  if(reason===null) return; // User pressed Cancel
+  if(!reason.trim()){
+    alert('⚠️ سبب الإلغاء مطلوب');
+    return;
+  }
+
+  const cancelNote=`[ملغي بتاريخ ${today()} — السبب: ${reason.trim()}]`;
+  const {error}=await sb.from('receipts').update({
+    is_cancelled: true,
+    cancel_reason: reason.trim(),
+    cancel_date: today(),
+    notes: ((r.notes||'')+'\n'+cancelNote).trim()
+  }).eq('id',id);
+
+  if(error){
+    // Field might not exist yet — show SQL to add it
+    alert(`❌ خطأ: ${error.message}\n\nتأكدي من تطبيق الـ SQL في Supabase أولاً:\n\nALTER TABLE receipts\n  ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false,\n  ADD COLUMN IF NOT EXISTS cancel_reason text,\n  ADD COLUMN IF NOT EXISTS cancel_date date;`);
+    return;
+  }
+
+  // Update local cache
+  if(r) { r.isCancelled=true; r.cancelReason=reason.trim(); r.cancelDate=today(); }
+  renderRecs();
+  renderDashboard();
+  alert(`✅ تم إلغاء الإيصال #${r.receiptNum} — الرقم التسلسلي محفوظ في السجل`);
 }
 
 // ═══════════════════════════════════════════════
@@ -4542,7 +4588,7 @@ function renderAtt(){
                   ${(()=>{
                     const attDate=el('attdate').value||today();
                     const month=monthOf(attDate);
-                    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
+                    const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
                     const exp=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
                     if(!exp) return '';
                     if(paid>=exp) return '<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:1px 6px;font-size:.65rem;font-weight:700">✅ Paid</span>';
@@ -7777,7 +7823,7 @@ async function genReport(){
     let totalInc=0,totalExp=0,totalChildren=0,totalActive=0;
     const rows=BRANCHES.map(br=>{
       const bd=allData[br.id]||{children:[],receipts:[],expenses:[]};
-      const inc=bd.receipts.filter(r=>monthOf(r.date)===month||monthOf(r.fromDate||'')===month).reduce((s,r)=>s+(r.total||0),0);
+      const inc=bd.receipts.filter(r=>!r.isCancelled&&(monthOf(r.date)===month||monthOf(r.fromDate||'')===month)).reduce((s,r)=>s+(r.total||0),0);
       const exp=bd.expenses.filter(e=>monthOf(e.date)===month).reduce((s,e)=>s+(e.total_amount||e.totalAmount||e.amount||0),0);
       const active=bd.children.filter(c=>!c.leaveDate&&!c.leave_date).length;
       totalInc+=inc;totalExp+=exp;totalChildren+=bd.children.length;totalActive+=active;
@@ -8695,7 +8741,7 @@ function getUnpaidThisMonth(){
   const month=monthOf(new Date());
   const active=DB.children.filter(c=>!c.leaveDate&&c.fee>0);
   return active.filter(c=>{
-    const paid=DB.receipts.filter(r=>String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
+    const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
     return paid<c.fee;
   });
 }
@@ -13162,6 +13208,8 @@ function printRecReport(exportType='print'){
   if(!from||!to){ alert(isAr?'اختاري الفترة':'Select date range'); return; }
 
   let list = DB.receipts.filter(r=>{
+    // Always exclude cancelled unless explicitly requested
+    if(r.isCancelled) return false;
     if(dateMode==='payment'){
       // Filter by actual payment date (r.date)
       return r.date >= from && r.date <= to;
@@ -15413,7 +15461,7 @@ Child Care Nurseries Group`;
 function renderFeeReminderPanel(){
   const mon=monthOf(new Date());
   const monLabel=new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  const paidIds=new Set(DB.receipts.filter(r=>recCoversMonth(r,mon)).map(r=>String(r.childId)));
+  const paidIds=new Set(DB.receipts.filter(r=>!r.isCancelled&&recCoversMonth(r,mon)).map(r=>String(r.childId)));
   const unpaid=DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0);
 
   let html=`<div style="background:#fff1f2;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
