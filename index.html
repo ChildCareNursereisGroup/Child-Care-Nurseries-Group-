@@ -4284,6 +4284,7 @@ function renderKidsWeek(){
   let totalPresent=0,totalAbsent=0;
   const html=classes.map(cls=>{
     const kids=classMap[cls];
+    const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const rows=kids.map((c,ci)=>{
       let wkPresent=0,wkAbsent=0;
       const absentDaysWA=[];
@@ -4292,14 +4293,48 @@ function renderKidsWeek(){
         const st=attDay[c.id]||attDay[String(c.id)]||'';
         const isP=st==='حضور';
         const isA=st==='غياب';
-        if(isP)wkPresent++;else if(isA){wkAbsent++;absentDaysWA.push(d);}
-        const bg=isP?'#059669':isA?'#dc2626':'#e5e7eb';
-        const icon=isP?'✓':isA?'✕':'';
-        const color=isP||isA?'#fff':'#9ca3af';
+
+        // Check if child is scheduled for this day
+        const dow=new Date(d+'T00:00:00').getDay();
+        const dayName=dayNames[dow];
+        const duty=(c.dutyDays||'').split(',').map(x=>x.trim()).filter(Boolean);
+        const isScheduled=duty.length===0 || duty.some(x=>x.toLowerCase()===dayName.toLowerCase());
+
+        if(isP)wkPresent++;
+        else if(isA){wkAbsent++;if(isScheduled)absentDaysWA.push(d);}
+
+        let bg,icon,color,title,extraStyle='',extraBadge='';
+
+        if(isP){
+          bg='#059669'; icon='✓'; color='#fff';
+          if(!isScheduled){
+            // Present on non-duty day — show with warning
+            bg='#047857'; icon='✓'; color='#fff';
+            extraBadge=`<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>`;
+            title=`${c.name}: حضر — لكن هذا اليوم غير مجدول (${dayName})`;
+          } else {
+            title=`${c.name}: حضور — ${dayName}`;
+          }
+        } else if(isA){
+          bg='#dc2626'; icon='✕'; color='#fff';
+          title=`${c.name}: غياب — ${dayName}`;
+        } else if(!isScheduled){
+          // OFF day — not scheduled, not recorded
+          bg=''; icon='—'; color='#94a3b8';
+          extraStyle=`background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px);`;
+          title=`${c.name}: يوم إيقاف — ${dayName} غير مدفوع`;
+        } else {
+          // Scheduled, not recorded
+          bg='#e5e7eb'; icon=''; color='#9ca3af';
+          title=`${c.name}: لم يُسجَّل — ${dayName}`;
+        }
+
         return`<td style="padding:3px;text-align:center;border:1px solid #f3f4f6">
           <div onclick="toggleKidsAtt('${c.id}','${d}')" data-kid="${c.id}" data-kdate="${d}"
-            style="width:28px;height:28px;border-radius:6px;background:${bg};color:${color};
-            display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;margin:auto;cursor:pointer;user-select:none">${icon}</div>
+            data-scheduled="${isScheduled?'1':'0'}"
+            title="${title}"
+            style="width:28px;height:28px;border-radius:6px;${extraStyle}${bg?'background:'+bg+';':''}color:${color};
+            display:flex;align-items:center;justify-content:center;font-size:${icon==='—'?'.75rem':'.82rem'};font-weight:800;margin:auto;cursor:pointer;user-select:none;position:relative">${icon}${extraBadge}</div>
         </td>`;
       }).join('');
       if(wkPresent>0) totalPresent++;
@@ -4350,10 +4385,17 @@ function renderKidsWeek(){
   }).join('');
 
   el('attlist').innerHTML=html;
-  el('attsum').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+  el('attsum').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
     <span style="color:#059669;font-weight:800">✅ ${lang==='ar'?'حضر هذا الأسبوع':'Attended this week'}: ${totalPresent}</span>
     <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'غياب هذا الأسبوع':'Had absence this week'}: ${totalAbsent}</span>
-    <span style="color:#6b7280;font-size:.72rem">${lang==='ar'?'الخلية الحمراء = غياب':'Red = Absent | Green = Present | Grey = Not recorded'}</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 2px,#e2e8f0 2px,#e2e8f0 5px)"></span>
+      ${lang==='ar'?'= يوم إيقاف (غير مجدول / غير مدفوع) — قابل للتغيير':'= Off day (not scheduled / not paid) — can be overridden'}
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#047857;position:relative"><span style="position:absolute;top:-2px;right:-2px;width:6px;height:6px;background:#f59e0b;border-radius:50%"></span></span>
+      ${lang==='ar'?'= حضر في يوم غير مدفوع ⚠️':'= Present on non-paid day ⚠️'}
+    </span>
   </div>`;
 }
 
@@ -7087,9 +7129,35 @@ async function toggleKidsAtt(childId, date){
   // Update cell visually immediately
   const cell=document.querySelector(`[data-kid="${childId}"][data-kdate="${date}"]`);
   if(cell){
-    cell.style.background=newSt==='حضور'?'#059669':newSt==='غياب'?'#dc2626':'#e5e7eb';
-    cell.style.color=newSt?'#fff':'#9ca3af';
-    cell.textContent=newSt==='حضور'?'✓':newSt==='غياب'?'✕':'';
+    const isScheduled=cell.dataset.scheduled!=='0';
+    if(newSt==='حضور'){
+      cell.style.background=isScheduled?'#059669':'#047857';
+      cell.style.color='#fff';
+      cell.style.backgroundImage='none';
+      cell.innerHTML=isScheduled?'✓':'✓<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>';
+      cell.style.fontSize='.82rem';
+    } else if(newSt==='غياب'){
+      cell.style.background='#dc2626';
+      cell.style.backgroundImage='none';
+      cell.style.color='#fff';
+      cell.innerHTML='✕';
+      cell.style.fontSize='.82rem';
+    } else {
+      // Back to empty — restore off-day style if not scheduled
+      if(!isScheduled){
+        cell.style.background='';
+        cell.style.backgroundImage='repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px)';
+        cell.style.color='#94a3b8';
+        cell.innerHTML='—';
+        cell.style.fontSize='.75rem';
+      } else {
+        cell.style.background='#e5e7eb';
+        cell.style.backgroundImage='none';
+        cell.style.color='#9ca3af';
+        cell.innerHTML='';
+        cell.style.fontSize='.82rem';
+      }
+    }
   }
 
   // Save to Supabase
