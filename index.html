@@ -1202,6 +1202,21 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="fix-receipts-output" style="font-size:.78rem"></div>
 </div>
 
+<!-- MERGE DUPLICATE CHILDREN -->
+<div class="card" style="border:2px solid #7c3aed">
+  <div class="ch"><div class="ct" style="color:#5b21b6">🔀 دمج الأطفال المكررين — Merge Duplicate Children</div></div>
+  <div style="background:#f5f3ff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.8rem;color:#4c1d95">
+    يبحث عن أطفال بنفس الاسم ونفس تاريخ الميلاد عبر كل الفروع، ثم يدمجهم في سجل واحد مع الاحتفاظ بكل الإيصالات والحضور.
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+    <button onclick="findDuplicateChildren()"
+      style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      🔍 البحث عن المكررين
+    </button>
+  </div>
+  <div id="merge-dup-output"></div>
+</div>
+
 <!-- API KEY SETTINGS -->
 <div class="card" style="border:1.5px solid #e0e7ff">
   <div class="ch"><div class="ct">🤖 AI Scanner — Anthropic API Key</div></div>
@@ -9284,6 +9299,162 @@ async function _findReceiptBranchIssues(){
     if(box) box.innerHTML=`<div style="color:#dc2626;font-weight:700">❌ خطأ: ${err.message}</div>`;
     return null;
   }
+}
+
+// ─── Duplicate Children Merge ─────────────────────────────────────────────
+async function findDuplicateChildren(){
+  const box=el('merge-dup-output');
+  box.innerHTML=`<div style="color:#7c3aed;font-weight:700">⏳ جاري البحث في كل الفروع...</div>`;
+
+  // Load ALL children from ALL branches
+  const {data:allKids,error}=await sb.from('children').select('*').order('created_at',{ascending:true});
+  if(error||!allKids){box.innerHTML=`<div style="color:#dc2626">❌ ${error?.message}</div>`;return;}
+
+  // Group by name+dob
+  const groups={};
+  allKids.forEach(k=>{
+    const name=(k.name||'').trim().toLowerCase();
+    const dob=k.dob||'';
+    if(!name||!dob) return;
+    const key=name+'__'+dob;
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(k);
+  });
+
+  const dupes=Object.values(groups).filter(g=>g.length>1);
+
+  if(!dupes.length){
+    box.innerHTML=`<div style="background:#d1fae5;border-radius:10px;padding:12px;color:#065f46;font-weight:800">
+      ✅ لا توجد أطفال مكررون — لا يوجد اسم وتاريخ ميلاد متطابقين
+    </div>`;
+    return;
+  }
+
+  // Load counts for receipts + attendance per child
+  const {data:recs}=await sb.from('receipts').select('id,child_id,total,branch_id');
+  const {data:atts}=await sb.from('attendance').select('id,child_id');
+  const recMap={},attMap={},recTotal={};
+  (recs||[]).forEach(r=>{const k=String(r.child_id);recMap[k]=(recMap[k]||0)+1;recTotal[k]=(recTotal[k]||0)+Number(r.total||0);});
+  (atts||[]).forEach(a=>{const k=String(a.child_id);attMap[k]=(attMap[k]||0)+1;});
+
+  box.innerHTML=`<div style="background:#faf5ff;border:1.5px solid #a78bfa;border-radius:10px;padding:10px;margin-bottom:10px;font-size:.78rem;color:#4c1d95;font-weight:700">
+    ⚠️ وُجد ${dupes.length} مجموعة مكررة — راجعي كل مجموعة ثم اضغطي دمج
+  </div>`+
+  dupes.map((group,gi)=>{
+    // Pick primary = has most data (receipts > notes > created_at earliest)
+    const scored=group.map(k=>({
+      ...k,
+      score:(recMap[String(k.id)]||0)*100 + (attMap[String(k.id)]||0)*10 + ((k.notes||'').length) + ((k.fee||0)>0?5:0) + ((k.parent_mom||k.parent_dad)?3:0)
+    }));
+    scored.sort((a,b)=>b.score-a.score);
+    const primary=scored[0];
+    const dupeIds=scored.slice(1).map(k=>k.id);
+
+    const branchLabel=id=>BRANCHES.find(b=>b.id===id)?.ar||id;
+
+    return`<div style="border:1.5px solid #c4b5fd;border-radius:12px;padding:12px;margin-bottom:10px;background:#fff">
+      <div style="font-weight:900;color:#5b21b6;font-size:.88rem;margin-bottom:8px">
+        👧 ${primary.name} — تاريخ الميلاد: ${primary.dob||'—'}
+        <span style="background:#7c3aed;color:#fff;font-size:.65rem;padding:2px 8px;border-radius:10px;margin-right:6px">${group.length} سجلات</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:10px">
+        ${scored.map((k,i)=>`
+        <div style="border:${i===0?'2px solid #22c55e':'1.5px solid #e5e7eb'};border-radius:9px;padding:8px;background:${i===0?'#f0fdf4':'#fafafa'}">
+          <div style="font-size:.65rem;font-weight:800;color:${i===0?'#15803d':'#6b7280'};margin-bottom:4px">${i===0?'✅ الأساسي (سيبقى)':'🗑 سيُحذف'}</div>
+          <div style="font-size:.72rem;font-weight:700">${branchLabel(k.branch_id)}</div>
+          <div style="font-size:.68rem;color:#6b7280">
+            🪪 #${k.reg_num||'—'} | ${k.class_name||'—'}<br>
+            💳 ${recMap[String(k.id)]||0} إيصال (${fmtNum(recTotal[String(k.id)]||0)} د.إ)<br>
+            📅 ${attMap[String(k.id)]||0} حضور<br>
+            ${k.fee?`رسوم: ${k.fee} د.إ`:''} ${k.parent_mom?'📱 '+k.parent_mom:''}
+          </div>
+        </div>`).join('')}
+      </div>
+      <button onclick="mergeChildren('${primary.id}','${dupeIds.join(',')}','${gi}')"
+        style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+        🔀 دمج — الاحتفاظ بـ ${primary.name} (${branchLabel(primary.branch_id)}) وحذف الباقي
+      </button>
+      <span id="merge-status-${gi}" style="font-size:.75rem;margin-right:8px;font-weight:700"></span>
+    </div>`;
+  }).join('');
+}
+
+async function mergeChildren(primaryId, dupeIdsStr, gi){
+  const dupeIds=dupeIdsStr.split(',').filter(Boolean);
+  const status=el('merge-status-'+gi);
+  if(!confirm(`دمج ${dupeIds.length+1} سجل في سجل واحد؟\n\nسيتم:\n✅ نقل كل الإيصالات → السجل الأساسي\n✅ نقل كل الحضور → السجل الأساسي\n🗑 حذف السجلات المكررة\n\nهذا الإجراء لا يمكن التراجع عنه!`))return;
+
+  if(status){status.textContent='⏳ جاري الدمج...';status.style.color='#7c3aed';}
+
+  // Load primary child to merge fields
+  const {data:primaryKid}=await sb.from('children').select('*').eq('id',primaryId).single();
+  let mergedNotes=(primaryKid?.notes||'').trim();
+  let errors=[];
+  let totalMerged={receipts:0,attendance:0};
+
+  for(const dupeId of dupeIds){
+    // Load dupe child data
+    const {data:dupeKid}=await sb.from('children').select('*').eq('id',dupeId).single();
+    if(!dupeKid) continue;
+
+    // Merge notes
+    if(dupeKid.notes) mergedNotes=(mergedNotes+'\n'+dupeKid.notes).trim();
+
+    // Move receipts → primary
+    const {error:rErr,count:rCount}=await sb.from('receipts')
+      .update({child_id:primaryId})
+      .eq('child_id',dupeId);
+    if(rErr) errors.push('receipts: '+rErr.message);
+    else totalMerged.receipts+=(rCount||0);
+
+    // Move attendance → primary (avoid duplicates by using upsert)
+    const {data:dupeAtts}=await sb.from('attendance').select('*').eq('child_id',dupeId);
+    if(dupeAtts&&dupeAtts.length){
+      for(const att of dupeAtts){
+        await sb.from('attendance').upsert(
+          {child_id:primaryId,branch_id:att.branch_id,date:att.date,status:att.status},
+          {onConflict:'child_id,date'}
+        );
+        totalMerged.attendance++;
+      }
+      // Delete dupe attendance
+      await sb.from('attendance').delete().eq('child_id',dupeId);
+    }
+
+    // Merge missing fields from dupe to primary (don't overwrite filled fields)
+    const updates={};
+    const fields=['parent_mom','parent_dad','email','dob','nationality','id_number','notes',
+                  'class_name','kids_time','duty_days','join_date','fee','bus_fee','bus','bus_direction','bus_area'];
+    fields.forEach(f=>{
+      const pk=f.replace(/_([a-z])/g,(m,c)=>c.toUpperCase()); // snake→camel for checking primaryKid
+      if(!primaryKid[f]&&dupeKid[f]) updates[f]=dupeKid[f];
+    });
+    if(mergedNotes) updates.notes=mergedNotes;
+
+    if(Object.keys(updates).length){
+      await sb.from('children').update(updates).eq('id',primaryId);
+    }
+
+    // Delete the duplicate child
+    const {error:dErr}=await sb.from('children').delete().eq('id',dupeId);
+    if(dErr) errors.push('delete child: '+dErr.message);
+  }
+
+  // Reload data
+  await loadFromSupa(curBid);
+
+  if(status){
+    if(errors.length){
+      status.textContent=`⚠️ دُمج مع أخطاء: ${errors.join(', ')}`;
+      status.style.color='#dc2626';
+    } else {
+      status.textContent=`✅ تم الدمج! — ${totalMerged.receipts} إيصال + ${totalMerged.attendance} حضور`;
+      status.style.color='#059669';
+    }
+  }
+
+  // Re-run search to update list
+  setTimeout(findDuplicateChildren,1500);
 }
 
 async function transferChild(){
