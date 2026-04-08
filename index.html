@@ -5978,15 +5978,26 @@ function switchHistTab(tab){
     rPanel.style.display='none'; ePanel.style.display='flex';
     eBtn.style.borderBottom='3px solid #059669'; eBtn.style.background='#fff'; eBtn.style.color='#059669';
     rBtn.style.borderBottom='3px solid transparent'; rBtn.style.background='#f5f3ff'; rBtn.style.color='#6b7280';
-    // Sync staff selector
+
     const entSel=el('hist-entry-staff');
     const repSel=el('hist-staff-sel');
+    const prevStaff=entSel.value; // save before overwriting
     entSel.innerHTML=repSel.innerHTML;
-    // Bind month change to render grid
+    // Restore previously selected value
+    if(prevStaff) entSel.value=prevStaff;
+    // Fall back to report tab selection
+    if(!entSel.value && repSel.value) entSel.value=repSel.value;
+
+    // Sync month from report tab if entry month empty
     const mEl=el('hist-entry-month');
+    if(!mEl.value && el('hist-from').value) mEl.value=el('hist-from').value;
+
+    // Bind events
     mEl.onchange=()=>renderHistEntryGrid();
     entSel.onchange=()=>renderHistEntryGrid();
     el('hist-entry-default').onchange=()=>renderHistEntryGrid();
+    // Auto-load immediately if both selected
+    if(entSel.value && mEl.value) renderHistEntryGrid();
   }
 }
 
@@ -6002,18 +6013,21 @@ async function renderHistEntryGrid(){
 
   grid.innerHTML='<div style="color:#0369a1;text-align:center;padding:16px;font-size:.8rem">⏳ جاري تحميل البيانات...</div>';
 
-  // Load existing attendance for this staff+month from Supabase
+  // Load existing attendance for this staff+month from Supabase (all branches)
   const fromDate=mon+'-01';
   const toDate=mon+'-31';
   const {data:existingAtt}=await sb.from('staff_attendance')
     .select('date,status')
     .eq('staff_id',staffId)
     .gte('date',fromDate)
-    .lte('date',toDate);
+    .lte('date',toDate)
+    .order('date',{ascending:true});
 
   // Build map of existing records
   const existingMap={};
   (existingAtt||[]).forEach(a=>{existingMap[a.date]=a.status;});
+  const loadedCount=(existingAtt||[]).length;
+  console.log('[HistGrid] Loaded from DB:', loadedCount, 'records for staff', staffId, 'month', mon, existingAtt);
 
   const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
   const [yr,mo]=mon.split('-').map(Number);
@@ -6111,6 +6125,8 @@ async function saveHistoricalAttEntry(){
       ?`<div style="background:#d1fae5;border-radius:8px;padding:8px;color:#065f46;font-weight:700">✅ تم الحفظ — ${ok} يوم تم تسجيله في الداتابيز</div>`
       :`<div style="background:#fee2e2;border-radius:8px;padding:8px;color:#dc2626;font-weight:700">⚠️ ${ok} نجح، ${err} فشل</div>`;
   }
+  // Reload grid to show saved data
+  if(ok>0) renderHistEntryGrid();
 }
 
 function openHistoricalAttModal(){
