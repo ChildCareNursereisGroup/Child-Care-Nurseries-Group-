@@ -721,7 +721,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()" id="bulk-att-btn">📋 إدخال جماعي</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="printMonthlyStaffSummary()" id="monthly-sum-btn">📊 ملخص الشهر</button>
       <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()" id="att-report-btn">📋 تقرير الغياب</button>
-      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openHistoricalAttModal()" id="hist-att-btn">📜 تقرير تاريخي</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openHistoricalAttModal()" id="hist-att-btn" style="display:none">📜 تقرير تاريخي</button>
     </div>
   </div>
   <div id="staffattlist"></div>
@@ -729,45 +729,53 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 <!-- Historical Staff Attendance Report Modal -->
 <div class="mover" id="hist-att-modal">
-  <div style="background:#fff;border-radius:17px;width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div class="mh" style="padding:14px 16px;border-bottom:1.5px solid #e5e7eb;flex-shrink:0;background:linear-gradient(135deg,#4c1d95,#7c3aed);border-radius:17px 17px 0 0">
-      <div class="mt" style="color:#fff">&#128220; تقرير حضور وغياب تاريخي</div>
+  <div style="background:#fff;border-radius:17px;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div class="mh" style="padding:14px 16px;border-bottom:0;flex-shrink:0;background:linear-gradient(135deg,#4c1d95,#7c3aed);border-radius:17px 17px 0 0">
+      <div class="mt" style="color:#fff">&#128220; تقرير وادارة الغياب التاريخي</div>
       <button class="xb" onclick="el('hist-att-modal').classList.remove('on')" style="color:#fff;background:rgba(255,255,255,.2)">&#x2715;</button>
     </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1">
-      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:10px;padding:10px;font-size:.75rem;color:#78350f">
+    <!-- Tabs -->
+    <div style="display:flex;flex-shrink:0;background:#f5f3ff;border-bottom:2px solid #e5e7eb">
+      <button id="hist-tab-report" onclick="switchHistTab('report')"
+        style="flex:1;padding:10px 8px;border:none;border-bottom:3px solid #7c3aed;background:#fff;color:#5b21b6;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.8rem;cursor:pointer">
+        &#x1F5A8; طباعة تقرير رسمي
+      </button>
+      <button id="hist-tab-entry" onclick="switchHistTab('entry')"
+        style="flex:1;padding:10px 8px;border:none;border-bottom:3px solid transparent;background:#f5f3ff;color:#6b7280;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem;cursor:pointer">
+        &#x270F;&#xFE0F; إدخال غياب يدوي
+      </button>
+    </div>
+    <!-- PANEL: Report -->
+    <div id="hist-panel-report" style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1">
+      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:9px;padding:9px;font-size:.73rem;color:#78350f">
         &#x2696;&#xFE0F; مناسب للشكاوى العمالية وجهات العمل الرسمية
       </div>
       <div class="fg">
-        <label style="font-weight:800;color:#5b21b6">&#x1F464; اختاري الموظفة</label>
+        <label style="font-weight:800;color:#5b21b6">اختاري الموظفة</label>
         <select id="hist-staff-sel" style="font-family:'Tajawal',sans-serif;width:100%;padding:8px;border:2px solid #a78bfa;border-radius:9px;box-sizing:border-box;font-size:.88rem">
           <option value="">-- اختاري موظفة --</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label style="font-weight:700">من شهر</label>
-          <input type="month" id="hist-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-        </div>
-        <div class="fg">
-          <label style="font-weight:700">إلى شهر</label>
-          <input type="month" id="hist-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-        </div>
+        <div class="fg"><label style="font-weight:700">من شهر</label>
+          <input type="month" id="hist-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box"></div>
+        <div class="fg"><label style="font-weight:700">إلى شهر</label>
+          <input type="month" id="hist-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box"></div>
       </div>
       <div class="fg">
-        <label style="font-weight:800;color:#5b21b6">&#x1F4CB; نوع التقرير</label>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+        <label style="font-weight:800;color:#5b21b6">نوع التقرير</label>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:7px 10px;border-radius:9px;border:1.5px solid #c4b5fd;font-size:.8rem">
             <input type="radio" name="hist-type" value="monthly" checked>
-            <div><div style="font-weight:800;font-size:.83rem">&#x1F4C5; تفصيلي شهري — يوم بيوم</div><div style="font-size:.68rem;color:#6b7280">Day-by-day per month</div></div>
+            <b>&#x1F4C5; تفصيلي يوم بيوم</b>
           </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:7px 10px;border-radius:9px;border:1.5px solid #c4b5fd;font-size:.8rem">
             <input type="radio" name="hist-type" value="summary">
-            <div><div style="font-weight:800;font-size:.83rem">&#x1F4CA; ملخص الفترة كاملة</div><div style="font-size:.68rem;color:#6b7280">Monthly totals summary</div></div>
+            <b>&#x1F4CA; ملخص شهري</b>
           </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:7px 10px;border-radius:9px;border:1.5px solid #c4b5fd;font-size:.8rem">
             <input type="radio" name="hist-type" value="both">
-            <div><div style="font-weight:800;font-size:.83rem">&#x1F4D1; الملخص + التفاصيل — للشكاوى العمالية</div><div style="font-size:.68rem;color:#6b7280">Full report for labour disputes</div></div>
+            <b>&#x1F4D1; الملخص + التفاصيل — للشكاوى العمالية</b>
           </label>
         </div>
       </div>
@@ -775,17 +783,42 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <label style="font-weight:700">اللغة</label>
         <div style="display:flex;gap:8px">
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="hist-lang" value="en" checked> English
-          </label>
+            <input type="radio" name="hist-lang" value="en" checked> English</label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
-            <input type="radio" name="hist-lang" value="ar"> عربي
-          </label>
+            <input type="radio" name="hist-lang" value="ar"> عربي</label>
         </div>
       </div>
-    </div>
-    <div style="padding:12px 16px;border-top:1.5px solid #e5e7eb;background:#fafafa;border-radius:0 0 17px 17px;flex-shrink:0">
-      <button onclick="printHistoricalAttReport()" style="width:100%;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:11px;padding:13px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.95rem">
+      <button onclick="printHistoricalAttReport()" style="width:100%;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:11px;padding:12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.92rem;margin-top:4px">
         &#x1F5A8;&#xFE0F; طباعة التقرير الرسمي
+      </button>
+    </div>
+    <!-- PANEL: Manual Entry -->
+    <div id="hist-panel-entry" style="padding:14px 16px;display:none;flex-direction:column;gap:10px;overflow-y:auto;flex:1">
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:9px;padding:9px;font-size:.73rem;color:#166534">
+        &#x270F;&#xFE0F; إدخال الغياب التاريخي من الكشف الورقي — يُضاف للداتابيز مباشرة
+      </div>
+      <div class="fg">
+        <label style="font-weight:800;color:#059669">اختاري الموظفة</label>
+        <select id="hist-entry-staff" style="font-family:'Tajawal',sans-serif;width:100%;padding:8px;border:2px solid #86efac;border-radius:9px;box-sizing:border-box;font-size:.88rem">
+          <option value="">-- اختاري موظفة --</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label style="font-weight:700">الشهر</label>
+          <input type="month" id="hist-entry-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #86efac;border-radius:8px;box-sizing:border-box"></div>
+        <div class="fg"><label style="font-weight:700">الحالة الافتراضية للأيام</label>
+          <select id="hist-entry-default" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #86efac;border-radius:8px;box-sizing:border-box">
+            <option value="present">✅ حضور (الكل حضر إلا المحدد)</option>
+            <option value="absent">❌ غياب (الكل غاب إلا المحدد)</option>
+          </select>
+        </div>
+      </div>
+      <div id="hist-entry-grid" style="background:#f8fafc;border-radius:10px;padding:10px;max-height:300px;overflow-y:auto">
+        <div style="color:#9ca3af;text-align:center;padding:20px;font-size:.8rem">اختاري موظفة وشهر لتظهر الأيام</div>
+      </div>
+      <div id="hist-entry-status" style="font-size:.78rem"></div>
+      <button onclick="saveHistoricalAttEntry()" style="width:100%;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:11px;padding:12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.92rem">
+        &#x1F4BE; حفظ في الداتابيز
       </button>
     </div>
   </div>
@@ -4781,6 +4814,9 @@ function setStaffDayData(staffId, date, data){
 }
 
 function renderStaffAtt(){
+  // Show historical report button only for admin
+  const histBtn=el('hist-att-btn');
+  if(histBtn) histBtn.style.display=curRole==='admin'?'':'none';
   renderStaffAttWeek();
 }
 
@@ -5927,6 +5963,128 @@ function printMonthlyStaffSummary(){
 </body></html>`;
 
   const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),600);
+}
+
+function switchHistTab(tab){
+  const rPanel=el('hist-panel-report');
+  const ePanel=el('hist-panel-entry');
+  const rBtn=el('hist-tab-report');
+  const eBtn=el('hist-tab-entry');
+  if(tab==='report'){
+    rPanel.style.display='flex'; ePanel.style.display='none';
+    rBtn.style.borderBottom='3px solid #7c3aed'; rBtn.style.background='#fff'; rBtn.style.color='#5b21b6';
+    eBtn.style.borderBottom='3px solid transparent'; eBtn.style.background='#f5f3ff'; eBtn.style.color='#6b7280';
+  } else {
+    rPanel.style.display='none'; ePanel.style.display='flex';
+    eBtn.style.borderBottom='3px solid #059669'; eBtn.style.background='#fff'; eBtn.style.color='#059669';
+    rBtn.style.borderBottom='3px solid transparent'; rBtn.style.background='#f5f3ff'; rBtn.style.color='#6b7280';
+    // Sync staff selector
+    const entSel=el('hist-entry-staff');
+    const repSel=el('hist-staff-sel');
+    entSel.innerHTML=repSel.innerHTML;
+    // Bind month change to render grid
+    const mEl=el('hist-entry-month');
+    mEl.onchange=renderHistEntryGrid;
+    entSel.onchange=renderHistEntryGrid;
+    el('hist-entry-default').onchange=renderHistEntryGrid;
+  }
+}
+
+function renderHistEntryGrid(){
+  const staffId=el('hist-entry-staff').value;
+  const mon=el('hist-entry-month').value;
+  const defSt=el('hist-entry-default').value;
+  const grid=el('hist-entry-grid');
+  if(!staffId||!mon){grid.innerHTML='<div style="color:#9ca3af;text-align:center;padding:20px;font-size:.8rem">اختاري موظفة وشهر</div>';return;}
+
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayNamesAr=['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+
+  // Build grid of days
+  let html=`<div style="font-size:.72rem;font-weight:800;color:#374151;margin-bottom:8px">
+    ${s.name} — ${new Date(yr,mo-1,1).toLocaleDateString('ar-AE',{month:'long',year:'numeric'})}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
+    ${['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'].map(d=>`<div style="text-align:center;font-size:.58rem;font-weight:700;color:#6b7280;padding:2px">${d}</div>`).join('')}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
+
+  // Find first day of month
+  const firstDow=new Date(yr,mo-1,1).getDay();
+  for(let i=0;i<firstDow;i++) html+=`<div></div>`;
+
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+    const dow=new Date(dateStr+'T00:00:00').getDay();
+    const isOff=!workDays.includes(dow);
+    const defaultStatus=isOff?'off':defSt==='present'?'حضور':'غياب';
+    const statusOptions=['حضور','غياب','نص يوم','إجازة','off'];
+    html+=`<div style="text-align:center">
+      <div style="font-size:.65rem;color:#6b7280;margin-bottom:1px">${d}</div>
+      <select id="heg-${dateStr}" data-date="${dateStr}"
+        style="width:100%;font-size:.6rem;padding:2px 1px;border:1px solid ${isOff?'#e5e7eb':'#86efac'};border-radius:4px;
+        background:${isOff?'#f9fafb':'#f0fdf4'};font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        ${statusOptions.map(st=>`<option value="${st}" ${st===defaultStatus?'selected':''}>${
+          st==='حضور'?'✅':st==='غياب'?'❌':st==='نص يوم'?'⚡':st==='إجازة'?'🏖️':'—'
+        }</option>`).join('')}
+      </select>
+    </div>`;
+  }
+  html+='</div>';
+  grid.innerHTML=html;
+}
+
+async function saveHistoricalAttEntry(){
+  const staffId=el('hist-entry-staff').value;
+  const mon=el('hist-entry-month').value;
+  const status=el('hist-entry-status');
+  if(!staffId||!mon){if(status) status.innerHTML='<span style="color:#dc2626">⚠️ اختاري موظفة وشهر</span>';return;}
+
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+
+  if(status) status.innerHTML='<span style="color:#0369a1">⏳ جاري الحفظ...</span>';
+
+  const payloads=[];
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+    const dow=new Date(dateStr+'T00:00:00').getDay();
+    if(!workDays.includes(dow)) continue; // skip off days
+    const sel=el('heg-'+dateStr);
+    if(!sel) continue;
+    const st=sel.value;
+    if(st==='off') continue; // skip
+    payloads.push({branch_id: s.workBranch||s.branchId||curBid, staff_id:s.id, date:dateStr, status:st});
+  }
+
+  if(!payloads.length){if(status)status.innerHTML='<span style="color:#d97706">⚠️ لا توجد أيام لحفظها</span>';return;}
+
+  let ok=0,err=0;
+  for(const p of payloads){
+    const {error}=await sb.from('staff_attendance').upsert(p,{onConflict:'branch_id,staff_id,date'});
+    if(error){err++;console.error(error);}else ok++;
+  }
+
+  // Update local cache
+  if(!DB.staffAtt) DB.staffAtt={};
+  payloads.forEach(p=>{
+    if(!DB.staffAtt[p.date]) DB.staffAtt[p.date]={};
+    DB.staffAtt[p.date][String(p.staff_id)]=p.status;
+  });
+
+  if(status){
+    status.innerHTML=err===0
+      ?`<div style="background:#d1fae5;border-radius:8px;padding:8px;color:#065f46;font-weight:700">✅ تم الحفظ — ${ok} يوم تم تسجيله في الداتابيز</div>`
+      :`<div style="background:#fee2e2;border-radius:8px;padding:8px;color:#dc2626;font-weight:700">⚠️ ${ok} نجح، ${err} فشل</div>`;
+  }
 }
 
 function openHistoricalAttModal(){
