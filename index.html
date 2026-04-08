@@ -721,11 +721,76 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()" id="bulk-att-btn">📋 إدخال جماعي</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="printMonthlyStaffSummary()" id="monthly-sum-btn">📊 ملخص الشهر</button>
       <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()" id="att-report-btn">📋 تقرير الغياب</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openHistoricalAttModal()" id="hist-att-btn">📜 تقرير تاريخي</button>
     </div>
   </div>
   <div id="staffattlist"></div>
   <div id="staffattsum" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:.8rem"></div>
 </div>
+<!-- Historical Staff Attendance Report Modal -->
+<div class="mover" id="hist-att-modal">
+  <div style="background:#fff;border-radius:17px;width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div class="mh" style="padding:14px 16px;border-bottom:1.5px solid #e5e7eb;flex-shrink:0;background:linear-gradient(135deg,#4c1d95,#7c3aed);border-radius:17px 17px 0 0">
+      <div class="mt" style="color:#fff">&#128220; تقرير حضور وغياب تاريخي</div>
+      <button class="xb" onclick="el('hist-att-modal').classList.remove('on')" style="color:#fff;background:rgba(255,255,255,.2)">&#x2715;</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1">
+      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:10px;padding:10px;font-size:.75rem;color:#78350f">
+        &#x2696;&#xFE0F; مناسب للشكاوى العمالية وجهات العمل الرسمية
+      </div>
+      <div class="fg">
+        <label style="font-weight:800;color:#5b21b6">&#x1F464; اختاري الموظفة</label>
+        <select id="hist-staff-sel" style="font-family:'Tajawal',sans-serif;width:100%;padding:8px;border:2px solid #a78bfa;border-radius:9px;box-sizing:border-box;font-size:.88rem">
+          <option value="">-- اختاري موظفة --</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg">
+          <label style="font-weight:700">من شهر</label>
+          <input type="month" id="hist-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+        <div class="fg">
+          <label style="font-weight:700">إلى شهر</label>
+          <input type="month" id="hist-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
+        </div>
+      </div>
+      <div class="fg">
+        <label style="font-weight:800;color:#5b21b6">&#x1F4CB; نوع التقرير</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+            <input type="radio" name="hist-type" value="monthly" checked>
+            <div><div style="font-weight:800;font-size:.83rem">&#x1F4C5; تفصيلي شهري — يوم بيوم</div><div style="font-size:.68rem;color:#6b7280">Day-by-day per month</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+            <input type="radio" name="hist-type" value="summary">
+            <div><div style="font-weight:800;font-size:.83rem">&#x1F4CA; ملخص الفترة كاملة</div><div style="font-size:.68rem;color:#6b7280">Monthly totals summary</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f5f3ff;padding:8px 12px;border-radius:9px;border:1.5px solid #c4b5fd">
+            <input type="radio" name="hist-type" value="both">
+            <div><div style="font-weight:800;font-size:.83rem">&#x1F4D1; الملخص + التفاصيل — للشكاوى العمالية</div><div style="font-size:.68rem;color:#6b7280">Full report for labour disputes</div></div>
+          </label>
+        </div>
+      </div>
+      <div class="fg">
+        <label style="font-weight:700">اللغة</label>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="hist-lang" value="en" checked> English
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;flex:1;justify-content:center">
+            <input type="radio" name="hist-lang" value="ar"> عربي
+          </label>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1.5px solid #e5e7eb;background:#fafafa;border-radius:0 0 17px 17px;flex-shrink:0">
+      <button onclick="printHistoricalAttReport()" style="width:100%;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:11px;padding:13px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.95rem">
+        &#x1F5A8;&#xFE0F; طباعة التقرير الرسمي
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Staff Attendance Report Modal -->
 <div class="mover" id="staff-att-report-modal">
   <div style="background:#fff;border-radius:17px;width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -5862,6 +5927,278 @@ function printMonthlyStaffSummary(){
 </body></html>`;
 
   const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),600);
+}
+
+function openHistoricalAttModal(){
+  // Populate staff dropdown — all staff in current branch
+  const sel=el('hist-staff-sel');
+  const branchStaff=(DB.staff||[]).filter(s=>{
+    const wb=s.workBranch||s.branchId;
+    return String(wb)===String(curBid);
+  });
+  sel.innerHTML='<option value="">-- اختاري موظفة --</option>'+
+    branchStaff.map(s=>`<option value="${s.id}">${s.name}${s.lastWorkingDay?' (مغادرة '+s.lastWorkingDay+')':''}</option>`).join('');
+
+  // Default: last 6 months
+  const now=new Date();
+  const toM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const fromD=new Date(now.getFullYear(),now.getMonth()-5,1);
+  const fromM=`${fromD.getFullYear()}-${String(fromD.getMonth()+1).padStart(2,'0')}`;
+  if(!el('hist-from').value) el('hist-from').value=fromM;
+  if(!el('hist-to').value)   el('hist-to').value=toM;
+  el('hist-att-modal').classList.add('on');
+}
+
+async function printHistoricalAttReport(){
+  const staffId=el('hist-staff-sel').value;
+  const fromMon=el('hist-from').value;
+  const toMon=el('hist-to').value;
+  const rType=document.querySelector('input[name="hist-type"]:checked')?.value||'both';
+  const rLang=document.querySelector('input[name="hist-lang"]:checked')?.value||'en';
+  const isAr=rLang==='ar';
+
+  if(!staffId){alert(isAr?'اختاري موظفة':'Select a staff member');return;}
+  if(!fromMon||!toMon){alert(isAr?'اختاري الفترة':'Select date range');return;}
+
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s){alert('Staff not found');return;}
+
+  const b=CB();
+  const branchName=isAr?(b.ar||b.en):b.en||b.ar;
+
+  // Load attendance from Supabase for full period
+  const fromDate=fromMon+'-01';
+  const toDate=toMon+'-31';
+  const {data:attData}=await sb.from('staff_attendance')
+    .select('date,status')
+    .eq('staff_id',staffId)
+    .gte('date',fromDate)
+    .lte('date',toDate)
+    .order('date',{ascending:true});
+
+  const attMap={};
+  (attData||[]).forEach(a=>{attMap[a.date]=a.status;});
+
+  // Build list of months in range
+  const months=[];
+  let cur=new Date(fromMon+'-01');
+  const toD=new Date(toMon+'-01');
+  while(cur<=toD){
+    months.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
+    cur.setMonth(cur.getMonth()+1);
+  }
+
+  const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
+  const dayNames=isAr?['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const fmtD=d=>{if(!d)return'';const p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];};
+  const printDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  // Compute monthly summaries
+  const monthlySummary=months.map(mon=>{
+    const yr=Number(mon.split('-')[0]),mo=Number(mon.split('-')[1])-1;
+    const daysInMonth=new Date(yr,mo+1,0).getDate();
+    let present=0,absent=0,half=0,off=0,leave=0;
+    for(let d=1;d<=daysInMonth;d++){
+      const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+      const dow=new Date(dateStr+'T00:00:00').getDay();
+      if(!workDays.includes(dow)){off++;continue;}
+      const st=attMap[dateStr]||'';
+      if(st==='حضور'||st==='تعويض') present++;
+      else if(st==='غياب') absent++;
+      else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
+      else if(st==='إجازة') leave++;
+    }
+    const gross=Number(s.grossSalary||s.basicSalary||0);
+    const daily=gross>0?gross/daysInMonth:0;
+    const deduct=absent*daily;
+    const net=gross-deduct;
+    return{mon,present,absent,half,off,leave,gross,daily,deduct,net,daysInMonth};
+  });
+
+  const totalPresent=monthlySummary.reduce((s,m)=>s+m.present,0);
+  const totalAbsent=monthlySummary.reduce((s,m)=>s+m.absent,0);
+  const totalLeave=monthlySummary.reduce((s,m)=>s+m.leave,0);
+  const totalDeduct=monthlySummary.reduce((s,m)=>s+m.deduct,0);
+
+  const monLabel=m=>{
+    const [y,mo]=m.split('-');
+    return new Date(y,Number(mo)-1,1).toLocaleDateString(isAr?'ar-AE':'en-AE',{month:'long',year:'numeric'});
+  };
+
+  // Color theme for labour report
+  const headerBg='#1e3a8a';
+  const accentRed='#dc2626';
+  const accentGreen='#059669';
+
+  // ── SUMMARY TABLE ──
+  const summaryHtml=`
+  <div style="margin-bottom:24px">
+    <div style="background:#1e3a8a;color:#fff;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:900;font-size:.88rem">
+      ${isAr?'ملخص الحضور والغياب خلال الفترة':'Attendance Summary for the Period'}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+      <thead>
+        <tr style="background:#eff6ff">
+          <th style="padding:7px 10px;border:1px solid #bfdbfe;text-align:${isAr?'right':'left'}">${isAr?'الشهر':'Month'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center;background:#d1fae5;color:#065f46">${isAr?'حضور':'Present'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center;background:#fee2e2;color:#991b1b">${isAr?'غياب':'Absent'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center;background:#fef3c7;color:#78350f">${isAr?'نص يوم':'Half Day'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center">${isAr?'إجازة':'Leave'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center">${isAr?'أيام العمل':'Work Days'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center;background:#fee2e2;color:#991b1b">${isAr?'خصم (AED)':'Deduct (AED)'}</th>
+          <th style="padding:7px;border:1px solid #bfdbfe;text-align:center">${isAr?'صافي (AED)':'Net (AED)'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${monthlySummary.map((m,i)=>`
+        <tr style="background:${i%2?'#f8fafc':'#fff'}">
+          <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700">${monLabel(m.mon)}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;color:#059669;font-weight:800">${m.present}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;color:${m.absent>0?'#dc2626':'#6b7280'};font-weight:${m.absent>0?'800':'400'}">${m.absent||'—'}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;color:#d97706">${m.half||'—'}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;color:#6b7280">${m.leave||'—'}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center">${m.daysInMonth-m.off}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;color:${m.deduct>0?'#dc2626':'#6b7280'};font-weight:700">${m.deduct>0?m.deduct.toFixed(2):'—'}</td>
+          <td style="padding:6px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${m.net.toFixed(2)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#1e3a8a;color:#fff;font-weight:900">
+          <td style="padding:8px 10px;border:1px solid #3b5998">${isAr?'الإجمالي':'TOTAL'}</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">${totalPresent}</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">${totalAbsent}</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">—</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">${totalLeave}</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">—</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">${totalDeduct.toFixed(2)} AED</td>
+          <td style="padding:8px;border:1px solid #3b5998;text-align:center">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+
+  // ── MONTHLY DETAIL PAGES ──
+  const monthlyDetailHtml=months.map(mon=>{
+    const yr=Number(mon.split('-')[0]),mo=Number(mon.split('-')[1])-1;
+    const daysInMonth=new Date(yr,mo+1,0).getDate();
+    const sumRow=monthlySummary.find(x=>x.mon===mon);
+    const rows=[];
+    for(let d=1;d<=daysInMonth;d++){
+      const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+      const dow=new Date(dateStr+'T00:00:00').getDay();
+      const isOff=!workDays.includes(dow);
+      const st=attMap[dateStr]||'';
+      let stLabel='',stColor='#374151',stBg='transparent';
+      if(isOff){stLabel=isAr?'إجازة أسبوعية':'Day Off';stColor='#9ca3af';stBg='#f9fafb';}
+      else if(st==='حضور'){stLabel=isAr?'✅ حضور':'✅ Present';stColor='#059669';stBg='#f0fdf4';}
+      else if(st==='غياب'){stLabel=isAr?'❌ غياب':'❌ Absent';stColor='#dc2626';stBg='#fff5f5';}
+      else if(st==='نص يوم'){stLabel=isAr?'⚡ نص يوم':'⚡ Half Day';stColor='#d97706';stBg='#fef9ec';}
+      else if(st==='إجازة'){stLabel=isAr?'🏖️ إجازة':'🏖️ Leave';stColor='#0369a1';stBg='#eff6ff';}
+      else if(st==='تعويض'){stLabel=isAr?'🔄 تعويض':'🔄 Comp Off';stColor='#7c3aed';stBg='#f5f3ff';}
+      else{stLabel=isAr?'— غير مسجل':'— Not recorded';stColor='#9ca3af';}
+      rows.push(`<tr style="background:${stBg}">
+        <td style="padding:5px 10px;border:1px solid #e5e7eb;font-weight:700;color:#374151">${d}</td>
+        <td style="padding:5px 10px;border:1px solid #e5e7eb;color:#6b7280">${dayNames[dow]}</td>
+        <td style="padding:5px 10px;border:1px solid #e5e7eb;font-weight:700;color:${stColor}">${stLabel}</td>
+      </tr>`);
+    }
+    return`
+    <div style="page-break-after:always;margin-bottom:20px">
+      <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);color:#fff;padding:10px 16px;border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:900;font-size:1rem">${monLabel(mon)}</div>
+        <div style="font-size:.75rem;opacity:.9">${s.name}</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:800">✅ ${isAr?'حضور':'Present'}: ${sumRow.present}</span>
+        <span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:800">❌ ${isAr?'غياب':'Absent'}: ${sumRow.absent}</span>
+        ${sumRow.half?`<span style="background:#fef3c7;color:#78350f;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:800">⚡ ${isAr?'نص يوم':'Half'}: ${sumRow.half}</span>`:''}
+        ${sumRow.deduct>0?`<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:800">💰 ${isAr?'خصم':'Deduct'}: ${sumRow.deduct.toFixed(2)} AED</span>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead><tr style="background:#1e3a8a;color:#fff">
+          <th style="padding:6px 10px;border:1px solid #3b5998;text-align:center;width:50px">${isAr?'اليوم':'Day'}</th>
+          <th style="padding:6px 10px;border:1px solid #3b5998;text-align:center;width:80px">${isAr?'الأحد-السبت':'Weekday'}</th>
+          <th style="padding:6px 10px;border:1px solid #3b5998;text-align:${isAr?'right':'left'}">${isAr?'الحالة':'Status'}</th>
+        </tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  // ── BUILD FULL HTML ──
+  let bodyContent='';
+  if(rType==='summary') bodyContent=summaryHtml;
+  else if(rType==='monthly') bodyContent=monthlyDetailHtml;
+  else bodyContent=summaryHtml+monthlyDetailHtml;
+
+  const contractInfo=s.contractStart?`${isAr?'من':'From'}: ${fmtD(s.contractStart)}${s.contractEnd?' '+( isAr?'إلى':'to')+' '+fmtD(s.contractEnd):''}${s.lastWorkingDay?' | '+(isAr?'آخر يوم عمل':'Last working day')+': '+fmtD(s.lastWorkingDay):''}`:'';
+
+  const html=`<!DOCTYPE html><html dir="${isAr?'rtl':'ltr'}"><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;padding:14px;background:#fff;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @media print{@page{size:A4 portrait;margin:10mm}body{padding:4px}div[style*="page-break-after"]{page-break-after:always}}
+  </style></head><body>
+  <!-- COVER HEADER -->
+  <div style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%);padding:20px 24px;border-radius:12px;margin-bottom:20px;color:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-size:1.4rem;font-weight:900;letter-spacing:.5px">مجموعة رعاية الطفل للحضانات</div>
+        <div style="font-size:.8rem;opacity:.85;margin-top:2px">Child Care Group — ${branchName}</div>
+      </div>
+      <div style="text-align:${isAr?'left':'right'}">
+        <div style="font-size:.75rem;opacity:.8">${isAr?'تاريخ الإصدار':'Issue Date'}: ${printDate}</div>
+        <div style="font-size:.75rem;opacity:.8">${isAr?'المرجع':'Ref'}: ATT-${staffId}-${fromMon}</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.3)">
+      <div style="font-size:1.1rem;font-weight:900;text-transform:uppercase">${isAr?'تقرير الحضور والغياب الرسمي':'OFFICIAL ATTENDANCE & ABSENCE REPORT'}</div>
+      <div style="font-size:.78rem;opacity:.85;margin-top:3px">${isAr?'هذا التقرير صادر رسمياً من نظام مجموعة رعاية الطفل':'This report is officially issued by Child Care Group Management System'}</div>
+    </div>
+  </div>
+
+  <!-- STAFF INFO BOX -->
+  <div style="border:2px solid #1e3a8a;border-radius:10px;margin-bottom:20px;overflow:hidden">
+    <div style="background:#eff6ff;padding:8px 14px;font-weight:900;color:#1e3a8a;font-size:.88rem">${isAr?'بيانات الموظفة':'Employee Information'}</div>
+    <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem">
+      <div><span style="color:#6b7280;font-weight:700">${isAr?'الاسم:':'Name:'}</span> <b>${s.name}</b></div>
+      <div><span style="color:#6b7280;font-weight:700">${isAr?'المنصب:':'Position:'}</span> ${s.position||'—'}</div>
+      <div><span style="color:#6b7280;font-weight:700">${isAr?'الفرع:':'Branch:'}</span> ${branchName}</div>
+      <div><span style="color:#6b7280;font-weight:700">${isAr?'الراتب الأساسي:':'Basic Salary:'}</span> ${fmtNum(s.grossSalary||s.basicSalary||0)} AED</div>
+      ${contractInfo?`<div style="grid-column:1/-1"><span style="color:#6b7280;font-weight:700">${isAr?'فترة العقد:':'Contract Period:'}</span> ${contractInfo}</div>`:''}
+      <div style="grid-column:1/-1"><span style="color:#6b7280;font-weight:700">${isAr?'فترة التقرير:':'Report Period:'}</span> <b>${monLabel(fromMon)} — ${monLabel(toMon)}</b></div>
+    </div>
+  </div>
+
+  ${bodyContent}
+
+  <!-- OFFICIAL FOOTER -->
+  <div style="margin-top:30px;border-top:2px solid #e5e7eb;padding-top:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.75rem;color:#6b7280;margin-bottom:30px">${isAr?'توقيع المدير / المديرة':'Manager Signature'}</div>
+        <div style="border-top:1px solid #374151;padding-top:6px;font-size:.75rem;color:#374151">${isAr?'الاسم والتوقيع':'Name & Signature'}</div>
+      </div>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.75rem;color:#6b7280;margin-bottom:30px">${isAr?'الختم الرسمي':'Official Stamp'}</div>
+        <div style="border-top:1px solid #374151;padding-top:6px;font-size:.75rem;color:#374151">${isAr?'ختم المنشأة':'Company Stamp'}</div>
+      </div>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;font-size:.68rem;color:#6b7280;text-align:center">
+      ${isAr
+        ?`هذا التقرير صادر من نظام إدارة مجموعة رعاية الطفل للحضانات — ${branchName} | تاريخ الطباعة: ${printDate}`
+        :`This report is generated by Child Care Group Management System — ${branchName} | Printed: ${printDate}`}
+    </div>
+  </div>
+  </body></html>`;
+
+  el('hist-att-modal').classList.remove('on');
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
 }
 
 function openStaffAttReportModal(){
