@@ -6015,7 +6015,9 @@ async function renderHistEntryGrid(){
 
   // Load existing attendance for this staff+month from Supabase (all branches)
   const fromDate=mon+'-01';
-  const toDate=mon+'-31';
+  const [_yr,_mo]=mon.split('-').map(Number);
+  const _lastDay=new Date(_yr,_mo,0).getDate();
+  const toDate=mon+'-'+String(_lastDay).padStart(2,'0');
   // Bypass RLS using IN array trick (same as main staffAtt loader)
   const {data:existingAtt, error:attErr}=await sb.from('staff_attendance')
     .select('date,status')
