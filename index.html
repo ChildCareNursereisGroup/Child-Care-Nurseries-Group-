@@ -5984,13 +5984,13 @@ function switchHistTab(tab){
     entSel.innerHTML=repSel.innerHTML;
     // Bind month change to render grid
     const mEl=el('hist-entry-month');
-    mEl.onchange=renderHistEntryGrid;
-    entSel.onchange=renderHistEntryGrid;
-    el('hist-entry-default').onchange=renderHistEntryGrid;
+    mEl.onchange=()=>renderHistEntryGrid();
+    entSel.onchange=()=>renderHistEntryGrid();
+    el('hist-entry-default').onchange=()=>renderHistEntryGrid();
   }
 }
 
-function renderHistEntryGrid(){
+async function renderHistEntryGrid(){
   const staffId=el('hist-entry-staff').value;
   const mon=el('hist-entry-month').value;
   const defSt=el('hist-entry-default').value;
@@ -5999,17 +5999,32 @@ function renderHistEntryGrid(){
 
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s) return;
+
+  grid.innerHTML='<div style="color:#0369a1;text-align:center;padding:16px;font-size:.8rem">⏳ جاري تحميل البيانات...</div>';
+
+  // Load existing attendance for this staff+month from Supabase
+  const fromDate=mon+'-01';
+  const toDate=mon+'-31';
+  const {data:existingAtt}=await sb.from('staff_attendance')
+    .select('date,status')
+    .eq('staff_id',staffId)
+    .gte('date',fromDate)
+    .lte('date',toDate);
+
+  // Build map of existing records
+  const existingMap={};
+  (existingAtt||[]).forEach(a=>{existingMap[a.date]=a.status;});
+
   const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
   const [yr,mo]=mon.split('-').map(Number);
   const daysInMonth=new Date(yr,mo,0).getDate();
-  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const dayNamesAr=['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
 
   // Build grid of days
   let html=`<div style="font-size:.72rem;font-weight:800;color:#374151;margin-bottom:8px">
     ${s.name} — ${new Date(yr,mo-1,1).toLocaleDateString('ar-AE',{month:'long',year:'numeric'})}
+    ${(existingAtt||[]).length>0?`<span style="background:#d1fae5;color:#065f46;font-size:.65rem;padding:1px 7px;border-radius:8px;margin-right:6px">✅ ${existingAtt.length} يوم محفوظ</span>`:'<span style="background:#fef3c7;color:#92400e;font-size:.65rem;padding:1px 7px;border-radius:8px;margin-right:6px">⚠️ لا توجد بيانات محفوظة</span>'}
   </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:6px">
     ${['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'].map(d=>`<div style="text-align:center;font-size:.58rem;font-weight:700;color:#6b7280;padding:2px">${d}</div>`).join('')}
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
@@ -6022,14 +6037,25 @@ function renderHistEntryGrid(){
     const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
     const dow=new Date(dateStr+'T00:00:00').getDay();
     const isOff=!workDays.includes(dow);
-    const defaultStatus=isOff?'off':defSt==='present'?'حضور':'غياب';
+
+    // Priority: 1) existing saved data, 2) default setting, 3) off
+    let currentStatus;
+    if(existingMap[dateStr]){
+      currentStatus=existingMap[dateStr]; // use saved value
+    } else if(isOff){
+      currentStatus='off';
+    } else {
+      currentStatus=defSt==='present'?'حضور':'غياب';
+    }
+
+    const hasSaved=!!existingMap[dateStr];
     const statusOptions=['حضور','غياب','نص يوم','إجازة','off'];
     html+=`<div style="text-align:center">
-      <div style="font-size:.65rem;color:#6b7280;margin-bottom:1px">${d}</div>
+      <div style="font-size:.65rem;color:${hasSaved?'#059669':'#6b7280'};margin-bottom:1px;font-weight:${hasSaved?'800':'400'}">${d}</div>
       <select id="heg-${dateStr}" data-date="${dateStr}"
-        style="width:100%;font-size:.6rem;padding:2px 1px;border:1px solid ${isOff?'#e5e7eb':'#86efac'};border-radius:4px;
-        background:${isOff?'#f9fafb':'#f0fdf4'};font-family:'Tajawal',sans-serif;box-sizing:border-box">
-        ${statusOptions.map(st=>`<option value="${st}" ${st===defaultStatus?'selected':''}>${
+        style="width:100%;font-size:.6rem;padding:2px 1px;border:1.5px solid ${hasSaved?'#059669':isOff?'#e5e7eb':'#86efac'};border-radius:4px;
+        background:${hasSaved?'#f0fdf4':isOff?'#f9fafb':'#fff'};font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        ${statusOptions.map(st=>`<option value="${st}" ${st===currentStatus?'selected':''}>${
           st==='حضور'?'✅':st==='غياب'?'❌':st==='نص يوم'?'⚡':st==='إجازة'?'🏖️':'—'
         }</option>`).join('')}
       </select>
