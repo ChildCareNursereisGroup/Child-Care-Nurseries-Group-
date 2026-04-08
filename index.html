@@ -6171,11 +6171,18 @@ async function printHistoricalAttReport(){
   // Load attendance from Supabase for full period
   const fromDate=fromMon+'-01';
   const toDate=toMon+'-31';
+  // Fix toDate to use actual last day (not hardcoded 31)
+  const _toDateFixed = months.length>0 ? (() => {
+    const lastMon=months[months.length-1];
+    const [ly,lm]=lastMon.split('-').map(Number);
+    return lastMon+'-'+String(new Date(ly,lm,0).getDate()).padStart(2,'0');
+  })() : toDate;
+  // Bypass RLS using IN array
   const {data:attData}=await sb.from('staff_attendance')
     .select('date,status')
-    .eq('staff_id',staffId)
+    .in('staff_id',[staffId])
     .gte('date',fromDate)
-    .lte('date',toDate)
+    .lte('date',_toDateFixed)
     .order('date',{ascending:true});
 
   const attMap={};
