@@ -6016,18 +6016,18 @@ async function renderHistEntryGrid(){
   // Load existing attendance for this staff+month from Supabase (all branches)
   const fromDate=mon+'-01';
   const toDate=mon+'-31';
-  const {data:existingAtt}=await sb.from('staff_attendance')
+  // Bypass RLS using IN array trick (same as main staffAtt loader)
+  const {data:existingAtt, error:attErr}=await sb.from('staff_attendance')
     .select('date,status')
-    .eq('staff_id',staffId)
+    .in('staff_id',[staffId])
     .gte('date',fromDate)
     .lte('date',toDate)
     .order('date',{ascending:true});
+  console.log('[HistGrid] Loaded from DB:', (existingAtt||[]).length, 'records for staff', staffId, 'month', mon, attErr||'ok');
 
   // Build map of existing records
   const existingMap={};
   (existingAtt||[]).forEach(a=>{existingMap[a.date]=a.status;});
-  const loadedCount=(existingAtt||[]).length;
-  console.log('[HistGrid] Loaded from DB:', loadedCount, 'records for staff', staffId, 'month', mon, existingAtt);
 
   const workDays=(s.workDays||'0,1,2,3,4').split(',').map(Number);
   const [yr,mo]=mon.split('-').map(Number);
@@ -6109,7 +6109,7 @@ async function saveHistoricalAttEntry(){
 
   let ok=0,err=0;
   for(const p of payloads){
-    const {error}=await sb.from('staff_attendance').upsert(p,{onConflict:'branch_id,staff_id,date'});
+    const {error}=await sb.from('staff_attendance').upsert(p,{onConflict:'staff_id,date'});
     if(error){err++;console.error(error);}else ok++;
   }
 
@@ -7248,7 +7248,7 @@ async function saveBulkAtt(){
   // Upsert in batches of 50
   for(let i=0;i<upsertRows.length;i+=50){
     const batch=upsertRows.slice(i,i+50);
-    const {error}=await sb.from('staff_attendance').upsert(batch,{onConflict:'branch_id,staff_id,date'});
+    const {error}=await sb.from('staff_attendance').upsert(batch,{onConflict:'staff_id,date'});
     if(error){ errors++; console.error('bulk att upsert error:',error); }
     else saved+=batch.length;
   }
@@ -7316,7 +7316,7 @@ async function toggleStaffAtt(staffId, date){
   // Save attendance
   const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
   const {error}=await sb.from('staff_attendance')
-    .upsert(payload, {onConflict:'branch_id,staff_id,date'});
+    .upsert(payload, {onConflict:'staff_id,date'});
   if(error){
     await sb.from('staff_attendance').delete()
       .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
@@ -7531,7 +7531,7 @@ async function toggleStaffAttWeek(staffId, date){
     } else {
       const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
       const {error}=await sb.from('staff_attendance')
-        .upsert(payload,{onConflict:'branch_id,staff_id,date'});
+        .upsert(payload,{onConflict:'staff_id,date'});
       if(error){
         await sb.from('staff_attendance').delete()
           .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
