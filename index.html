@@ -3309,12 +3309,19 @@ function renderChildren(){
           return curRole==='admin'?`<span style="color:var(--ok);font-weight:700">${parts.join(' + ')} = <b>${fmtNum(total)}</b> AED</span>`:'';
         })()}
         ${(()=>{
-          const _phone=(c.parentMom||c.parentDad||'').replace(/[^0-9]/g,'');
+          const _phone=(c.parentMom||c.parentDad||'');
           if(!_phone) return '';
-          const _waMsg=c.leaveDate
-            ? encodeURIComponent('مرحباً، نتمنى أن يكون '+c.name+' بخير. نود متابعتكم.')
-            : encodeURIComponent('مرحباً ولي أمر '+c.name+'،');
-          return '<button onclick="event.stopPropagation();window.open(\'https://wa.me/'+_phone+'?text='+_waMsg+'\',\'_blank\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬 WA</button>';
+          if(c.leaveDate){
+            // Left kids: show reconnect buttons (ar/en)
+            return '<span style="display:flex;gap:4px">'
+              +'<button onclick="event.stopPropagation();sendReconnectMessage('+c.id+',\'ar\')" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬 ع</button>'
+              +'<button onclick="event.stopPropagation();sendReconnectMessage('+c.id+',\'en\')" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬 EN</button>'
+              +'</span>';
+          } else {
+            // Active kids: simple WA
+            const _ph=_phone.replace(/[^0-9]/g,'');
+            return '<button onclick="event.stopPropagation();openWA(\''+_ph+'\',\''+'مرحباً ولي أمر '+c.name+'،'+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>';
+          }
         })()}
       </div>
     </div>`).join('');
