@@ -3309,15 +3309,12 @@ function renderChildren(){
           return curRole==='admin'?`<span style="color:var(--ok);font-weight:700">${parts.join(' + ')} = <b>${fmtNum(total)}</b> AED</span>`:'';
         })()}
         ${(()=>{
-          const phone=c.parentMom||c.parentDad||'';
-          if(!phone) return '';
-          const msg=c.leaveDate
-            ? encodeURIComponent('مرحباً، نتمنى أن يكون الطفل '+c.name+' بخير. نود التواصل معكم.')
+          const _phone=(c.parentMom||c.parentDad||'').replace(/[^0-9]/g,'');
+          if(!_phone) return '';
+          const _waMsg=c.leaveDate
+            ? encodeURIComponent('مرحباً، نتمنى أن يكون '+c.name+' بخير. نود متابعتكم.')
             : encodeURIComponent('مرحباً ولي أمر '+c.name+'،');
-          return `<button onclick="event.stopPropagation();openWA('${phone.replace(/\D/g,'')}','${c.leaveDate?'check':'hi'}_${c.id}')" 
-            style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700;display:flex;align-items:center;gap:3px">
-            💬 WA
-          </button>`;
+          return '<button onclick="event.stopPropagation();window.open(\'https://wa.me/'+_phone+'?text='+_waMsg+'\',\'_blank\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬 WA</button>';
         })()}
       </div>
     </div>`).join('');
@@ -13855,6 +13852,14 @@ function printRecReport(exportType='print'){
   const grandTotal = list.reduce((s,r)=>s+r.total,0);
 
   if(exportType==='excel'){
+    const activeList2=list.filter(r=>!r.isCancelled);
+    const cancelledList2=list.filter(r=>r.isCancelled);
+    const totalCashA=activeList2.filter(r=>(r.payMethod||'cash')==='cash').reduce((s,r)=>s+r.total,0);
+    const totalBankA=activeList2.filter(r=>(r.payMethod||'cash')==='bank').reduce((s,r)=>s+r.total,0);
+    const totalCardA=activeList2.filter(r=>(r.payMethod||'cash')==='card').reduce((s,r)=>s+r.total,0);
+    const totalVATA=activeList2.reduce((s,r)=>s+(r.vatAmount||0),0);
+    const grandTotalA=activeList2.reduce((s,r)=>s+r.total,0);
+
     const wsData = [
       [isAr?'تقرير الإيصالات':'Receipt Report', b.en||b.ar, `${from} → ${to}`, payF==='all'?'All Payments':payF],
       [],
@@ -13862,23 +13867,30 @@ function printRecReport(exportType='print'){
        isAr?'التاريخ':'Date', isAr?'من':'From', isAr?'إلى':'To',
        isAr?'الرسوم':'Fee', isAr?'التسجيل':'Reg', isAr?'المواصلات':'Transport',
        isAr?'ملابس':'Uniforms', isAr?'أدوات':'Stationary',
-       isAr?'ضريبة':'VAT', isAr?'طريقة الدفع':'Pay Method', isAr?'الإجمالي':'Total'],
+       isAr?'بالساعة':'Hourly', isAr?'وقت':'Time', isAr?'إضافي':'Overtime',
+       isAr?'ضريبة':'VAT', isAr?'طريقة الدفع':'Pay Method', isAr?'الإجمالي':'Total',
+       isAr?'الحالة':'Status', isAr?'سبب الإلغاء':'Cancel Reason'],
       ...list.map(r=>[
         r.childName||'', r.className||'', r.receiptNum||'',
         fmtD(r.date), fmtD(r.fromDate), fmtD(r.toDate),
         r.fee||0, r.reg||0, r.bus||0,
         r.clothes||0, r.tools||0,
-        r.vatAmount||0, r.payMethod||'cash', r.total||0
+        r.hourFee||0, (r.hourIn&&r.hourOut?r.hourIn+'→'+r.hourOut:''),
+        r.overtimeFee||0,
+        r.vatAmount||0, r.payMethod||'cash', r.total||0,
+        r.isCancelled?(isAr?'ملغي':'Cancelled'):(isAr?'نشط':'Active'),
+        r.cancelReason||''
       ]),
       [],
-      [isAr?'إجمالي كاش':'Total Cash','','','','','','','','','','','','',totalCash],
-      [isAr?'إجمالي تحويل':'Total Bank','','','','','','','','','','','','',totalBank],
-      [isAr?'إجمالي كارت':'Total Card','','','','','','','','','','','','',totalCard],
-      [isAr?'إجمالي ضريبة':'Total VAT','','','','','','','','','','','','',totalVAT],
-      [isAr?'الإجمالي الكلي':'Grand Total','','','','','','','','','','','','',grandTotal],
+      [isAr?'إجمالي كاش (فعّال)':'Total Cash (Active)','','','','','','','','','','','','','','','',totalCashA],
+      [isAr?'إجمالي تحويل (فعّال)':'Total Bank (Active)','','','','','','','','','','','','','','','',totalBankA],
+      [isAr?'إجمالي كارت (فعّال)':'Total Card (Active)','','','','','','','','','','','','','','','',totalCardA],
+      [isAr?'إجمالي ضريبة':'Total VAT','','','','','','','','','','','','','','','',totalVATA],
+      [isAr?'الإجمالي الكلي (فعّال)':'Grand Total (Active)','','','','','','','','','','','','','','','',grandTotalA],
+      cancelledList2.length?[isAr?'عدد الملغيين':'Cancelled Count','','','','','','','','','','','','','','','',cancelledList2.length]:[],
     ];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols']=[{wch:22},{wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12}];
+    ws['!cols']=[{wch:22},{wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:8},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
     const wb2 = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb2, ws, isAr?'الإيصالات':'Receipts');
     XLSX.writeFile(wb2, `Receipt_Report_${from}_${to}.xlsx`);
