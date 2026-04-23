@@ -154,10 +154,15 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="mover" id="daily-report-modal">
   <div class="mbox" style="max-width:480px">
     <div class="mh">
-      <div class="mt">📊 تقرير اليوم</div>
+      <div class="mt">📊 تقرير الإيصالات اليومي</div>
       <button class="xb" onclick="el('daily-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;background:#eff6ff;border-radius:10px;padding:9px 12px">
+        <label style="font-weight:800;font-size:.82rem;color:#1e3a8a;white-space:nowrap">📅 تاريخ التقرير:</label>
+        <input type="date" id="daily-report-date" style="flex:1;padding:6px 10px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem"
+          onchange="refreshDailyReport()">
+      </div>
       <div id="daily-report-preview" style="background:#f9fafb;border-radius:10px;padding:12px;font-size:.8rem;max-height:350px;overflow-y:auto;white-space:pre-wrap;font-family:'Tajawal',monospace;line-height:1.7"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="sendDailyWhatsApp()" style="background:#25d366;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
@@ -4429,8 +4434,8 @@ function numToWords(num){
 }
 function doPrint(){const w=window.open('','_blank');w.document.write(`<html><head><meta charset="UTF-8"><style>@page{size:A5;margin:8mm}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;background:#fff}#inv-print{width:100%!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important;border:none!important}</style></head><body>${el('pprev').innerHTML}</body></html>`);w.document.close();setTimeout(()=>w.print(),500);}
 async function delRec(id){
-  // Only admin can cancel receipts (no actual delete allowed)
-  if(curRole!=='admin'){
+  // Admin and manager can cancel receipts
+  if(curRole!=='admin' && curRole!=='manager'){
     alert('❌ صلاحيات الإدارة فقط — Admin access required');
     return;
   }
@@ -14351,8 +14356,12 @@ function logActivity(type, msg){
 function buildDailyReport(){
   const b = CB();
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-  const dateStr = now.getDate().toString().padStart(2,'0')+'/'+(now.getMonth()+1).toString().padStart(2,'0')+'/'+now.getFullYear();
+  const dateEl=el('daily-report-date');
+  const selectedDate=dateEl?.value || now.toISOString().split('T')[0];
+  const todayStr = selectedDate;
+  const isToday = selectedDate === now.toISOString().split('T')[0];
+  const [sy,sm,sd]=selectedDate.split('-');
+  const dateStr = sd+'/'+sm+'/'+sy;
   const bname = lang==='ar' ? b.ar : (b.en||b.ar);
 
   // Count by type from activity log
@@ -14437,10 +14446,18 @@ function buildDailyReport(){
 }
 
 function openDailyReport(){
+  const today=new Date().toISOString().split('T')[0];
+  const dateEl=el('daily-report-date');
+  if(dateEl && !dateEl.value) dateEl.value=today;
   const report = buildDailyReport();
   el('daily-report-preview').textContent = report;
   el('daily-copy-ok').style.display='none';
   el('daily-report-modal').classList.add('on');
+}
+
+function refreshDailyReport(){
+  const report=buildDailyReport();
+  el('daily-report-preview').textContent=report;
 }
 
 function copyDailyReport(){
