@@ -214,6 +214,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <span class="sind" id="sind">☁️ محفوظ</span>
     <button class="hbtn" onclick="toggleLang()">EN/ع</button>
     <button class="hbtn" style="background:rgba(255,255,255,.15)" onclick="openDailyReport()">📊 تقرير اليوم</button>
+    <button class="hbtn" id="add-staff-quick-btn" style="background:rgba(255,255,255,.15);display:none" onclick="showPage('staff',null);setTimeout(()=>openStaffForm(null),300)" title="إضافة موظف جديد">👷➕</button>
     <button class="hbtn" id="logout-btn" onclick="doLogout()">خروج 🚪</button>
   </div>
 </header>
@@ -1334,11 +1335,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="card" style="border:2px solid #0891b2">
   <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
-    <b>قواعد التوزيع:</b><br>
-    ☀️ <b>08:00-11:00</b> → S (أول 20) ثم C<br>
-    🕑 <b>11:00-03:00</b> → F (أول 20) ثم D<br>
-    🌙 <b>01:00-05:00</b> → N (أول 20) ثم M<br>
-    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:00 أو Full Day) → A (رضع <1 سنة) / C (1-2 سنة) / D (2-3 سنة) / E (3+ سنة)<br>
+    <b>قواعد التوزيع — حد أقصى 15 طفل لكل فصل:</b><br>
+    🍼 <b>A</b> → أقل من 1.5 سنة — أي وقت<br>
+    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:00): C (1.5-2 سنة) / D (2-3 سنة) / E (3-5 سنة)<br>
+    ☀️ <b>08:00-11:00</b>: CS (1.5-2 سنة) | S ثم G (2-5 سنة)<br>
+    🕑 <b>11:00-03:00</b>: CF (1.5-2 سنة) | F ثم H (2-5 سنة)<br>
+    🌙 <b>01:00-05:00</b>: M (1.5-2 سنة) | N (2-5 سنة)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -1403,11 +1405,11 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- HR Sub-tabs -->
 <div style="display:flex;gap:4px;overflow-x:auto;padding:0 2px 8px;scrollbar-width:none;flex-wrap:nowrap">
   <button class="hr-tab on" onclick="showHRTab('hr-records',this)">👷 Staff</button>
-  <button class="hr-tab" onclick="showHRTab('hr-payroll',this)">💰 Payroll</button>
-  <button class="hr-tab" onclick="showHRTab('hr-sal-history',this)">📋 Salary History</button>
-  <button class="hr-tab" onclick="showHRTab('hr-leaves',this)">🏖️ Leave</button>
-  <button class="hr-tab" onclick="showHRTab('hr-eog',this)">📋 End of Service</button>
-  <button class="hr-tab" onclick="showHRTab('hr-reports',this)">📊 Reports</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-payroll',this)">💰 Payroll</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-sal-history',this)">📋 Salary History</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-leaves',this)">🏖️ Leave</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-eog',this)">📋 End of Service</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-reports',this)">📊 Reports</button>
 </div>
 
 <!-- TAB: Staff Records -->
@@ -2162,7 +2164,7 @@ const BRANCHES = [
 ];
 const ROLES_PAGES = {
   admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','admin'],
-  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders'],
+  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff'],
   visitor_reg:['visitors'],
   receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
   expenses:   ['expenses'],
@@ -2555,7 +2557,10 @@ async function loadFromSupa(bid) {
     return true;
   } catch(err) {
     hideLoad();
-    console.error('Supabase load error:',err);
+    console.error('Supabase load error — message:', err?.message || err);
+    console.error('Supabase load error — code:', err?.code);
+    console.error('Supabase load error — details:', err?.details);
+    console.error('Supabase load error — full:', JSON.stringify(err));
     return false;
   }
 }
@@ -2606,7 +2611,8 @@ function refreshCurrentPage(){
       const panel=el(tabId);
       if(btn) btn.style.display=curRole==='admin'?'':'none';
     });
-    loadHRData().then(()=>{ populateStaffBranchFilter(); renderStaff(); renderStaffAlerts(); });
+    // Only load staff records — don't load leaves here to avoid errors if table missing
+    populateStaffBranchFilter(); renderStaff(); renderStaffAlerts();
   }
   if(pid==='expenses')renderExps();
 }
@@ -3053,6 +3059,9 @@ function initApp(){
     .catch(()=>{});
 }
 function renderNav(){
+  // Show quick add-staff button for admin and manager
+  const addStaffBtn=el('add-staff-quick-btn');
+  if(addStaffBtn) addStaffBtn.style.display=(curRole==='admin'||curRole==='manager')?'':'none';
   const pages=ROLES_PAGES[curRole];
   const labels={
     dashboard:()=>t('navDashboard'), children:()=>t('navChildren'), add:()=>t('navAdd'),
@@ -3102,7 +3111,13 @@ async function showPage(page,btn){
   }
   if(page==='expenses'){renderECats();renderExps();}
   if(page==='admin')renderAdmin();
-  if(page==='staff'){populateStaffBranchFilter();renderStaff();renderStaffAlerts();}
+  if(page==='staff'){
+    populateStaffBranchFilter();renderStaff();renderStaffAlerts();
+    // Hide admin-only HR tabs for manager
+    document.querySelectorAll('.hr-admin-only').forEach(btn=>{
+      btn.style.display=(curRole==='admin')?'':'none';
+    });
+  }
   if(page==='licenses')renderLicenses();
   if(page==='buses'){renderBuses();renderBusAlerts();}
   if(page==='visitors'){
@@ -3710,7 +3725,11 @@ function renderRecs(){
           ${r.isCancelled
             ? `<button class="btn bsm" style="background:#6b7280;color:#fff;border:none;cursor:not-allowed;opacity:.7" title="ملغي — ${r.cancelReason||''}" disabled>🚫 ملغي</button>`
             : `<button class="btn bd bsm" onclick="delRec('${r.id}')" title="إلغاء الإيصال">🚫</button>`
-          }`:''}
+          }`
+        :curRole==='manager'?(r.isCancelled
+          ?`<button class="btn bsm" style="background:#6b7280;color:#fff;border:none;cursor:not-allowed;opacity:.7" disabled>🚫 ملغي</button>`
+          :`<button class="btn bd bsm" onclick="delRec('${r.id}')" title="إلغاء الإيصال">🚫</button>`
+        ):''}
       </div>
     </div>`).join('');
 }
@@ -10102,19 +10121,16 @@ async function _findReceiptBranchIssues(){
 // ─── Auto Class Assignment ─────────────────────────────────────────────────
 function _getTimeGroup(kidsTime){
   const t=(kidsTime||'').replace(/\s/g,'').toLowerCase();
-  // Full day variants: 08:00-01:00 through 08:00-05:00, or "full day"
   if(/fullday|fulltime|full/.test(t)) return 'fullday';
-  if(/08:?00[-–]0?1:?00|08:?00[-–]13:?00/.test(t)) return 'fullday';
-  if(/08:?00[-–]0?2:?00|08:?00[-–]14:?00/.test(t)) return 'fullday';
-  if(/08:?00[-–]0?3:?00|08:?00[-–]15:?00/.test(t)) return 'fullday';
-  if(/08:?00[-–]0?4:?00|08:?00[-–]16:?00/.test(t)) return 'fullday';
-  if(/08:?00[-–]0?5:?00|08:?00[-–]17:?00/.test(t)) return 'fullday';
+  // Full day: 08:xx to 01/02/03/04/05
+  if(/08:?00[-–](0?1|0?2|0?3|0?4|0?5):?00/.test(t)) return 'fullday';
+  if(/08:?00[-–](13|14|15|16|17):?00/.test(t)) return 'fullday';
   // Morning: 08:00-11:00
   if(/08:?00[-–]11:?00/.test(t)) return 'morning';
   // Midday: 11:00-03:00
-  if(/11:?00[-–]0?3:?00|11:?00[-–]15:?00/.test(t)) return 'midday';
-  // Afternoon: 01:00-05:00 / 13:00-17:00
-  if(/0?1:?00[-–]0?5:?00|13:?00[-–]17:?00/.test(t)) return 'afternoon';
+  if(/11:?00[-–](0?3|15):?00/.test(t)) return 'midday';
+  // Afternoon: 01:00-05:00
+  if(/(0?1|13):?00[-–](0?5|17):?00/.test(t)) return 'afternoon';
   return 'other';
 }
 
@@ -10124,18 +10140,10 @@ function _ageMonths(dob){
 }
 
 function _buildClassAssignments(){
+  const MAX=15; // max kids per class
   const active=DB.children.filter(c=>!c.leaveDate);
-  const morning=[],midday=[],afternoon=[],fullday=[],other=[];
-  active.forEach(c=>{
-    const g=_getTimeGroup(c.kidsTime);
-    if(g==='morning') morning.push(c);
-    else if(g==='midday') midday.push(c);
-    else if(g==='afternoon') afternoon.push(c);
-    else if(g==='fullday') fullday.push(c);
-    else other.push(c);
-  });
 
-  // Sort each group by age: youngest first (largest DOB string = most recent)
+  // Sort by age: youngest first
   const byAge=arr=>[...arr].sort((a,b)=>{
     if(!a.dob&&!b.dob) return (a.name||'').localeCompare(b.name||'','ar');
     if(!a.dob) return 1; if(!b.dob) return -1;
@@ -10144,30 +10152,54 @@ function _buildClassAssignments(){
 
   const assignments=[];
 
-  // Morning → S (0-19), C (20+)
-  byAge(morning).forEach((c,i)=>{
-    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'S':'C'});
-  });
-  // Midday → F (0-19), D (20+)
-  byAge(midday).forEach((c,i)=>{
-    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'F':'D'});
-  });
-  // Afternoon → N (0-19), M (20+)
-  byAge(afternoon).forEach((c,i)=>{
-    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:i<20?'N':'M'});
-  });
-  // Full day → by age group
-  byAge(fullday).forEach(c=>{
+  // Counters per class
+  const cnt={};
+  const nextSlot=(cls,overflow)=>{
+    if(!cnt[cls]) cnt[cls]=0;
+    if(cnt[cls]<MAX){ cnt[cls]++; return cls; }
+    // overflow class
+    if(!cnt[overflow]) cnt[overflow]=0;
+    cnt[overflow]++;
+    return overflow;
+  };
+
+  byAge(active).forEach(c=>{
     const mo=_ageMonths(c.dob);
-    let cls='E';
-    if(mo<12) cls='A';
-    else if(mo<24) cls='C';
-    else if(mo<36) cls='D';
+    const tg=_getTimeGroup(c.kidsTime);
+    let cls='';
+
+    // Rule 1: Under 1.5 years (18 months) → Class A regardless of timing
+    if(mo<18){
+      cls=nextSlot('A','A2');
+    }
+    // Rule 2: Full day (08:xx-01:xx to 08:xx-05:xx)
+    else if(tg==='fullday'){
+      if(mo<24)       cls=nextSlot('C','C2');
+      else if(mo<36)  cls=nextSlot('D','D2');
+      else            cls=nextSlot('E','E2');
+    }
+    // Rule 3: Morning 08:00-11:00
+    else if(tg==='morning'){
+      if(mo<24)       cls=nextSlot('CS','CS2');
+      else            cls=nextSlot('S','G');   // 2-5 yrs: S then G
+    }
+    // Rule 4: Midday 11:00-03:00
+    else if(tg==='midday'){
+      if(mo<24)       cls=nextSlot('CF','CF2');
+      else            cls=nextSlot('F','H');   // 2-5 yrs: F then H
+    }
+    // Rule 5: Afternoon 01:00-05:00
+    else if(tg==='afternoon'){
+      if(mo<24)       cls=nextSlot('M','M2');
+      else            cls=nextSlot('N','N2');
+    }
+    else{
+      // Unknown timing — no change
+      assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className,noChange:true});
+      return;
+    }
+
     assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:cls});
-  });
-  // Other: no change
-  other.forEach(c=>{
-    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className,noChange:true});
   });
 
   return assignments;
@@ -10186,7 +10218,7 @@ function previewAutoClasses(){
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
 
-  const classColors={A:'#7c3aed',C:'#0891b2',D:'#059669',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',M:'#9333ea'};
+  const classColors={A:'#7c3aed',C:'#0891b2',CS:'#06b6d4',CF:'#0369a1',D:'#059669',E:'#d97706',S:'#1d4ed8',G:'#4f46e5',F:'#dc2626',H:'#b91c1c',M:'#9333ea',N:'#0e7490'};
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
@@ -14319,72 +14351,88 @@ function logActivity(type, msg){
 function buildDailyReport(){
   const b = CB();
   const now = new Date();
+  const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const dateStr = now.getDate().toString().padStart(2,'0')+'/'+(now.getMonth()+1).toString().padStart(2,'0')+'/'+now.getFullYear();
   const bname = lang==='ar' ? b.ar : (b.en||b.ar);
-  
-  // Count by type
+
+  // Count by type from activity log
   const att    = _actLog.filter(a=>a.type==='attendance');
-  const recs   = _actLog.filter(a=>a.type==='receipt');
   const exps   = _actLog.filter(a=>a.type==='expense');
   const kids   = _actLog.filter(a=>a.type==='child');
-  const other  = _actLog.filter(a=>!['attendance','receipt','expense','child','edit','whatsapp'].includes(a.type));
   const edits  = _actLog.filter(a=>a.type==='edit');
-  const waLogs = _actLog.filter(a=>a.type==='whatsapp');
 
-  // Attendance summary
-  const present = att.filter(a=>a.msg.includes('حضور')||a.msg.includes('Present'));
-  const absent  = att.filter(a=>a.msg.includes('غياب')||a.msg.includes('Absent'));
-  
-  // Receipt total
-  const recTotal = recs.reduce((s,r)=>s+(r.amount||0),0);
+  // ── RECEIPT BREAKDOWN from DB (more accurate than activity log) ──
+  const todayRecs = DB.receipts.filter(r=>!r.isCancelled && r.date===todayStr);
+  const cashRecs  = todayRecs.filter(r=>(r.payMethod||'cash')==='cash');
+  const bankRecs  = todayRecs.filter(r=>(r.payMethod||'cash')==='bank');
+  const cardRecs  = todayRecs.filter(r=>(r.payMethod||'cash')==='card');
+
+  const getRange = arr => {
+    if(!arr.length) return '—';
+    const nums = arr.map(r=>parseInt(String(r.receiptNum||'0').replace(/[^0-9]/g,''))||0).filter(n=>n>0).sort((a,b)=>a-b);
+    if(!nums.length) return arr.map(r=>r.receiptNum||'?').join(', ');
+    const prefix = (arr[0].receiptNum||'').replace(/[0-9]+$/,'');
+    if(nums.length===1) return prefix+String(nums[0]).padStart(4,'0');
+    return prefix+String(nums[0]).padStart(4,'0')+' → '+prefix+String(nums[nums.length-1]).padStart(4,'0');
+  };
+
+  const fmtAmt = n => n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+' AED';
 
   const NL='\n';
   let report = '';
   report += '🏫 *'+bname+'*'+NL;
   report += '📅 تقرير يوم: '+dateStr+NL;
   report += '─────────────────────'+NL;
-  
+
+  // ── RECEIPTS SECTION ──
+  if(todayRecs.length){
+    report += NL+'💰 *الإيصالات — '+dateStr+'*'+NL;
+    report += '📄 إجمالي الإيصالات: '+todayRecs.length+' إيصال'+NL;
+    report += '💵 الإجمالي الكلي: '+fmtAmt(todayRecs.reduce((s,r)=>s+r.total,0))+NL;
+    report += NL;
+    if(cashRecs.length){
+      report += '💵 *كاش — Cash* ('+cashRecs.length+' إيصال)'+NL;
+      report += '   📋 أرقام: '+getRange(cashRecs)+NL;
+      report += '   💰 الإجمالي: '+fmtAmt(cashRecs.reduce((s,r)=>s+r.total,0))+NL;
+    }
+    if(bankRecs.length){
+      report += '🏦 *تحويل بنكي — Bank* ('+bankRecs.length+' إيصال)'+NL;
+      report += '   📋 أرقام: '+getRange(bankRecs)+NL;
+      report += '   💰 الإجمالي: '+fmtAmt(bankRecs.reduce((s,r)=>s+r.total,0))+NL;
+    }
+    if(cardRecs.length){
+      report += '💳 *كارت — Card* ('+cardRecs.length+' إيصال)'+NL;
+      report += '   📋 أرقام: '+getRange(cardRecs)+NL;
+      report += '   💰 الإجمالي: '+fmtAmt(cardRecs.reduce((s,r)=>s+r.total,0))+NL;
+    }
+  }
+
+  // ── ATTENDANCE ──
   if(att.length){
+    const present = att.filter(a=>a.msg.includes('حضور')||a.msg.includes('Present'));
+    const absent  = att.filter(a=>a.msg.includes('غياب')||a.msg.includes('Absent'));
     report += NL+'📋 *الحضور والغياب*'+NL;
     report += '✅ حضور: '+present.length+' طفل'+NL;
     report += '❌ غياب: '+absent.length+' طفل'+NL;
-    if(att.length<=15){
-      present.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
-      absent.forEach(a=>{  report += '  · '+a.msg+' ('+a.time+')'+NL; });
-    }
   }
-  
-  if(recs.length){
-    report += NL+'💰 *الإيصالات المحصلة*'+NL;
-    report += '📄 عدد الإيصالات: '+recs.length+NL;
-    if(recTotal>0) report += '💵 الإجمالي: '+fmtNum(recTotal)+' د.إ'+NL;
-    recs.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
-  }
-  
+
   if(exps.length){
     report += NL+'💸 *المصاريف المسجلة*'+NL;
     report += '📝 عدد البنود: '+exps.length+NL;
-    exps.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+    exps.forEach(a=>{ report += '  · '+a.msg+NL; });
   }
-  
+
   if(kids.length){
-    report += NL+'👶 *الأطفال المضافة/المعدلة*'+NL;
-    kids.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
+    report += NL+'👶 *أطفال جدد/معدلة*'+NL;
+    kids.forEach(a=>{ report += '  · '+a.msg+NL; });
   }
-  
-  if(edits.length){
-    report += NL+'✏️ *تعديلات الإيصالات*'+NL;
-    report += '📝 عدد التعديلات: '+edits.length+NL;
-    edits.forEach(a=>{ report += '  · '+a.msg+' ('+a.time+')'+NL; });
-  }
-  
-  if(!att.length&&!recs.length&&!exps.length&&!kids.length){
+
+  if(!todayRecs.length&&!att.length&&!exps.length&&!kids.length){
     report += NL+'📭 لا توجد نشاطات مسجلة اليوم'+NL;
   }
-  
+
   report += NL+'─────────────────────'+NL;
   report += '🤖 تقرير تلقائي - مجموعة رعاية الطفل';
-  
   return report;
 }
 
