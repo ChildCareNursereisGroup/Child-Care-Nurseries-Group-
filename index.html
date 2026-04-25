@@ -12387,18 +12387,191 @@ function downloadChildExp2026Template(){
 
 function downloadExpensesTemplate(){
   const XLSX=window.XLSX; if(!XLSX) return;
-  const data=[
-    ['Category','Date (DD/MM/YYYY)','Amount','VAT Type','VAT Amount','Total Amount','Supplier Name','Supplier Tax No','Description/Reason','Sub Type/Notes'],
-    ['purch','05/10/2025','500','exempt','0','500','ABC Stationery','100123456700003','School supplies for KG1',''],
-    ['salary','30/10/2025','3500','exempt','0','3500','','','October salary - Teacher',''],
-    ['util','15/10/2025','800','5','40','840','DEWA','','Electricity bill October',''],
-    ['bus','10/10/2025','300','exempt','0','300','','','Fuel bus SHJ-1234','Bus No. SHJ-1234'],
-    ['tel','01/10/2025','110','5','5.5','115.5','Etisalat','','Etisalat bill September','Nursery Phone - 050-4742500'],
+
+  // Common columns that appear in all expense forms
+  const commonCols=['Invoice No.','Supplier / Entity Name','Supplier TRN','Reason for Payment','VAT Type (exempt/5/15)','VAT Amount (AED)','Paid By (owner/accountant/petty)','Branch ID (b1-b5, optional)'];
+
+  const wb=XLSX.utils.book_new();
+
+  // ── Sheet 1: Bus Expenses ──
+  const busData=[
+    ['🚌 Bus Expenses — مصاريف الباص'],
+    ['Bus No.','Expense Type (Fuel/Maintenance/Insurance/Fines/Wash/Other)','Amount (AED)','Extra Expenses (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['BUS-01','Fuel','300','0','10/04/2026','INV-001','ADNOC','','Fuel April','exempt','0','accountant','b1'],
+    ['BUS-02','Maintenance','500','50','15/04/2026','INV-002','Al Futtaim','100123456700003','AC repair','5','27.5','owner','b2'],
   ];
-  const ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:12},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:18},{wch:30},{wch:20}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Expenses');
-  XLSX.writeFile(wb,'expenses_import_template.xlsx');
+  const wsBus=XLSX.utils.aoa_to_sheet(busData);
+  wsBus['!cols']=[{wch:10},{wch:30},{wch:14},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  wsBus['A1'].s={font:{bold:true,sz:13},fill:{fgColor:{rgb:'E8F4FD'}}};
+  XLSX.utils.book_append_sheet(wb,wsBus,'Bus');
+
+  // ── Sheet 2: Purchases ──
+  const purchData=[
+    ['🛒 Purchases — المشتريات'],
+    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['School Stationery','500','05/04/2026','INV-003','ABC Stationery','','Stationery KG1','exempt','0','owner','b1'],
+    ['Cleaning Supplies','200','10/04/2026','INV-004','Clean Co.','','Monthly supplies','exempt','0','petty','b1'],
+  ];
+  const wsPurch=XLSX.utils.aoa_to_sheet(purchData);
+  wsPurch['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsPurch,'Purchases');
+
+  // ── Sheet 3: Staff Salaries ──
+  const salaryData=[
+    ['👷 Staff Salaries — رواتب العاملين'],
+    ['Employee Name','Job Title','Salary (AED)','Payment Date (DD/MM/YYYY)',...commonCols],
+    ['Jane Smith','Teacher','4000','30/04/2026','SAL-001','','','April salary','exempt','0','accountant','b1'],
+    ['John Doe','Driver','2500','30/04/2026','SAL-002','','','April salary','exempt','0','accountant','b2'],
+  ];
+  const wsSalary=XLSX.utils.aoa_to_sheet(salaryData);
+  wsSalary['!cols']=[{wch:22},{wch:18},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsSalary,'Staff Salaries');
+
+  // ── Sheet 4: Annual Contracts ──
+  const contractData=[
+    ['📄 Annual Contracts — عقود سنوية'],
+    ['Contract Name','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
+    ['Security Contract','12000','01/01/2026','01/01/2026','31/12/2026','CON-001','G4S','100234567800003','Annual security','5','600','owner','b1'],
+  ];
+  const wsContract=XLSX.utils.aoa_to_sheet(contractData);
+  wsContract['!cols']=[{wch:22},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsContract,'Annual Contracts');
+
+  // ── Sheet 5: Maintenance ──
+  const maintData=[
+    ['🔧 Maintenance — الصيانة'],
+    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['AC Service','800','12/04/2026','MNT-001','Cool Tech','','AC maintenance classrooms','5','40','owner','b1'],
+  ];
+  const wsMaint=XLSX.utils.aoa_to_sheet(maintData);
+  wsMaint['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsMaint,'Maintenance');
+
+  // ── Sheet 6: Utilities ──
+  const utilData=[
+    ['💡 Utilities — الكهرباء والماء'],
+    ['Type (كهرباء/ماء/كهرباء وماء/غاز)','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['كهرباء وماء','1200','01/04/2026','DEWA-001','DEWA','','March utilities','exempt','0','owner','b1'],
+  ];
+  const wsUtil=XLSX.utils.aoa_to_sheet(utilData);
+  wsUtil['!cols']=[{wch:28},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsUtil,'Utilities');
+
+  // ── Sheet 7: Communications ──
+  const telData=[
+    ['📱 Communications — الاتصالات'],
+    ['Service / Subscription No.','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['050-4053818','110','01/04/2026','ETI-001','Etisalat','','April phone bill','5','5.5','owner','b1'],
+  ];
+  const wsTel=XLSX.utils.aoa_to_sheet(telData);
+  wsTel['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsTel,'Communications');
+
+  // ── Sheet 8: Rent ──
+  const rentData=[
+    ['🏠 Rent Fees — رسوم الإيجار'],
+    ['Property / Description','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
+    ['Shop G16 CBD2 Sharjah','15000','01/04/2026','01/04/2026','30/04/2026','RENT-001','Allsopp & Allsopp','','April rent','exempt','0','owner','b1'],
+  ];
+  const wsRent=XLSX.utils.aoa_to_sheet(rentData);
+  wsRent['!cols']=[{wch:26},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsRent,'Rent');
+
+  // ── Sheet 9: Government Fees ──
+  const govtData=[
+    ['🏛️ Government Fees — مصاريف حكومية'],
+    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['Trade License Renewal','3000','15/04/2026','GOV-001','DED','','License renewal 2026','exempt','0','owner','b1'],
+  ];
+  const wsGovt=XLSX.utils.aoa_to_sheet(govtData);
+  wsGovt['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsGovt,'Government Fees');
+
+  // ── Sheet 10: Advertising ──
+  const adsData=[
+    ['📢 Advertising — الإعلانات'],
+    ['Channel / Platform','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['Meta (Facebook/Instagram)','2000','01/04/2026','META-001','Meta Ireland','','April ads campaign','5','100','owner','b1'],
+  ];
+  const wsAds=XLSX.utils.aoa_to_sheet(adsData);
+  wsAds['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsAds,'Advertising');
+
+  // ── Sheet 11: Bank Charges ──
+  const bankData=[
+    ['🏦 Bank Charges — رسوم البنك'],
+    ['Type (رسوم بنك/تحويل رواتب/رسوم بطاقة/فوائد/أخرى)','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['تحويل رواتب','25','30/04/2026','BNK-001','Emirates NBD','','Salary transfer fees April','exempt','0','owner','b1'],
+  ];
+  const wsBank=XLSX.utils.aoa_to_sheet(bankData);
+  wsBank['!cols']=[{wch:40},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsBank,'Bank Charges');
+
+  // ── Sheet 12: Typing Work ──
+  const printData=[
+    ['✍️ Typing Work — أعمال التايبينج'],
+    ['Description','No. of Items','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['Child contracts typing','20','100','10/04/2026','TYP-001','Smart Typing','','Typing new contracts','exempt','0','owner','b1'],
+  ];
+  const wsPrint=XLSX.utils.aoa_to_sheet(printData);
+  wsPrint['!cols']=[{wch:26},{wch:14},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsPrint,'Typing Work');
+
+  // ── Sheet 13: License Fees ──
+  const licenseData=[
+    ['📋 License Fees — رسوم الترخيص'],
+    ['License Type','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
+    ['SPEA Operating License','5000','01/01/2026','01/01/2026','31/12/2026','LIC-001','SPEA','','Annual nursery license 2026','exempt','0','owner','b1'],
+  ];
+  const wsLicense=XLSX.utils.aoa_to_sheet(licenseData);
+  wsLicense['!cols']=[{wch:26},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsLicense,'License Fees');
+
+  // ── Sheet 14: Other ──
+  const otherData=[
+    ['📝 Other — أخرى'],
+    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
+    ['Office Coffee & Tea','80','20/04/2026','OTH-001','LuLu','','Staff refreshments','exempt','0','petty','b1'],
+  ];
+  const wsOther=XLSX.utils.aoa_to_sheet(otherData);
+  wsOther['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsOther,'Other');
+
+  // ── Sheet 15: HOW TO USE ──
+  const helpData=[
+    ['📖 HOW TO USE THIS TEMPLATE — كيفية الاستخدام'],
+    [],
+    ['IMPORTANT NOTES:'],
+    ['1. Each sheet = one expense category. Use the correct sheet for each expense.'],
+    ['2. Row 1 is the title, Row 2 is the header — DO NOT delete them.'],
+    ['3. Add your data from Row 3 onwards.'],
+    ['4. DATE format: DD/MM/YYYY (e.g. 25/04/2026)'],
+    ['5. VAT Type: use "exempt" for 0%, "5" for 5%, "15" for 15%'],
+    ['6. Paid By: use "owner", "accountant", or "petty"'],
+    ['7. Branch ID: b1=الفرحة, b2=السعادة, b3=الدولفين, b4=السعادة للأطفال, b5=أبطال البراعم'],
+    ['8. Leave optional fields blank — do not delete the column.'],
+    [],
+    ['CATEGORIES (Sheet names):'],
+    ['Bus → Bus expenses (fuel, maintenance, etc.)'],
+    ['Purchases → Buying supplies and materials'],
+    ['Staff Salaries → Monthly staff salaries'],
+    ['Annual Contracts → Security, cleaning, etc.'],
+    ['Maintenance → Repairs and maintenance'],
+    ['Utilities → Electricity, water, gas'],
+    ['Communications → Phone, internet bills'],
+    ['Rent → Monthly or annual rent'],
+    ['Government Fees → Government transactions'],
+    ['Advertising → Marketing expenses'],
+    ['Bank Charges → Bank fees and transfers'],
+    ['Typing Work → Typing/printing services'],
+    ['License Fees → SPEA, trade license, etc.'],
+    ['Other → Any other expenses'],
+  ];
+  const wsHelp=XLSX.utils.aoa_to_sheet(helpData);
+  wsHelp['!cols']=[{wch:80}];
+  XLSX.utils.book_append_sheet(wb,wsHelp,'📖 HOW TO USE');
+
+  XLSX.writeFile(wb,'expenses_import_template_v2.xlsx');
 }
 
 // ═══════════════════════════════════════════════
