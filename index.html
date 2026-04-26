@@ -14180,16 +14180,19 @@ async function printExpSummaryAllBranches(exportType='print'){
 
   showLoad('جاري تحميل مصاريف كل الفروع...');
 
-  // Load expenses from ALL branches from Supabase directly
-  let query=sb.from('expenses').select('*');
-  if(dateMode==='entry'){
-    query=query.gte('created_at',from+'T00:00:00').lte('created_at',to+'T23:59:59');
-  } else {
-    query=query.gte('date',from).lte('date',to);
+  // Load expenses per branch (proven pattern that works with RLS)
+  const allExp=[];
+  for(const b of BRANCHES){
+    let q=sb.from('expenses').select('*').eq('branch_id',b.id);
+    if(dateMode==='entry'){
+      q=q.gte('created_at',from+'T00:00:00').lte('created_at',to+'T23:59:59');
+    } else {
+      q=q.gte('date',from).lte('date',to);
+    }
+    const {data:bExp}=await q.order('date',{ascending:true});
+    if(bExp) allExp.push(...bExp);
   }
-  const {data:allExp,error}=await query.order('date',{ascending:true});
   hideLoad();
-  if(error){alert('خطأ في تحميل البيانات: '+error.message);return;}
 
   const [sy,sm,sd]=from.split('-');
   const [ey,em,ed]=to.split('-');
