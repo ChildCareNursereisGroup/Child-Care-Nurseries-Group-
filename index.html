@@ -12783,7 +12783,23 @@ async function importExpensesExcel(file){
         }
 
         // Get amount (first numeric-looking column after name columns)
-        const amt=parseFloat(String(getCol(row,'Amount','amount','Salary','salary')).replace(/,/g,''))||0;
+        // Get amount — avoid matching 'VAT Amount' or 'Total Amount' or 'Extra Expenses'
+        const getAmt=()=>{
+          // Priority: Salary, then Amount (excluding VAT/Total/Extra columns)
+          const amtCols=['Salary (AED)','Amount (AED)','Amount'];
+          for(const colName of amtCols){
+            const idx=headers.findIndex(h=>String(h).toLowerCase()===colName.toLowerCase());
+            if(idx>=0 && row[idx]!==undefined && row[idx]!=='') return parseFloat(String(row[idx]).replace(/,/g,''))||0;
+          }
+          // Fallback: first 'amount' col that doesn't have vat/total/extra
+          const fallback=headers.findIndex(h=>{
+            const hl=String(h).toLowerCase();
+            return hl.includes('amount') && !hl.includes('vat') && !hl.includes('total') && !hl.includes('extra');
+          });
+          if(fallback>=0) return parseFloat(String(row[fallback]).replace(/,/g,''))||0;
+          return 0;
+        };
+        const amt=getAmt();
         if(!amt && !getCol(row,'Invoice No','Invoice','Date')) continue; // skip empty rows
 
         // Date
@@ -12884,6 +12900,7 @@ async function confirmImportExpenses(rows){
   };
 
   let ok=0,err=0,skipped=0;
+  window._failedExpRows=[];
   showAlert('exp-imp-alert','⏳ Importing...', false);
 
   // Detect if rows are pre-processed (new format) or raw (old format)
@@ -12948,14 +12965,27 @@ async function confirmImportExpenses(rows){
       if(existing?.length){skipped++;continue;}
 
       const {error:insErr}=await sb.from('expenses').insert(r);
-      if(insErr){console.error('Insert error:',insErr);err++;}
-      else ok++;
+      if(insErr){
+        console.error('Insert error:',insErr,r);
+        _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,reason:reason,error:insErr.message||insErr.code});
+        err++;
+      } else ok++;
     }catch(e){err++;console.error('Row error:',e);}
   }
   
   await loadFromSupa(curBid);
   const msg=`✅ Imported ${ok} expense records${skipped?' | ⏭ '+skipped+' already existed (skipped)':''}${err?' | ⚠️ '+err+' errors':''}`;
-  document.getElementById('exp-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>`;
+  let errDetails='';
+  if(window._failedExpRows&&window._failedExpRows.length){
+    errDetails=`<div style="margin-top:10px;background:#fff5f5;border-radius:9px;padding:10px;font-size:.75rem">
+      <b style="color:#dc2626">❌ الصفوف اللي فشلت (${window._failedExpRows.length}):</b>
+      <table style="width:100%;border-collapse:collapse;margin-top:6px">
+        <tr style="background:#dc2626;color:#fff"><th style="padding:4px 6px">Category</th><th style="padding:4px 6px">Date</th><th style="padding:4px 6px">Amount</th><th style="padding:4px 6px">Supplier</th><th style="padding:4px 6px">Error</th></tr>
+        ${window._failedExpRows.map(r=>`<tr style="border-bottom:1px solid #fca5a5"><td style="padding:3px 6px">${r.sheet}</td><td style="padding:3px 6px">${r.date}</td><td style="padding:3px 6px">${r.amount}</td><td style="padding:3px 6px">${(r.supplier||'').substring(0,20)}</td><td style="padding:3px 6px;color:#dc2626">${(r.error||'').substring(0,30)}</td></tr>`).join('')}
+      </table>
+    </div>`;
+  }
+  document.getElementById('exp-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>${errDetails}`;
 }
 
 // ═══════════════════════════════════════════════
