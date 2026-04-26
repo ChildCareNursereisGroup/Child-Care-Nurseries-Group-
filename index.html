@@ -12724,39 +12724,145 @@ async function importExpensesExcel(file){
   try{
     const ab=await file.arrayBuffer();
     const wb=XLSX.read(ab);
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-    if(!rows.length){preview.innerHTML='<div class="alert aerr">❌ No data found</div>';return;}
-    
-    const previewRows=rows.slice(0,5);
-    // Format values for display (convert date serials to DD/MM/YYYY)
-    const fmtPreview=v=>{
-      if(typeof v==='number' && v>40000 && v<60000){
-        const d=new Date((v-25569)*86400000);
-        return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
-      }
-      return v;
+
+    // ── Detect format: multi-sheet (new template) vs single-sheet (old) ──
+    const SHEET_CAT_MAP={
+      'Bus':'bus','Purchases':'purch','Staff Salaries':'salary',
+      'Annual Contracts':'contract','Maintenance':'maint','Utilities':'util',
+      'Communications':'tel','Rent':'rent','Government Fees':'govt',
+      'Advertising':'ads','Bank Charges':'bank','Typing Work':'printing',
+      'License Fees':'license','Other':'other'
     };
+
+    const allRows=[];
+    let totalSheets=0;
+
+    for(const sheetName of wb.SheetNames){
+      if(sheetName==='📖 HOW TO USE'||sheetName.includes('HOW TO')) continue;
+      const ws=wb.Sheets[sheetName];
+      // Read as array of arrays to handle title row
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(raw.length<3) continue; // Need at least title + header + 1 data row
+
+      // Row 0 = title, Row 1 = headers, Row 2+ = data
+      const knownSheet=SHEET_CAT_MAP[sheetName];
+      let headers, dataRows;
+
+      // Check if first row looks like a title (has emoji or long text in col 0, mostly empty)
+      const firstRowIsTitle=raw[0].filter(Boolean).length<=2;
+      if(firstRowIsTitle){
+        headers=raw[1];
+        dataRows=raw.slice(2);
+      } else {
+        headers=raw[0];
+        dataRows=raw.slice(1);
+      }
+
+      const hMap={}; // column index → normalized header name
+      headers.forEach((h,i)=>{
+        const hn=String(h).toLowerCase().trim();
+        hMap[i]=hn;
+      });
+
+      const getCol=(row,...names)=>{
+        for(const name of names){
+          const idx=headers.findIndex(h=>String(h).toLowerCase().includes(name.toLowerCase()));
+          if(idx>=0 && row[idx]!==undefined && row[idx]!=='') return row[idx];
+        }
+        return '';
+      };
+
+      for(const row of dataRows){
+        if(!row||row.every(c=>c===''||c===null||c===undefined)) continue;
+
+        // Auto-detect category from sheet name or Category column
+        let cat=knownSheet;
+        if(!cat){
+          const catVal=String(getCol(row,'Category','category')||'').toLowerCase().trim();
+          cat=catVal||'other';
+        }
+
+        // Get amount (first numeric-looking column after name columns)
+        const amt=parseFloat(String(getCol(row,'Amount','amount','Salary','salary')).replace(/,/g,''))||0;
+        if(!amt && !getCol(row,'Invoice No','Invoice','Date')) continue; // skip empty rows
+
+        // Date
+        let dateVal=getCol(row,'Date','date','Payment Date','Invoice Date');
+        
+        // Branch ID — normalize to lowercase b1-b5
+        let branchVal=String(getCol(row,'Branch','branch')||'').trim().toLowerCase();
+        if(!branchVal||branchVal==='b0') branchVal=curBid;
+        // Handle "B5" → "b5"
+        branchVal=branchVal.toLowerCase();
+        if(!['b1','b2','b3','b4','b5'].includes(branchVal)) branchVal=curBid;
+
+        // Paid by — normalize "Account" → "accountant"
+        let paidBy=String(getCol(row,'Paid By','paid','Paid')||'owner').toLowerCase().trim();
+        if(paidBy==='account'||paidBy==='محاسب') paidBy='accountant';
+        if(!['owner','accountant','petty'].includes(paidBy)) paidBy='owner';
+
+        const vatType=String(getCol(row,'VAT Type','vat type','vattype')||'exempt').toLowerCase().trim();
+        const vatAmt=parseFloat(String(getCol(row,'VAT Amount','vat amount')).replace(/,/g,''))||0;
+        const totalAmt=parseFloat(String(getCol(row,'Total Amount','total')).replace(/,/g,''))||amt+vatAmt;
+        const supplier=String(getCol(row,'Supplier','supplier','Entity')||'').trim();
+        const taxNo=String(getCol(row,'TRN','Tax No','Supplier TRN','Supplier Tax')||'').trim();
+        const reason=String(getCol(row,'Reason','Description','description','reason','Notes')||'').trim();
+        const invoiceNo=String(getCol(row,'Invoice No','Invoice No.','invoice')||'').trim();
+        const subType=String(getCol(row,'Sub Type','Bus No','Expense Type','Item','Employee','Job Title','License','Contract','Property','Type','Service','Channel')||'').trim();
+        const extra=String(getCol(row,'Extra Expenses','extra')||'0');
+
+        // Build type/label
+        const catObj=EXP_CATS.find(c=>c.k===cat)||EXP_CATS[0];
+        const catLabel=typeof catObj.ar==='function'?catObj.ar():catObj.ar;
+
+        allRows.push({
+          _cat:cat, _branch:branchVal, _paidBy:paidBy,
+          _dateRaw:dateVal, _amt:amt, _vatType:vatType, _vatAmt:vatAmt,
+          _total:totalAmt, _supplier:supplier, _taxNo:taxNo, _reason:reason,
+          _invoiceNo:invoiceNo, _subType:subType, _catLabel:catLabel,
+          _extra:extra
+        });
+      }
+      totalSheets++;
+    }
+
+    if(!allRows.length){
+      preview.innerHTML='<div class="alert aerr">❌ No data found — check file format</div>';
+      return;
+    }
+
     preview.innerHTML=`
       <div style="background:#fff7ed;border-radius:9px;padding:10px;margin-bottom:9px">
-        <b>${rows.length} expense rows found</b> — Preview:
+        <b>${allRows.length} expense rows found</b> from ${totalSheets} sheet(s) — Preview of first 5:
       </div>
       <div style="overflow-x:auto;margin-bottom:10px">
-        <table style="width:100%;font-size:.75rem;border-collapse:collapse">
-          <tr style="background:#d97706;color:#fff">${Object.keys(previewRows[0]).slice(0,7).map(h=>`<th style="padding:5px 7px">${h}</th>`).join('')}</tr>
-          ${previewRows.map(r=>`<tr>${Object.values(r).slice(0,7).map(v=>`<td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${fmtPreview(v)}</td>`).join('')}</tr>`).join('')}
+        <table style="width:100%;font-size:.73rem;border-collapse:collapse">
+          <tr style="background:#d97706;color:#fff">
+            <th style="padding:5px 7px">Category</th><th style="padding:5px 7px">Branch</th>
+            <th style="padding:5px 7px">Date</th><th style="padding:5px 7px">Amount</th>
+            <th style="padding:5px 7px">Supplier</th><th style="padding:5px 7px">Reason</th>
+          </tr>
+          ${allRows.slice(0,5).map(r=>`<tr>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${r._cat}</td>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${r._branch}</td>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${r._dateRaw}</td>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${r._amt}</td>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${r._supplier}</td>
+            <td style="padding:4px 7px;border-bottom:1px solid #e5e7eb">${String(r._reason).substring(0,30)}</td>
+          </tr>`).join('')}
         </table>
       </div>
       <div style="display:flex;gap:7px">
-        <button class="btn" style="background:#d97706;color:#fff;border:none;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700" onclick="confirmImportExpenses(window._pendingExpensesData)">✅ Import ${rows.length} Expenses</button>
+        <button class="btn" style="background:#d97706;color:#fff;border:none;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700" onclick="confirmImportExpenses(window._pendingExpensesData)">✅ Import ${allRows.length} Expenses</button>
         <button class="btn bg bsm" onclick="document.getElementById('exp-imp-preview').innerHTML=''">Cancel</button>
       </div>
       <div id="exp-imp-alert"></div>`;
     
-    window._pendingExpensesData=rows;
+    window._pendingExpensesData=allRows;
     
   }catch(err){
     preview.innerHTML=`<div class="alert aerr">❌ Error: ${err.message}</div>`;
+    console.error('Import error:',err);
   }
 }
 
@@ -12766,93 +12872,85 @@ async function confirmImportExpenses(rows){
     if(!v) return null;
     if(typeof v==='number'){const d=new Date((v-25569)*86400000);return d.toISOString().split('T')[0];}
     const s=String(v).trim();
+    // DD/MM/YYYY
     const dm=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if(dm) return `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
-    return s||null;
+    // YYYY-MM-DD
+    if(s.match(/^\d{4}-\d{2}-\d{2}/)) return s.substring(0,10);
+    // ISO date string (e.g. 2026-04-01 00:00:00)
+    const iso=s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if(iso) return iso[1];
+    return null;
   };
-  const toNum=v=>parseFloat(v)||0;
-  const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','rent','license','other'];
-  // Map common variations to valid categories
-  const catMap={
-    'communication':'tel','communications':'tel','telephone':'tel','telecom':'tel',
-    'etisalat':'tel','du':'tel','phone':'tel','internet':'tel','mobile':'tel',
-    'electricity':'util','utilities':'util','water':'util','electric':'util',
-    'purchase':'purch','purchases':'purch','shopping':'purch',
-    'maintenance':'maint','repair':'maint','repairs':'maint',
-    'government':'govt','gov':'govt','municipality':'govt','visa':'govt',
-    'government fees':'govt','governmental':'govt','govt fees':'govt','رسوم حكومية':'govt',
-    'advertising':'ads','advertisement':'ads','marketing':'ads',
-    'typing':'printing','typing work':'printing','print':'printing','stationery':'printing',
-    'bank':'bank','banking':'bank','finance':'bank',
-    'contract':'contract','annual contract':'contract',
-    'bus':'bus','transport':'bus','transportation':'bus','vehicle':'bus',
-    'rent':'rent','rental':'rent','lease':'rent','إيجار':'rent','rent fees':'rent',
-    'license':'license','licence':'license','licensing':'license','license fees':'license',
-    'رخصة':'license','ترخيص':'license',
-  };
-  
+
   let ok=0,err=0,skipped=0;
   showAlert('exp-imp-alert','⏳ Importing...', false);
-  
+
+  // Detect if rows are pre-processed (new format) or raw (old format)
+  const isPreProcessed=rows[0] && '_cat' in rows[0];
+
   for(const row of rows){
     try{
-      const cat=String(row['Category']||row['category']||'other').toLowerCase().trim();
-      const validCat=validCats.includes(cat)?cat:(catMap[cat]||'other');
-      const catObj=EXP_CATS.find(c=>c.k===validCat)||EXP_CATS[0];
-      const catLabel=typeof catObj.ar==='function'?catObj.ar():catObj.ar;
-      const amt=toNum(row['Amount']||row['amount']);
-      const vatAmt=toNum(row['VAT Amount']||row['vat_amount']);
-      const total=toNum(row['Total Amount']||row['total_amount'])||amt+vatAmt;
-      
-      const supplierRaw = String(row['Supplier Name']||row['supplier_name']||'').trim();
-      const subType  = String(row['Sub Type/Notes']||'').trim();
-      // Combine supplier + sub type to make unique (e.g. "Etisalat Bus no 1 - 050-3313746")
-      const supplier = subType ? `${supplierRaw} ${subType}`.trim() : supplierRaw;
-      const taxNo    = String(row['Supplier Tax No']||row['tax_number']||'').trim();
-      const reason   = String(row['Description/Reason']||row['description']||'').trim();
+      let cat,branchId,paidBy,dateStr,amt,vatType,vatAmt,total,supplier,taxNo,reason,invoiceNo,subType,catLabel;
 
-      const extra={
-        supplier,
-        taxNo,
-        reason,
-      };
-      
+      if(isPreProcessed){
+        // New format — already processed
+        cat=row._cat; branchId=row._branch; paidBy=row._paidBy;
+        dateStr=toDate(row._dateRaw); amt=row._amt;
+        vatType=row._vatType; vatAmt=row._vatAmt; total=row._total;
+        supplier=row._supplier; taxNo=row._taxNo; reason=row._reason;
+        invoiceNo=row._invoiceNo; subType=row._subType; catLabel=row._catLabel;
+      } else {
+        // Old format — raw rows from single-sheet
+        const validCats=['bus','purch','salary','contract','printing','maint','tel','util','govt','bank','ads','rent','license','other'];
+        const catMap={'communication':'tel','communications':'tel','purchase':'purch','purchases':'purch','maintenance':'maint','government':'govt','advertising':'ads','typing':'printing','typing work':'printing','contract':'contract','bus':'bus','rent':'rent','license':'license'};
+        const rawCat=String(row['Category']||row['category']||'other').toLowerCase().trim();
+        cat=validCats.includes(rawCat)?rawCat:(catMap[rawCat]||'other');
+        const catObj=EXP_CATS.find(c=>c.k===cat)||EXP_CATS[0];
+        catLabel=typeof catObj.ar==='function'?catObj.ar():catObj.ar;
+        branchId=curBid; paidBy='owner';
+        dateStr=toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']);
+        amt=parseFloat(String(row['Amount']||row['amount']||0).replace(/,/g,''))||0;
+        vatType=String(row['VAT Type']||'exempt').toLowerCase();
+        vatAmt=parseFloat(String(row['VAT Amount']||0).replace(/,/g,''))||0;
+        total=parseFloat(String(row['Total Amount']||0).replace(/,/g,''))||amt+vatAmt;
+        supplier=String(row['Supplier Name']||row['Supplier / Entity Name']||'').trim();
+        taxNo=String(row['Supplier Tax No']||row['Supplier TRN']||'').trim();
+        reason=String(row['Description/Reason']||row['Reason for Payment']||'').trim();
+        invoiceNo=''; subType=String(row['Sub Type/Notes']||'').trim();
+      }
+
+      if(!dateStr) continue;
+
       const r={
-        branch_id: curBid,
-        category: validCat,
+        branch_id: branchId,
+        category: cat,
         type: catLabel,
         amount: amt,
-        vat_type: String(row['VAT Type']||row['vat_type']||'exempt'),
+        vat_type: vatType,
         vat_amount: vatAmt,
         total_amount: total,
-        date: toDate(row['Date']||row['Date (DD/MM/YYYY)']||row['date']),
+        date: dateStr,
         note: reason,
-        sub_type: String(row['Sub Type/Notes']||''),
+        sub_type: subType||null,
         supplier_name: supplier||null,
         tax_number: taxNo||null,
-        extra: JSON.stringify(extra),
+        paid_by: paidBy,
+        extra: JSON.stringify({supplier,taxNo,reason,invoiceNo}),
       };
-      if(!r.date) continue;
 
-      // ── Duplicate check: same category + date + amount + supplier + note ──
-      let dupQuery = sb.from('expenses').select('id')
-        .eq('branch_id', curBid)
-        .eq('category', validCat)
-        .eq('date', r.date)
-        .eq('amount', amt);
+      // Duplicate check
+      let dupQuery=sb.from('expenses').select('id')
+        .eq('branch_id',branchId).eq('category',cat).eq('date',dateStr).eq('amount',amt);
+      if(supplier) dupQuery=dupQuery.eq('supplier_name',supplier);
+      if(reason)   dupQuery=dupQuery.eq('note',reason);
+      const {data:existing}=await dupQuery.limit(1);
+      if(existing?.length){skipped++;continue;}
 
-      if(supplier){
-        dupQuery = dupQuery.eq('supplier_name', supplier);
-      }
-      if(reason){
-        dupQuery = dupQuery.eq('note', reason);
-      }
-
-      const {data:existing} = await dupQuery.limit(1);
-      if(existing?.length){ skipped++; continue; } // Already exists — skip
-
-      await sb.from('expenses').insert(r); ok++;
-    }catch(e){ err++; }
+      const {error:insErr}=await sb.from('expenses').insert(r);
+      if(insErr){console.error('Insert error:',insErr);err++;}
+      else ok++;
+    }catch(e){err++;console.error('Row error:',e);}
   }
   
   await loadFromSupa(curBid);
