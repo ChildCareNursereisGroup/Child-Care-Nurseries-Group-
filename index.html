@@ -12953,22 +12953,49 @@ async function confirmImportExpenses(rows){
         supplier_name: supplier||null,
         tax_number: taxNo||null,
         paid_by: paidBy,
-        extra: JSON.stringify({supplier,taxNo,reason,invoiceNo}),
+        invoice_number: invoiceNo||null,
+        extra: JSON.stringify({supplier,taxNo,reason,invoiceNo,subType}),
       };
 
-      // Duplicate check
+      // Smart duplicate check — invoice number is the best unique key
       let dupQuery=sb.from('expenses').select('id')
         .eq('branch_id',branchId).eq('category',cat).eq('date',dateStr).eq('amount',amt);
-      if(supplier) dupQuery=dupQuery.eq('supplier_name',supplier);
-      if(reason)   dupQuery=dupQuery.eq('note',reason);
+      
+      if(invoiceNo){
+        // If we have an invoice number, use it as the primary unique key
+        dupQuery=sb.from('expenses').select('id')
+          .eq('branch_id',branchId).eq('category',cat).eq('date',dateStr)
+          .eq('amount',amt).eq('invoice_number',invoiceNo);
+      } else {
+        // No invoice number — use supplier + reason as fallback
+        if(supplier) dupQuery=dupQuery.eq('supplier_name',supplier);
+        if(reason)   dupQuery=dupQuery.eq('note',reason);
+        if(subType)  dupQuery=dupQuery.eq('sub_type',subType);
+      }
       const {data:existing}=await dupQuery.limit(1);
       if(existing?.length){skipped++;continue;}
 
       const {error:insErr}=await sb.from('expenses').insert(r);
       if(insErr){
-        console.error('Insert error:',insErr,r);
-        _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,reason:reason,error:insErr.message||insErr.code});
-        err++;
+        if(insErr.code==='23505'||String(insErr.message||'').includes('duplicate key')){
+          // Supabase unique constraint hit — the record exists but with different detail
+          // Try inserting with null invoice_no to bypass unique constraint
+          const r2={...r, invoice_number:null,
+            note: (r.note||'')+(invoiceNo?' [INV:'+invoiceNo+']':''),
+            sub_type: (r.sub_type||'')+(subType?' ['+subType+']':'')
+          };
+          const {error:insErr2}=await sb.from('expenses').insert(r2);
+          if(insErr2){
+            _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,
+              supplier:supplier,reason:reason,invoiceNo:invoiceNo,
+              error:'Invoice No: '+invoiceNo+' | '+insErr2.message});
+            err++;
+          } else ok++;
+        } else {
+          console.error('Insert error:',insErr,r);
+          _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,reason:reason,invoiceNo:invoiceNo,error:insErr.message||insErr.code});
+          err++;
+        }
       } else ok++;
     }catch(e){err++;console.error('Row error:',e);}
   }
@@ -12981,7 +13008,7 @@ async function confirmImportExpenses(rows){
       <b style="color:#dc2626">❌ الصفوف اللي فشلت (${window._failedExpRows.length}):</b>
       <table style="width:100%;border-collapse:collapse;margin-top:6px">
         <tr style="background:#dc2626;color:#fff"><th style="padding:4px 6px">Category</th><th style="padding:4px 6px">Date</th><th style="padding:4px 6px">Amount</th><th style="padding:4px 6px">Supplier</th><th style="padding:4px 6px">Error</th></tr>
-        ${window._failedExpRows.map(r=>`<tr style="border-bottom:1px solid #fca5a5"><td style="padding:3px 6px">${r.sheet}</td><td style="padding:3px 6px">${r.date}</td><td style="padding:3px 6px">${r.amount}</td><td style="padding:3px 6px">${(r.supplier||'').substring(0,20)}</td><td style="padding:3px 6px;color:#dc2626">${(r.error||'').substring(0,30)}</td></tr>`).join('')}
+        ${window._failedExpRows.map(r=>`<tr style="border-bottom:1px solid #fca5a5"><td style="padding:3px 6px">${r.sheet}</td><td style="padding:3px 6px">${r.date}</td><td style="padding:3px 6px">${r.amount}</td><td style="padding:3px 6px">${r.invoiceNo||'—'}</td><td style="padding:3px 6px">${(r.supplier||'').substring(0,15)}</td><td style="padding:3px 6px;color:#dc2626">${(r.error||'').substring(0,40)}</td></tr>`).join('')}
       </table>
     </div>`;
   }
