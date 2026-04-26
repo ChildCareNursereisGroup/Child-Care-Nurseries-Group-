@@ -1062,6 +1062,18 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="xb" onclick="el('exp-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <!-- Report Type -->
+      <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:10px">
+        <div style="font-weight:800;color:#1e3a8a;font-size:.8rem;margin-bottom:7px">📋 نوع التقرير — Report Type</div>
+        <div style="display:flex;gap:6px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid #bfdbfe;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.76rem;font-weight:700">
+            <input type="radio" name="exp-rep-type" value="detail" checked onchange="toggleExpRepType()"> 📄 تفصيلي
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:5px 10px;border:1.5px solid #bfdbfe;border-radius:8px;flex:1;justify-content:center;background:#fff;font-size:.76rem;font-weight:700">
+            <input type="radio" name="exp-rep-type" value="summary" onchange="toggleExpRepType()"> 📊 ملخص كل الفروع
+          </label>
+        </div>
+      </div>
       <!-- Filter mode -->
       <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:10px;padding:10px">
         <div style="font-weight:800;color:#92400e;font-size:.8rem;margin-bottom:7px">📅 فلترة حسب — Filter By</div>
@@ -1085,6 +1097,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
           <input type="date" id="exp-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
       </div>
+      <div id="exp-rep-detail-options">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="fg"><label>Branch — الفرع</label>
           <select id="exp-rep-branch" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
@@ -1118,6 +1131,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
           </div>
         </div>
       </div>
+      </div><!-- end detail options -->
       <!-- Petty Cash Section -->
       <div style="background:#fef3c7;border-radius:10px;padding:12px;border:1.5px solid #f59e0b">
         <div style="font-weight:800;color:#92400e;margin-bottom:8px;font-size:.83rem">💵 Petty Cash Tracker — متابعة الكاش</div>
@@ -1133,10 +1147,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button onclick="printExpReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+        <button onclick="(document.querySelector('input[name=exp-rep-type]:checked')?.value==='summary'?printExpSummaryAllBranches():printExpReport('print'))" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
           🖨️ Print / PDF
         </button>
-        <button onclick="printExpReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
+        <button onclick="(document.querySelector('input[name=exp-rep-type]:checked')?.value==='summary'?printExpSummaryAllBranches('excel'):printExpReport('excel'))" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">
           📊 Excel
         </button>
       </div>
@@ -12978,22 +12992,12 @@ async function confirmImportExpenses(rows){
       const {error:insErr}=await sb.from('expenses').insert(r);
       if(insErr){
         if(insErr.code==='23505'||String(insErr.message||'').includes('duplicate key')){
-          // Supabase unique constraint hit — the record exists but with different detail
-          // Try inserting with null invoice_no to bypass unique constraint
-          const r2={...r, invoice_number:null,
-            note: (r.note||'')+(invoiceNo?' [INV:'+invoiceNo+']':''),
-            sub_type: (r.sub_type||'')+(subType?' ['+subType+']':'')
-          };
-          const {error:insErr2}=await sb.from('expenses').insert(r2);
-          if(insErr2){
-            _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,
-              supplier:supplier,reason:reason,invoiceNo:invoiceNo,
-              error:'Invoice No: '+invoiceNo+' | '+insErr2.message});
-            err++;
-          } else ok++;
+          // Already exists — skip, don't insert again
+          skipped++;
         } else {
           console.error('Insert error:',insErr,r);
-          _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,reason:reason,invoiceNo:invoiceNo,error:insErr.message||insErr.code});
+          _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,
+            reason:reason,invoiceNo:invoiceNo,error:insErr.message||insErr.code});
           err++;
         }
       } else ok++;
@@ -14162,6 +14166,179 @@ function toggleRecDateMode(){
     }
   }
 }
+function toggleExpRepType(){
+  const type=document.querySelector('input[name="exp-rep-type"]:checked')?.value||'detail';
+  const detailOpts=el('exp-rep-detail-options');
+  if(detailOpts) detailOpts.style.display=type==='detail'?'':'none';
+}
+
+async function printExpSummaryAllBranches(exportType='print'){
+  const from=el('exp-rep-from').value;
+  const to=el('exp-rep-to').value;
+  const dateMode=document.querySelector('input[name="exp-date-mode"]:checked')?.value||'invoice';
+  if(!from||!to){alert('اختاري الفترة');return;}
+
+  showLoad('جاري تحميل مصاريف كل الفروع...');
+
+  // Load expenses from ALL branches from Supabase directly
+  let query=sb.from('expenses').select('*');
+  if(dateMode==='entry'){
+    query=query.gte('created_at',from+'T00:00:00').lte('created_at',to+'T23:59:59');
+  } else {
+    query=query.gte('date',from).lte('date',to);
+  }
+  const {data:allExp,error}=await query.order('date',{ascending:true});
+  hideLoad();
+  if(error){alert('خطأ في تحميل البيانات: '+error.message);return;}
+
+  const [sy,sm,sd]=from.split('-');
+  const [ey,em,ed]=to.split('-');
+  const fromLabel=`${sd}/${sm}/${sy}`;
+  const toLabel=`${ed}/${em}/${ey}`;
+  const printDate=new Date().toLocaleDateString('en-GB');
+
+  // Build category totals per branch
+  const branchTotals={}; // branch_id → {cat → total}
+  const catTotals={};    // cat → total across all branches
+  let grandTotal=0;
+
+  (allExp||[]).forEach(e=>{
+    const bid=e.branch_id;
+    const cat=e.category||'other';
+    const amt=Number(e.total_amount||e.amount||0);
+    if(!branchTotals[bid]) branchTotals[bid]={};
+    if(!branchTotals[bid][cat]) branchTotals[bid][cat]=0;
+    branchTotals[bid][cat]+=amt;
+    if(!catTotals[cat]) catTotals[cat]=0;
+    catTotals[cat]+=amt;
+    grandTotal+=amt;
+  });
+
+  const allCats=Object.keys(catTotals).sort((a,b)=>catTotals[b]-catTotals[a]);
+  const allBranches=BRANCHES;
+  const fmt=n=>Number(n||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const getCatLabel=k=>{const c=EXP_CATS.find(x=>x.k===k);return c?(c.ic+' '+(typeof c.ar==='function'?c.ar():c.ar)):k;};
+
+  if(exportType==='excel'){
+    const XLSX=window.XLSX; if(!XLSX){alert('Excel library not loaded');return;}
+    // Build Excel: rows=categories, cols=branches
+    const header=['البند / Category',...allBranches.map(b=>b.ar||b.en),'الإجمالي / Total'];
+    const rows=[header];
+    allCats.forEach(cat=>{
+      const row=[getCatLabel(cat)];
+      allBranches.forEach(b=>{ row.push(Number((branchTotals[b.id]||{})[cat]||0).toFixed(2)); });
+      row.push(Number(catTotals[cat]||0).toFixed(2));
+      rows.push(row);
+    });
+    // Total row
+    const totRow=['الإجمالي الكلي / Grand Total'];
+    allBranches.forEach(b=>{
+      const bt=Object.values(branchTotals[b.id]||{}).reduce((s,v)=>s+v,0);
+      totRow.push(bt.toFixed(2));
+    });
+    totRow.push(grandTotal.toFixed(2));
+    rows.push(totRow);
+
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:30},...allBranches.map(()=>({wch:16})),{wch:16}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,`Expenses Summary ${from}`);
+    XLSX.writeFile(wb,`expenses_summary_${from}_${to}.xlsx`);
+    el('exp-report-modal').classList.remove('on');
+    return;
+  }
+
+  // ── HTML Print Report ──
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;padding:14px;background:#fff;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}
+    @media print{@page{size:A4 landscape;margin:8mm}}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th,td{padding:6px 8px;border:1px solid #e5e7eb;text-align:center}
+    th{background:#1e3a8a;color:#fff;font-weight:800}
+    td:first-child{text-align:right;font-weight:700}
+    tr:nth-child(even){background:#f8fafc}
+    .total-row{background:#1e3a8a!important;color:#fff;font-weight:900}
+    .branch-col{background:#eff6ff}
+  </style></head><body>
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);color:#fff;padding:14px 18px;border-radius:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:1.2rem;font-weight:900">مجموعة رعاية الطفل للحضانات</div>
+      <div style="font-size:.82rem;opacity:.85">Child Care Nurseries Group</div>
+    </div>
+    <div style="text-align:left">
+      <div style="font-size:1rem;font-weight:900">ملخص المصاريف — كل الفروع</div>
+      <div style="font-size:.78rem;opacity:.85">Expenses Summary — All Branches</div>
+      <div style="font-size:.75rem;opacity:.8">الفترة: ${fromLabel} — ${toLabel} | طباعة: ${printDate}</div>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div style="display:grid;grid-template-columns:repeat(${allBranches.length+1},1fr);gap:8px;margin-bottom:14px">
+    ${allBranches.map(b=>{
+      const bt=Object.values(branchTotals[b.id]||{}).reduce((s,v)=>s+v,0);
+      return`<div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-weight:800;color:#1e3a8a;font-size:.75rem">${b.icon||''} ${b.ar||b.en}</div>
+        <div style="font-size:1rem;font-weight:900;color:#1e3a8a">${fmt(bt)}</div>
+        <div style="font-size:.65rem;color:#6b7280">AED</div>
+      </div>`;
+    }).join('')}
+    <div style="background:#1e3a8a;border-radius:8px;padding:8px;text-align:center">
+      <div style="font-weight:800;color:#fff;font-size:.75rem">🏢 إجمالي كل الفروع</div>
+      <div style="font-size:1rem;font-weight:900;color:#fbbf24">${fmt(grandTotal)}</div>
+      <div style="font-size:.65rem;color:#bfdbfe">AED</div>
+    </div>
+  </div>
+
+  <!-- Main Table -->
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:right;width:22%">البند — Category</th>
+        ${allBranches.map(b=>`<th>${b.icon||''} ${b.ar||b.en}</th>`).join('')}
+        <th style="background:#fbbf24;color:#1e3a8a">الإجمالي</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${allCats.map(cat=>{
+        const catRow=`<tr>
+          <td style="text-align:right">${getCatLabel(cat)}</td>
+          ${allBranches.map(b=>{
+            const v=(branchTotals[b.id]||{})[cat]||0;
+            return`<td>${v>0?fmt(v):'—'}</td>`;
+          }).join('')}
+          <td style="font-weight:800;color:#1e3a8a">${fmt(catTotals[cat])}</td>
+        </tr>`;
+        return catRow;
+      }).join('')}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td style="text-align:right">الإجمالي الكلي — Grand Total</td>
+        ${allBranches.map(b=>{
+          const bt=Object.values(branchTotals[b.id]||{}).reduce((s,v)=>s+v,0);
+          return`<td>${fmt(bt)} AED</td>`;
+        }).join('')}
+        <td style="color:#fbbf24">${fmt(grandTotal)} AED</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div style="margin-top:12px;font-size:.68rem;color:#6b7280;text-align:center">
+    تقرير صادر من نظام مجموعة رعاية الطفل — تاريخ الإصدار: ${printDate}
+  </div>
+  </body></html>`;
+
+  el('exp-report-modal').classList.remove('on');
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
+}
+
 function toggleExpDateMode(){
   const mode=document.querySelector('input[name="exp-date-mode"]:checked')?.value||'invoice';
   const hint=el('exp-date-mode-hint');
