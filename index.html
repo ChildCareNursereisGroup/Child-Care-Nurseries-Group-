@@ -10390,16 +10390,22 @@ function _getTimeGroup(kidsTime){
     // Fix reversed times: e.g. 09:00-06:00 → likely means 09:00-18:00 (6pm)
     if(endH < startH && endH>=6 && endH<=11) endH+=12;
 
-    // ── RULE 1: Start 6,7,8,9 AM ends at 12:00 (noon) or after → fullday (C/D/E) ──
-    if(startH>=6 && startH<=9 && endH>=12) return 'fullday';
+    // ── RULE 1: Start 6 or 7 AM ends at 12:00+ → fullday (C/D/E) ──
+    if((startH===6||startH===7) && endH>=12) return 'fullday';
 
-    // ── RULE 2: Start 10 or 11 AM ends at 15:00 (3PM) or after → midday (CF/F/H) ──
+    // ── RULE 2: Start 8 or 9 AM ends at 13:00 (1PM) or after → fullday (C/D/E) ──
+    if((startH===8||startH===9) && endH>=13) return 'fullday';
+
+    // ── RULE 3: Start 10 or 11 AM ends at 15:00 (3PM) or after → midday (CF/F/H) ──
     if((startH===10||startH===11) && endH>=15) return 'midday';
 
-    // ── RULE 3: Start 6,7,8 AM ends at 11:00 exactly → morning (CS/S/G) ──
-    if((startH===6||startH===7||startH===8) && endH===11) return 'morning';
+    // ── RULE 4: Start 6,7,8 AM ends at 11:00 or 12:00 → morning (CS/S/G) ──
+    if((startH===6||startH===7||startH===8) && (endH===11||endH===12)) return 'morning';
 
-    // ── RULE 4: Start 10 or 11 AM ends before 13:00 → morning (CS/S/G) ──
+    // ── RULE 5: Start 9 AM ends at 12:00 → morning (CS/S/G) ──
+    if(startH===9 && endH===12) return 'morning';
+
+    // ── RULE 6: Start 10 or 11 AM ends before 13:00 → morning (CS/S/G) ──
     if((startH===10||startH===11) && endH<13) return 'morning';
 
     // ── RULE 5: Afternoon start 13:00+ → (M/N) ──
