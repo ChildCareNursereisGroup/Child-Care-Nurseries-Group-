@@ -1357,10 +1357,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
     <b>قواعد التوزيع — حد أقصى 15 طفل لكل فصل:</b><br>
     🍼 <b>A</b> → أقل من 1.5 سنة — أي وقت<br>
-    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:xx أو بداية 6ص/7ص + أكثر من 4 ساعات): C (1.5-2 سنة) / D (2-3 سنة) / E (3-5 سنة)<br>
-    ☀️ <b>08:00-11:00</b>: CS (1.5-2 سنة) | S ثم G (2-5 سنة)<br>
-    🕑 <b>11:00-03:00</b>: CF (1.5-2 سنة) | F ثم H (2-5 سنة)<br>
-    🌙 <b>01:00-05:00</b>: M (1.5-2 سنة) | N (2-5 سنة)<br>
+    🌟 <b>C / D / E</b> حسب العمر: بداية 6ص - 7ص - 8ص - 9ص وتنتهي 1م أو بعدها<br>
+    🕑 <b>CF / F / H</b> حسب العمر: بداية 10ص - 11ص وتنتهي 3م<br>
+    ☀️ <b>CS / S / G</b> حسب العمر: بداية 6ص - 7ص - 8ص وتنتهي 11ص بالظبط<br>
+    🌙 <b>M / N</b> حسب العمر: بداية 1م أو بعدها<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -10381,30 +10381,33 @@ function _getTimeGroup(kidsTime){
   // ── Parse start and end hours ──
   const timeMatch = t.match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
   if(timeMatch){
-    let startH=parseInt(timeMatch[1]), startM=parseInt(timeMatch[2]);
-    let endH=parseInt(timeMatch[3]),   endM=parseInt(timeMatch[4]);
-    // Normalize PM-style end hours: 1–5 means 13–17 if start is morning
+    let startH=parseInt(timeMatch[1]);
+    let endH=parseInt(timeMatch[3]), endM=parseInt(timeMatch[4]);
+
+    // Normalize: end 1–5 means 13–17 when start is morning
     if(startH>=6 && startH<=11 && endH>=1 && endH<=5) endH+=12;
-    const durationMins=(endH*60+endM)-(startH*60+startM);
 
-    // Early start (6 or 7 AM) + duration > 4 hours (240 min) → full day classes (C/D/E)
-    if((startH===6||startH===7) && durationMins>240) return 'fullday';
+    // ── RULE 1: Start 6,7,8,9 AM → ends at 13:00 or after → fullday (C/D/E) ──
+    if(startH>=6 && startH<=9 && endH>=13) return 'fullday';
 
-    // Full day starting at 8: end at 1pm or later (12:00+)
-    if(startH===8 && endH>=12) return 'fullday';
-    // Morning: 8:00-11:00 (exactly ~3h)
-    if(startH===8 && endH===11) return 'morning';
-    // Midday: 11:00-15:00
-    if(startH===11) return 'midday';
-    // Afternoon: 13:00-17:00
-    if((startH===1||startH===13) && (endH===5||endH===17)) return 'afternoon';
+    // ── RULE 2: Start 10 or 11 AM → ends at 15:00 (3PM) → midday (CF/F/H) ──
+    if((startH===10||startH===11) && endH>=15) return 'midday';
+
+    // ── RULE 3: Start 6,7,8 AM ends at 11:00 exactly → morning (CS/S/G) ──
+    if((startH===6||startH===7||startH===8) && endH===11) return 'morning';
+
+    // ── RULE 4: Start 10 or 11 AM → morning (CS/S/G) ──  
+    if((startH===10||startH===11) && endH<13) return 'morning';
+
+    // ── RULE 4: Afternoon only: start 13:00+ → afternoon (M/N) ──
+    if(startH>=13) return 'afternoon';
+    // 1:00pm written as 1:xx
+    if(startH===1 && endH>=17) return 'afternoon';
   }
 
-  // Fallback regex patterns
-  if(/fullday|fulltime|full/.test(t)) return 'fullday';
+  // Fallback regex
   if(/08:?00[-–](0?1|0?2|0?3|0?4|0?5):?00/.test(t)) return 'fullday';
   if(/08:?00[-–](13|14|15|16|17):?00/.test(t)) return 'fullday';
-  if(/08:?00[-–]11:?00/.test(t)) return 'morning';
   if(/11:?00[-–](0?3|15):?00/.test(t)) return 'midday';
   if(/(0?1|13):?00[-–](0?5|17):?00/.test(t)) return 'afternoon';
   return 'other';
