@@ -278,6 +278,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-ch-file').click()">📥 Import Children Excel</button>
     <button class="btn bg bsm" onclick="downloadChildTemplate()">📋 Template</button>
+    <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="printClassCards()">🪪 Print Class Cards</button>
   </div>
   <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:#0369a1;font-weight:700">
     💡 اضغطي على اسم الطفل لتعديل بياناته أو حذفه
@@ -1356,7 +1357,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
     <b>قواعد التوزيع — حد أقصى 15 طفل لكل فصل:</b><br>
     🍼 <b>A</b> → أقل من 1.5 سنة — أي وقت<br>
-    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:00): C (1.5-2 سنة) / D (2-3 سنة) / E (3-5 سنة)<br>
+    🌟 <b>يوم كامل</b> (08:00-01:00 حتى 08:00-05:xx أو بداية 6ص/7ص + أكثر من 4 ساعات): C (1.5-2 سنة) / D (2-3 سنة) / E (3-5 سنة)<br>
     ☀️ <b>08:00-11:00</b>: CS (1.5-2 سنة) | S ثم G (2-5 سنة)<br>
     🕑 <b>11:00-03:00</b>: CF (1.5-2 سنة) | F ثم H (2-5 سنة)<br>
     🌙 <b>01:00-05:00</b>: M (1.5-2 سنة) | N (2-5 سنة)<br>
@@ -2815,6 +2816,10 @@ const T = {
     receiptsLog:'📋 Receipts Log', vatReport:'🧾 VAT Report',
     totalCollected:'Total:', preview:'👁 Preview', delete:'🗑',
     noReceipts:'No receipts found',
+    // Child modal tabs
+    tabInfo:'📋 Info', tabRecs:'🧾 Receipts', tabAccount:'💰 Account',
+    tabMedical:'🏥 Health', tabProgress:'📈 Progress', tabAtt:'✅ Attendance',
+    tabTrans:'🔄 Transfer', tabCard:'🪪 ID Card', tabCert:'📜 Certificate',
     // Attendance
     dailyAtt:'📋 Daily Attendance', attPresent:'✅ Present', attAbsent:'❌ Absent',
     // Expenses
@@ -9392,8 +9397,192 @@ function printChildCard(){
 }
 
 // ═══════════════════════════════════════════════
-//  PRINT ACCOUNT STATEMENT
+//  PRINT CLASS CLOTHING TAGS
 // ═══════════════════════════════════════════════
+function printClassCards(){
+  const b=CB();
+  const active=DB.children.filter(c=>!c.leaveDate);
+
+  // Get all classes
+  const classes=[...new Set(active.map(c=>c.className||'—').filter(Boolean))].sort();
+
+  // Build class selector popup
+  const box=document.createElement('div');
+  box.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;padding:20px;z-index:9999;box-shadow:0 10px 40px rgba(0,0,0,.25);min-width:300px;max-width:90vw;font-family:Tajawal,sans-serif';
+  box.innerHTML=`
+    <div style="font-weight:900;font-size:1rem;color:#7c3aed;margin-bottom:14px">🪪 Print Class Cards — بطاقات الفصل</div>
+    <div style="font-size:.8rem;color:#6b7280;margin-bottom:10px">اختاري الفصل المطلوب:</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:220px;overflow-y:auto;margin-bottom:14px">
+      ${classes.map(cls=>{
+        const count=active.filter(c=>c.className===cls).length;
+        return`<button onclick="doPrintClassCards('${cls}');this.closest('div[style*=fixed]').remove();document.getElementById('ccards-overlay').remove()"
+          style="background:#f5f3ff;border:2px solid #8b5cf6;color:#5b21b6;border-radius:9px;padding:8px 6px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.78rem;font-weight:800">
+          ${cls}<br><span style="font-size:.65rem;font-weight:400;color:#7c3aed">${count} children</span>
+        </button>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="doPrintClassCards('ALL');this.closest('div[style*=fixed]').remove();document.getElementById('ccards-overlay').remove()"
+        style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:9px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.8rem;font-weight:700">
+        🖨️ Print All Classes
+      </button>
+      <button onclick="this.closest('div[style*=fixed]').remove();document.getElementById('ccards-overlay').remove()"
+        style="background:#e5e7eb;color:#374151;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.8rem">
+        Cancel
+      </button>
+    </div>`;
+
+  const overlay=document.createElement('div');
+  overlay.id='ccards-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  overlay.onclick=()=>{overlay.remove();box.remove();};
+  document.body.appendChild(overlay);
+  document.body.appendChild(box);
+}
+
+function doPrintClassCards(clsFilter){
+  const b=CB();
+  const active=DB.children.filter(c=>!c.leaveDate);
+  const list=clsFilter==='ALL'?active:active.filter(c=>c.className===clsFilter);
+  if(!list.length){alert('No children in this class');return;}
+
+  // Sort by class then by name
+  list.sort((a,b)=>{
+    if(a.className!==b.className) return (a.className||'').localeCompare(b.className||'');
+    return (a.name||'').localeCompare(b.name||'','en');
+  });
+
+  const printDate=new Date().toLocaleDateString('en-GB');
+  const bName=b.en||b.ar||'';
+  const branchColor=b.c||'#1e3a8a';
+
+  // One card per child — credit card / clothing tag size: 85.6 × 54mm
+  const cards=list.map(c=>{
+    const med=DB.medical?.[String(c.id)]||{};
+    const age=calcAge(c.dob)||'—';
+    const initial=(c.name||'?')[0].toUpperCase();
+    const allergyWarning=med.allergies?`<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:5px;padding:3px 6px;margin-top:5px;color:#dc2626;font-size:.58rem;font-weight:800">⚠️ ALLERGY: ${med.allergies}</div>`:'';
+
+    return `<div class="tag">
+      <div class="tag-hd">
+        <div class="av">${initial}</div>
+        <div class="tag-info">
+          <div class="tag-name">${(c.name||'').toUpperCase()}</div>
+          <div class="tag-sub">${bName} &nbsp;|&nbsp; Class: <b>${c.className||'—'}</b></div>
+        </div>
+        <div class="tag-logo">🏫</div>
+      </div>
+      <div class="tag-body">
+        <div class="tag-row"><span class="tl">DOB</span><span class="tv">${fmtDate(c.dob)} &nbsp;(${age})</span></div>
+        <div class="tag-row"><span class="tl">Nation.</span><span class="tv">${c.nationality||'—'}</span></div>
+        <div class="tag-row"><span class="tl">Blood</span><span class="tv">${med.blood_type||'—'}</span></div>
+        <div class="tag-row"><span class="tl">Hours</span><span class="tv">${c.kidsTime||'—'}</span></div>
+        <div class="tag-row"><span class="tl">Mother</span><span class="tv">${c.parentMom||'—'}</span></div>
+        <div class="tag-row"><span class="tl">Father</span><span class="tv">${c.parentDad||'—'}</span></div>
+        ${allergyWarning}
+      </div>
+      <div class="tag-ft">${bName} &nbsp;·&nbsp; ${printDate} &nbsp;·&nbsp; Reg #${c.regNum||'—'}</div>
+    </div>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Tajawal',Arial,sans-serif; background:#f3f4f6; padding:8mm; }
+
+    @media print {
+      @page { size: A4; margin: 8mm; }
+      body { background: white; padding: 0; }
+      .page-title { display: none; }
+    }
+
+    .page-title {
+      text-align:center; font-size:1rem; font-weight:900; color:${branchColor};
+      margin-bottom:8mm; letter-spacing:.5px;
+    }
+
+    .tags-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5mm;
+      justify-content: flex-start;
+    }
+
+    /* Tag size: 85.6mm × 54mm — standard clothing tag */
+    .tag {
+      width: 85.6mm;
+      height: 54mm;
+      border: 2px solid ${branchColor};
+      border-radius: 5mm;
+      overflow: hidden;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+    }
+
+    .tag-hd {
+      background: ${branchColor};
+      color: #fff;
+      padding: 2.5mm 3mm;
+      display: flex;
+      align-items: center;
+      gap: 2.5mm;
+      flex-shrink: 0;
+    }
+    .av {
+      width: 9mm; height: 9mm;
+      border-radius: 50%;
+      background: rgba(255,255,255,.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4mm; font-weight: 900;
+      border: 1px solid rgba(255,255,255,.5);
+      flex-shrink: 0;
+    }
+    .tag-info { flex:1; min-width:0; }
+    .tag-name { font-size: 3.2mm; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tag-sub  { font-size: 2.2mm; opacity: .85; margin-top: .5mm; }
+    .tag-logo { font-size: 4.5mm; opacity:.7; flex-shrink:0; }
+
+    .tag-body {
+      flex: 1;
+      padding: 1.5mm 3mm 1mm;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8mm;
+    }
+    .tag-row { display: flex; gap: 1.5mm; font-size: 2.1mm; align-items: baseline; }
+    .tl { color: #6b7280; min-width: 12mm; flex-shrink: 0; font-size: 1.9mm; }
+    .tv { font-weight: 700; color: #1f2937; font-size: 2.1mm; }
+
+    .tag-ft {
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      padding: 1mm 3mm;
+      font-size: 1.7mm;
+      color: #9ca3af;
+      text-align: center;
+      flex-shrink: 0;
+    }
+  </style></head><body>
+  <div class="page-title">
+    🏫 ${bName} — Class Cards &nbsp;|&nbsp;
+    ${clsFilter==='ALL'?'All Classes':'Class: '+clsFilter} &nbsp;|&nbsp;
+    ${list.length} children &nbsp;|&nbsp; Printed: ${printDate}
+  </div>
+  <div class="tags-grid">${cards}</div>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+
+
 function printAccountStatement(){
   const c=DB.children.find(x=>String(x.id)===String(curChild));if(!c)return;
   const b=CB();
@@ -10188,14 +10377,35 @@ async function _findReceiptBranchIssues(){
 function _getTimeGroup(kidsTime){
   const t=(kidsTime||'').replace(/\s/g,'').toLowerCase();
   if(/fullday|fulltime|full/.test(t)) return 'fullday';
-  // Full day: 08:xx to 01/02/03/04/05
+
+  // ── Parse start and end hours ──
+  const timeMatch = t.match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
+  if(timeMatch){
+    let startH=parseInt(timeMatch[1]), startM=parseInt(timeMatch[2]);
+    let endH=parseInt(timeMatch[3]),   endM=parseInt(timeMatch[4]);
+    // Normalize PM-style end hours: 1–5 means 13–17 if start is morning
+    if(startH>=6 && startH<=11 && endH>=1 && endH<=5) endH+=12;
+    const durationMins=(endH*60+endM)-(startH*60+startM);
+
+    // Early start (6 or 7 AM) + duration > 4 hours (240 min) → full day classes (C/D/E)
+    if((startH===6||startH===7) && durationMins>240) return 'fullday';
+
+    // Full day starting at 8: end at 1pm or later (12:00+)
+    if(startH===8 && endH>=12) return 'fullday';
+    // Morning: 8:00-11:00 (exactly ~3h)
+    if(startH===8 && endH===11) return 'morning';
+    // Midday: 11:00-15:00
+    if(startH===11) return 'midday';
+    // Afternoon: 13:00-17:00
+    if((startH===1||startH===13) && (endH===5||endH===17)) return 'afternoon';
+  }
+
+  // Fallback regex patterns
+  if(/fullday|fulltime|full/.test(t)) return 'fullday';
   if(/08:?00[-–](0?1|0?2|0?3|0?4|0?5):?00/.test(t)) return 'fullday';
   if(/08:?00[-–](13|14|15|16|17):?00/.test(t)) return 'fullday';
-  // Morning: 08:00-11:00
   if(/08:?00[-–]11:?00/.test(t)) return 'morning';
-  // Midday: 11:00-03:00
   if(/11:?00[-–](0?3|15):?00/.test(t)) return 'midday';
-  // Afternoon: 01:00-05:00
   if(/(0?1|13):?00[-–](0?5|17):?00/.test(t)) return 'afternoon';
   return 'other';
 }
