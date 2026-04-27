@@ -6882,7 +6882,25 @@ async function printStaffAttReport(exportType='print'){
     if(raw) return {status:raw, smart:false, isWorkDay:true}; // saved = treat as work day
 
     // No saved record → check if scheduled off
-    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false};
+    if(!isWorkDay){
+      // ── Smart off-day logic: check nearest working-day neighbors ──
+      const sMap = attMap[String(staffId)]||{};
+      const getNearSt=(dir)=>{
+        for(let i=1;i<=7;i++){
+          const ni=dayIdx+(dir*i);
+          if(ni<0||ni>=days.length) return null;
+          const nDow=new Date(days[ni]+'T00:00:00').getDay();
+          if(workDays.includes(nDow)) return sMap[days[ni]]||'unset';
+        }
+        return null;
+      };
+      const prevSt=getNearSt(-1), nextSt=getNearSt(1);
+      const anyAbsent=prevSt==='غياب'||nextSt==='غياب';
+      const bothPresent=(prevSt==='حضور'||prevSt==='تعويض')&&(nextSt==='حضور'||nextSt==='تعويض');
+      if(anyAbsent) return {status:'غياب', smart:true, isWorkDay:false};
+      if(bothPresent) return {status:'حضور', smart:true, isWorkDay:false};
+      return {status:'off', smart:false, isWorkDay:false};
+    }
 
     // Work day, not recorded
     return {status:'', smart:false, isWorkDay};
@@ -6949,12 +6967,12 @@ async function printStaffAttReport(exportType='print'){
         rowBg='#f3f4f6'; statusColor='#9ca3af';
       } else if(status==='حضور'){
         present++;
-        statusCell=isAr?'✓ حضور':'✓ Present';
+        statusCell=smart?(isAr?'✓ حضور (راحة)':'✓ Present (Off)'):(isAr?'✓ حضور':'✓ Present');
         rowBg='#f0fdf4'; statusColor='#059669';
       } else if(status==='غياب'){
         absent++;
-        absences.push(`${day}/${String(mo).padStart(2,'0')}`);
-        statusCell=isAr?'✕ غياب':'✕ Absent';
+        if(!smart) absences.push(`${day}/${String(mo).padStart(2,'0')}`);
+        statusCell=smart?(isAr?'✕ غياب (راحة)':'✕ Absent (Off)'):(isAr?'✕ غياب':'✕ Absent');
         rowBg='#fff5f5'; statusColor='#dc2626';
       } else if(status==='نص يوم'){
         half++;present+=0.5;absent+=0.5;
