@@ -2404,15 +2404,35 @@ function showLoad(msg){el('loading').style.display='flex';el('lmsg').textContent
 function hideLoad(){el('loading').style.display='none';}
 function setSyncing(yes){const s=el('sind');if(s)s.textContent=yes?'🔄 جاري الحفظ...':'☁️ محفوظ';}
 function showAlert(id,msg,err){const e=el(id);if(e){e.innerHTML=`<div class="alert ${err?'aerr':'aok'}">${msg}</div>`;setTimeout(()=>e.innerHTML='',4000);}}
-function getPW(bid,role){
-  if(role==='public_reg'||role==='visitor_reg'||role==='inquiry') return '__PUBLIC__'; // no password
-  return localStorage.getItem(`pw_${bid}_${role}`)||{
-    admin:'admin123',
-    manager:'mgr123',
-    expenses:'exp789',
-  }[role]||'';
+// ── Password cache (loaded from Supabase on startup) ──
+const _pwCache = {
+  // Defaults — overridden by Supabase on load
+  b1_admin:'Maro@2020', b2_admin:'Maro@2020', b3_admin:'Maro@2020',
+  b4_admin:'Maro@2020', b5_admin:'Maro@2020',
+  b1_manager:'Nursery123', b2_manager:'Nursery123', b3_manager:'Nursery123',
+  b4_manager:'Nursery123', b5_manager:'Nursery123',
+  b1_expenses:'exp789', b2_expenses:'exp789', b3_expenses:'exp789',
+  b4_expenses:'exp789', b5_expenses:'exp789',
+};
+
+async function loadPasswordsFromSupa(){
+  try{
+    const {data}=await sb.from('app_settings').select('key,value').like('key','pw_%');
+    if(data) data.forEach(r=>{ _pwCache[r.key.replace('pw_','')]=r.value; });
+  }catch(e){ console.warn('Passwords loaded from defaults'); }
 }
-function setPW(bid,role,pw){localStorage.setItem(`pw_${bid}_${role}`,pw);}
+
+function getPW(bid,role){
+  if(role==='public_reg'||role==='visitor_reg'||role==='inquiry') return '__PUBLIC__';
+  return _pwCache[`${bid}_${role}`] || {admin:'Maro@2020',manager:'Nursery123',expenses:'exp789'}[role] || '';
+}
+
+async function setPW(bid,role,pw){
+  _pwCache[`${bid}_${role}`]=pw;
+  try{
+    await sb.from('app_settings').upsert({key:`pw_${bid}_${role}`,value:pw},{onConflict:'key'});
+  }catch(e){ console.error('Failed to save password:', e); }
+}
 
 // ═══════════════════════════════════════════════
 //  SUPABASE DATA LAYER
@@ -3023,6 +3043,8 @@ async function doLogin(){
   initApp();
 }
 el('pwi').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+// Load passwords from Supabase when page opens (before login)
+loadPasswordsFromSupa();
 function doLogout(){
   realtimeSubs.forEach(s=>sb.removeChannel(s));realtimeSubs=[];
   el('app').style.display='none';el('login').style.display='flex';el('pwi').value='';
@@ -8533,17 +8555,24 @@ async function genReport(){
 //  ADMIN
 // ═══════════════════════════════════════════════
 // renderAdmin defined in Excel Import section above
-function changePW(){
+async function changePW(){
   const bid=el('abr').value;const role=el('arole').value;const pw=v('apw');
   if(!pw||pw.length<4){showAlert('admalert',lang==='ar'?'⚠️ الباسورد 4 أحرف على الأقل':'⚠️ Password must be at least 4 characters',true);return;}
-  if(bid==='all')BRANCHES.forEach(b=>setPW(b.id,role,pw));else setPW(bid,role,pw);
-  el('apw').value='';showAlert('admalert',lang==='ar'?'✅ تم تغيير الباسورد!':'✅ Password changed!',false);renderAdmin();
+  showAlert('admalert','⏳ جاري الحفظ...',false);
+  if(bid==='all'){
+    await Promise.all(BRANCHES.map(b=>setPW(b.id,role,pw)));
+  } else {
+    await setPW(bid,role,pw);
+  }
+  el('apw').value='';
+  showAlert('admalert',lang==='ar'?'✅ تم تغيير الباسورد على كل الأجهزة!':'✅ Password changed on all devices!',false);
+  renderAdmin();
 }
-function saveMgrPW(bid){
+async function saveMgrPW(bid){
   const inp=el(`mgr_pw_${bid}`);
   const pw=(inp.value||'').trim();
   if(!pw||pw.length<4){inp.style.borderColor='#dc2626';setTimeout(()=>inp.style.borderColor='#818cf8',1500);return;}
-  setPW(bid,'manager',pw);
+  await setPW(bid,'manager',pw);
   inp.style.borderColor='#059669';
   const ok=el(`mgr_ok_${bid}`);ok.style.display='inline';
   setTimeout(()=>{inp.style.borderColor='#818cf8';ok.style.display='none';},2000);
