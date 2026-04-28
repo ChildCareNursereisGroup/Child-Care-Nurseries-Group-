@@ -1441,7 +1441,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bp bsm" onclick="openStaffForm(null)">➕ Add Staff</button>
       <button class="btn" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('staff-xl-inp').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadStaffTemplate()">📋 Download Template</button>
-      ${curRole==='admin'?`<button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffExpCertModal()" id="exp-cert-btn">📜 Experience Certificate</button>`:''}
+      <button class="btn bsm" id="exp-cert-btn" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700;display:none" onclick="openStaffExpCertModal()">📜 Experience Certificate</button>
     </div>
     <input type="file" id="staff-xl-inp" accept=".xlsx,.xls,.csv" style="display:none" onchange="importStaffFromExcel(this.files[0])">
     <div id="staff-import-alert"></div>
@@ -3164,6 +3164,9 @@ async function showPage(page,btn){
     document.querySelectorAll('.hr-admin-only').forEach(btn=>{
       btn.style.display=(curRole==='admin')?'':'none';
     });
+    // Show experience certificate button for admin only
+    const expBtn=el('exp-cert-btn');
+    if(expBtn) expBtn.style.display=(curRole==='admin')?'':'none';
   }
   if(page==='licenses')renderLicenses();
   if(page==='buses'){renderBuses();renderBusAlerts();}
@@ -9476,16 +9479,15 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos){
   const joinFmt=c.joinDate ? new Date(c.joinDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
 
   const headerSection = lhImg
-    ? `<img src="${lhImg.header}" style="width:100%;display:block;margin:0;padding:0">`
-    : `<div style="background:${branchColor};padding:14mm 15mm 10mm;color:#fff">
-        <div style="font-size:22pt;font-weight:900">${nurseryName}</div>
-        <div style="font-size:13pt;font-family:Arial,sans-serif;opacity:.85">${nurseryAr}</div>
-        <div style="font-size:9pt;opacity:.7;margin-top:3mm">Child Care Nurseries Group — مجموعة رعاية الطفل للحضانات</div>
+    ? `<img src="${lhImg.header}" style="width:100%;display:block;margin:0;padding:0;background:#fff">`
+    : `<div style="border-bottom:3px solid ${branchColor};padding:8mm 15mm 5mm;display:flex;align-items:center;gap:10mm">
+        <div style="font-size:24pt;font-weight:900;color:${branchColor}">${nurseryName}</div>
+        <div style="margin-left:auto;text-align:right;font-size:8.5pt;color:#6b7280;line-height:1.6">Child Care Nurseries Group<br>مجموعة رعاية الطفل للحضانات</div>
       </div>`;
 
   const footerSection = lhImg
-    ? `<img src="${lhImg.footer}" style="width:100%;display:block;margin:0;padding:0">`
-    : `<div style="background:#f3f4f6;border-top:2px solid ${branchColor};padding:4mm 15mm;font-size:8pt;color:#6b7280;display:flex;justify-content:space-between">
+    ? `<img src="${lhImg.footer}" style="width:100%;display:block;margin:0;padding:0;background:#fff">`
+    : `<div style="border-top:2px solid ${branchColor};padding:4mm 15mm;font-size:8pt;color:#6b7280;display:flex;justify-content:space-between">
         <span>${nurseryName}</span><span>Child Care Nurseries Group</span><span>www.childcarenurseriesgroup.com</span>
       </div>`;
 
@@ -9655,12 +9657,15 @@ function generateExpCertificate(){
                 'less than one month';
 
   const headerSection=lhImg
-    ?`<img src="${lhImg.header}" style="width:100%;display:block;margin:0;padding:0">`
-    :`<div style="background:${branchColor};padding:12mm 15mm 9mm;color:#fff"><div style="font-size:20pt;font-weight:900">${nurseryName}</div><div style="font-size:9pt;opacity:.7;margin-top:2mm">Child Care Nurseries Group</div></div>`;
+    ?`<img src="${lhImg.header}" style="width:100%;display:block;margin:0;padding:0;background:#fff">`
+    :`<div style="border-bottom:3px solid ${branchColor};padding:8mm 15mm 5mm;display:flex;align-items:center">
+        <div style="font-size:22pt;font-weight:900;color:${branchColor}">${nurseryName}</div>
+        <div style="margin-left:auto;font-size:8.5pt;color:#6b7280;text-align:right">Child Care Nurseries Group<br>مجموعة رعاية الطفل للحضانات</div>
+      </div>`;
 
   const footerSection=lhImg
-    ?`<img src="${lhImg.footer}" style="width:100%;display:block;margin:0;padding:0">`
-    :`<div style="background:#f3f4f6;border-top:2px solid ${branchColor};padding:4mm 15mm;font-size:8pt;color:#6b7280;display:flex;justify-content:space-between"><span>${nurseryName}</span><span>Child Care Nurseries Group</span><span>www.childcarenurseriesgroup.com</span></div>`;
+    ?`<img src="${lhImg.footer}" style="width:100%;display:block;margin:0;padding:0;background:#fff">`
+    :`<div style="border-top:2px solid ${branchColor};padding:4mm 15mm;font-size:8pt;color:#6b7280;display:flex;justify-content:space-between"><span>${nurseryName}</span><span>Child Care Nurseries Group</span><span>www.childcarenurseriesgroup.com</span></div>`;
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
