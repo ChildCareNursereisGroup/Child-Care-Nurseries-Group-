@@ -6888,14 +6888,18 @@ async function printStaffAttReport(exportType='print'){
 
     // No saved record → check if scheduled off
     if(!isWorkDay){
-      // ── Smart off-day logic: check nearest working-day neighbors ──
+      // ── Smart off-day logic: check nearest days that have a record OR are workdays ──
       const sMap = attMap[String(staffId)]||{};
       const getNearSt=(dir)=>{
         for(let i=1;i<=7;i++){
           const ni=dayIdx+(dir*i);
           if(ni<0||ni>=days.length) return null;
           const nDow=new Date(days[ni]+'T00:00:00').getDay();
-          if(workDays.includes(nDow)) return sMap[days[ni]]||'unset';
+          const hasRecord=!!sMap[days[ni]];
+          // Accept if it's a work day OR if it has an explicit record
+          if(workDays.includes(nDow)||hasRecord){
+            return sMap[days[ni]]||'unset';
+          }
         }
         return null;
       };
