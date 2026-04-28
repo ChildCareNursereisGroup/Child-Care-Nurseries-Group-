@@ -9373,7 +9373,11 @@ async function printAttCertificate(childId){
   const dobFmt      = fmt(c.dob);
   const joinFmt     = fmt(c.joinDate);
 
-  if(!window.docx){ alert('Word library is loading, please try again in a moment.'); return; }
+  if(!window.docx){
+    // Fallback: generate HTML print certificate instead of docx
+    generateHTMLCertificate(c, certDate, mgrName, mgrPos);
+    return;
+  }
 
   const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, WidthType,
           Table, TableRow, TableCell, ShadingType, UnderlineType } = window.docx;
@@ -9455,6 +9459,200 @@ async function printAttCertificate(childId){
   document.body.appendChild(a);
   a.click();
   setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+function generateHTMLCertificate(c, certDate, mgrName, mgrPos){
+  const b=CB();
+  const bx=getBranchExtra?.(b.id)||{};
+  const nurseryName=b.en||b.ar||'Child Care Nursery';
+  const nurseryAr=b.ar||'';
+  const branchColor=b.c||'#1e3a8a';
+  const certDateFmt=certDate ? new Date(certDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : new Date().toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'});
+  const dobFmt=c.dob ? new Date(c.dob+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
+  const joinFmt=c.joinDate ? new Date(c.joinDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&family=Lato:wght@300;400;700;900&display=swap');
+    @page { size: A4; margin: 0; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Lato',Arial,sans-serif; background:#fff; color:#1f2937; }
+
+    .page {
+      width: 210mm; min-height: 297mm;
+      margin: 0 auto; position: relative;
+      display: flex; flex-direction: column;
+      padding: 0;
+    }
+
+    /* ── Header / Letterhead ── */
+    .letterhead {
+      background: linear-gradient(135deg,${branchColor},${branchColor}dd);
+      padding: 18mm 18mm 10mm;
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .lh-left { color: #fff; }
+    .lh-nursery-en { font-size: 20pt; font-weight: 900; letter-spacing: -.5px; }
+    .lh-nursery-ar { font-size: 14pt; font-family:'Tajawal',sans-serif; font-weight: 700; opacity:.85; margin-top:2px; direction:rtl; }
+    .lh-group { font-size: 9pt; opacity:.75; margin-top:4px; }
+    .lh-right { text-align: right; color: rgba(255,255,255,.85); font-size: 9pt; line-height: 1.7; }
+    .lh-logo { font-size: 48pt; opacity:.9; }
+
+    /* ── Gold border strip ── */
+    .gold-strip { height: 5px; background: linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24); }
+
+    /* ── Body ── */
+    .body { padding: 12mm 18mm; flex: 1; }
+
+    /* Certificate title */
+    .cert-title {
+      text-align: center; margin-bottom: 8mm; padding-bottom: 4mm;
+      border-bottom: 2px solid ${branchColor};
+    }
+    .cert-title h1 { font-size: 18pt; font-weight: 900; color: ${branchColor}; letter-spacing: .5px; text-transform: uppercase; }
+    .cert-title p { font-size: 10pt; color: #6b7280; margin-top: 2mm; }
+
+    /* Date */
+    .date-line { text-align: right; font-size: 10pt; color: #374151; margin-bottom: 8mm; }
+    .date-line strong { color: ${branchColor}; }
+
+    /* Content */
+    .cert-body { font-size: 11pt; line-height: 1.9; color: #1f2937; }
+    .cert-body p { margin-bottom: 4mm; text-align: justify; }
+    .cert-body .highlight { color: ${branchColor}; font-weight: 700; }
+
+    /* Child info box */
+    .child-box {
+      background: #f8fafc; border: 1.5px solid #e5e7eb;
+      border-left: 5px solid ${branchColor};
+      border-radius: 0 8px 8px 0;
+      padding: 5mm 6mm; margin: 6mm 0;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 3mm;
+    }
+    .child-box .row { display: flex; gap: 2mm; font-size: 10pt; }
+    .child-box .lbl { color: #6b7280; min-width: 90px; }
+    .child-box .val { font-weight: 700; color: #1f2937; }
+
+    /* Signature section */
+    .sig-section { margin-top: 10mm; display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; }
+    .sig-block { border-top: 1.5px solid #d1d5db; padding-top: 3mm; }
+    .sig-block .sig-label { font-size: 9pt; color: #6b7280; margin-bottom: 15mm; }
+    .sig-block .sig-name { font-size: 10pt; font-weight: 700; color: #1f2937; }
+    .sig-block .sig-pos { font-size: 9pt; color: #6b7280; }
+
+    .stamp-box {
+      border: 2px dashed #d1d5db; border-radius: 8px;
+      width: 60mm; height: 30mm; margin: 6mm auto;
+      display: flex; align-items: center; justify-content: center;
+      color: #9ca3af; font-size: 9pt;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e5e7eb;
+      padding: 5mm 18mm; 
+      display: flex; justify-content: space-between; align-items: center;
+      background: #f9fafb;
+    }
+    .footer .f-left { font-size: 8pt; color: #6b7280; }
+    .footer .f-center { font-size: 8pt; color: #6b7280; text-align: center; }
+    .footer .f-right { font-size: 8pt; color: #6b7280; text-align: right; }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
+    }
+  </style>
+  </head><body>
+  <!-- Print button (hidden on print) -->
+  <div class="no-print" style="background:#1f2937;padding:10px;text-align:center">
+    <button onclick="window.print()" style="background:${branchColor};color:#fff;border:none;padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;margin-right:10px">🖨️ Print / Save PDF</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px">✕ Close</button>
+  </div>
+
+  <div class="page">
+    <!-- LETTERHEAD -->
+    <div class="letterhead">
+      <div class="lh-left">
+        <div class="lh-nursery-en">${nurseryName}</div>
+        ${nurseryAr?`<div class="lh-nursery-ar">${nurseryAr}</div>`:''}
+        <div class="lh-group">Child Care Nurseries Group — مجموعة رعاية الطفل للحضانات</div>
+      </div>
+      <div class="lh-right">
+        ${bx.phone?`☎ ${bx.phone}<br>`:''}
+        ${bx.address?`📍 ${bx.address}<br>`:''}
+        ${bx.email?`✉ ${bx.email}<br>`:''}
+        🌐 www.childcarenurseriesgroup.com
+      </div>
+    </div>
+    <div class="gold-strip"></div>
+
+    <!-- BODY -->
+    <div class="body">
+      <!-- Date -->
+      <div class="date-line">Date: <strong>${certDateFmt}</strong></div>
+
+      <!-- Title -->
+      <div class="cert-title">
+        <h1>Attendance Certificate</h1>
+        <p>شهادة حضور وتسجيل طفل</p>
+      </div>
+
+      <!-- To Whom -->
+      <div class="cert-body">
+        <p><strong>To Whom It May Concern,</strong></p>
+
+        <p>This is to certify that the child <span class="highlight">${c.name||'___________'}</span>, 
+        of <span class="highlight">${c.nationality||'___________'}</span> nationality, 
+        born on <span class="highlight">${dobFmt}</span>, 
+        has been officially enrolled and regularly attending 
+        <span class="highlight">${nurseryName}</span>.</p>
+
+        <!-- Child Info Box -->
+        <div class="child-box">
+          <div class="row"><span class="lbl">Child Name:</span><span class="val">${c.name||'—'}</span></div>
+          <div class="row"><span class="lbl">Class:</span><span class="val">${c.className||'—'}</span></div>
+          <div class="row"><span class="lbl">Date of Birth:</span><span class="val">${dobFmt}</span></div>
+          <div class="row"><span class="lbl">Nationality:</span><span class="val">${c.nationality||'—'}</span></div>
+          <div class="row"><span class="lbl">Enrollment Date:</span><span class="val">${joinFmt}</span></div>
+          <div class="row"><span class="lbl">ID Number:</span><span class="val">${c.idNumber||'—'}</span></div>
+        </div>
+
+        <p>The child has been enrolled with us since <span class="highlight">${joinFmt}</span> and 
+        attends the nursery according to our regular program scheduled hours.</p>
+
+        <p>This certificate is issued upon the request of the child's parent/guardian to confirm the child's 
+        registration and attendance at our nursery. It is valid for official and governmental purposes.</p>
+
+        <p>Should you require any further information, please do not hesitate to contact us.</p>
+      </div>
+
+      <!-- Signature Section -->
+      <div class="sig-section" style="margin-top:12mm">
+        <div class="sig-block">
+          <div class="sig-label">Manager / Director Signature</div>
+          <div class="sig-name">${mgrName||'_______________________________'}</div>
+          <div class="sig-pos">${mgrPos||'Nursery Manager'}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9pt;color:#6b7280;margin-bottom:4mm">Official Stamp</div>
+          <div class="stamp-box">Stamp Here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="f-left">${nurseryName}<br>${bx.address||''}</div>
+      <div class="f-center">Child Care Nurseries Group<br>مجموعة رعاية الطفل للحضانات</div>
+      <div class="f-right">📞 ${bx.phone||''}<br>🌐 www.childcarenurseriesgroup.com</div>
+    </div>
+  </div>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 function printChildCard(){
