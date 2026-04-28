@@ -6903,9 +6903,11 @@ async function printStaffAttReport(exportType='print'){
         }
         return null;
       };
+      const isPresent=st=>(st==='حضور'||st==='present'||st==='تعويض'||st==='comp');
+      const isAbsent=st=>(st==='غياب'||st==='absent');
       const prevSt=getNearSt(-1), nextSt=getNearSt(1);
-      const anyAbsent=prevSt==='غياب'||nextSt==='غياب';
-      const bothPresent=(prevSt==='حضور'||prevSt==='تعويض')&&(nextSt==='حضور'||nextSt==='تعويض');
+      const anyAbsent=isAbsent(prevSt)||isAbsent(nextSt);
+      const bothPresent=isPresent(prevSt)&&isPresent(nextSt);
       if(anyAbsent) return {status:'غياب', smart:true, isWorkDay:false};
       if(bothPresent) return {status:'حضور', smart:true, isWorkDay:false};
       return {status:'off', smart:false, isWorkDay:false};
