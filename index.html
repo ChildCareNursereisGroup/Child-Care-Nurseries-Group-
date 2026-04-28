@@ -726,9 +726,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <input type="date" id="staffattdate" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderStaffAtt()">
       <span id="staff-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#ede9fe;color:#5b21b6"></span>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBulkAttModal()" id="bulk-att-btn">📋 إدخال جماعي</button>
-      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="printMonthlyStaffSummary()" id="monthly-sum-btn">📊 ملخص الشهر</button>
+      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="printMonthlyStaffSummary()" id="monthly-sum-btn">📊 Monthly Summary</button>
       <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openStaffAttReportModal()" id="att-report-btn">📋 تقرير الغياب</button>
-      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openHistoricalAttModal()" id="hist-att-btn" style="display:none">📜 تقرير تاريخي</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openHistoricalAttModal()" id="hist-att-btn" style="display:none">📜 Historical Report</button>
     </div>
   </div>
   <div id="staffattlist"></div>
@@ -846,7 +846,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         </div>
         <div class="fg"><label>Staff — الموظف</label>
           <select id="att-rep-staff" onchange="refreshAdjList()" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
-            <option value="all">👥 All Staff — كل الموظفين</option>
+            <option value="all">👥 All Staff</option>
           </select>
         </div>
       </div>
@@ -854,24 +854,24 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
       <!-- Bonus / Warning / Loan per staff -->
       <div style="background:#f0f9ff;border-radius:10px;padding:12px;border:1.5px solid #bae6fd">
-        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 تعديلات الراتب — Salary Adjustments (اختياري)</div>
+        <div style="font-weight:800;color:#0369a1;margin-bottom:8px;font-size:.82rem">💰 Salary Adjustments (Optional)</div>
         <div id="att-rep-adj-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
       </div>
       <!-- Signatures section -->
       <div style="background:#f8faff;border-radius:10px;padding:12px;border:1.5px solid #c7d2fe">
-        <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">✍️ التوقيعات الإلكترونية — Electronic Signatures</div>
+        <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">✍️ Electronic Signatures</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع الموظف / Employee Signature</div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">Employee Signature</div>
             <canvas id="sig-employee-canvas" width="200" height="80"
               style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
-            <button onclick="clearSig('sig-employee-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            <button onclick="clearSig('sig-employee-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 Clear</button>
           </div>
           <div>
-            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">توقيع المدير / Manager Signature</div>
+            <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:4px">Manager Signature</div>
             <canvas id="sig-manager-canvas" width="200" height="80"
               style="border:1.5px solid #c7d2fe;border-radius:7px;background:#fff;cursor:crosshair;touch-action:none;width:100%"></canvas>
-            <button onclick="clearSig('sig-manager-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 مسح</button>
+            <button onclick="clearSig('sig-manager-canvas')" style="width:100%;margin-top:4px;padding:3px;background:#fee2e2;border:none;border-radius:5px;cursor:pointer;font-size:.7rem;font-family:'Tajawal',sans-serif;color:#dc2626;font-weight:700">🗑 Clear</button>
           </div>
         </div>
       </div>
@@ -879,7 +879,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <!-- Sticky buttons at bottom — always visible -->
     <div id="adj-save-feedback" style="padding:0 16px"></div>
     <div style="padding:12px 16px;border-top:1.5px solid #e5e7eb;background:#fff;border-radius:0 0 17px 17px;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      <button onclick="saveAdjDataToHistory()" style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">💾 حفظ البيانات</button>
+      <button onclick="saveAdjDataToHistory()" style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">💾 Save Data</button>
       <button onclick="printStaffAttReport('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">🖨️ Print PDF</button>
       <button onclick="printStaffAttReport('excel')" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:11px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">📊 Excel</button>
     </div>
@@ -5850,7 +5850,7 @@ async function previewBulkSalary(file){
 async function confirmBulkSalaryImport(){
   if(!_bulkSalRows.length){ alert('لا توجد بيانات'); return; }
   const alertEl = el('bsal-alert');
-  alertEl.innerHTML = '<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ جاري الحفظ...</div>';
+  alertEl.innerHTML = '<div style="background:#eff6ff;border-radius:8px;padding:10px;font-size:.82rem">⏳ Saving...</div>';
 
   // DEBUG: show what we have
   console.log('_bulkSalRows:', JSON.stringify(_bulkSalRows.map(r=>({name:r.name,staffId:r.staffId,branchId:r.branchId,month:r.month,net:r.net}))));
@@ -6180,7 +6180,7 @@ async function saveHistoricalAttEntry(){
   const [yr,mo]=mon.split('-').map(Number);
   const daysInMonth=new Date(yr,mo,0).getDate();
 
-  if(status) status.innerHTML='<span style="color:#0369a1">⏳ جاري الحفظ...</span>';
+  if(status) status.innerHTML='<span style="color:#0369a1">⏳ Saving...</span>';
 
   const payloads=[];
   for(let d=1;d<=daysInMonth;d++){
@@ -6578,33 +6578,33 @@ function openStaffAttReportModal(){
         <div style="font-weight:700;font-size:.78rem;margin-bottom:6px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
           <div>
-            <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 بونص (أيام عمل)</div>
+            <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 Bonus (Work Days)</div>
             <input type="number" min="0" step="0.5" placeholder="0" id="adj-bonus-${s.id}"
               style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-            <input type="text" placeholder="السبب / Reason" id="adj-bonus-reason-${s.id}"
+            <input type="text" placeholder="Reason" id="adj-bonus-reason-${s.id}"
               style="width:100%;padding:3px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
           </div>
           <div>
-            <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ خصم / تحذير (أيام عمل)</div>
+            <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ Deduction / Warning (Work Days)</div>
             <input type="number" min="0" step="0.5" placeholder="0" id="adj-deduct-${s.id}"
               style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-            <input type="text" placeholder="السبب / Reason" id="adj-deduct-reason-${s.id}"
+            <input type="text" placeholder="Reason" id="adj-deduct-reason-${s.id}"
               style="width:100%;padding:3px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
           <div>
-            <div style="font-size:.65rem;color:#0369a1;font-weight:700;margin-bottom:2px">📋 تسجيلات / Registrations <span style="color:#059669">(+50 AED each)</span></div>
+            <div style="font-size:.65rem;color:#0369a1;font-weight:700;margin-bottom:2px">📋 Registrations <span style="color:#059669">(+50 AED each)</span></div>
             <input type="number" min="0" step="1" placeholder="0" id="adj-reg-${s.id}"
               oninput="updateRegCalc('${s.id}')"
               style="width:100%;padding:4px 8px;border:1.5px solid #bae6fd;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
             <div id="adj-reg-aed-${s.id}" style="font-size:.65rem;color:#0369a1;margin-top:1px;min-height:12px"></div>
           </div>
           <div>
-            <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 خصم قرض / Loan (AED)</div>
+            <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 Loan Deduction (AED)</div>
             <input type="number" min="0" placeholder="0" id="adj-loan-${s.id}"
               style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-            <input type="text" placeholder="السبب / Reason" id="adj-loan-reason-${s.id}"
+            <input type="text" placeholder="Reason" id="adj-loan-reason-${s.id}"
               style="width:100%;padding:3px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
           </div>
         </div>
@@ -6621,7 +6621,7 @@ function openStaffAttReportModal(){
 async function saveAdjDataToHistory(){
   const mon = el('att-rep-month')?.value || (el('staffattdate')?.value||today()).substring(0,7);
   const fb = el('adj-save-feedback');
-  if(fb) fb.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px;font-size:.78rem;color:#92400e;margin-bottom:6px">⏳ جاري الحفظ...</div>`;
+  if(fb) fb.innerHTML=`<div style="background:#fef3c7;border-radius:8px;padding:8px;font-size:.78rem;color:#92400e;margin-bottom:6px">⏳ Saving...</div>`;
 
   const branchStaff=(DB.staff||[]).filter(s=>{
     const wb=s.workBranch||s.branchId;
@@ -6683,7 +6683,7 @@ async function saveAdjDataToHistory(){
   }
   if(fb){
     if(err===0){
-      fb.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px;font-size:.78rem;color:#065f46;margin-bottom:6px">✅ تم الحفظ بنجاح — ${ok} موظف تم حفظ بيانات الخصم والبونص الخاصة بهم في ملخص الشهر</div>`;
+      fb.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px;font-size:.78rem;color:#065f46;margin-bottom:6px">✅ Saved successfully — ${ok} staff salary adjustments saved</div>`;
     } else {
       fb.innerHTML=`<div style="background:#fee2e2;border-radius:8px;padding:8px;font-size:.78rem;color:#dc2626;margin-bottom:6px">⚠️ ${ok} حُفظ، ${err} فشل</div>`;
     }
@@ -6707,17 +6707,17 @@ function refreshAdjList(){
       <div style="font-weight:700;font-size:.78rem;margin-bottom:6px;color:#374151">${s.name} <span style="color:#9ca3af;font-weight:400">${s.position||''}</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
         <div>
-          <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 بونص (أيام عمل)</div>
+          <div style="font-size:.65rem;color:#059669;font-weight:700;margin-bottom:2px">🎁 Bonus (Work Days)</div>
           <input type="number" min="0" step="0.5" placeholder="0" id="adj-bonus-${s.id}"
             style="width:100%;padding:4px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-          <input type="text" placeholder="السبب / Reason" id="adj-bonus-reason-${s.id}"
+          <input type="text" placeholder="Reason" id="adj-bonus-reason-${s.id}"
             style="width:100%;padding:3px 8px;border:1.5px solid #d1fae5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
         </div>
         <div>
-          <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ خصم / تحذير (أيام عمل)</div>
+          <div style="font-size:.65rem;color:#dc2626;font-weight:700;margin-bottom:2px">⚠️ Deduction / Warning (Work Days)</div>
           <input type="number" min="0" step="0.5" placeholder="0" id="adj-deduct-${s.id}"
             style="width:100%;padding:4px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-          <input type="text" placeholder="السبب / Reason" id="adj-deduct-reason-${s.id}"
+          <input type="text" placeholder="Reason" id="adj-deduct-reason-${s.id}"
             style="width:100%;padding:3px 8px;border:1.5px solid #fee2e2;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
         </div>
       </div>
@@ -6730,10 +6730,10 @@ function refreshAdjList(){
           <div id="adj-reg-aed-${s.id}" style="font-size:.65rem;color:#0369a1;margin-top:1px;min-height:12px"></div>
         </div>
         <div>
-          <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 خصم قرض / Loan (AED)</div>
+          <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 Loan Deduction (AED)</div>
           <input type="number" min="0" placeholder="0" id="adj-loan-${s.id}"
             style="width:100%;padding:4px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-          <input type="text" placeholder="السبب / Reason" id="adj-loan-reason-${s.id}"
+          <input type="text" placeholder="Reason" id="adj-loan-reason-${s.id}"
             style="width:100%;padding:3px 8px;border:1.5px solid #ede9fe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;box-sizing:border-box;margin-top:2px">
         </div>
       </div>
@@ -6977,13 +6977,23 @@ async function printStaffAttReport(exportType='print'){
         rowBg='#f3f4f6'; statusColor='#9ca3af';
       } else if(status==='حضور'){
         present++;
-        statusCell=smart?(isAr?'✓ حضور (راحة)':'✓ Present (Off)'):(isAr?'✓ حضور':'✓ Present');
-        rowBg='#f0fdf4'; statusColor='#059669';
+        if(smart){
+          statusCell='Off ●';
+          rowBg='#f0fdf4'; statusColor='#6b7280';
+        } else {
+          statusCell=isAr?'✓ حضور':'✓ Present';
+          rowBg='#f0fdf4'; statusColor='#059669';
+        }
       } else if(status==='غياب'){
         absent++;
         if(!smart) absences.push(`${day}/${String(mo).padStart(2,'0')}`);
-        statusCell=smart?(isAr?'✕ غياب (راحة)':'✕ Absent (Off)'):(isAr?'✕ غياب':'✕ Absent');
-        rowBg='#fff5f5'; statusColor='#dc2626';
+        if(smart){
+          statusCell='Off ✕';
+          rowBg='#fff5f5'; statusColor='#9ca3af';
+        } else {
+          statusCell=isAr?'✕ غياب':'✕ Absent';
+          rowBg='#fff5f5'; statusColor='#dc2626';
+        }
       } else if(status==='نص يوم'){
         half++;present+=0.5;absent+=0.5;
         statusCell=isAr?'½ نصف يوم':'½ Half Day';
@@ -7386,7 +7396,7 @@ async function saveBulkAtt(){
   const mon = el('bulk-att-month')?.value;
   const bid = el('bulk-att-branch')?.value||curBid;
   const alertEl = el('bulk-att-alert');
-  alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.8rem">⏳ جاري الحفظ...</div>`;
+  alertEl.innerHTML=`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.8rem">⏳ Saving...</div>`;
 
   // Separate into: records to upsert, and records to delete (cleared)
   const upsertRows=[];
@@ -8611,7 +8621,7 @@ async function genReport(){
 async function changePW(){
   const bid=el('abr').value;const role=el('arole').value;const pw=v('apw');
   if(!pw||pw.length<4){showAlert('admalert',lang==='ar'?'⚠️ الباسورد 4 أحرف على الأقل':'⚠️ Password must be at least 4 characters',true);return;}
-  showAlert('admalert','⏳ جاري الحفظ...',false);
+  showAlert('admalert','⏳ Saving...',false);
   if(bid==='all'){
     await Promise.all(BRANCHES.map(b=>setPW(b.id,role,pw)));
   } else {
@@ -16118,7 +16128,7 @@ function openExpInvoice(id){
         <tr><td style="padding:8px 10px;color:#6b7280">📁 الفئة / Category</td><td style="padding:8px 10px;font-weight:700">${cat.ic} ${catName}</td></tr>
         ${e.supplierName?`<tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280">🏢 المورد / Supplier</td><td style="padding:8px 10px;font-weight:700">${e.supplierName}</td></tr>`:''}
         ${e.taxNumber?`<tr><td style="padding:8px 10px;color:#6b7280">🔢 الرقم الضريبي / TRN</td><td style="padding:8px 10px;font-weight:700">${e.taxNumber}</td></tr>`:''}
-        ${e.note?`<tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280">📝 السبب / Reason</td><td style="padding:8px 10px;font-weight:700">${e.note}</td></tr>`:''}
+        ${e.note?`<tr style="background:#f8fafc"><td style="padding:8px 10px;color:#6b7280">📝 Reason</td><td style="padding:8px 10px;font-weight:700">${e.note}</td></tr>`:''}
       </table>
       <!-- Amounts -->
       <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:14px">
@@ -17619,7 +17629,7 @@ async function savePastAtt(){
   const mon = el('past-att-month')?.value;
   const alertEl = el('past-att-alert');
   if(!mon){ alertEl.innerHTML='<div style="color:#dc2626">اختاري الشهر أولاً</div>'; return; }
-  alertEl.innerHTML='<div style="color:#6b7280">⏳ جاري الحفظ...</div>';
+  alertEl.innerHTML='<div style="color:#6b7280">⏳ Saving...</div>';
 
   const [yr,mo] = mon.split('-').map(Number);
   const daysInMonth = new Date(yr,mo,0).getDate();
