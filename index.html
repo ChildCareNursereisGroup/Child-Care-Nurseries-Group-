@@ -4955,7 +4955,6 @@ function renderStaffAttDay(){
     const dowDay = new Date(date+'T00:00:00').getDay();
     const workDaysArr = (s.workDays||'0,1,2,3,4').split(',').map(Number);
     const isOffDayView = !workDaysArr.includes(dowDay);
-    // '' = not recorded yet, 'حضور' = present, 'غياب' = absent
     const st = isOffDayView ? 'off' : (DB.staffAtt[date][String(s.id)]||'');
     const isP = st==='حضور';
     const isA = st==='غياب';
@@ -7455,18 +7454,17 @@ async function saveBulkAtt(){
 }
 
 async function toggleStaffAtt(staffId, date){
-  // Check if this is a work day for this staff member
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
   const dow=new Date(date+'T00:00:00').getDay();
-  if(!workDays.includes(dow)){
-    // Off day — don't allow recording
-    return;
-  }
+  const isOffDay=!workDays.includes(dow);
+  // Off days are NOT manually togglable — system auto-calculates
+  if(isOffDay) return;
+
   if(!DB.staffAtt[date]) DB.staffAtt[date]={};
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
-  // Cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
+  // Work day cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
   const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
   DB.staffAtt[date][sid]=newSt;
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
@@ -7626,15 +7624,41 @@ async function renderStaffAttWeek(){
         const daysInMo=new Date(yrM,moM+1,0).getDate();
         const monPrefix=`${yrM}-${String(moM+1).padStart(2,'0')}-`;
         let monPresent=0, monAbsent=0;
+        const allMonDays=[];
         for(let d2=1;d2<=daysInMo;d2++){
           const dd=monPrefix+String(d2).padStart(2,'0');
+          allMonDays.push(dd);
+        }
+        allMonDays.forEach((dd,idx)=>{
           const dow2=new Date(dd+'T00:00:00').getDay();
           const isWD=workDays.includes(dow2);
           const st2=(DB.staffAtt[dd]||{})[String(s.id)]||'';
           if(st2==='حضور') monPresent++;
           else if(st2==='غياب') monAbsent++;
           else if(st2==='نص يوم'){monPresent+=0.5;monAbsent+=0.5;}
-        }
+          else if(!isWD && !st2){
+            // Smart off-day: check neighbors
+            const sMap=DB.staffAtt;
+            const isP2=st=>(s2=>(s2==='حضور'||s2==='present'||s2==='تعويض'));
+            const isA2=st=>(s2=>(s2==='غياب'||s2==='absent'));
+            const getN=(dir)=>{
+              for(let k=1;k<=7;k++){
+                const ni=idx+(dir*k);
+                if(ni<0||ni>=allMonDays.length) return null;
+                const nd=allMonDays[ni];
+                const ndow=new Date(nd+'T00:00:00').getDay();
+                const nst=(sMap[nd]||{})[String(s.id)]||'';
+                if(workDays.includes(ndow)||nst) return nst||'unset';
+              }
+              return null;
+            };
+            const prev=getN(-1), next=getN(1);
+            const smartAbsent=prev==='غياب'||next==='غياب';
+            const smartPresent=(prev==='حضور'||prev==='تعويض')&&(next==='حضور'||next==='تعويض');
+            if(smartAbsent) monAbsent++;
+            else if(smartPresent) monPresent++;
+          }
+        });
         return`<tr style="background:${si%2?'#fff':'#fafafa'}">
           <td style="padding:7px 10px;border:1px solid #e5e7eb">
             <div style="font-weight:800;font-size:.82rem">${s.name}</div>
