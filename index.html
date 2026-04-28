@@ -10212,6 +10212,7 @@ function renderBusChildrenReport(){
           <th style="padding:7px 9px;text-align:right">#</th>
           <th style="padding:7px 9px;text-align:right">اسم الطفل</th>
           <th style="padding:7px 9px;text-align:right">الفصل</th>
+          <th style="padding:7px 9px;text-align:right">وقت الحضانة</th>
           <th style="padding:7px 9px;text-align:right">الاتجاه</th>
           <th style="padding:7px 9px;text-align:right">المنطقة</th>
           <th style="padding:7px 9px;text-align:left">رسوم الباص</th>
@@ -10226,6 +10227,7 @@ function renderBusChildrenReport(){
             <td style="padding:6px 9px;color:#9ca3af">${i+1}</td>
             <td style="padding:6px 9px;font-weight:700">${c.name}</td>
             <td style="padding:6px 9px;color:#6b7280">${c.className||'—'}</td>
+            <td style="padding:6px 9px;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
             <td style="padding:6px 9px">${dirLabel(c.busDirection)} ${pdLabel(c.busDirection,c.busPickDrop)}</td>
             <td style="padding:6px 9px;color:#374151">${c.busArea||'—'}</td>
             <td style="padding:6px 9px;text-align:left;font-weight:700;color:#b45309">${c.busFee?fmtNum(c.busFee)+' AED':'—'}</td>
@@ -10233,7 +10235,7 @@ function renderBusChildrenReport(){
           </tr>`;
         }).join('')}
         <tr style="background:#fef3c7;font-weight:900;border-top:2px solid #fbbf24">
-          <td colspan="5" style="padding:7px 9px;text-align:right">الإجمالي</td>
+          <td colspan="6" style="padding:7px 9px;text-align:right">الإجمالي</td>
           <td style="padding:7px 9px;text-align:left;color:#b45309">${fmtNum(totalBusFees)} AED</td>
           <td style="padding:7px 9px;text-align:left;color:#059669">${fmtNum(totalPaid)} AED</td>
         </tr>
@@ -10305,10 +10307,12 @@ function exportBusChildrenExcel(){
   // One sheet per branch (or single sheet if one branch)
   d.allExportData.forEach(({br,kids,monRecs})=>{
     if(!kids.length) return;
-    const rows=[['#','اسم الطفل','الفصل','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع '+d.mon]];
+    const rows=[['#','اسم الطفل','الفصل','وقت الحضانة','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع '+d.mon]];
     kids.forEach((c,i)=>{
       const rec=monRecs.find(r=>String(r.childId)===String(c.id));
-      rows.push([i+1, c.name, c.className||'', dirMap[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
+      const dirMap2={'two_way':'اتجاهين','one_way':'اتجاه واحد','':'غير محدد'};
+      const pdMap2={'pick':'Pick استقبال','drop':'Drop إيصال','':'—'};
+      rows.push([i+1, c.name, c.className||'', c.kidsTime||'—', dirMap2[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap2[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
     });
     // Totals row
     const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
