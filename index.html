@@ -9520,12 +9520,15 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos){
     .stamp-box{border:2px dashed #d1d5db;border-radius:6px;width:55mm;height:25mm;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:8pt;}
     @media print{.no-print{display:none!important;}}
   </style></head><body>
-  <div class="no-print" style="background:#111;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99">
-    <button onclick="window.print()" style="background:${branchColor};color:#fff;border:none;padding:6px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;margin-right:8px">🖨️ Print / Save PDF</button>
-    <button onclick="window.close()" style="background:#555;color:#fff;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
+  <div class="no-print" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;align-items:center;gap:8px">
+    <span style="color:#9ca3af;font-size:12px;margin-right:4px">📄 Download as:</span>
+    <button onclick="window.print()" style="background:${branchColor};color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print / PDF</button>
+    <button id="word-btn" style="background:#2563eb;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">📝 Word (.doc)</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕ Close</button>
   </div>
-  <div style="height:36px" class="no-print"></div>
+  <div style="height:40px" class="no-print"></div>
 
+  <div id="cert-body-wrap">
   <div class="page">
     <!-- HEADER LETTERHEAD -->
     ${headerSection}
@@ -9565,15 +9568,11 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos){
       </div>
 
       <!-- SIGNATURE -->
-      <div class="sig-area">
+      <div class="sig-area" style="grid-template-columns:1fr">
         <div class="sig-block">
           <div class="sig-lbl">Manager / Director Signature</div>
           <div class="sig-name">${mgrName||'_______________________________'}</div>
           <div class="sig-pos">${mgrPos||'Nursery Manager'}</div>
-        </div>
-        <div class="stamp-area">
-          <div style="font-size:8pt;color:#6b7280;margin-bottom:2mm">Official Stamp — الختم الرسمي</div>
-          <div class="stamp-box">Stamp Here</div>
         </div>
       </div>
     </div>
@@ -9696,12 +9695,15 @@ function generateExpCertificate(){
     .stamp-box{border:2px dashed #d1d5db;border-radius:6px;width:55mm;height:25mm;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:8pt;}
     @media print{.no-print{display:none!important;}}
   </style></head><body>
-  <div class="no-print" style="background:#111;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99">
-    <button onclick="window.print()" style="background:${branchColor};color:#fff;border:none;padding:6px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;margin-right:8px">🖨️ Print / Save PDF</button>
-    <button onclick="window.close()" style="background:#555;color:#fff;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
+  <div class="no-print" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;align-items:center;gap:8px">
+    <span style="color:#9ca3af;font-size:12px;margin-right:4px">📄 Download as:</span>
+    <button onclick="window.print()" style="background:${branchColor};color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print / PDF</button>
+    <button id="word-btn" style="background:#2563eb;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">📝 Word (.doc)</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕ Close</button>
   </div>
-  <div style="height:36px" class="no-print"></div>
+  <div style="height:40px" class="no-print"></div>
 
+  <div id="cert-body-wrap">
   <div class="page">
     ${headerSection}
     <div class="body">
@@ -9735,29 +9737,36 @@ function generateExpCertificate(){
           We wish them continued success in their future endeavours.</p>
         </div>
       </div>
-      <div class="sig-area">
+      <div class="sig-area" style="grid-template-columns:1fr">
         <div class="sig-block">
           <div class="sig-lbl">Manager / Director Signature</div>
           <div class="sig-name">${mgrName||'_______________________________'}</div>
           <div class="sig-pos">${mgrPos}</div>
         </div>
-        <div class="stamp-area">
-          <div style="font-size:8pt;color:#6b7280;margin-bottom:2mm">Official Stamp — الختم الرسمي</div>
-          <div class="stamp-box">Stamp Here</div>
-        </div>
       </div>
     </div>
     ${footerSection}
   </div>
+  </div>
   </body></html>`;
 
-  // Close modal
+  // Close the modal
   document.querySelector('div[style*="fixed"][style*="flex-direction:column"]')?.remove();
   document.getElementById('exp-cert-overlay')?.remove();
 
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+  setTimeout(()=>{
+    const btn=w.document.getElementById('word-btn');
+    if(btn) btn.onclick=()=>{
+      const body=w.document.getElementById('cert-body-wrap').innerHTML;
+      const d='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;margin:15mm 20mm}img{width:100%}</style></head><body>'+body+'</body></html>';
+      const blob=new Blob([d],{type:'application/msword'});
+      const url=URL.createObjectURL(blob);
+      const a=w.document.createElement('a');a.href=url;a.download='Experience_Certificate.doc';a.click();
+    };
+  },300);
 }
 
 function printChildCard(){
