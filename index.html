@@ -4998,7 +4998,9 @@ function renderStaffAttDay(){
             : `<button onclick="sendStaffAbsenceWA('${s.id}','${date}')" style="background:#25d366;border:none;color:#fff;border-radius:9px;padding:3px 8px;cursor:pointer;font-size:.7rem;font-weight:700">💬</button>`)
             : ''}
           <!-- Checkbox -->
-          <div onclick="toggleStaffAtt('${s.id}','${date}')" title="${isEmpty?'اضغط: حضور → نص يوم → غياب':isP?'حضور ✓ — اضغط للتغيير':isH?'نص يوم ½ — اضغط للغياب':'غياب ✕ — اضغط للمسح'}"
+          <div onclick="toggleStaffAtt('${s.id}','${date}')" 
+            oncontextmenu="event.preventDefault();showAttMenu('${s.id}','${date}',this)"
+            title="${isEmpty?'Click: cycle status | Right-click: choose status':isP?'✓ Present — click to change | right-click for menu':isH?'½ Half Day — click to change | right-click for menu':isA?'✕ Absent — click to change | right-click for menu':'Day Off — right-click to change'}"
             style="width:28px;height:28px;border:2.5px solid ${chkBord};border-radius:7px;background:${chkBg};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;font-weight:900;color:${chkColor};user-select:none;flex-shrink:0;transition:all .15s">
             ${chkIcon}
           </div>
@@ -7105,9 +7107,11 @@ async function printStaffAttReport(exportType='print'){
                   const dayNum=d.split('-')[2];
                   const dow=new Date(d+'T00:00:00').getDay();
                   const dayName=dayNames[dow];
-                  const {status}=getSmartStatus(s.id,idx);
+                  const {status, smart}=getSmartStatus(s.id,idx);
                   let cls='s-blank', sym='—', txt='';
-                  if(status==='حضور'){cls='s-present';sym='✓';txt=isAr?'حضور':'Present';}
+                  if(status==='حضور' && smart){cls='s-off';sym='';txt=isAr?'راحة (✓)':'Off (✓)';}
+                  else if(status==='حضور'){cls='s-present';sym='✓';txt=isAr?'حضور':'Present';}
+                  else if(status==='غياب' && smart){cls='s-off';sym='';txt=isAr?'راحة (✕)':'Off (✕)';}
                   else if(status==='غياب'){cls='s-absent';sym='✕';txt=isAr?'غياب':'Absent';}
                   else if(status==='نص يوم'){cls='s-half';sym='½';txt=isAr?'نصف':'Half';}
                   else if(status==='off'){cls='s-off';sym='';txt=isAr?'راحة':'Off';}
@@ -7123,7 +7127,7 @@ async function printStaffAttReport(exportType='print'){
           </tbody>
         </table>
         <div style="margin-top:4px;font-size:.55rem;color:#9ca3af">
-          ✓ ${isAr?'حضور':'Present'} &nbsp;|&nbsp; ✕ ${isAr?'غياب':'Absent'} &nbsp;|&nbsp; ½ ${isAr?'نصف يوم':'Half Day'} &nbsp;|&nbsp; ${isAr?'راحة':'Off'} = ${isAr?'يوم راحة':'Day Off'} &nbsp;|&nbsp; — = ${isAr?'غير مسجل':'Unrecorded'}
+          ✓ ${isAr?'حضور':'Present'} &nbsp;|&nbsp; ✕ ${isAr?'غياب':'Absent'} &nbsp;|&nbsp; ½ ${isAr?'نصف يوم':'Half Day'} &nbsp;|&nbsp; ${isAr?'راحة':'Off'} = ${isAr?'يوم راحة':'Day Off'} &nbsp;|&nbsp; ${isAr?'راحة (✓)':'Off (✓)'} = ${isAr?'راحة محسوب حضور':'Off counted as Present'} &nbsp;|&nbsp; ${isAr?'راحة (✕)':'Off (✕)'} = ${isAr?'راحة محسوب غياب':'Off counted as Absent'} &nbsp;|&nbsp; — = ${isAr?'غير مسجل':'Unrecorded'}
         </div>
       </div>
 
@@ -7463,6 +7467,70 @@ async function saveBulkAtt(){
   }
 }
 
+function showAttMenu(staffId, date, el){
+  // Remove any existing menu
+  document.querySelectorAll('.att-quick-menu').forEach(m=>m.remove());
+  const opts=[
+    {st:'حضور', label:'✓ Present', bg:'#059669'},
+    {st:'نص يوم', label:'½ Half Day', bg:'#f59e0b'},
+    {st:'غياب', label:'✕ Absent', bg:'#dc2626'},
+    {st:'إجازة', label:'🏖 Day Off', bg:'#6b7280'},
+    {st:'', label:'— Clear', bg:'#e5e7eb', color:'#374151'},
+  ];
+  const menu=document.createElement('div');
+  menu.className='att-quick-menu';
+  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.2);padding:5px;display:flex;flex-direction:column;gap:3px;min-width:130px';
+  const rect=el.getBoundingClientRect();
+  menu.style.top=(rect.bottom+4)+'px';
+  menu.style.left=Math.min(rect.left,window.innerWidth-140)+'px';
+  opts.forEach(o=>{
+    const btn=document.createElement('button');
+    btn.textContent=o.label;
+    btn.style.cssText=`background:${o.bg};color:${o.color||'#fff'};border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:700;text-align:left`;
+    btn.onclick=async()=>{
+      menu.remove();
+      await setStaffAtt(staffId, date, o.st);
+    };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',function h(){menu.remove();document.removeEventListener('click',h);}),100);
+}
+
+async function setStaffAtt(staffId, date, newSt){
+  if(!DB.staffAtt[date]) DB.staffAtt[date]={};
+  const sid=String(staffId);
+  DB.staffAtt[date][sid]=newSt;
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
+  renderStaffAtt();
+  const sum=el('staffattsum');
+  const showMsg=(ok,msg)=>{
+    if(!sum) return;
+    const d=document.createElement('div');
+    d.style.cssText=`background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#dc2626'};border-radius:8px;padding:4px 12px;font-size:.75rem;margin-top:4px;font-family:Tajawal,sans-serif;display:inline-block`;
+    d.textContent=msg;
+    sum.appendChild(d);
+    setTimeout(()=>d.remove(),3000);
+  };
+  if(!newSt){
+    await sb.from('staff_attendance').delete()
+      .eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+    showMsg(true,'🗑️ Cleared');
+    return;
+  }
+  const payload={branch_id:curBid, staff_id:Number(staffId), date, status:newSt};
+  const {error}=await sb.from('staff_attendance').upsert(payload,{onConflict:'staff_id,date'});
+  if(error){
+    await sb.from('staff_attendance').delete().eq('branch_id',curBid).eq('staff_id',Number(staffId)).eq('date',date);
+    const {error:err2}=await sb.from('staff_attendance').insert(payload);
+    if(err2) showMsg(false,'❌ Error: '+err2.message);
+    else showMsg(true,'✅ '+(newSt==='حضور'?'Present ✓':newSt==='نص يوم'?'Half Day ½':newSt==='غياب'?'Absent ✕':newSt==='إجازة'?'Day Off 🏖':'Cleared'));
+  } else {
+    showMsg(true,'✅ '+(newSt==='حضور'?'Present ✓':newSt==='نص يوم'?'Half Day ½':newSt==='غياب'?'Absent ✕':newSt==='إجازة'?'Day Off 🏖':'Cleared'));
+  }
+}
+
 async function toggleStaffAtt(staffId, date){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
@@ -7475,7 +7543,8 @@ async function toggleStaffAtt(staffId, date){
   const sid=String(staffId);
   const cur=DB.staffAtt[date][sid]||'';
   // Work day cycle: '' → 'حضور' → 'نص يوم' → 'غياب' → ''
-  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : '';
+  // Work day cycle: '' → حضور → نص يوم → غياب → إجازة → ''
+  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'نص يوم' : cur==='نص يوم' ? 'غياب' : cur==='غياب' ? 'إجازة' : '';
   DB.staffAtt[date][sid]=newSt;
   if(s) logActivity('attendance', s.name+' (staff) → '+(newSt||'cleared'));
   renderStaffAtt();
@@ -7597,8 +7666,9 @@ async function renderStaffAttWeek(){
             const ovColor=isOvP?'#fff':isOvA?'#fff':'#9ca3af';
             return`<td style="padding:4px;text-align:center;background:${ovBg};border:1px solid #e5e7eb">
               <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
+                oncontextmenu="event.preventDefault();showAttMenu('${s.id}','${d}',this)"
                 data-wid="${s.id}" data-wdate="${d}"
-                title="Off Day — click to override"
+                title="Off Day — click to override | right-click for menu"
                 style="width:32px;height:32px;border-radius:7px;border:2px dashed ${ovBord};background:${ovBoxBg};
                 display:flex;align-items:center;justify-content:center;cursor:pointer;
                 font-size:${ovIcon?'.85rem':'.55rem'};font-weight:900;color:${ovColor};margin:auto;user-select:none">
@@ -7615,6 +7685,7 @@ async function renderStaffAttWeek(){
           const boxBg=isP?'#059669':isA?'#dc2626':isH?'#f59e0b':isOff2?'#6b7280':'#fff';
           return`<td style="padding:4px;text-align:center;background:${bg};border:1px solid #e5e7eb">
             <div onclick="toggleStaffAttWeek('${s.id}','${d}')"
+              oncontextmenu="event.preventDefault();showAttMenu('${s.id}','${d}',this)"
               data-wid="${s.id}" data-wdate="${d}"
               style="width:32px;height:32px;border-radius:7px;border:2px solid ${bord};
               background:${boxBg};
