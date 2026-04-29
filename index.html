@@ -3773,7 +3773,8 @@ function renderRecs(){
         ${curRole==='admin'?`
           <button class="btn bsm" style="background:#f59e0b;color:#fff;border:none" onclick="openEditRec('${r.id}')" title="تعديل" ${r.isCancelled?'disabled style="opacity:.4;cursor:not-allowed;background:#f59e0b;color:#fff;border:none"':''}>✏️</button>
           ${r.isCancelled
-            ? `<button class="btn bsm" style="background:#6b7280;color:#fff;border:none;cursor:not-allowed;opacity:.7" title="ملغي — ${r.cancelReason||''}" disabled>🚫 ملغي</button>`
+            ? `<button class="btn bsm" style="background:#6b7280;color:#fff;border:none;cursor:not-allowed;opacity:.5;font-size:.65rem" title="ملغي — ${r.cancelReason||''}" disabled>🚫</button>
+               <button class="btn bsm" style="background:#059669;color:#fff;border:none;font-size:.65rem" onclick="restoreRec('${r.id}')" title="إعادة الإيصال — Restore Receipt">↩️ Restore</button>`
             : `<button class="btn bd bsm" onclick="delRec('${r.id}')" title="إلغاء الإيصال">🚫</button>`
           }`
         :curRole==='manager'?(r.isCancelled
@@ -4478,6 +4479,22 @@ function numToWords(num){
   return result.charAt(0).toUpperCase()+result.slice(1);
 }
 function doPrint(){const w=window.open('','_blank');w.document.write(`<html><head><meta charset="UTF-8"><style>@page{size:A5;margin:8mm}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;background:#fff}#inv-print{width:100%!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important;border:none!important}</style></head><body>${el('pprev').innerHTML}</body></html>`);w.document.close();setTimeout(()=>w.print(),500);}
+async function restoreRec(id){
+  if(curRole!=='admin'){alert('Admin access only');return;}
+  const r=DB.receipts.find(x=>String(x.id)===String(id));
+  if(!r) return;
+  if(!confirm(`إعادة الإيصال #${r.receiptNum}؟\nالطفل: ${r.childName}\nالمبلغ: ${r.total} د.إ`)) return;
+  const {error}=await sb.from('receipts').update({
+    is_cancelled:false, cancel_reason:null, cancel_date:null
+  }).eq('id',id);
+  if(error){alert('خطأ: '+error.message);return;}
+  const rec=DB.receipts.find(x=>String(x.id)===String(id));
+  if(rec){rec.isCancelled=false;rec.cancelReason='';rec.cancelDate=null;}
+  renderRecs();
+  showAlert('rec-alert','✅ تم استعادة الإيصال بنجاح',false);
+  logActivity('edit',`Restored receipt #${r.receiptNum} — ${r.childName}`);
+}
+
 async function delRec(id){
   // Admin and manager can cancel receipts
   if(curRole!=='admin' && curRole!=='manager'){
@@ -10509,7 +10526,7 @@ async function loadBusAllBranchData(forceReload){
   const result={};
   for(const b of BRANCHES){
     const [c, r] = await Promise.all([
-      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id').eq('branch_id',b.id).limit(5000),
+      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time').eq('branch_id',b.id).limit(5000),
       sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id).limit(5000),
     ]);
     result[b.id]={
@@ -10517,7 +10534,7 @@ async function loadBusAllBranchData(forceReload){
         id:x.id, name:x.name||'', className:x.class_name||'',
         bus:x.bus||'No', busFee:Number(x.bus_fee||0),
         busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
-        leaveDate:x.leave_date||null, branchId:x.branch_id
+        leaveDate:x.leave_date||null, branchId:x.branch_id, kidsTime:x.kids_time||''
       })),
       receipts:(r.data||[]).map(x=>({id:x.id,childId:x.child_id,date:x.date||'',bus:Number(x.bus||0)}))
     };
