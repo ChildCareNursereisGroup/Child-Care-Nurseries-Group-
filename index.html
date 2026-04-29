@@ -6901,12 +6901,11 @@ async function printStaffAttReport(exportType='print'){
           const nDow=new Date(days[ni]+'T00:00:00').getDay();
           const rec=sMap[days[ni]]||'';
           const neighborIsWorkDay=workDays.includes(nDow);
-
-          // If this neighbor has an explicit record → use it
+          // If neighbor has an explicit record → use it
           if(rec&&rec!=='إجازة') return rec;
-          // If it's a scheduled work day with NO record → treat as unset (skip, keep looking)
-          // If it's an off day with no record → skip it, keep looking for a real data point
-          if(neighborIsWorkDay && !rec) return 'unset'; // workday, no record = unrecorded
+          // If it's a scheduled work day with NO record → unrecorded, stop here
+          if(neighborIsWorkDay&&!rec) return 'unset';
+          // Off day with no record → skip, keep searching
         }
         return null;
       };
@@ -7740,10 +7739,10 @@ async function renderStaffAttWeek(){
           else if(st2==='غياب') monAbsent++;
           else if(st2==='نص يوم'){monPresent+=0.5;monAbsent+=0.5;}
           else if(!isWD && !st2){
-            // Smart off-day: check neighbors
+            // Smart off-day: skip consecutive off days, look for nearest RECORDED day
             const sMap=DB.staffAtt;
-            const isP2=st=>(s2=>(s2==='حضور'||s2==='present'||s2==='تعويض'));
-            const isA2=st=>(s2=>(s2==='غياب'||s2==='absent'));
+            const isP2=v=>(v==='حضور'||v==='present'||v==='تعويض');
+            const isA2=v=>(v==='غياب'||v==='absent');
             const getN=(dir)=>{
               for(let k=1;k<=7;k++){
                 const ni=idx+(dir*k);
@@ -7751,13 +7750,17 @@ async function renderStaffAttWeek(){
                 const nd=allMonDays[ni];
                 const ndow=new Date(nd+'T00:00:00').getDay();
                 const nst=(sMap[nd]||{})[String(s.id)]||'';
-                if(workDays.includes(ndow)||nst) return nst||'unset';
+                // If neighbor has explicit record → use it
+                if(nst&&nst!=='إجازة') return nst;
+                // If neighbor is a workday with no record → stop (unrecorded workday)
+                if(workDays.includes(ndow)&&!nst) return 'unset';
+                // Otherwise it's an off day with no record → keep looking
               }
               return null;
             };
             const prev=getN(-1), next=getN(1);
-            const smartAbsent=prev==='غياب'||next==='غياب';
-            const smartPresent=(prev==='حضور'||prev==='تعويض')&&(next==='حضور'||next==='تعويض');
+            const smartAbsent=isA2(prev)||isA2(next);
+            const smartPresent=isP2(prev)&&isP2(next);
             if(smartAbsent) monAbsent++;
             else if(smartPresent) monPresent++;
           }
