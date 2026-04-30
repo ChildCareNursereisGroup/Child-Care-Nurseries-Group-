@@ -9165,8 +9165,8 @@ function showDTab(tab,btn){
       <div style="background:#f8fafc;border:1.5px solid #c4b5fd;border-radius:11px;padding:12px;margin-bottom:14px">
         <div style="font-weight:800;color:#5b21b6;font-size:.82rem;margin-bottom:8px">✍️ Electronic Signature — التوقيع الإلكتروني</div>
         <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px">وقّعي بالماوس أو الإصبع في المربع أدناه</div>
-        <canvas id="cert-sig-canvas" width="400" height="100"
-          style="border:2px solid #c4b5fd;border-radius:8px;background:#fff;width:100%;max-width:400px;cursor:crosshair;touch-action:none;display:block">
+        <canvas id="cert-sig-canvas" width="380" height="110"
+          style="border:2px solid #c4b5fd;border-radius:8px;background:#fff;width:380px;max-width:100%;height:110px;cursor:crosshair;touch-action:none;display:block">
         </canvas>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button onclick="clearCertSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.75rem">🗑 Clear</button>
@@ -9614,6 +9614,7 @@ async function printAttCertificate(childId){
   const nurseryName = branch.en || branch.ar || 'Nursery';
 
   generateHTMLCertificate(c, certDate, mgrName, mgrPos, sigDataURL);
+  return; // all handled by generateHTMLCertificate
 
   const fmt = (d) => d ? new Date(d+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
   const certDateFmt = fmt(certDate);
@@ -9715,6 +9716,47 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos, sigDataURL){
   const nurseryName=b.en||b.ar||'Child Care Nursery';
   const nurseryAr=b.ar||'';
   const branchColor=b.c||'#1e3a8a';
+  const bx=getBranchExtra?.(bid)||{};
+  const logo=bx.logo||null;
+
+  // ── Signature HTML ──
+  const sigHtml = sigDataURL
+    ? `<img src="${sigDataURL}" style="height:45px;max-width:180px;display:block;margin-bottom:2mm" alt="Signature">`
+    : `<div style="height:14mm;width:55mm;border-bottom:1.5px solid #374151;margin-bottom:2mm"></div>`;
+
+  // ── Professional stamp: base64 encoded SVG ──
+  const makeStampImg=()=>{
+    const c2=branchColor;
+    let dots='';
+    for(let i=0;i<12;i++){
+      const a=(i*30-90)*Math.PI/180;
+      const x=Math.round(100+80*Math.cos(a));
+      const y=Math.round(100+80*Math.sin(a));
+      dots+=['<circle cx="',x,'" cy="',y,'" r="2.5" fill="',c2,'"/>'].join('');
+    }
+    const logoEl=logo
+      ?['<image href="',logo,'" x="55" y="45" width="90" height="55" preserveAspectRatio="xMidYMid meet"/>'].join('')
+      :'<text x="100" y="95" text-anchor="middle" font-size="36">&#x1F60A;</text>';
+    const parts=[
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 200" width="110" height="110">',
+      '<defs><clipPath id="lc"><rect x="50" y="40" width="100" height="60" rx="5"/></clipPath></defs>',
+      '<circle cx="100" cy="100" r="95" fill="',c2,'18" stroke="',c2,'" stroke-width="3.5"/>',
+      '<circle cx="100" cy="100" r="79" fill="none" stroke="',c2,'" stroke-width="1.5"/>',
+      dots,
+      '<g clip-path="url(#lc)">',logoEl,'</g>',
+      '<line x1="30" y1="115" x2="170" y2="115" stroke="',c2,'" stroke-width="1.5"/>',
+      '<text x="100" y="133" text-anchor="middle" font-family="Arial,sans-serif" font-size="9.5" font-weight="bold" fill="',c2,'">',nurseryName,'</text>',
+      '<text x="100" y="147" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="',c2,'">',nurseryAr,'</text>',
+      '<text x="100" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="',c2,'">Child Care Nurseries Group</text>',
+      '<text x="40" y="133" text-anchor="middle" font-size="10" fill="',c2,'">&#9733;</text>',
+      '<text x="160" y="133" text-anchor="middle" font-size="10" fill="',c2,'">&#9733;</text>',
+      '</svg>'
+    ];
+    const svgStr=parts.join('');
+    const b64=btoa(unescape(encodeURIComponent(svgStr)));
+    return '<img src="data:image/svg+xml;base64,'+b64+'" style="width:110px;height:110px" alt="Official Stamp">';
+  };
+  const stampHtml = makeStampImg();
   const certDateFmt=certDate ? new Date(certDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : new Date().toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'});
   const dobFmt=c.dob ? new Date(c.dob+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
   const joinFmt=c.joinDate ? new Date(c.joinDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}) : '___________';
@@ -9800,11 +9842,15 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos, sigDataURL){
             <div class="info-row"><span class="info-lbl">ID Number:</span><span class="info-val">${c.idNumber||'—'}</span></div>
           </div>
 
-          ${c.suspendDate?`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:7px;padding:6px 10px;margin:4mm 0;font-size:9.5pt">
-            <b>⏸️ Note:</b> The child has been on a temporary leave of absence since 
-            <b>${new Date(c.suspendDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'})}</b>
-            ${c.resumeDate?` and is expected to resume on <b>${new Date(c.resumeDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'})}</b>`:''}.
-          </div>`:''}
+          ${(()=>{
+            if(!c.suspendDate) return '';
+            const sd=new Date(c.suspendDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'});
+            const rd=c.resumeDate?new Date(c.resumeDate+'T00:00:00').toLocaleDateString('en-AE',{year:'numeric',month:'long',day:'numeric'}):'';
+            return '<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:7px;padding:6px 10px;margin:4mm 0;font-size:9.5pt">'
+              +'<b>Note:</b> The child has been on a temporary leave of absence since <b>'+sd+'</b>'
+              +(rd?' and is expected to resume on <b>'+rd+'</b>':'')+'.'
+              +'</div>';
+          })()}
 
           <p>The child has been enrolled since <span class="hl">${joinFmt}</span> and
           attends the nursery according to our regular scheduled hours.</p>
@@ -9817,13 +9863,12 @@ function generateHTMLCertificate(c, certDate, mgrName, mgrPos, sigDataURL){
       <!-- SIGNATURE + STAMP -->
       <div class="sig-area">
         <div class="sig-block">
-          ${sigDataURL?`<img src="${sigDataURL}" style="height:40px;max-width:200px;display:block;margin-bottom:3mm" alt="Signature">`:
-            '<div style="height:12mm;border-bottom:1px solid #9ca3af;width:60mm;margin-bottom:2mm"></div>'}
+          ${sigHtml}
           <div class="sig-name">${mgrName||'_______________________________'}</div>
           <div class="sig-pos">${mgrPos||'Nursery Manager'}</div>
         </div>
         <div style="text-align:center">
-          ${(()=>{const st=typeof getBranchStamp!=='undefined'?getBranchStamp(bid):null;return st?`<img src="${st}" style="width:90px;height:90px;opacity:.85" alt="Official Stamp">`:'<div style="border:2px dashed #d1d5db;border-radius:50%;width:80px;height:80px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#9ca3af">Stamp</div>';})()}
+          ${stampHtml}
         </div>
       </div>
     </div>
@@ -9915,6 +9960,42 @@ function generateExpCertificate(){
                 months>0?`${months} month${months!==1?'s':''}`:
                 'less than one month';
 
+  const bx=getBranchExtra?.(bid)||{};
+  const logo=bx.logo||null;
+  const nurseryAr=b.ar||'';
+
+  const makeStamp=()=>{
+    const c2=branchColor;
+    let dots='';
+    for(let i=0;i<12;i++){
+      const a=(i*30-90)*Math.PI/180;
+      const x=Math.round(100+80*Math.cos(a));
+      const y=Math.round(100+80*Math.sin(a));
+      dots+=['<circle cx="',x,'" cy="',y,'" r="2.5" fill="',c2,'"/>'].join('');
+    }
+    const logoEl=logo
+      ?['<image href="',logo,'" x="55" y="45" width="90" height="55" preserveAspectRatio="xMidYMid meet"/>'].join('')
+      :'<text x="100" y="95" text-anchor="middle" font-size="36">&#x1F3EB;</text>';
+    const parts=[
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 200" width="110" height="110">',
+      '<defs><clipPath id="lc2"><rect x="50" y="40" width="100" height="60" rx="5"/></clipPath></defs>',
+      '<circle cx="100" cy="100" r="95" fill="',c2,'18" stroke="',c2,'" stroke-width="3.5"/>',
+      '<circle cx="100" cy="100" r="79" fill="none" stroke="',c2,'" stroke-width="1.5"/>',
+      dots,
+      '<g clip-path="url(#lc2)">',logoEl,'</g>',
+      '<line x1="30" y1="115" x2="170" y2="115" stroke="',c2,'" stroke-width="1.5"/>',
+      '<text x="100" y="133" text-anchor="middle" font-family="Arial,sans-serif" font-size="9.5" font-weight="bold" fill="',c2,'">',nurseryName,'</text>',
+      '<text x="100" y="147" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="',c2,'">',nurseryAr,'</text>',
+      '<text x="100" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="',c2,'">Child Care Nurseries Group</text>',
+      '<text x="40" y="133" text-anchor="middle" font-size="10" fill="',c2,'">&#9733;</text>',
+      '<text x="160" y="133" text-anchor="middle" font-size="10" fill="',c2,'">&#9733;</text>',
+      '</svg>'
+    ];
+    const svgStr=parts.join('');
+    const b64=btoa(unescape(encodeURIComponent(svgStr)));
+    return '<img src="data:image/svg+xml;base64,'+b64+'" style="width:110px;height:110px" alt="Official Stamp">';
+  };
+
   const headerSection=lhImg
     ?`<img src="${lhImg.header}" style="width:100%;display:block;margin:0;padding:0;background:#fff">`
     :`<div style="border-bottom:3px solid ${branchColor};padding:8mm 15mm 5mm;display:flex;align-items:center">
@@ -10004,7 +10085,7 @@ function generateExpCertificate(){
           <div class="sig-pos">${mgrPos}</div>
         </div>
         <div style="text-align:center">
-          ${(()=>{const st=typeof getBranchStamp!=='undefined'?getBranchStamp(bid):null;return st?`<img src="${st}" style="width:90px;height:90px;opacity:.85" alt="Official Stamp">`:'';})()}
+          ${makeStamp()}
         </div>
       </div>
     </div>
@@ -10099,51 +10180,6 @@ const LH_IMAGES={
   },
 };
 
-// ── Branch Stamp Generator (uses actual logo) ──
-function getBranchStamp(bid){
-  const bx = getBranchExtra(bid)||{};
-  const br = BRANCHES.find(b=>b.id===bid)||{};
-  const color = br.c||'#1e3a8a';
-  const nameEn = br.en||br.ar||'Nursery';
-  const nameAr = br.ar||'';
-  const logo = bx.logo||null; // base64 data URL from branch settings
-
-  // Build circular SVG stamp with logo in center
-  const logoEl = logo
-    ? `<image href="${logo}" x="65" y="55" width="90" height="60" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>`
-    : `<text x="110" y="105" text-anchor="middle" font-size="38">😊</text>`;
-
-  const dots = Array.from({length:12},(_,i)=>{
-    const a=i*30-90, r=88;
-    const x=Math.round(110+r*Math.cos(a*Math.PI/180));
-    const y=Math.round(110+r*Math.sin(a*Math.PI/180));
-    return `<circle cx="${x}" cy="${y}" r="3" fill="${color}"/>`;
-  }).join('');
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 220 220" width="120" height="120">
-  <defs>
-    <path id="top_s" d="M 20,110 A 90,90 0 0,1 200,110"/>
-    <path id="bot_s" d="M 200,110 A 90,90 0 0,1 20,110"/>
-    <clipPath id="logoClip"><ellipse cx="110" cy="85" rx="50" ry="35"/></clipPath>
-  </defs>
-  <circle cx="110" cy="110" r="105" fill="${color}15" stroke="${color}" stroke-width="4"/>
-  <circle cx="110" cy="110" r="88" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="5,3"/>
-  ${dots}
-  <text font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="${color}">
-    <textPath href="#top_s" startOffset="8%">${nameEn}</textPath>
-  </text>
-  <text font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="${color}">
-    <textPath href="#bot_s" startOffset="22%">${nameAr}</textPath>
-  </text>
-  ${logoEl}
-  <text x="55" y="115" text-anchor="middle" font-size="13" fill="${color}">✦</text>
-  <text x="165" y="115" text-anchor="middle" font-size="13" fill="${color}">✦</text>
-  <line x1="35" y1="125" x2="185" y2="125" stroke="${color}" stroke-width="1" opacity="0.4"/>
-  <text x="110" y="145" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${color}" font-weight="bold">UAE</text>
-</svg>`;
-
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-}
 
 // ═══════════════════════════════════════════════
 //  PRINT CLASS CLOTHING TAGS
