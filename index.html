@@ -699,6 +699,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <select id="kids-class-filter" onchange="renderAtt()" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem">
         <option value="">🎓 All Classes</option>
       </select>
+      <button id="weekend-filter-btn" onclick="toggleWeekendFilter()" title="عرض أطفال الويك إند فقط" style="padding:4px 10px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;background:#fff;color:#d97706;cursor:pointer">🏖️ Weekend</button>
       <span id="att-day-badge" style="font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:10px;background:#e0e7ff;color:#3730a3"></span>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:5px 10px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="el('xl-att-file').click()">📥 Import</button>
       <button class="btn bg bsm" onclick="downloadAttTemplate()">📋 Template</button>
@@ -4593,6 +4594,35 @@ async function delRec(id){
 
 // ═══════════════════════════════════════════════
 //  ATTENDANCE
+// ─── Weekend Filter ───────────────────────────
+let weekendFilterOn = false;
+function toggleWeekendFilter(){
+  weekendFilterOn = !weekendFilterOn;
+  const btn = el('weekend-filter-btn');
+  if(btn){
+    btn.style.background = weekendFilterOn ? '#d97706' : '#fff';
+    btn.style.color      = weekendFilterOn ? '#fff'    : '#d97706';
+    btn.textContent      = weekendFilterOn ? '🏖️ Weekend ✓' : '🏖️ Weekend';
+  }
+  renderAtt();
+}
+
+// Returns true if this child has a non-cancelled receipt that covers
+// the given date AND includes a weekend-day fee matching that date's weekday.
+function hasWeekendReceipt(childId, date){
+  const dow   = new Date(date+'T00:00:00').getDay(); // 0=Sun, 5=Fri, 6=Sat
+  const month = monthOf(date);
+  return DB.receipts.some(r=>{
+    if(r.isCancelled) return false;
+    if(String(r.childId) !== String(childId)) return false;
+    if(!recCoversMonth(r, month)) return false;
+    if(dow===5 && (r.friFee||0)>0) return true;
+    if(dow===6 && (r.satFee||0)>0) return true;
+    if(dow===0 && (r.sunFee||0)>0) return true;
+    return false;
+  });
+}
+
 // ═══════════════════════════════════════════════
 let kidsAttView='day';
 function setKidsAttView(v){
@@ -4636,8 +4666,17 @@ function renderKidsWeek(){
   }
   const selClass = classFilter?.value||'';
 
-  // All active children - filtered by class if selected
-  const active=DB.children.filter(c=>!c.leaveDate&&(!selClass||(c.className||'—')===selClass));
+  // All active children - filtered by class if selected, and by weekend if filter is on
+  const active=DB.children.filter(c=>{
+    if(c.leaveDate) return false;
+    if(selClass && (c.className||'—')!==selClass) return false;
+    if(weekendFilterOn){
+      const days=(c.dutyDays||'').split(',').map(d=>d.trim().toLowerCase());
+      return days.includes('fri')||days.includes('sat')||days.includes('sun')||
+             (c.friFee||0)>0||(c.satFee||0)>0||(c.sunFee||0)>0;
+    }
+    return true;
+  });
   if(!active.length){el('attlist').innerHTML=`<div class="empty"><div class="ei">👧</div><p>No children</p></div>`;return;}
 
   // Group by class, sort alphabetically by class name
@@ -4674,13 +4713,27 @@ function renderKidsWeek(){
         let bg,icon,color,title,extraStyle='',extraBadge='';
 
         if(isP){
-          bg='#059669'; icon='✓'; color='#fff';
+          const isWeekendDay=(dow===0||dow===5||dow===6); // Sun/Fri/Sat
           if(!isScheduled){
-            // Present on non-duty day — show with warning
-            bg='#047857'; icon='✓'; color='#fff';
-            extraBadge=`<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>`;
-            title=`${c.name}: حضر — لكن هذا اليوم غير مجدول (${dayName})`;
+            if(isWeekendDay){
+              // Non-registered weekend attendance: RED=unpaid, GREEN=paid
+              const paid=hasWeekendReceipt(c.id, d);
+              if(paid){
+                bg='#059669'; icon='✓'; color='#fff';
+                title=`${c.name}: حضر الويك إند ✅ مدفوع — ${dayName}`;
+              } else {
+                bg='#dc2626'; icon='✓'; color='#fff';
+                extraBadge=`<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#fbbf24;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#92400e;font-weight:900">$</div>`;
+                title=`${c.name}: حضر الويك إند ❌ غير مدفوع — ${dayName}`;
+              }
+            } else {
+              // Present on non-weekend non-duty day — existing warning style
+              bg='#047857'; icon='✓'; color='#fff';
+              extraBadge=`<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>`;
+              title=`${c.name}: حضر — لكن هذا اليوم غير مجدول (${dayName})`;
+            }
           } else {
+            bg='#059669'; icon='✓'; color='#fff';
             title=`${c.name}: حضور — ${dayName}`;
           }
         } else if(isA){
@@ -4688,9 +4741,14 @@ function renderKidsWeek(){
           title=`${c.name}: غياب — ${dayName}`;
         } else if(!isScheduled){
           // OFF day — not scheduled, not recorded
-          bg=''; icon='—'; color='#94a3b8';
-          extraStyle=`background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px);`;
-          title=`${c.name}: يوم إيقاف — ${dayName} غير مدفوع`;
+          const isWeekendOff=(dow===0||dow===5||dow===6);
+          bg=''; icon='—'; color=isWeekendOff?'#d97706':'#94a3b8';
+          extraStyle=isWeekendOff
+            ?`background:repeating-linear-gradient(45deg,#fef9c3,#fef9c3 3px,#fde68a 3px,#fde68a 7px);` // warm yellow for weekend
+            :`background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px);`;
+          title=isWeekendOff
+            ?`${c.name}: ويك إند غير مسجل — اضغط لتسجيل حضور (${dayName})`
+            :`${c.name}: يوم إيقاف — ${dayName} غير مدفوع`;
         } else {
           // Scheduled, not recorded
           bg='#e5e7eb'; icon=''; color='#9ca3af';
@@ -4758,11 +4816,19 @@ function renderKidsWeek(){
     <span style="color:#dc2626;font-weight:800">❌ ${lang==='ar'?'غياب هذا الأسبوع':'Had absence this week'}: ${totalAbsent}</span>
     <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
       <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 2px,#e2e8f0 2px,#e2e8f0 5px)"></span>
-      ${lang==='ar'?'= يوم إيقاف (غير مجدول / غير مدفوع) — قابل للتغيير':'= Off day (not scheduled / not paid) — can be overridden'}
+      ${lang==='ar'?'= يوم إيقاف عادي':'= Regular off day'}
     </span>
     <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#047857;position:relative"><span style="position:absolute;top:-2px;right:-2px;width:6px;height:6px;background:#f59e0b;border-radius:50%"></span></span>
-      ${lang==='ar'?'= حضر في يوم غير مدفوع ⚠️':'= Present on non-paid day ⚠️'}
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:repeating-linear-gradient(45deg,#fef9c3,#fef9c3 2px,#fde68a 2px,#fde68a 5px)"></span>
+      ${lang==='ar'?'= ويك إند غير مسجل (قابل للتسجيل)':'= Unregistered weekend (click to mark)'}
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#dc2626;position:relative"><span style="position:absolute;top:-2px;right:-2px;width:6px;height:6px;background:#fbbf24;border-radius:50%"></span></span>
+      ${lang==='ar'?'= ويك إند حضر — غير مدفوع':'= Weekend attended — unpaid'}
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:#64748b">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#059669"></span>
+      ${lang==='ar'?'= ويك إند حضر — مدفوع ✅':'= Weekend attended — paid ✅'}
     </span>
   </div>`;
 }
@@ -8151,12 +8217,28 @@ async function toggleKidsAtt(childId, date){
   const cell=document.querySelector(`[data-kid="${childId}"][data-kdate="${date}"]`);
   if(cell){
     const isScheduled=cell.dataset.scheduled!=='0';
+    const dow=new Date(date+'T00:00:00').getDay();
+    const isWeekendDay=(dow===0||dow===5||dow===6);
     if(newSt==='حضور'){
-      cell.style.background=isScheduled?'#059669':'#047857';
-      cell.style.color='#fff';
-      cell.style.backgroundImage='none';
-      cell.innerHTML=isScheduled?'✓':'✓<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>';
-      cell.style.fontSize='.82rem';
+      if(!isScheduled && isWeekendDay){
+        // Non-registered weekend: check payment → RED or GREEN
+        const paid=hasWeekendReceipt(childId, date);
+        cell.style.background=paid?'#059669':'#dc2626';
+        cell.style.backgroundImage='none';
+        cell.style.color='#fff';
+        if(paid){
+          cell.innerHTML='✓';
+        } else {
+          cell.innerHTML='✓<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#fbbf24;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#92400e;font-weight:900">$</div>';
+        }
+        cell.style.fontSize='.82rem';
+      } else {
+        cell.style.background=isScheduled?'#059669':'#047857';
+        cell.style.color='#fff';
+        cell.style.backgroundImage='none';
+        cell.innerHTML=isScheduled?'✓':'✓<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:1px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;color:#fff">!</div>';
+        cell.style.fontSize='.82rem';
+      }
     } else if(newSt==='غياب'){
       cell.style.background='#dc2626';
       cell.style.backgroundImage='none';
@@ -8167,7 +8249,9 @@ async function toggleKidsAtt(childId, date){
       // Back to empty — restore off-day style if not scheduled
       if(!isScheduled){
         cell.style.background='';
-        cell.style.backgroundImage='repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px)';
+        cell.style.backgroundImage=isWeekendDay
+          ?'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 7px)' // warm yellow for weekend off
+          :'repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px)';
         cell.style.color='#94a3b8';
         cell.innerHTML='—';
         cell.style.fontSize='.75rem';
