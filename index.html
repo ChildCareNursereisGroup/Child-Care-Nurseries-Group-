@@ -9177,9 +9177,25 @@ function showDTab(tab,btn){
       </div>
 
       <button onclick="printAttCertificate('${c.id}')"
-        style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 22px;cursor:pointer;font-weight:800;font-size:.85rem;font-family:'Tajawal',sans-serif;width:100%">
+        style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:10px 22px;cursor:pointer;font-weight:800;font-size:.85rem;font-family:'Tajawal',sans-serif;width:100%;margin-bottom:8px">
         ⬇️ Generate & Print Certificate
       </button>
+
+      <!-- WhatsApp send options -->
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px">
+        <div style="font-size:.75rem;font-weight:800;color:#065f46;margin-bottom:7px">💬 إرسال للأهل عبر واتساب — Send to Parents via WhatsApp</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button onclick="sendCertWA('${c.id}','ar')"
+            style="background:#25d366;color:#fff;border:none;border-radius:9px;padding:8px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">
+            💬 إرسال عربي
+          </button>
+          <button onclick="sendCertWA('${c.id}','en')"
+            style="background:#128c7e;color:#fff;border:none;border-radius:9px;padding:8px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700">
+            💬 Send English
+          </button>
+        </div>
+        <div style="font-size:.67rem;color:#6b7280;margin-top:5px;text-align:center">الرسالة تشمل تهنئة + رابط تقييم Google ⭐</div>
+      </div>
       ` : `
       <div style="text-align:center;padding:20px;color:#9ca3af;font-size:.83rem">
         <div style="font-size:2rem;margin-bottom:8px">📅</div>
@@ -9603,6 +9619,54 @@ function getCertSigDataURL(){
   const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
   const hasDrawing=data.some(v=>v!==0);
   return hasDrawing ? canvas.toDataURL('image/png') : null;
+}
+
+function sendCertWA(childId, lang2){
+  const c=DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return;
+  const phone=(c.parentMom||c.parentDad||'').replace(/\D/g,'');
+  if(!phone){alert('No parent phone number found');return;}
+  const num=formatWANum(c.parentMom||c.parentDad);
+  const b=CB();
+  const nurseryName=b.en||b.ar||'Nursery';
+  const nurseryAr=b.ar||'الحضانة';
+  const googleLink='https://g.page/r/XXXXXXXXXXXXXXXX/review'; // ← ضعي رابط Google Review بتاعكم هنا
+
+  let msg;
+  if(lang2==='ar'){
+    msg = `السلام عليكم ورحمة الله وبركاته 🌸
+
+عزيزنا ولي أمر ${c.name}،
+
+يسعدنا في ${nurseryAr} أن نُخبركم بأن شهادة حضور طفلكم/${c.name}/ قد تم إصدارها بنجاح. ✅
+
+نحن سعداء بخدمتكم وبثقتكم فينا لرعاية طفلكم الكريم.
+
+🌟 نودّ أن نطلب منكم لطفاً تقييمنا على Google — رأيكم يساعدنا على تقديم أفضل الخدمات ويساعد الأسر الأخرى على اتخاذ قرارهم:
+
+⭐ رابط التقييم:
+${googleLink}
+
+شكراً جزيلاً لثقتكم الغالية 💙
+${nurseryAr} — مجموعة رعاية الطفل للحضانات`;
+  } else {
+    msg = `Dear Parent of ${c.name}, 🌸
+
+We're delighted to inform you that your child's Attendance Certificate has been successfully issued. ✅
+
+It has been our pleasure to care for your child at ${nurseryName}.
+
+🌟 We would truly appreciate it if you could take a moment to leave us a Google Review — your feedback helps us improve and helps other families find us:
+
+⭐ Leave a Review:
+${googleLink}
+
+Thank you so much for your trust and support! 💙
+${nurseryName} — Child Care Nurseries Group`;
+  }
+
+  openWA(num, msg);
+  logActivity('whatsapp', `📜 Cert WA → ${c.name} (${lang2})`);
 }
 
 async function printAttCertificate(childId){
