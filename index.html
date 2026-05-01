@@ -9014,6 +9014,66 @@ function showDTab(tab,btn){
         <div class="fg"><label data-t="emailId">Email ID</label><input type="email" value="${c.email||''}" onchange="updateField('email',this.value)"></div>
       </div>
 
+      <!-- ══ FEES SECTION ══ -->
+      <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:.82rem;font-weight:900;color:#15803d;margin-bottom:10px">💰 الرسوم الشهرية — Monthly Fees</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:.74rem;font-weight:700;color:#166534;display:block;margin-bottom:4px">📅 الرسوم الشهرية — Monthly Fee (AED)</label>
+            <input type="number" min="0" value="${c.fee||0}"
+              onchange="updateField('fee',Number(this.value))"
+              style="width:100%;padding:8px 12px;border:2px solid #4ade80;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:1rem;font-weight:800;color:#15803d;box-sizing:border-box;background:#fff">
+          </div>
+          <div>
+            <label style="font-size:.74rem;font-weight:700;color:#92400e;display:block;margin-bottom:4px">🚌 رسوم المواصلات — Transport Fee (AED)</label>
+            <input type="number" min="0" value="${c.busFee||0}"
+              onchange="updateField('busFee',Number(this.value))"
+              style="width:100%;padding:8px 12px;border:2px solid #fcd34d;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:1rem;font-weight:800;color:#92400e;box-sizing:border-box;background:#fff">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:.75rem;font-weight:800;color:#d97706;margin-bottom:4px">🟡 الجمعة — Friday</div>
+            <input type="number" min="0" value="${c.friFee||0}"
+              onchange="updateField('friFee',Number(this.value))"
+              style="width:100%;padding:5px;border:1px solid #fde68a;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:700;text-align:center;box-sizing:border-box">
+            <div style="font-size:.65rem;color:#92400e;margin-top:3px">AED/month</div>
+          </div>
+          <div style="background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:.75rem;font-weight:800;color:#7c3aed;margin-bottom:4px">🟣 السبت — Saturday</div>
+            <input type="number" min="0" value="${c.satFee||0}"
+              onchange="updateField('satFee',Number(this.value))"
+              style="width:100%;padding:5px;border:1px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:700;text-align:center;box-sizing:border-box">
+            <div style="font-size:.65rem;color:#5b21b6;margin-top:3px">AED/month</div>
+          </div>
+          <div style="background:#ecfeff;border:1.5px solid #cffafe;border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:.75rem;font-weight:800;color:#0891b2;margin-bottom:4px">🔵 الأحد — Sunday</div>
+            <input type="number" min="0" value="${c.sunFee||0}"
+              onchange="updateField('sunFee',Number(this.value))"
+              style="width:100%;padding:5px;border:1px solid #cffafe;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:700;text-align:center;box-sizing:border-box">
+            <div style="font-size:.65rem;color:#164e63;margin-top:3px">AED/month</div>
+          </div>
+        </div>
+        ${(()=>{
+          const wk=(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+          const bus=(c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0;
+          const tot=(c.fee||0)+bus+wk;
+          const parts=[];
+          if(c.fee)    parts.push('رسوم: '+fmtNum(c.fee));
+          if(bus)      parts.push('مواصلات: '+fmtNum(bus));
+          if(c.friFee) parts.push('🟡 '+fmtNum(c.friFee));
+          if(c.satFee) parts.push('🟣 '+fmtNum(c.satFee));
+          if(c.sunFee) parts.push('🔵 '+fmtNum(c.sunFee));
+          return `<div style="background:#fff;border:2px solid #4ade80;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:.68rem;color:#15803d;font-weight:700;margin-bottom:2px">💳 الإجمالي الشهري المتوقع</div>
+              <div style="font-size:.7rem;color:#6b7280">${parts.join(' + ')}</div>
+            </div>
+            <div style="font-size:1.3rem;font-weight:900;color:#15803d">${fmtNum(tot)} AED</div>
+          </div>`;
+        })()}
+      </div>
+
       <!-- SUSPENSION SECTION -->
       <div style="background:${c.suspendDate&&!c.resumeDate?'#fef3c7':'#f9fafb'};border:1.5px solid ${c.suspendDate&&!c.resumeDate?'#fcd34d':'#e5e7eb'};border-radius:10px;padding:11px 13px;margin-bottom:9px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -9048,7 +9108,6 @@ function showDTab(tab,btn){
       </div>
 
       <div class="g3" style="margin-bottom:9px">
-        <div class="fg"><label data-t="transportPayment">Transportation Payment (AED)</label><input type="number" value="${c.busFee||0}" onchange="updateField('busFee',Number(this.value))"></div>
         <div class="fg"><label data-t="useBus">Use Bus</label>
           <select onchange="updateField('bus',this.value);toggleBusFieldsEdit(this.value)">
             <option value="No" ${c.bus==='No'?'selected':''}>No 🚶</option>
@@ -9085,53 +9144,7 @@ function showDTab(tab,btn){
           </div>
         </div>
         <div class="fg"><label>Leave Date</label><input type="date" value="${c.leaveDate||''}" onchange="updateField('leaveDate',this.value||null)"></div>
-        <!-- Weekend Fees -->
-        <div class="fg" style="grid-column:1/-1">
-          <label>🎉 Weekend Fees — رسوم الويكند (per month / شهرياً)</label>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:5px">
-            <div style="border:1.5px solid #fde68a;border-radius:10px;padding:8px;background:#fffbeb">
-              <div style="font-weight:800;color:#d97706;font-size:.83rem;margin-bottom:4px">🟡 Friday</div>
-              <div style="font-size:.7rem;color:#92400e;margin-bottom:3px">Fee/month (AED)</div>
-              <input type="number" value="${c.friFee||0}" min="0" placeholder="0"
-                onchange="updateField('friFee',Number(this.value))"
-                style="width:100%;padding:5px;border:1px solid #fde68a;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
-            </div>
-            <div style="border:1.5px solid #ddd6fe;border-radius:10px;padding:8px;background:#f5f3ff">
-              <div style="font-weight:800;color:#7c3aed;font-size:.83rem;margin-bottom:4px">🟣 Saturday</div>
-              <div style="font-size:.7rem;color:#5b21b6;margin-bottom:3px">Fee/month (AED)</div>
-              <input type="number" value="${c.satFee||0}" min="0" placeholder="0"
-                onchange="updateField('satFee',Number(this.value))"
-                style="width:100%;padding:5px;border:1px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
-            </div>
-            <div style="border:1.5px solid #cffafe;border-radius:10px;padding:8px;background:#ecfeff">
-              <div style="font-weight:800;color:#0891b2;font-size:.83rem;margin-bottom:4px">🔵 Sunday</div>
-              <div style="font-size:.7rem;color:#164e63;margin-bottom:3px">Fee/month (AED)</div>
-              <input type="number" value="${c.sunFee||0}" min="0" placeholder="0"
-                onchange="updateField('sunFee',Number(this.value))"
-                style="width:100%;padding:5px;border:1px solid #cffafe;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
-            </div>
-          </div>
-        </div>
       </div>
-      <!-- TOTAL EXPECTED MONTHLY -->
-      ${(()=>{
-        const wk=(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
-        const bus=(c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0;
-        const tot=(c.fee||0)+bus+wk;
-        const parts=[];
-        if(c.fee) parts.push((lang==='ar'?'رسوم':'Fees')+': '+fmtNum(c.fee));
-        if(bus)   parts.push((lang==='ar'?'مواصلات':'Bus')+': '+fmtNum(bus));
-        if(c.friFee) parts.push('🟡Fri: '+fmtNum(c.friFee));
-        if(c.satFee) parts.push('🟣Sat: '+fmtNum(c.satFee));
-        if(c.sunFee) parts.push('🔵Sun: '+fmtNum(c.sunFee));
-        return `<div style="background:${CB().l};border:1.5px solid ${CB().c};border-radius:11px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-          <div>
-            <div style="font-size:.72rem;color:${CB().c};font-weight:700;margin-bottom:3px">${lang==='ar'?'💰 إجمالي الدفع الشهري المتوقع':'💰 Total Expected Monthly Payment'}</div>
-            <div style="font-size:.76rem;color:#6b7280">${parts.join(' + ')}</div>
-          </div>
-          <div style="font-size:1.3rem;font-weight:900;color:${CB().c}">${fmtNum(tot)} AED</div>
-        </div>`;
-      })()}
       <div class="fg" style="margin-bottom:9px"><label>Notes</label><textarea rows="2" onchange="updateField('notes',this.value)">${c.notes||''}</textarea></div>
       ${c.leaveDate ? `
       <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:14px;padding:14px 16px;margin-bottom:10px">
