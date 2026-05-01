@@ -581,6 +581,13 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
       <input type="hidden" id="edit-rec-id">
+      <!-- Admin only: rename child everywhere -->
+      <div id="edit-rec-childname-row" style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:9px;padding:8px 12px;display:none">
+        <div style="font-size:.7rem;font-weight:700;color:#92400e;margin-bottom:5px">👤 Rename Child — تغيير اسم الطفل <span style="font-weight:400;color:#b45309">(بيتغير في سجل الطفل + كل إيصالاته معاً)</span></div>
+        <input type="text" id="edit-rchild-name" placeholder="اسم الطفل الجديد..."
+          style="width:100%;padding:6px 10px;border:1.5px solid #fbbf24;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:700;box-sizing:border-box">
+        <div style="font-size:.65rem;color:#92400e;margin-top:4px">⚠️ هيتغير الاسم في سجل الطفل وفي جميع إيصالاته — اتركه كما هو لو مش عايزة تغيير</div>
+      </div>
       <div class="g3" style="gap:8px">
         <div class="fg"><label>Receipt No. <span style="font-size:.68rem;color:#6b7280">(auto)</span></label><input type="text" id="edit-rnum" readonly style="font-family:'Tajawal',sans-serif;background:#f0f4ff;color:#1e3a8a;font-weight:800;cursor:not-allowed"></div>
         <div class="fg"><label>Date</label><input type="date" id="edit-rdate" style="font-family:'Tajawal',sans-serif"></div>
@@ -6548,12 +6555,18 @@ async function printHistoricalAttReport(){
   // Helper: resolve off-day status based on neighbors
   const resolveOffDay=(d,mon,daysInMonth)=>{
     const getNear=(dir)=>{
-      for(let i=1;i<=7;i++){
+      for(let i=1;i<=14;i++){
         const nd=d+(dir*i);
         if(nd<1||nd>daysInMonth) return null;
         const nDate=`${mon}-${String(nd).padStart(2,'0')}`;
-        if(workDays.includes(new Date(nDate+'T00:00:00').getDay()))
-          return attMap[nDate]||'unset';
+        const nDow=new Date(nDate+'T00:00:00').getDay();
+        if(workDays.includes(nDow)){
+          // Found a real work day — return its status
+          const st=attMap[nDate]||'';
+          if(st && st!=='إجازة') return st;
+          return 'unset';
+        }
+        // Non-work day: skip entirely
       }
       return null;
     };
@@ -6738,12 +6751,20 @@ function openStaffAttReportModal(){
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px">
           <div>
+            <div style="font-size:.65rem;color:#1e3a8a;font-weight:700;margin-bottom:2px">✏️ Override Present Days <span style="color:#9ca3af;font-weight:400">(leave blank = auto)</span></div>
+            <input type="number" min="0" step="0.5" placeholder="auto" id="adj-present-override-${s.id}"
+              style="width:100%;padding:4px 8px;border:2px solid #bfdbfe;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;color:#1e3a8a;box-sizing:border-box"
+              title="اكتبي العدد الصحيح لأيام الحضور لو الحساب التلقائي مش صح">
+          </div>
+          <div>
             <div style="font-size:.65rem;color:#0369a1;font-weight:700;margin-bottom:2px">📋 Registrations <span style="color:#059669">(+50 AED each)</span></div>
             <input type="number" min="0" step="1" placeholder="0" id="adj-reg-${s.id}"
               oninput="updateRegCalc('${s.id}')"
               style="width:100%;padding:4px 8px;border:1.5px solid #bae6fd;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
             <div id="adj-reg-aed-${s.id}" style="font-size:.65rem;color:#0369a1;margin-top:1px;min-height:12px"></div>
           </div>
+        </div>
+        <div style="margin-bottom:5px">
           <div>
             <div style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-bottom:2px">💳 Loan Deduction (AED)</div>
             <input type="number" min="0" placeholder="0" id="adj-loan-${s.id}"
@@ -6800,6 +6821,12 @@ async function saveAdjDataToHistory(){
       else if(st==='غياب') absent++;
       else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
     });
+    // Apply manual override if provided
+    const overrideRaw = document.getElementById('adj-present-override-'+s.id)?.value;
+    if(overrideRaw!==''&&overrideRaw!=null&&overrideRaw!==undefined){
+      const ov=Number(overrideRaw);
+      if(!isNaN(ov)){ present=ov; absent=Math.max(0,daysInMonth-ov); }
+    }
     const absDeduct=absent*daily;
     const bonusAed=bonusDays*daily;
     const deductAed=deductDays*daily;
@@ -7033,17 +7060,18 @@ async function printStaffAttReport(exportType='print'){
     if(!isWorkDay){
       const sMap = attMap[String(staffId)]||{};
       const getNearSt=(dir)=>{
-        for(let i=1;i<=7;i++){
+        for(let i=1;i<=14;i++){
           const ni=dayIdx+(dir*i);
           if(ni<0||ni>=days.length) return null;
           const nDow=new Date(days[ni]+'T00:00:00').getDay();
           const rec=sMap[days[ni]]||'';
           const neighborIsWorkDay=workDays.includes(nDow);
-          // If neighbor has an explicit record → use it
-          if(rec&&rec!=='إجازة') return rec;
-          // If it's a scheduled work day with NO record → unrecorded, stop here
-          if(neighborIsWorkDay&&!rec) return 'unset';
-          // Off day with no record → skip, keep searching
+          // ONLY use the status of a scheduled WORK DAY — skip non-work days entirely
+          if(neighborIsWorkDay){
+            if(rec && rec!=='إجازة') return rec; // work day with real record
+            return 'unset'; // work day with no (or leave) record
+          }
+          // Non-work day: skip regardless of any saved record
         }
         return null;
       };
@@ -7106,6 +7134,9 @@ async function printStaffAttReport(exportType='print'){
     const loanReason  = document.getElementById('adj-loan-reason-'+s.id)?.value||'';
     const regCount    = Number(document.getElementById('adj-reg-'+s.id)?.value||0);
     const regBonus    = regCount * 50;
+    // Manual override for present days (if filled, use it; otherwise auto-calculate)
+    const presentOverride = document.getElementById('adj-present-override-'+s.id)?.value;
+    const presentOverrideVal = presentOverride!==''&&presentOverride!=null ? Number(presentOverride) : null;
 
     // Use CONTRACT branch (branchId), not work branch
     const contractBranch = BRANCHES.find(x=>x.id===s.branchId)||b;
@@ -7161,7 +7192,10 @@ async function printStaffAttReport(exportType='print'){
     // Use GROSS salary for all calculations
     const gross     = Number(s.grossSalary||s.basicSalary||0);
     const daily     = gross>0 ? gross/30 : 0;
-    const absentDed = absent>0&&gross>0 ? absent*daily : 0;
+    // Apply manual override if provided
+    const finalPresent = (presentOverrideVal !== null && !isNaN(presentOverrideVal)) ? presentOverrideVal : present;
+    const finalAbsent  = (presentOverrideVal !== null && !isNaN(presentOverrideVal)) ? Math.max(0, daysInMonth - finalPresent) : absent;
+    const absentDed = finalAbsent>0&&gross>0 ? finalAbsent*daily : 0;
     const bonusAed  = bonusDays>0  ? bonusDays*daily  : 0;
     const deductAed = deductDays>0 ? deductDays*daily : 0;
     const netSalary = gross - absentDed - deductAed - loanAed + bonusAed + regBonus;
@@ -7203,11 +7237,11 @@ async function printStaffAttReport(exportType='print'){
           <div class="sum-lbl" style="color:#1e40af">${isAr?'أيام الشهر':'Month Days'}</div>
         </div>
         <div class="sum-cell" style="background:#d1fae5">
-          <div class="sum-num" style="color:#059669">${Number(present).toFixed(present%1?1:0)}</div>
+          <div class="sum-num" style="color:#059669">${Number(finalPresent).toFixed(finalPresent%1?1:0)}${presentOverrideVal!==null&&!isNaN(presentOverrideVal)?'<span style="font-size:.5rem;color:#d97706;display:block;margin-top:1px">✏️ manual</span>':''}</div>
           <div class="sum-lbl" style="color:#059669">${isAr?'أيام الحضور':'Present'}</div>
         </div>
         <div class="sum-cell" style="background:#fee2e2">
-          <div class="sum-num" style="color:#dc2626">${Number(absent).toFixed(absent%1?1:0)}</div>
+          <div class="sum-num" style="color:#dc2626">${Number(finalAbsent).toFixed(finalAbsent%1?1:0)}</div>
           <div class="sum-lbl" style="color:#dc2626">${isAr?'أيام الغياب':'Absent'}</div>
         </div>
         <div class="sum-cell" style="background:#fef3c7">
@@ -16831,6 +16865,12 @@ function openEditRec(id){
   el('edit-rto').value      = r.toDate||'';
   el('edit-rnotes').value   = r.notes||'';
   el('edit-rec-alert').innerHTML = '';
+  // Show child name override for admin only
+  const cnRow = el('edit-rec-childname-row');
+  if(cnRow){
+    cnRow.style.display = (curRole==='admin') ? 'block' : 'none';
+  }
+  if(el('edit-rchild-name')) el('edit-rchild-name').value = r.childName||'';
   // Show existing total — don't recalculate if fields might be missing
   if(el('edit-total-show')) el('edit-total-show').textContent = (r.total||0).toFixed(2);
   calcEditTotal();
@@ -16870,7 +16910,8 @@ async function saveEditRec(){
   const newVals = 'Fee:'+fee+' Reg:'+reg+' Bus:'+bus+' Clo:'+clo+' Sup:'+sup+' Total:'+tot;
 
   setSyncing(true);
-  const {error} = await sb.from('receipts').update({
+  // Build update payload
+  const updatePayload = {
     receipt_num: el('edit-rnum').value.trim(),
     date:        el('edit-rdate').value,
     from_date:   el('edit-rfrom')?.value||null,
@@ -16884,7 +16925,28 @@ async function saveEditRec(){
     vat_type:vatType, vat_amount:vat,
     total:tot,
     notes: el('edit-rnotes').value
-  }).eq('id', id);
+  };
+  // Admin can rename child — updates children table + ALL receipts for that child
+  let childRenamed = false;
+  if(curRole==='admin' && el('edit-rchild-name')){
+    const newChildName = el('edit-rchild-name').value.trim();
+    if(newChildName && newChildName !== r.childName && r.childId) {
+      // 1. Update children table
+      const {error: childErr} = await sb.from('children').update({name: newChildName}).eq('id', r.childId);
+      if(!childErr){
+        // 2. Update ALL receipts for this child (not just this one)
+        await sb.from('receipts').update({child_name: newChildName})
+          .eq('child_id', r.childId).eq('branch_id', r.branchId);
+        // 3. Update local DB.children cache
+        const child = DB.children.find(c=>String(c.id)===String(r.childId));
+        if(child) child.name = newChildName;
+        // 4. Update local DB.receipts cache
+        DB.receipts.forEach(rec=>{ if(String(rec.childId)===String(r.childId)) rec.childName=newChildName; });
+        childRenamed = true;
+      }
+    }
+  }
+  const {error} = await sb.from('receipts').update(updatePayload).eq('id', id);
   setSyncing(false);
 
   if(error){
@@ -16893,13 +16955,15 @@ async function saveEditRec(){
   }
 
   // Log edit for admin report
-  logActivity('edit', '✏️ '+r.childName+' | #'+r.receiptNum+' | '+oldVals+' → '+newVals);
+  const nameNote = childRenamed ? ` | 👤 Renamed: ${r.childName}→${el('edit-rchild-name')?.value?.trim()}` : '';
+  logActivity('edit', '✏️ '+r.childName+' | #'+r.receiptNum+' | '+oldVals+' → '+newVals+nameNote);
 
-  // Save to audit log in Supabase (optional - use notes for now)
   el('edit-rec-modal').classList.remove('on');
   await loadFromSupa(curBid);
   renderRecs(); renderDashboard();
-  showAlert('recalert','✅ تم التعديل بنجاح!',false);
+  showAlert('recalert', childRenamed
+    ? `✅ تم التعديل وتغيير الاسم في كل الإيصالات وسجل الطفل!`
+    : '✅ تم التعديل بنجاح!', false);
 }
 
 // ─── Fix/Renumber All Receipts ──────────────────
