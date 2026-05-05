@@ -2154,7 +2154,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="vis-list"></div>
 </div>
-</div>
 
 <!-- FOLLOW-UP WHATSAPP MODAL -->
 <div class="mover" id="followup-modal">
@@ -3397,28 +3396,31 @@ function renderPV(){
   const month=el('pvmon')?.value||monthOf(new Date());
   const active=DB.children.filter(c=>!c.leaveDate&&c.fee>0);
   if(!active.length){el('pvcont').innerHTML=`<div class="empty"><div class="ei">👶</div><p>لا يوجد أطفال</p></div>`;return;}
-  let ok=0,miss=0,part=0;
-  const rows=active.map(c=>{
+  let ok=0,miss=0,part=0,totalExp=0,totalPaid=0;
+  active.forEach(c=>{
     const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
-    const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);const diff=exp-paid;
-    let cls,txt;
-    if(paid===0){cls='pmiss';txt=t('notPaid');miss++;}
-    else if(diff<=0){cls='pok';txt=t('paid');ok++;}
-    else{cls='ppart';txt=t('partial');part++;}
-    const pct=exp>0?Math.min(100,Math.round(paid/exp*100)):0;
-    return`<div class="pcard ${cls}" onclick="openChild('${c.id}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px">
-        <div style="display:flex;align-items:center;gap:7px">
-          <div class="av" style="background:${chCol(c.id)};width:28px;height:28px;font-size:.75rem">${(c.name||'؟')[0]}</div>
-          <div><div style="font-weight:700;font-size:.88rem">${c.name}</div><div style="font-size:.7rem;color:var(--muted)">${c.className||''}</div></div>
-        </div>
-        <div style="font-size:.76rem">متوقع: <b>${fmtNum(exp)}</b> | مدفوع: <b style="color:var(--ok)">${fmtNum(paid)}</b>${diff>0?` | متبقي: <b style="color:var(--err)">${fmtNum(diff)}</b>`:''}</div>
-        <span style="font-weight:700;font-size:.76rem">${txt}</span>
+    const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
+    const diff=exp-paid;
+    totalExp+=exp; totalPaid+=paid;
+    if(paid===0) miss++;
+    else if(diff<=0) ok++;
+    else part++;
+  });
+  const pct=totalExp>0?Math.min(100,Math.round(totalPaid/totalExp*100)):0;
+  el('pvcont').innerHTML=`
+    <div class="sboxes" style="margin-bottom:10px">
+      <div class="sbox sg"><div class="sv">${ok}</div><div class="sk">${t('paid')}</div></div>
+      <div class="sbox sy"><div class="sv">${part}</div><div class="sk">${t('partial')}</div></div>
+      <div class="sbox sr"><div class="sv">${miss}</div><div class="sk">${t('notPaid')}</div></div>
+    </div>
+    <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:.7rem;color:#166534;font-weight:700;margin-bottom:2px">💰 ${lang==='ar'?'إجمالي الشهر':'Month Total'} — ${month}</div>
+        <div style="font-size:.76rem;color:#374151">${lang==='ar'?'متوقع':'Expected'}: <b>${fmtNum(totalExp)}</b> د.إ &nbsp;|&nbsp; ${lang==='ar'?'محصّل':'Collected'}: <b style="color:#059669">${fmtNum(totalPaid)}</b> د.إ ${totalExp-totalPaid>0?`&nbsp;|&nbsp; ${lang==='ar'?'متبقي':'Remaining'}: <b style="color:#dc2626">${fmtNum(totalExp-totalPaid)}</b> د.إ`:''}</div>
       </div>
-      <div class="pbar"><div class="pbfill" style="width:${pct}%;background:${diff<=0?'var(--ok)':diff<exp?'var(--warn)':'var(--err)'}"></div></div>
-    </div>`;
-  }).join('');
-  el('pvcont').innerHTML=`<div class="sboxes"><div class="sbox sg"><div class="sv">${ok}</div><div class="sk">${t('paid')}</div></div><div class="sbox sy"><div class="sv">${part}</div><div class="sk">${t('partial')}</div></div><div class="sbox sr"><div class="sv">${miss}</div><div class="sk">${t('notPaid')}</div></div></div>${rows}`;
+      <div style="font-size:1.4rem;font-weight:900;color:${pct>=100?'#059669':pct>=50?'#d97706':'#dc2626'}">${pct}%</div>
+    </div>
+    <div class="pbar" style="margin-top:6px;height:8px;border-radius:6px"><div class="pbfill" style="width:${pct}%;height:8px;border-radius:6px;background:${pct>=100?'var(--ok)':pct>=50?'var(--warn)':'var(--err)'}"></div></div>`;
 }
 async function switchBranch(bid){
   curBid = bid;
@@ -8488,7 +8490,13 @@ function buildCmsgText(childName){
   let msg = (el('cmsg-text')?.value||'').trim();
   if(!msg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Please write a message first!'); return null; }
   if(personalize && childName){
-    msg = `🌸 ولي أمر الطفل/ة ${childName}،\n\n` + msg + `\n\n— مجموعة رعاية الطفل للحضانات 🏫`;
+    const prefix = lang==='ar'
+      ? `🌸 ولي أمر الطفل/ة ${childName}،\n\n`
+      : `🌸 Dear Parent of ${childName},\n\n`;
+    const suffix = lang==='ar'
+      ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫`
+      : `\n\n— Child Care Nurseries Group 🏫`;
+    msg = prefix + msg + suffix;
   }
   return msg;
 }
@@ -8519,7 +8527,10 @@ async function sendClassMsgBulk(){
   let sent=0;
   for(const c of withPhone){
     const phone = c.parentMom||c.parentDad;
-    const finalMsg = personalize ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n${(el('cmsg-text')?.value||'').trim()}\n\n— مجموعة رعاية الطفل للحضانات 🏫` : msg;
+    const rawMsg = (el('cmsg-text')?.value||'').trim();
+    const prefix = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
+    const suffix = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
+    const finalMsg = personalize ? prefix + rawMsg + suffix : rawMsg;
     openWA(phone, finalMsg);
     logActivity('whatsapp', `💬 Bulk Msg → ${c.name} (${c.className||'—'})`);
     sent++;
@@ -8542,7 +8553,9 @@ async function sendClassMsgSelected(){
     if(!c) continue;
     const phone = c.parentMom||c.parentDad;
     if(!phone) continue;
-    const finalMsg = personalize ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n${rawMsg}\n\n— مجموعة رعاية الطفل للحضانات 🏫` : rawMsg;
+    const pfx = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
+    const sfx = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
+    const finalMsg = personalize ? pfx + rawMsg + sfx : rawMsg;
     openWA(phone, finalMsg);
     logActivity('whatsapp', `💬 Individual Msg → ${c.name} (${c.className||'—'})`);
     sent++;
@@ -8554,12 +8567,28 @@ async function sendClassMsgSelected(){
 function insertCmsgTemplate(type){
   const ta = el('cmsg-text');
   if(!ta) return;
+  const isAr = lang==='ar';
   const templates = {
-    reminder: `السادة أولياء الأمور الكرام 🌸\n\nنود تذكيركم بأن رسوم الشهر الحالي مستحقة السداد.\nيرجى التواصل مع إدارة الحضانة لإتمام الدفع.\n\nشكراً لتعاونكم 🙏`,
-    event:    `السادة أولياء الأمور 🎉\n\nيسعدنا دعوتكم لحضور:\n📅 التاريخ: \n⏰ الوقت: \n📍 المكان: \n\nنتطلع لرؤيتكم 🌸`,
-    holiday:  `السادة أولياء الأمور المحترمون 🏖️\n\nنحيطكم علماً بأن الحضانة ستكون مغلقة بمناسبة:\n📅 من: \n📅 إلى: \n\nنتمنى لكم إجازة ممتعة 🌟`,
-    uniform:  `السادة أولياء الأمور 👗\n\nيرجى التأكد من ارتداء طفلكم/ة الزي الرسمي للحضانة يومياً.\nالزي الكامل: \n\nشكراً لالتزامكم 🙏`,
-    medical:  `السادة أولياء الأمور 💊\n\nنود إحاطتكم علماً بـ:\n\nيرجى اتخاذ الاحتياطات اللازمة والتواصل مع الإدارة عند الحاجة.\n\nدمتم بصحة وسلامة 🌸`,
+    reminder: isAr
+      ? `السادة أولياء الأمور الكرام 🌸\n\nنود تذكيركم بأن رسوم الشهر الحالي مستحقة السداد.\nيرجى التواصل مع إدارة الحضانة لإتمام الدفع في أقرب وقت.\n\nشكراً لتعاونكم 🙏`
+      : `Dear Parents 🌸\n\nThis is a friendly reminder that this month's fees are now due.\nPlease contact the nursery administration to complete your payment at the earliest convenience.\n\nThank you for your cooperation 🙏`,
+
+    event: isAr
+      ? `السادة أولياء الأمور 🎉\n\nيسعدنا دعوتكم لحضور:\n📅 التاريخ: \n⏰ الوقت: \n📍 المكان: \n\nنتطلع لرؤيتكم 🌸`
+      : `Dear Parents 🎉\n\nWe are pleased to invite you to:\n📅 Date: \n⏰ Time: \n📍 Location: \n\nWe look forward to seeing you 🌸`,
+
+    holiday: isAr
+      ? `السادة أولياء الأمور المحترمون 🏖️\n\nنحيطكم علماً بأن الحضانة ستكون مغلقة بمناسبة:\n📅 من: \n📅 إلى: \n\nنتمنى لكم إجازة ممتعة 🌟`
+      : `Dear Parents 🏖️\n\nPlease be informed that the nursery will be closed due to:\n📅 From: \n📅 To: \n\nWishing you a wonderful holiday 🌟`,
+
+    uniform: isAr
+      ? `السادة أولياء الأمور 👗\n\nيرجى التأكد من ارتداء طفلكم/ة الزي الرسمي للحضانة يومياً.\nالزي الكامل: \n\nشكراً لالتزامكم 🙏`
+      : `Dear Parents 👗\n\nPlease ensure your child wears the official nursery uniform every day.\nFull uniform includes: \n\nThank you for your cooperation 🙏`,
+
+    medical: isAr
+      ? `السادة أولياء الأمور 💊\n\nنود إحاطتكم علماً بـ:\n\nيرجى اتخاذ الاحتياطات اللازمة والتواصل مع الإدارة عند الحاجة.\n\nدمتم بصحة وسلامة 🌸`
+      : `Dear Parents 💊\n\nWe would like to inform you of the following:\n\nPlease take the necessary precautions and contact the administration if needed.\n\nWishing you and your family good health 🌸`,
+
     custom:   '',
   };
   ta.value = templates[type]||'';
