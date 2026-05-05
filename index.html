@@ -1954,9 +1954,115 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 
 <!-- VISITORS PAGE -->
-<div class="page" id="pg-visitors">
+<div class="page" id="pg-class-msg">
+<div class="card np">
+  <div class="ch">
+    <div class="ct">💬 رسائل الفصول — Class Messages</div>
+  </div>
 
-<!-- ══ INQUIRY FORM (receipt-style) ══ -->
+  <!-- ── Controls Row ── -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:12px 14px;background:#f0f9ff;border-radius:12px;border:1.5px solid #bae6fd">
+
+    <!-- Class selector -->
+    <div style="flex:1;min-width:150px">
+      <div style="font-size:.72rem;font-weight:700;color:#0369a1;margin-bottom:4px">🎓 الفصل — Class</div>
+      <select id="cmsg-class" onchange="renderClassMsgList()"
+        style="width:100%;padding:7px 10px;border:1.5px solid #bae6fd;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.85rem">
+        <option value="__all__">📋 كل الفصول — All Classes</option>
+      </select>
+    </div>
+
+    <!-- Send mode -->
+    <div style="flex:1;min-width:150px">
+      <div style="font-size:.72rem;font-weight:700;color:#0369a1;margin-bottom:4px">📤 طريقة الإرسال — Mode</div>
+      <select id="cmsg-mode" onchange="toggleCmsgMode()"
+        style="width:100%;padding:7px 10px;border:1.5px solid #bae6fd;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.85rem">
+        <option value="bulk">👥 جماعي لكل الفصل — Bulk to class</option>
+        <option value="individual">👤 فردي (اختار أولياء) — Individual</option>
+      </select>
+    </div>
+
+    <!-- Refresh -->
+    <button onclick="renderClassMsgList()"
+      style="padding:7px 14px;background:#0369a1;color:#fff;border:none;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer">
+      🔄 تحديث
+    </button>
+  </div>
+
+  <!-- ── Message compose area ── -->
+  <div style="background:#fff;border:2px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:.75rem;font-weight:800;color:#0369a1;margin-bottom:8px">✏️ اكتبي الرسالة — Write Message</div>
+
+    <!-- Quick templates -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button onclick="insertCmsgTemplate('reminder')"
+        style="padding:4px 10px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#1e40af">
+        📅 تذكير دفع
+      </button>
+      <button onclick="insertCmsgTemplate('event')"
+        style="padding:4px 10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#166534">
+        🎉 فعالية
+      </button>
+      <button onclick="insertCmsgTemplate('holiday')"
+        style="padding:4px 10px;background:#fef9c3;border:1.5px solid #fde047;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#854d0e">
+        🏖️ إجازة
+      </button>
+      <button onclick="insertCmsgTemplate('uniform')"
+        style="padding:4px 10px;background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#7e22ce">
+        👗 الزي
+      </button>
+      <button onclick="insertCmsgTemplate('medical')"
+        style="padding:4px 10px;background:#fff1f2;border:1.5px solid #fecdd3;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#be123c">
+        💊 طبي
+      </button>
+      <button onclick="insertCmsgTemplate('custom')"
+        style="padding:4px 10px;background:#f9fafb;border:1.5px solid #d1d5db;border-radius:20px;font-family:'Tajawal',sans-serif;font-size:.72rem;cursor:pointer;font-weight:700;color:#374151">
+        ✏️ مخصص
+      </button>
+    </div>
+
+    <textarea id="cmsg-text" rows="5" placeholder="اكتبي رسالتك هنا... / Write your message here..."
+      style="width:100%;padding:10px;border:1.5px solid #bae6fd;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.88rem;line-height:1.7;resize:vertical;box-sizing:border-box"></textarea>
+
+    <!-- Personalize toggle -->
+    <label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:.78rem;color:#374151;font-weight:600">
+      <input type="checkbox" id="cmsg-personalize" checked style="accent-color:#0369a1">
+      تشخيص الرسالة — Add child's name automatically (👤 اسم الطفل)
+    </label>
+  </div>
+
+  <!-- ── Bulk send button ── -->
+  <div id="cmsg-bulk-bar" style="margin-bottom:12px">
+    <button onclick="sendClassMsgBulk()"
+      style="width:100%;padding:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:12px;font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:900;cursor:pointer;letter-spacing:.3px">
+      💬 إرسال لكل الفصل عبر واتساب — Send to whole class
+    </button>
+    <div id="cmsg-bulk-status" style="margin-top:6px;font-size:.75rem;color:#6b7280;text-align:center"></div>
+  </div>
+
+  <!-- ── Individual list ── -->
+  <div id="cmsg-individual-bar" style="display:none;margin-bottom:10px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <button onclick="selectAllCmsg(true)"
+        style="padding:5px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">
+        ✅ تحديد الكل
+      </button>
+      <button onclick="selectAllCmsg(false)"
+        style="padding:5px 12px;background:#6b7280;color:#fff;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">
+        ⬜ إلغاء الكل
+      </button>
+      <button onclick="sendClassMsgSelected()"
+        style="padding:5px 14px;background:#25d366;color:#fff;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800;cursor:pointer">
+        💬 إرسال المحددين
+      </button>
+      <div id="cmsg-sel-count" style="font-size:.78rem;color:#0369a1;font-weight:700"></div>
+    </div>
+  </div>
+
+  <!-- ── Children list ── -->
+  <div id="cmsg-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
+</div>
+</div><!-- end pg-class-msg -->
 <div class="card np" id="inquiry-form-card">
   <div class="ch">
     <div class="ct" id="vis-form-title">📋 New Inquiry — استفسار جديد</div>
@@ -2202,8 +2308,8 @@ const BRANCHES = [
   {id:'b5', ar:'أبطال البراعم',   en:'Abtal Al Baraeim',  icon:'🦸', c:'#dc2626', l:'#fee2e2'},
 ];
 const ROLES_PAGES = {
-  admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','admin'],
-  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff'],
+  admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','class-msg','admin'],
+  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff','class-msg'],
   visitor_reg:['visitors'],
   receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
   expenses:   ['expenses'],
@@ -3139,6 +3245,7 @@ function renderNav(){
     buses:()=>lang==='ar'?'🚌 الباصات':'🚌 Buses',
     birthdays:()=>lang==='ar'?'🎂 أعياد الميلاد':'🎂 Birthdays',
     reminders:()=>lang==='ar'?'💸 تذكير الرسوم':'💸 Fee Reminders',
+    'class-msg':()=>lang==='ar'?'💬 رسائل الفصول':'💬 Class Messages',
   };
   el('nav').innerHTML=pages.map((p,i)=>`<button class="ntab${i===0?' on':''}" onclick="showPage('${p}',this)">${labels[p]()}</button>`).join('');
 }
@@ -3172,6 +3279,7 @@ async function showPage(page,btn){
   if(page==='birthdays'){
     const p=el('bday-month-picker2'); if(p&&!p.value){p.value=today().slice(0,7);} renderBirthdayPanel();
   }
+  if(page==='class-msg') initClassMsgPage();
   if(page==='reminders'){
     const inp=el('fee-rem-month');
     if(inp&&!inp.value){const d=new Date();d.setMonth(d.getMonth()+1);inp.value=d.toISOString().slice(0,7);}
@@ -8205,6 +8313,183 @@ Best regards 🌸`;
   // Update button visually
   renderAtt();
 }
+
+// ═══════════════════════════════════════════════
+// CLASS MESSAGING SYSTEM 💬
+// ═══════════════════════════════════════════════
+function initClassMsgPage(){
+  // Populate class dropdown
+  const sel = el('cmsg-class');
+  if(!sel) return;
+  const classes = [...new Set(
+    DB.children.filter(c=>!c.leaveDate).map(c=>c.className||'—').filter(Boolean)
+  )].sort();
+  sel.innerHTML = `<option value="__all__">${lang==='ar'?'📋 كل الفصول':'📋 All Classes'}</option>`
+    + classes.map(c=>`<option value="${c}">🎓 ${c}</option>`).join('');
+  renderClassMsgList();
+}
+
+function getClassMsgChildren(){
+  const cls = el('cmsg-class')?.value||'__all__';
+  return DB.children.filter(c=>{
+    if(c.leaveDate) return false;
+    if(cls!=='__all__' && (c.className||'—')!==cls) return false;
+    return true;
+  });
+}
+
+function toggleCmsgMode(){
+  const mode = el('cmsg-mode')?.value;
+  el('cmsg-bulk-bar').style.display  = mode==='bulk'       ? '' : 'none';
+  el('cmsg-individual-bar').style.display = mode==='individual' ? '' : 'none';
+  renderClassMsgList();
+}
+
+function renderClassMsgList(){
+  const mode     = el('cmsg-mode')?.value||'bulk';
+  const children = getClassMsgChildren();
+  const list     = el('cmsg-list');
+  if(!list) return;
+
+  if(mode==='bulk'){
+    el('cmsg-bulk-bar').style.display='';
+    el('cmsg-individual-bar').style.display='none';
+    list.innerHTML = children.map(c=>{
+      const phone = c.parentMom||c.parentDad||'';
+      const hasPhone = !!phone;
+      return `<div style="background:#f8fafc;border:1.5px solid ${hasPhone?'#bae6fd':'#fde8e8'};border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-weight:800;font-size:.85rem;color:#1e293b">${c.name}</div>
+          <div style="font-size:.72rem;color:#64748b">${c.className||'—'} ${hasPhone?'📱 '+phone:'⚠️ لا يوجد رقم'}</div>
+        </div>
+        <button onclick="sendCmsgToOne('${c.id}')"
+          style="padding:5px 10px;background:${hasPhone?'#25d366':'#9ca3af'};color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif"
+          ${hasPhone?'':'disabled title="لا يوجد رقم واتساب"'}>
+          💬 إرسال
+        </button>
+      </div>`;
+    }).join('');
+  } else {
+    el('cmsg-bulk-bar').style.display='none';
+    el('cmsg-individual-bar').style.display='';
+    list.innerHTML = children.map(c=>{
+      const phone = c.parentMom||c.parentDad||'';
+      const hasPhone = !!phone;
+      return `<label style="background:#f8fafc;border:1.5px solid ${hasPhone?'#bae6fd':'#fee2e2'};border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:10px;cursor:${hasPhone?'pointer':'not-allowed'}">
+        <input type="checkbox" class="cmsg-chk" data-id="${c.id}" ${hasPhone?'':'disabled'}
+          onchange="updateCmsgSelCount()"
+          style="accent-color:#0369a1;width:16px;height:16px;flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:.85rem;color:#1e293b">${c.name}</div>
+          <div style="font-size:.72rem;color:#64748b">${c.className||'—'} — ${hasPhone?'📱 '+phone:'⚠️ لا يوجد رقم'}</div>
+        </div>
+      </label>`;
+    }).join('');
+    updateCmsgSelCount();
+  }
+}
+
+function updateCmsgSelCount(){
+  const chks = document.querySelectorAll('.cmsg-chk:checked');
+  const total = document.querySelectorAll('.cmsg-chk:not(:disabled)');
+  const cnt = el('cmsg-sel-count');
+  if(cnt) cnt.textContent = `${chks.length} / ${total.length} ${lang==='ar'?'محدد':'selected'}`;
+}
+
+function selectAllCmsg(state){
+  document.querySelectorAll('.cmsg-chk:not(:disabled)').forEach(c=>c.checked=state);
+  updateCmsgSelCount();
+}
+
+function buildCmsgText(childName){
+  const personalize = el('cmsg-personalize')?.checked;
+  let msg = (el('cmsg-text')?.value||'').trim();
+  if(!msg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Please write a message first!'); return null; }
+  if(personalize && childName){
+    msg = `🌸 ولي أمر الطفل/ة ${childName}،\n\n` + msg + `\n\n— مجموعة رعاية الطفل للحضانات 🏫`;
+  }
+  return msg;
+}
+
+function sendCmsgToOne(childId){
+  const c = DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return;
+  const phone = c.parentMom||c.parentDad;
+  if(!phone){ alert(lang==='ar'?'لا يوجد رقم واتساب!':'No WhatsApp number!'); return; }
+  const msg = buildCmsgText(c.name);
+  if(!msg) return;
+  openWA(phone, msg);
+  logActivity('whatsapp', `💬 Class Msg → ${c.name} (${c.className||'—'})`);
+}
+
+async function sendClassMsgBulk(){
+  const children = getClassMsgChildren();
+  const withPhone = children.filter(c=>c.parentMom||c.parentDad);
+  if(!withPhone.length){ alert(lang==='ar'?'لا يوجد أطفال بأرقام واتساب!':'No children with phone numbers!'); return; }
+  const msg = buildCmsgText(null);
+  if(!msg) return;
+
+  const cls = el('cmsg-class')?.value||'all';
+  const personalize = el('cmsg-personalize')?.checked;
+  const status = el('cmsg-bulk-status');
+  if(status) status.textContent = `⏳ ${lang==='ar'?'جاري الإرسال...':'Sending...'}`;
+
+  let sent=0;
+  for(const c of withPhone){
+    const phone = c.parentMom||c.parentDad;
+    const finalMsg = personalize ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n${(el('cmsg-text')?.value||'').trim()}\n\n— مجموعة رعاية الطفل للحضانات 🏫` : msg;
+    openWA(phone, finalMsg);
+    logActivity('whatsapp', `💬 Bulk Msg → ${c.name} (${c.className||'—'})`);
+    sent++;
+    if(withPhone.length>1) await new Promise(r=>setTimeout(r,600));
+  }
+
+  if(status) status.textContent = `✅ ${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`;
+}
+
+async function sendClassMsgSelected(){
+  const selected = [...document.querySelectorAll('.cmsg-chk:checked')].map(c=>c.dataset.id);
+  if(!selected.length){ alert(lang==='ar'?'لم تختاري أحداً!':'No one selected!'); return; }
+  const personalize = el('cmsg-personalize')?.checked;
+  const rawMsg = (el('cmsg-text')?.value||'').trim();
+  if(!rawMsg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Write the message first!'); return; }
+
+  let sent=0;
+  for(const id of selected){
+    const c = DB.children.find(x=>String(x.id)===String(id));
+    if(!c) continue;
+    const phone = c.parentMom||c.parentDad;
+    if(!phone) continue;
+    const finalMsg = personalize ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n${rawMsg}\n\n— مجموعة رعاية الطفل للحضانات 🏫` : rawMsg;
+    openWA(phone, finalMsg);
+    logActivity('whatsapp', `💬 Individual Msg → ${c.name} (${c.className||'—'})`);
+    sent++;
+    if(selected.length>1) await new Promise(r=>setTimeout(r,600));
+  }
+  setTimeout(()=>alert(`✅ ${sent} ${lang==='ar'?'رسالة أُرسلت':'messages sent'}`),300);
+}
+
+function insertCmsgTemplate(type){
+  const ta = el('cmsg-text');
+  if(!ta) return;
+  const templates = {
+    reminder: `السادة أولياء الأمور الكرام 🌸\n\nنود تذكيركم بأن رسوم الشهر الحالي مستحقة السداد.\nيرجى التواصل مع إدارة الحضانة لإتمام الدفع.\n\nشكراً لتعاونكم 🙏`,
+    event:    `السادة أولياء الأمور 🎉\n\nيسعدنا دعوتكم لحضور:\n📅 التاريخ: \n⏰ الوقت: \n📍 المكان: \n\nنتطلع لرؤيتكم 🌸`,
+    holiday:  `السادة أولياء الأمور المحترمون 🏖️\n\nنحيطكم علماً بأن الحضانة ستكون مغلقة بمناسبة:\n📅 من: \n📅 إلى: \n\nنتمنى لكم إجازة ممتعة 🌟`,
+    uniform:  `السادة أولياء الأمور 👗\n\nيرجى التأكد من ارتداء طفلكم/ة الزي الرسمي للحضانة يومياً.\nالزي الكامل: \n\nشكراً لالتزامكم 🙏`,
+    medical:  `السادة أولياء الأمور 💊\n\nنود إحاطتكم علماً بـ:\n\nيرجى اتخاذ الاحتياطات اللازمة والتواصل مع الإدارة عند الحاجة.\n\nدمتم بصحة وسلامة 🌸`,
+    custom:   '',
+  };
+  ta.value = templates[type]||'';
+  ta.focus();
+}
+
+function showPage_classmsg(){
+  initClassMsgPage();
+}
+
+function renderClassMsgPage(){initClassMsgPage();}
+// ─── End Class Messaging ───────────────────────
 
 function sendAllAbsentWhatsApp(cls, date){
   const kids=DB.children.filter(c=>{
