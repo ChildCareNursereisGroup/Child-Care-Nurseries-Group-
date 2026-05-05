@@ -214,8 +214,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="htxt"><div class="ht">مجموعة رعاية الطفل</div><div class="hb" id="hbr"></div></div>
   </div>
   <div class="hr">
-    <div class="hstat"><div class="hn" id="htot">0</div><div class="hl2">أطفال</div></div>
-    <div class="hstat"><div class="hn" id="hact">0</div><div class="hl2">نشطين</div></div>
+    <div class="hstat"><div class="hn" id="htot">0</div><div class="hl2">نشطين</div></div>
     <span class="sind" id="sind">☁️ محفوظ</span>
     <button class="hbtn" onclick="toggleLang()">EN/ع</button>
     <button class="hbtn" style="background:rgba(255,255,255,.15)" onclick="openDailyReport()">📊 تقرير اليوم</button>
@@ -2063,6 +2062,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
   <div id="cmsg-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
 </div>
 </div><!-- end pg-class-msg -->
+
+<div class="page" id="pg-visitors">
 <div class="card np" id="inquiry-form-card">
   <div class="ch">
     <div class="ct" id="vis-form-title">📋 New Inquiry — استفسار جديد</div>
@@ -2154,6 +2155,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="vis-list"></div>
 </div>
+</div><!-- end pg-visitors -->
 
 <!-- FOLLOW-UP WHATSAPP MODAL -->
 <div class="mover" id="followup-modal">
@@ -3312,10 +3314,9 @@ async function showPage(page,btn){
 function renderDashboard(){
   const tot=DB.children.length;const act=DB.children.filter(c=>!c.leaveDate).length;
   const income=DB.receipts.filter(r=>!r.isCancelled).reduce((s,r)=>s+r.total,0);const bus=DB.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).length;
-  el('htot').textContent=tot;el('hact').textContent=act;
+  el('htot').textContent=act;
   el('dstats').innerHTML=`
-    <div class="sc"><div class="si">👧</div><div class="sv">${tot}</div><div class="sk">${t('totalChildren')}</div></div>
-    <div class="sc"><div class="si">✅</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
+    <div class="sc"><div class="si">👧</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
     ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
     <div class="sc"><div class="si">🚌</div><div class="sv">${bus}</div><div class="sk">${t('busUsers')}</div></div>`;
 
