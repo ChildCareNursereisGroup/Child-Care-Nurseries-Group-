@@ -8315,6 +8315,88 @@ Best regards 🌸`;
 }
 
 // ═══════════════════════════════════════════════
+// PAYMENT CONFIRMATION WHATSAPP MESSAGE
+// ═══════════════════════════════════════════════
+function _buildPaymentConfirmMsg(childId){
+  const c = DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return null;
+  const msgLang = el('pmsg-lang-sel')?.value || 'en';
+  const selId   = el('pmsg-rec-sel')?.value   || '__last__';
+
+  // Choose receipt
+  const activeRecs = DB.receipts.filter(r=>String(r.childId)===String(childId)&&!r.isCancelled)
+                                .sort((a,b)=>b.date>a.date?1:-1);
+  if(!activeRecs.length) { alert(lang==='ar'?'لا يوجد إيصال نشط!':'No active receipt found!'); return null; }
+  const r = selId==='__last__' ? activeRecs[0] : (activeRecs.find(x=>String(x.id)===String(selId)) || activeRecs[0]);
+
+  const branch   = BRANCHES.find(b=>b.id===(r.branchId||curBid))||CB();
+  const brName   = msgLang==='ar' ? (branch.ar||branch.en) : (branch.en||branch.ar);
+  const recNum   = r.receiptNum||'—';
+  const amount   = fmtNum(r.total);
+  const pmMap    = {cash: msgLang==='ar'?'نقدي':'Cash', bank: msgLang==='ar'?'تحويل بنكي':'Bank Transfer', card: msgLang==='ar'?'بطاقة':'Card'};
+  const pmLabel  = pmMap[r.payMethod||'cash'] || (r.payMethod||'Cash');
+  const recDate  = fmtDate(r.date);
+  const fromD    = r.fromDate ? fmtDate(r.fromDate) : '—';
+  const toD      = r.toDate   ? fmtDate(r.toDate)   : '—';
+  const period   = (r.fromDate||r.toDate) ? `${fromD} → ${toD}` : recDate;
+
+  if(msgLang==='en'){
+    return `To Whom It May Concern,
+
+This is to confirm that the parent of the child ${c.name}, enrolled at Child Care Nurseries Group – ${brName}, has successfully paid the monthly fees.
+
+📋 Receipt Details:
+   • Receipt No: #${recNum}
+   • Amount Paid: AED ${amount}
+   • Payment Method: ${pmLabel}
+   • Period: ${period}
+   • Date: ${recDate}
+
+This letter is issued upon request as proof of payment for official purposes.
+If you require any further information, please feel free to contact us.
+
+Child Care Nurseries Group – ${brName}`;
+  } else {
+    return `إلى من يهمه الأمر،
+
+يسرّنا أن نؤكد أن ولي أمر الطفل/ة ${c.name}، الملتحق/ة بمجموعة رعاية الطفل للحضانات – ${brName}، قد سدّد رسوم الشهر بنجاح.
+
+📋 تفاصيل الإيصال:
+   • رقم الإيصال: #${recNum}
+   • المبلغ المدفوع: ${amount} د.إ
+   • طريقة الدفع: ${pmLabel}
+   • الفترة: ${period}
+   • تاريخ الدفع: ${recDate}
+
+يُصدر هذا الخطاب بناءً على الطلب كإثبات رسمي للسداد لأغراض رسمية.
+لأي استفسار إضافي، يرجى التواصل معنا.
+
+مجموعة رعاية الطفل للحضانات – ${brName}`;
+  }
+}
+
+function previewPaymentConfirmMsg(childId){
+  const msg = _buildPaymentConfirmMsg(childId);
+  const box = el('pmsg-preview-box');
+  if(!box) return;
+  if(!msg){ box.style.display='none'; return; }
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+function sendPaymentConfirmWA(childId){
+  if(curRole!=='admin'&&curRole!=='manager'){alert('Admin/Manager only');return;}
+  const msg   = _buildPaymentConfirmMsg(childId);
+  if(!msg) return;
+  const phone = el('pmsg-phone-sel')?.value;
+  if(!phone){ alert(lang==='ar'?'لا يوجد رقم واتساب لولي الأمر!':'No WhatsApp number for this parent!'); return; }
+  const c = DB.children.find(x=>String(x.id)===String(childId));
+  openWA(phone, msg);
+  logActivity('whatsapp', `📜 Payment Confirm WA → ${c?.name||childId}`);
+}
+// ─── End Payment Confirmation ──────────────────
+
+// ═══════════════════════════════════════════════
 // CLASS MESSAGING SYSTEM 💬
 // ═══════════════════════════════════════════════
 function initClassMsgPage(){
@@ -9465,10 +9547,51 @@ function showDTab(tab,btn){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
     const tot=recs.reduce((s,r)=>s+r.total,0);
     const isAdm=curRole==='admin';
+    const isAdmOrMgr=curRole==='admin'||curRole==='manager';
+    const activeRecs=recs.filter(r=>!r.isCancelled).sort((a,b)=>b.date>a.date?1:-1);
+    const waSection=isAdmOrMgr?`
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:11px 14px;margin-bottom:11px">
+        <div style="font-size:.78rem;font-weight:800;color:#166534;margin-bottom:9px">💬 إرسال تأكيد الدفع — Send Payment Confirmation</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🧾 الإيصال — Receipt</div>
+            <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.76rem">
+              <option value="__last__">⚡ آخر إيصال — Last Receipt</option>
+              ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">📞 إرسال إلى — Send to</div>
+            <select id="pmsg-phone-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.76rem">
+              ${c.parentMom?`<option value="${c.parentMom}">👩 أم · ${c.parentMom}</option>`:''}
+              ${c.parentDad?`<option value="${c.parentDad}">👨 أب · ${c.parentDad}</option>`:''}
+              ${!c.parentMom&&!c.parentDad?'<option value="">⚠️ لا يوجد رقم</option>':''}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🌐 اللغة — Language</div>
+            <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.76rem">
+              <option value="en">🇬🇧 English</option>
+              <option value="ar">🇦🇪 عربي</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="sendPaymentConfirmWA('${c.id}')"
+            style="flex:1;padding:8px;background:#25d366;color:#fff;border:none;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800;cursor:pointer">
+            💬 إرسال واتساب — Send WhatsApp
+          </button>
+          <button onclick="previewPaymentConfirmMsg('${c.id}')"
+            style="padding:8px 12px;background:#1e3a8a;color:#fff;border:none;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">
+            👁️ معاينة
+          </button>
+        </div>
+        <div id="pmsg-preview-box" style="display:none;margin-top:8px;background:#fff;border:1.5px solid #d1fae5;border-radius:9px;padding:10px;font-size:.78rem;white-space:pre-wrap;line-height:1.7;color:#1e293b;font-family:'Tajawal',monospace;max-height:200px;overflow-y:auto"></div>
+      </div>`:'';
     cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
-    </div>`:''}
+    </div>`:''}${waSection}
     ${recs.map(r=>`<div class="rc" style="margin-bottom:8px">
       <div class="rh">
         <div>#${r.receiptNum}</div>
