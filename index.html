@@ -2112,6 +2112,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="dtab" onclick="showDTab('trans',this)" data-tab="trans"></button>
     <button class="dtab" onclick="printChildCard()" data-tab="card"></button>
     <button class="dtab" onclick="showDTab('cert',this)" data-tab="cert"></button>
+    <button class="dtab" onclick="showDTab('payletter',this)" data-tab="payletter"></button>
   </div>
   <div id="dtcont"></div>
 </div>
@@ -2749,7 +2750,7 @@ const T = {
     // Modal tabs
     tabInfo:'📋 البيانات', tabRecs:'🧾 الإيصالات', tabAccount:'💰 كشف حساب',
     tabMedical:'🏥 الصحة', tabProgress:'📈 التطور', tabAtt:'✅ الحضور',
-    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة', tabCert:'📜 شهادة',
+    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة', tabCert:'📜 شهادة', tabPayLetter:'📄 خطاب الدفع',
     // Age
     ageLabel:'Age — العمر', ageMonths:'months', ageYears:'years',
     // Expenses
@@ -2840,7 +2841,7 @@ const T = {
     // Child modal tabs
     tabInfo:'📋 Info', tabRecs:'🧾 Receipts', tabAccount:'💰 Account',
     tabMedical:'🏥 Health', tabProgress:'📈 Progress', tabAtt:'✅ Attendance',
-    tabTrans:'🔄 Transfer', tabCard:'🪪 ID Card', tabCert:'📜 Certificate',
+    tabTrans:'🔄 Transfer', tabCard:'🪪 ID Card', tabCert:'📜 Certificate', tabPayLetter:'📄 Pay Letter',
     // Attendance
     dailyAtt:'📋 Daily Attendance', attPresent:'✅ Present', attAbsent:'❌ Absent',
     // Expenses
@@ -9464,6 +9465,7 @@ function renderModalTabs(){
     {tab:'trans',  key:'tabTrans'},
     {tab:'card',   key:'tabCard'},
     {tab:'cert',   key:'tabCert'},
+    {tab:'payletter', key:'tabPayLetter'},
   ];
   document.querySelectorAll('#child-modal-tabs .dtab').forEach((btn,i)=>{
     if(tabDefs[i]){
@@ -9471,6 +9473,9 @@ function renderModalTabs(){
       // Hide account statement tab from manager — Admin only
       if(tabDefs[i].tab==='account'){
         btn.style.display = curRole==='admin' ? '' : 'none';
+      }
+      if(tabDefs[i].tab==='payletter'){
+        btn.style.display = (curRole==='admin'||curRole==='manager') ? '' : 'none';
       }
     }
   });
@@ -9705,59 +9710,8 @@ function showDTab(tab,btn){
     const isAdm=curRole==='admin';
     const isAdmOrMgr=curRole==='admin'||curRole==='manager';
     const activeRecs=recs.filter(r=>!r.isCancelled).sort((a,b)=>b.date>a.date?1:-1);
-    const mgrName = DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
-    const waSection=isAdmOrMgr?`
-      <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:13px;padding:13px 15px;margin-bottom:11px">
-        <div style="font-size:.82rem;font-weight:900;color:#166534;margin-bottom:11px">📄 Payment Confirmation Letter — خطاب تأكيد الدفع الرسمي</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
-          <div>
-            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🧾 الإيصال — Receipt</div>
-            <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
-              <option value="__last__">⚡ آخر إيصال — Last Receipt</option>
-              ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🌐 اللغة — Language</div>
-            <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
-              <option value="en">🇬🇧 English</option>
-              <option value="ar">🇦🇪 Arabic — عربي</option>
-            </select>
-          </div>
-        </div>
-        <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:11px;margin-bottom:9px">
-          <div style="font-size:.73rem;font-weight:800;color:#1e3a8a;margin-bottom:8px">📝 Letter Details</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">Letter Date</div>
-              <input type="date" id="pltr-date" value="${today()}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
-            </div>
-            <div>
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">Manager / Director Name</div>
-              <input type="text" id="pltr-mgr" placeholder="Manager name" value="${mgrName}"
-                style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
-            </div>
-            <div style="grid-column:1/-1">
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">Position</div>
-              <input type="text" id="pltr-pos" value="Director / Manager" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
-            </div>
-          </div>
-        </div>
-        <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
-          <div style="font-size:.73rem;font-weight:800;color:#5b21b6;margin-bottom:6px">✍️ Electronic Signature — التوقيع الإلكتروني</div>
-          <canvas id="pltr-sig-canvas" width="380" height="90"
-            style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;max-width:380px;height:90px;cursor:crosshair;touch-action:none;display:block"></canvas>
-          <div style="display:flex;gap:6px;margin-top:5px">
-            <button onclick="clearPltrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem">🗑 Clear</button>
-            <span id="pltr-sig-status" style="font-size:.7rem;color:#6b7280;align-self:center">وقّعي بالماوس أو الإصبع</span>
-          </div>
-        </div>
-        <button onclick="generatePaymentLetter('${c.id}')"
-          style="width:100%;padding:11px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:900;cursor:pointer">
-          📄 Generate Payment Confirmation Letter
-        </button>
-      </div>`:'';
-    cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
+    const waSection='';
+        cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
     </div>`:''}${waSection}
@@ -9916,7 +9870,71 @@ function showDTab(tab,btn){
     if(eligible) setTimeout(()=>initCertSigCanvas(),100);
   }
 
-  // ── ACCOUNT STATEMENT ─────────────────────────
+  // ── PAYMENT CONFIRMATION LETTER ───────────────
+  if(tab==='payletter'){
+    if(curRole!=='admin'&&curRole!=='manager'){ cont.innerHTML=''; return; }
+    const activeRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled)
+                                .sort((a,b)=>b.date>a.date?1:-1);
+    const mgrDefault=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+    const ar=lang==='ar';
+    cont.innerHTML=`<div style="padding:8px 0">
+      <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:13px;padding:13px 15px">
+        <div style="font-size:.82rem;font-weight:900;color:#166534;margin-bottom:11px">📄 ${ar?'خطاب تأكيد الدفع الرسمي':'Payment Confirmation Letter'}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🧾 ${ar?'الإيصال':'Receipt'}</div>
+            <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+              <option value="__last__">⚡ ${ar?'آخر إيصال':'Last Receipt'}</option>
+              ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🌐 ${ar?'اللغة':'Language'}</div>
+            <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+              <option value="en">🇬🇧 English</option>
+              <option value="ar">🇦🇪 Arabic — عربي</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:11px;margin-bottom:9px">
+          <div style="font-size:.73rem;font-weight:800;color:#1e3a8a;margin-bottom:8px">📝 ${ar?'تفاصيل الخطاب':'Letter Details'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'تاريخ الخطاب':'Letter Date'}</div>
+              <input type="date" id="pltr-date" value="${today()}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+            </div>
+            <div>
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'اسم المدير/ة':'Manager / Director Name'}</div>
+              <input type="text" id="pltr-mgr" placeholder="${ar?'اسم المدير':'Manager name'}" value="${mgrDefault}"
+                style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+            </div>
+            <div style="grid-column:1/-1">
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'المسمى الوظيفي':'Position'}</div>
+              <input type="text" id="pltr-pos" value="Director / Manager" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
+          <div style="font-size:.73rem;font-weight:800;color:#5b21b6;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني':'Electronic Signature'}</div>
+          <canvas id="pltr-sig-canvas" width="380" height="90"
+            style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;max-width:380px;height:90px;cursor:crosshair;touch-action:none;display:block"></canvas>
+          <div style="display:flex;gap:6px;margin-top:5px">
+            <button onclick="clearPltrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem">🗑 ${ar?'مسح':'Clear'}</button>
+            <span style="font-size:.7rem;color:#6b7280;align-self:center">${ar?'وقّعي بالماوس أو الإصبع':'Sign with mouse or finger'}</span>
+          </div>
+        </div>
+
+        <button onclick="generatePaymentLetter('${c.id}')"
+          style="width:100%;padding:11px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:900;cursor:pointer">
+          📄 ${ar?'إنشاء خطاب تأكيد الدفع':'Generate Payment Confirmation Letter'}
+        </button>
+      </div>
+    </div>`;
+    setTimeout(()=>initPltrSigCanvas(),100);
+  }
   if(tab==='account'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled).sort((a,b)=>new Date(a.date)-new Date(b.date));
     const cancelledRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&r.isCancelled);
