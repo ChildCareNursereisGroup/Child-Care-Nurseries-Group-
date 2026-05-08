@@ -2244,6 +2244,23 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── Universal unlimited fetch — paginates automatically ──────────
+// Usage: const rows = await fetchAll(sb.from('table').select('*').eq('x',y))
+async function fetchAll(baseQuery, pageSize=1000){
+  const all=[];
+  let page=0, hasMore=true;
+  while(hasMore){
+    const {data,error}=await baseQuery.range(page*pageSize,(page+1)*pageSize-1);
+    if(error){ console.error('fetchAll error:',error); break; }
+    if(!data||data.length===0){ hasMore=false; break; }
+    all.push(...data);
+    if(data.length<pageSize) hasMore=false;
+    else page++;
+  }
+  return all;
+}
+// ─────────────────────────────────────────────────────────────────
 let sbOK = false;
 
 // ═══════════════════════════════════════════════
@@ -2564,22 +2581,15 @@ async function loadFromSupa(bid) {
   _busAllBranchCache = null; // Invalidate bus report cache on data reload
   showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
   try {
-    const [c,r,a,e,sa,vis] = await Promise.all([
-      sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true}).limit(5000),
-      // Receipts loaded separately with pagination below
-      Promise.resolve({data:[],error:null}),
-      // attendance loaded separately with pagination below
-      Promise.resolve({data:[],error:null}),
-      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(5000),
-      sb.from('staff_attendance').select('*').limit(1), // placeholder - loaded separately below
-      sb.from('visitors').select('*').eq('branch_id',bid).limit(500),
+    // ── Load all main tables with fetchAll (no limits) ──────────────
+    const [childrenRaw, expensesRaw, visitorsRaw] = await Promise.all([
+      fetchAll(sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
+      fetchAll(sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
+      fetchAll(sb.from('visitors').select('*').eq('branch_id',bid)),
     ]);
-    if(c.error)throw c.error;
-    if(r.error)throw r.error;
-    if(a.error)throw a.error;
-    // Visitors
-    if(!vis.error) DB.visitors=(vis.data||[]).map(v=>({...v,name:(v.name||'').trim()}));
-    DB.children = (c.data||[]).map(x=>({
+
+    DB.visitors=(visitorsRaw||[]).map(v=>({...v,name:(v.name||'').trim()}));
+    DB.children = (childrenRaw||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
       dob:x.dob||null, kidsTime:x.kids_time||'Full Day', dutyDays:x.duty_days||'', friFee:x.fri_fee||0, satFee:x.sat_fee||0, sunFee:x.sun_fee||0,
@@ -2590,23 +2600,10 @@ async function loadFromSupa(bid) {
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id
     }));
-    // Load ALL receipts with pagination
+
+    // ── Load ALL receipts ──
     {
-      let allRecs = [];
-      let rPage = 0;
-      const rPageSize = 1000;
-      let rKeepGoing = true;
-      while(rKeepGoing){
-        const {data:pg, error:pgErr} = await sb.from('receipts').select('*')
-          .eq('branch_id',bid)
-          .order('date',{ascending:true})
-          .range(rPage*rPageSize, (rPage+1)*rPageSize-1);
-        if(pgErr || !pg || pg.length===0){ rKeepGoing=false; break; }
-        allRecs = allRecs.concat(pg);
-        if(pg.length < rPageSize) rKeepGoing=false;
-        rPage++;
-        if(rPage > 20) rKeepGoing=false; // safety cap at 20k receipts
-      }
+      const allRecs = await fetchAll(sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:true}));
       DB.receipts = allRecs.map(x=>({
         id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
         receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
@@ -2623,21 +2620,20 @@ async function loadFromSupa(bid) {
       }));
     }
     DB.attendance={};
-    // Load children attendance - last 3 months
+    // Load ALL children attendance with fetchAll (no limits)
     {
-      const now2 = new Date();
-      const from3mo = new Date(now2.getFullYear(), now2.getMonth()-2, 1).toISOString().split('T')[0];
-      const {data:attPg} = await sb.from('attendance').select('child_id,date,status')
-        .eq('branch_id',bid)
-        .gte('date', from3mo)
-        .limit(3000);
-      (attPg||[]).forEach(x=>{
+      const attRows = await fetchAll(
+        sb.from('attendance').select('child_id,date,status')
+          .eq('branch_id', bid)
+          .order('date', {ascending: false})
+      );
+      attRows.forEach(x=>{
         const d=x.date; if(!DB.attendance[d]) DB.attendance[d]={};
-        DB.attendance[d][x.child_id]         = x.status; // number key (from DB)
-        DB.attendance[d][String(x.child_id)] = x.status; // string key (for onclick attrs)
+        DB.attendance[d][x.child_id]        =x.status;
+        DB.attendance[d][String(x.child_id)]=x.status;
       });
     }
-    DB.expenses = (e.data||[]).map(x=>{
+    DB.expenses = (expensesRaw||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
       return{id:x.id,category:x.category||'',type:x.type||'',
         amount:Number(x.amount||0),vatType:x.vat_type||'معفى (0%)',vatAmount:Number(x.vat_amount||0),
@@ -2647,8 +2643,8 @@ async function loadFromSupa(bid) {
         invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
         branchId:x.branch_id||'',extra};
     });
-    // Load ALL staff FIRST (needed for staffAtt query)
-    const {data:allStaff} = await sb.from('staff').select('*');
+    // Load ALL staff (unlimited)
+    const allStaff = await fetchAll(sb.from('staff').select('*'));
     DB.staff = (allStaff||[]).map(x=>({
       id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
       workDays:x.work_days||'0,1,2,3,4',
@@ -2685,7 +2681,7 @@ async function loadFromSupa(bid) {
         const batch=allIds.slice(bi,bi+50);
         const res=await Promise.all(months.map(({from,to})=>
           sb.from('staff_attendance').select('staff_id,date,status')
-            .in('staff_id',batch).gte('date',from).lte('date',to).limit(3000)
+            .in('staff_id',batch).gte('date',from).lte('date',to)
         ));
         res.forEach(({data})=>{(data||[]).forEach(x=>{
           if(!DB.staffAtt[x.date])DB.staffAtt[x.date]={};
@@ -2697,10 +2693,10 @@ async function loadFromSupa(bid) {
 
     hideLoad();
 
-    // Load salary history in background (needed for EOS & leave calculations)
-    sb.from('staff_salary_history').select('*')
-      .then(({data:sh})=>{
-        if(!sh) return;
+    // Load salary history in background (unlimited)
+    fetchAll(sb.from('staff_salary_history').select('*'))
+      .then(sh=>{
+        if(!sh||!sh.length) return;
         DB.salaryHistory={};
         sh.forEach(x=>{
           const sid=String(x.staff_id);
@@ -2732,9 +2728,9 @@ async function loadAllBranches() {
   const result={};
   for(const b of BRANCHES){
     const [c,r,e]=await Promise.all([
-      sb.from('children').select('*').eq('branch_id',b.id).limit(5000),
-      sb.from('receipts').select('*').eq('branch_id',b.id).limit(5000),
-      sb.from('expenses').select('*').eq('branch_id',b.id).limit(5000),
+      fetchAll(sb.from('children').select('*').eq('branch_id',b.id)),
+      fetchAll(sb.from('receipts').select('*').eq('branch_id',b.id)),
+      fetchAll(sb.from('expenses').select('*').eq('branch_id',b.id)),
     ]);
     result[b.id]={
       children:(c.data||[]),
@@ -4763,6 +4759,30 @@ function renderKidsWeek(){
   if(badge){badge.textContent=`📆 ${fmtD(weekDays[0])} — ${fmtD(weekDays[6])}`;badge.style.background='#eff6ff';badge.style.color='#1e3a8a';}
   el('att-day-label').innerHTML='';
 
+  // ── Fetch fresh attendance for this week from Supabase ──
+  const weekMin=weekDays[0], weekMax=weekDays[6];
+  const alreadyLoaded=weekDays.every(d=>DB.attendance[d]!==undefined);
+  if(!alreadyLoaded){
+    // Load this week's data fresh (non-blocking — renders with cached then re-renders with fresh)
+    sb.from('attendance').select('child_id,date,status')
+      .eq('branch_id',curBid)
+      .gte('date',weekMin).lte('date',weekMax)
+      .then(({data})=>{
+        if(!data) return;
+        // Mark all week days as loaded (even if empty)
+        weekDays.forEach(d=>{ if(!DB.attendance[d]) DB.attendance[d]={}; });
+        data.forEach(x=>{
+          const d=x.date;
+          if(!DB.attendance[d]) DB.attendance[d]={};
+          DB.attendance[d][x.child_id]        =x.status;
+          DB.attendance[d][String(x.child_id)]=x.status;
+        });
+        renderKidsWeek(); // re-render with fresh data
+      });
+    // Mark as loading so we don't fetch again
+    weekDays.forEach(d=>{ if(!DB.attendance[d]) DB.attendance[d]={}; });
+  }
+
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayAr=['أحد','اثن','ثلا','أرب','خمس','جمع','سبت'];
   const dayLabels=lang==='ar'?dayAr:dayNames;
@@ -5591,7 +5611,7 @@ async function debugAllSalaryHistory(){
   body.innerHTML = '<div style="padding:12px;color:#6b7280">⏳ جاري جلب كل البيانات من Supabase...</div>';
 
   // Query ALL records — no filter at all
-  const {data, error} = await sb.from('staff_salary_history').select('*').order('month',{ascending:false}).limit(200);
+  const {data, error} = await sb.from('staff_salary_history').select('*').order('month',{ascending:false});
 
   if(error){
     body.innerHTML = `<div style="background:#fee2e2;border-radius:10px;padding:12px;color:#dc2626">
@@ -7136,8 +7156,7 @@ async function printStaffAttReport(exportType='print'){
         .select('staff_id,date,status')
         .in('staff_id', batch)
         .gte('date', mon+'-01')
-        .lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'))
-        .limit(5000);
+        .lte('date', mon+'-'+String(daysInMonth).padStart(2,'0'));
       (rptAtt||[]).forEach(x=>{
         const sid=String(x.staff_id);
         if(!attMap[sid]) attMap[sid]={};
@@ -7565,7 +7584,7 @@ async function renderBulkAtt(){
   } else {
     // Not in cache - fetch for this month (no branch filter)
     const {data:bAtt} = await sb.from('staff_attendance').select('staff_id,date,status')
-      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0')).limit(5000);
+      .gte('date',mon+'-01').lte('date',mon+'-'+String(daysInMonth).padStart(2,'0'));
     (bAtt||[]).forEach(r=>{
       if(!existing[r.date]) existing[r.date]={};
       existing[r.date][String(r.staff_id)]=r.status;
@@ -8215,8 +8234,15 @@ async function markAllClass(cls, date, status){
   });
   if(!DB.attendance[date])DB.attendance[date]={};
   for(const c of kids){
-    DB.attendance[date][c.id]=status;
-    await sb.from('attendance').upsert({branch_id:curBid,child_id:c.id,date,status},{onConflict:'branch_id,child_id,date'});
+    const cid=Number(c.id);
+    DB.attendance[date][cid]        =status;
+    DB.attendance[date][String(cid)]=status;
+    // Safe UPDATE-or-INSERT
+    const {data:upd}=await sb.from('attendance').update({status})
+      .eq('branch_id',curBid).eq('child_id',cid).eq('date',date).select('id');
+    if(!upd||upd.length===0){
+      await sb.from('attendance').insert({branch_id:curBid,child_id:cid,date,status});
+    }
   }
   renderAtt();
 }
@@ -8877,70 +8903,82 @@ const _attSaveQueue = new Map(); // key: childId+date → promise
 
 async function _saveAttWithRetry(childId, date, newSt, cell, maxRetries=3){
   // Show saving indicator
-  let savingEl = null;
   if(cell){
-    savingEl = document.createElement('div');
-    savingEl.id = `att-saving-${childId}-${date}`;
-    savingEl.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:inherit;z-index:5;pointer-events:none';
-    savingEl.textContent = '⏳';
-    cell.style.position = 'relative';
-    cell.appendChild(savingEl);
+    const saving=document.createElement('div');
+    saving.id=`att-saving-${childId}-${date}`;
+    saving.style.cssText='position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:inherit;z-index:5;pointer-events:none';
+    saving.textContent='⏳';
+    cell.style.position='relative';
+    cell.appendChild(saving);
   }
 
-  const cid = Number(childId); // always integer to Supabase
-  let lastErr = null;
+  const cid=Number(childId);
+  let lastErr=null;
 
   for(let attempt=1; attempt<=maxRetries; attempt++){
     try{
-      // Step 1: DELETE any existing record for this child+date (avoids duplicates)
-      const {error:delErr} = await sb.from('attendance')
-        .delete()
-        .eq('branch_id', curBid)
-        .eq('child_id', cid)
-        .eq('date', date);
-      if(delErr) throw delErr;
+      if(!newSt){
+        // ── CLEAR: just delete ──
+        const {error}=await sb.from('attendance').delete()
+          .eq('branch_id',curBid).eq('child_id',cid).eq('date',date);
+        if(error) throw error;
 
-      // Step 2: INSERT fresh record if status is set
-      if(newSt){
-        const {error:insErr} = await sb.from('attendance')
-          .insert({branch_id: curBid, child_id: cid, date, status: newSt});
-        if(insErr) throw insErr;
+      } else {
+        // ── SAVE: try UPDATE first (safe — won't lose data if INSERT fails) ──
+        const {data:updated, error:upErr}=await sb.from('attendance')
+          .update({status:newSt})
+          .eq('branch_id',curBid).eq('child_id',cid).eq('date',date)
+          .select('id');
+        if(upErr) throw upErr;
+
+        if(!updated || updated.length===0){
+          // No existing record → INSERT new one
+          const {error:insErr}=await sb.from('attendance')
+            .insert({branch_id:curBid, child_id:cid, date, status:newSt});
+          // 23505 = unique violation (record exists from another source) → retry as update
+          if(insErr && (insErr.code==='23505'||String(insErr.message).includes('duplicate'))){
+            const {error:up2}=await sb.from('attendance').update({status:newSt})
+              .eq('branch_id',curBid).eq('child_id',cid).eq('date',date);
+            if(up2) throw up2;
+          } else if(insErr){
+            throw insErr;
+          }
+        }
       }
 
-      // SUCCESS — update local cache with both key types
-      if(!DB.attendance[date]) DB.attendance[date] = {};
+      // ── SUCCESS: update local cache ──
+      if(!DB.attendance[date]) DB.attendance[date]={};
       if(newSt){
-        DB.attendance[date][cid]         = newSt;
-        DB.attendance[date][String(cid)] = newSt;
+        DB.attendance[date][cid]        =newSt;
+        DB.attendance[date][String(cid)]=newSt;
       } else {
         delete DB.attendance[date][cid];
         delete DB.attendance[date][String(cid)];
       }
-
-      _removeUnsavedFlag(childId, date);
-      const ind = document.getElementById(`att-saving-${childId}-${date}`);
+      _removeUnsavedFlag(childId,date);
+      const ind=document.getElementById(`att-saving-${childId}-${date}`);
       if(ind) ind.remove();
       return true;
 
     } catch(err){
-      lastErr = err;
-      console.warn(`Att save attempt ${attempt}/${maxRetries}:`, err?.message||err);
-      if(attempt < maxRetries) await new Promise(r=>setTimeout(r, 600 * attempt));
+      lastErr=err;
+      console.warn(`Att save attempt ${attempt}/${maxRetries}:`,err?.message||err,{childId,date,newSt,branch:curBid});
+      if(attempt<maxRetries) await new Promise(r=>setTimeout(r,700*attempt));
     }
   }
 
-  // ALL RETRIES FAILED
-  console.error('Att save FAILED:', lastErr, {childId, date, newSt});
-  _addUnsavedFlag(childId, date, newSt);
-  const ind = document.getElementById(`att-saving-${childId}-${date}`);
+  // ── ALL RETRIES FAILED ──
+  console.error('Att save FAILED:',lastErr,{childId,date,newSt});
+  _addUnsavedFlag(childId,date,newSt);
+  const ind=document.getElementById(`att-saving-${childId}-${date}`);
   if(ind){
-    ind.textContent = '❌';
-    ind.style.background = 'rgba(220,38,38,.2)';
-    ind.style.color = '#dc2626';
-    ind.style.pointerEvents = 'auto';
-    ind.title = 'فشل الحفظ — اضغط للمحاولة';
-    ind.onclick = () => _saveAttWithRetry(childId, date, newSt, cell, 3);
-    setTimeout(()=>{ if(ind?.parentNode) ind.remove(); }, 4000);
+    ind.textContent='❌';
+    ind.style.background='rgba(220,38,38,.2)';
+    ind.style.color='#dc2626';
+    ind.style.pointerEvents='auto';
+    ind.title='فشل الحفظ — اضغط للمحاولة مجدداً';
+    ind.onclick=()=>_saveAttWithRetry(childId,date,newSt,cell,3);
+    setTimeout(()=>{ if(ind?.parentNode) ind.remove(); },5000);
   }
   return false;
 }
@@ -9047,24 +9085,29 @@ async function toggleKidsAtt(childId, date){
 }
 
 async function toggleAtt(childId,date){
-  const cid = Number(childId);
-  const attDay = DB.attendance[date]||{};
-  const cur = attDay[cid] || attDay[String(cid)] || '';
-  const newSt = cur==='حضور' ? 'غياب' : 'حضور';
+  const cid=Number(childId);
+  const attDay=DB.attendance[date]||{};
+  const cur=attDay[cid]||attDay[String(cid)]||'';
+  const newSt=cur==='حضور'?'غياب':'حضور';
   const _attChild=DB.children.find(c=>String(c.id)===String(childId));
-  if(_attChild) logActivity('attendance', _attChild.name+' → '+newSt);
+  if(_attChild) logActivity('attendance',_attChild.name+' → '+newSt);
   if(!DB.attendance[date]) DB.attendance[date]={};
-  DB.attendance[date][cid]         = newSt;
-  DB.attendance[date][String(cid)] = newSt;
+  DB.attendance[date][cid]        =newSt;
+  DB.attendance[date][String(cid)]=newSt;
   renderAtt();
+  // Safe UPDATE-or-INSERT (never loses existing data)
   try{
-    await sb.from('attendance').delete()
-      .eq('branch_id',curBid).eq('child_id',cid).eq('date',date);
-    const {error}=await sb.from('attendance')
-      .insert({branch_id:curBid,child_id:cid,date,status:newSt});
-    if(error){ console.error('toggleAtt save error:',error); _addUnsavedFlag(childId,date,newSt); }
+    const {data:upd,error:upErr}=await sb.from('attendance')
+      .update({status:newSt}).eq('branch_id',curBid).eq('child_id',cid).eq('date',date).select('id');
+    if(upErr) throw upErr;
+    if(!upd||upd.length===0){
+      const {error:insErr}=await sb.from('attendance')
+        .insert({branch_id:curBid,child_id:cid,date,status:newSt});
+      if(insErr&&!(insErr.code==='23505'||String(insErr.message).includes('duplicate'))) throw insErr;
+    }
   } catch(err){
-    console.error('toggleAtt error:',err); _addUnsavedFlag(childId,date,newSt);
+    console.error('toggleAtt error:',err);
+    _addUnsavedFlag(childId,date,newSt);
   }
 }
 function printAtt(){
@@ -12176,8 +12219,8 @@ async function loadBusAllBranchData(forceReload){
   const result={};
   for(const b of BRANCHES){
     const [c, r] = await Promise.all([
-      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time').eq('branch_id',b.id).limit(5000),
-      sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id).limit(5000),
+      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time').eq('branch_id',b.id),
+      sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id),
     ]);
     result[b.id]={
       children:(c.data||[]).map(x=>({
@@ -16314,7 +16357,12 @@ async function importAttendanceExcel(file){
                   DB.children.find(c=>c.name.toLowerCase().includes(name.toLowerCase()));
       if(!child){skip++;continue;}
       const st = /absent|غياب/i.test(status)?'غياب':'حضور';
-      await sb.from('attendance').upsert({branch_id:curBid,child_id:child.id,date,status:st},{onConflict:'branch_id,child_id,date'});
+      const cid=Number(child.id);
+      const {data:upd}=await sb.from('attendance').update({status:st})
+        .eq('branch_id',curBid).eq('child_id',cid).eq('date',date).select('id');
+      if(!upd||upd.length===0){
+        await sb.from('attendance').insert({branch_id:curBid,child_id:cid,date,status:st});
+      }
       ok++;
     }
     await loadFromSupa(curBid);renderAtt();
@@ -18279,7 +18327,7 @@ async function refreshVisitors(btn){
   if(vl) vl.innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>';
   try{
     // Try direct query first
-    const {data,error}=await sb.from('visitors').select('*').eq('branch_id',curBid).limit(2000);
+    const {data,error}=await sb.from('visitors').select('*').eq('branch_id',curBid);
     if(error) throw error;
     DB.visitors=(data||[]).map(v=>({...v,name:(v.name||'').trim()}))
       .sort((a,b)=>(b.visit_date||'').localeCompare(a.visit_date||''));
@@ -18287,7 +18335,7 @@ async function refreshVisitors(btn){
   }catch(err){
     // Fallback: load all and filter
     try{
-      const {data:all}=await sb.from('visitors').select('*').limit(2000);
+      const {data:all}=await sb.from('visitors').select('*');
       DB.visitors=(all||[]).filter(v=>String(v.branch_id)===String(curBid))
         .map(v=>({...v,name:(v.name||'').trim()}));
       console.log('Visitors fallback:',DB.visitors.length);
@@ -18303,12 +18351,12 @@ async function refreshVisitors(btn){
 
 async function loadVisitors(){
   // Try ordering by visit_date; if that fails try without ordering
-  let query = sb.from('visitors').select('*').eq('branch_id',curBid).limit(2000);
+  let query = sb.from('visitors').select('*').eq('branch_id',curBid);
   const {data,error} = await query;
   if(error){
     console.error('Visitors load error:',error.message);
     // Try without branch filter as fallback
-    const {data:data2,error:err2} = await sb.from('visitors').select('*').limit(2000);
+    const {data:data2,error:err2} = await sb.from('visitors').select('*');
     if(!err2 && data2){
       DB.visitors = (data2||[]).filter(v=>!v.branch_id||v.branch_id===curBid).map(v=>({...v, name:(v.name||'').trim()}));
       console.log('✅ Visitors loaded (fallback):',DB.visitors.length);
@@ -21978,7 +22026,7 @@ async function runDBHealthCheck(){
   // ── 2. Duplicate attendance check ──
   log(`<div style="font-weight:800;color:#1e3a8a;margin:12px 0 8px;font-size:.9rem">🔍 Duplicate Kids Attendance Check</div>`);
   try{
-    const {data:attAll}=await sb.from('attendance').select('id,branch_id,child_id,date,status').limit(15000);
+    const {data:attAll}=await sb.from('attendance').select('id,branch_id,child_id,date,status');
     if(attAll){
       const keyMap={};
       attAll.forEach(r=>{
