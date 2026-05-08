@@ -1501,6 +1501,26 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="card np">
   <div class="ch">
     <div class="ct">📋 Salary History — سجل الرواتب السابقة</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="downloadSalaryHistoryTemplate()"
+        style="background:#059669;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.78rem">
+        ⬇️ Download Template — نزّلي النموذج
+      </button>
+      <button onclick="el('bulk-hist-import-inp').click()"
+        style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.78rem">
+        📥 Bulk Import All Staff — استيراد جميع الموظفين
+      </button>
+      <input type="file" id="bulk-hist-import-inp" accept=".xlsx,.xls,.csv" style="display:none"
+        onchange="bulkImportAllStaffHistory(this.files[0]);this.value=''">
+    </div>
+  </div>
+  <div id="sal-hist-import-alert" style="margin-bottom:8px"></div>
+  <div id="bulk-hist-progress" style="display:none;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:10px 14px;margin-bottom:10px">
+    <div style="font-size:.78rem;font-weight:700;color:#0369a1;margin-bottom:5px">📥 Importing...</div>
+    <div id="bulk-hist-bar-wrap" style="background:#dbeafe;border-radius:6px;height:8px;margin-bottom:5px">
+      <div id="bulk-hist-bar" style="background:#2563eb;height:8px;border-radius:6px;width:0%;transition:width .3s"></div>
+    </div>
+    <div id="bulk-hist-msg" style="font-size:.75rem;color:#374151"></div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
     <select id="sh-tab-staff" onchange="loadSHInline()" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #6366f1;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.88rem">
@@ -1908,6 +1928,16 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <!-- STAFF MODAL -->
+<div class="mover" id="staff-leave-dashboard-modal">
+  <div class="mbox" style="max-width:720px">
+    <div class="mh" style="background:linear-gradient(135deg,#5b21b6,#7c3aed)">
+      <div class="mt" style="color:#fff">🏖️ Leave & Attendance Dashboard</div>
+      <button class="xb" style="color:#fff;background:rgba(255,255,255,.15)" onclick="el('staff-leave-dashboard-modal').classList.remove('on')">✕</button>
+    </div>
+    <div id="staff-leave-dashboard-body" style="padding:16px;max-height:80vh;overflow-y:auto"></div>
+  </div>
+</div>
+
 <div class="mover" id="staff-modal">
 <div class="modal" style="max-width:680px">
   <div class="mh"><div class="mt" id="staff-modal-title">👷 Staff Member</div><button class="xb" onclick="closeStaffModal()">✕</button></div>
@@ -5024,7 +5054,14 @@ function renderActiveKidsList(){
 
 // ─── Active Staff List ───────────────────────────
 function renderActiveStaffList(){
-  const staff=DB.staff||[];
+  let staff=DB.staff||[];
+  // Filter by branch for manager
+  if(curRole==='manager'){
+    staff=staff.filter(s=>String(s.workBranch||s.branchId||'')===String(curBid));
+  }
+  // Deduplicate by ID
+  const seen=new Set();
+  staff=staff.filter(s=>{if(!s.id||seen.has(String(s.id)))return false;seen.add(String(s.id));return true;});
   const cnt=el('active-staff-count');
   if(cnt) cnt.textContent=staff.length+' '+(lang==='ar'?'موظف نشط':'active staff');
   const container=el('active-staff-list');
@@ -8764,8 +8801,88 @@ ${b.ar} — نتواصل معكم بخصوص *${c.name}*.
   });
   setTimeout(()=>alert(`${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`),300);
 }
+// ── Pending save queue to avoid race conditions ──
+const _attSaveQueue = new Map(); // key: childId+date → promise
+
+async function _saveAttWithRetry(childId, date, newSt, cell, maxRetries=3){
+  // Show saving indicator on cell
+  if(cell){
+    const saving = document.createElement('div');
+    saving.id = `att-saving-${childId}-${date}`;
+    saving.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:inherit;z-index:5';
+    saving.textContent = '⏳';
+    cell.style.position = 'relative';
+    cell.appendChild(saving);
+  }
+
+  let lastErr = null;
+  for(let attempt=1; attempt<=maxRetries; attempt++){
+    try{
+      if(!newSt){
+        const {error} = await sb.from('attendance').delete()
+          .eq('branch_id',curBid).eq('child_id',childId).eq('date',date);
+        if(error) throw error;
+      } else {
+        const {error} = await sb.from('attendance').upsert(
+          {branch_id:curBid, child_id:childId, date, status:newSt},
+          {onConflict:'branch_id,child_id,date'}
+        );
+        if(error) throw error;
+      }
+      // SUCCESS
+      _removeUnsavedFlag(childId, date);
+      const ind = document.getElementById(`att-saving-${childId}-${date}`);
+      if(ind) ind.remove();
+      return true;
+    } catch(err){
+      lastErr = err;
+      if(attempt < maxRetries) await new Promise(r=>setTimeout(r, 800 * attempt));
+    }
+  }
+  // ALL RETRIES FAILED
+  console.error('Kids att save FAILED after retries:', lastErr, {childId, date, newSt});
+  _addUnsavedFlag(childId, date, newSt);
+  const ind = document.getElementById(`att-saving-${childId}-${date}`);
+  if(ind){ ind.textContent='❌'; ind.style.background='rgba(220,38,38,.18)'; ind.style.color='#dc2626'; ind.title='لم يتم الحفظ — Click cell to retry'; setTimeout(()=>ind.remove(), 3000); }
+  return false;
+}
+
+// Track unsaved changes
+const _unsavedAtt = new Map();
+function _addUnsavedFlag(childId, date, status){ _unsavedAtt.set(`${childId}__${date}`, {childId, date, status}); _renderUnsavedBanner(); }
+function _removeUnsavedFlag(childId, date){ _unsavedAtt.delete(`${childId}__${date}`); _renderUnsavedBanner(); }
+function _renderUnsavedBanner(){
+  let banner = el('att-unsaved-banner');
+  if(_unsavedAtt.size === 0){ if(banner) banner.remove(); return; }
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'att-unsaved-banner';
+    banner.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 20px;border-radius:12px;font-family:Tajawal,sans-serif;font-weight:800;font-size:.85rem;z-index:9999;display:flex;align-items:center;gap:10px;box-shadow:0 4px 18px rgba(0,0,0,.35)';
+    banner.innerHTML = `<span>⚠️ <span id="att-unsaved-count"></span> ${lang==='ar'?'حضور لم يتم حفظه — اضغط للمحاولة مجدداً':'attendance records not saved — tap to retry'}</span>
+      <button onclick="_retryAllUnsaved()" style="background:#fff;color:#dc2626;border:none;border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:900;font-size:.82rem;font-family:Tajawal,sans-serif">🔄 ${lang==='ar'?'إعادة':'Retry'}</button>`;
+    document.body.appendChild(banner);
+  }
+  const cnt = el('att-unsaved-count');
+  if(cnt) cnt.textContent = _unsavedAtt.size;
+}
+async function _retryAllUnsaved(){
+  const entries = [..._unsavedAtt.values()];
+  for(const {childId, date, status} of entries){
+    await _saveAttWithRetry(childId, date, status, null, 3);
+  }
+}
+
+// ── Warn before closing if unsaved attendance ──
+window.addEventListener('beforeunload', e=>{
+  if(_unsavedAtt && _unsavedAtt.size > 0){
+    const msg = 'يوجد حضور لم يتم حفظه. هل تريد المغادرة؟ / There are unsaved attendance records.';
+    e.preventDefault();
+    e.returnValue = msg;
+    return msg;
+  }
+});
+
 async function toggleKidsAtt(childId, date){
-  // Toggle: '' → حضور → غياب → ''
   const cur=(DB.attendance[date]||{})[String(childId)]||(DB.attendance[date]||{})[childId]||'';
   const newSt=cur===''?'حضور':cur==='حضور'?'غياب':'';
   if(!DB.attendance[date]) DB.attendance[date]={};
@@ -8779,7 +8896,6 @@ async function toggleKidsAtt(childId, date){
     const isWeekendDay=(dow===0||dow===5||dow===6);
     if(newSt==='حضور'){
       if(!isScheduled && isWeekendDay){
-        // Non-registered weekend: check payment → RED or GREEN
         const paid=hasWeekendReceipt(childId, date);
         cell.style.background=paid?'#059669':'#dc2626';
         cell.style.backgroundImage='none';
@@ -8804,11 +8920,10 @@ async function toggleKidsAtt(childId, date){
       cell.innerHTML='✕';
       cell.style.fontSize='.82rem';
     } else {
-      // Back to empty — restore off-day style if not scheduled
       if(!isScheduled){
         cell.style.background='';
         cell.style.backgroundImage=isWeekendDay
-          ?'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 7px)' // warm yellow for weekend off
+          ?'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 7px)'
           :'repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 3px,#e2e8f0 3px,#e2e8f0 7px)';
         cell.style.color='#94a3b8';
         cell.innerHTML='—';
@@ -8823,17 +8938,8 @@ async function toggleKidsAtt(childId, date){
     }
   }
 
-  // Save to Supabase
-  if(!newSt){
-    await sb.from('attendance').delete()
-      .eq('branch_id',curBid).eq('child_id',childId).eq('date',date);
-  } else {
-    const {error}=await sb.from('attendance').upsert(
-      {branch_id:curBid,child_id:childId,date,status:newSt},
-      {onConflict:'branch_id,child_id,date'}
-    );
-    if(error) console.error('Kids att save error:',error);
-  }
+  // Save with retry + visual indicator
+  _saveAttWithRetry(childId, date, newSt, cell);
 }
 
 async function toggleAtt(childId,date){
@@ -8850,11 +8956,16 @@ async function toggleAtt(childId,date){
   );
   if(attErr){
     console.error('Attendance save error:',attErr);
-    // Retry with explicit select after upsert
+    // Retry once
+    await new Promise(r=>setTimeout(r,800));
     const {error:attErr2}=await sb.from('attendance').upsert(
-      {branch_id:curBid,child_id:childId,date,status:newSt}
+      {branch_id:curBid,child_id:childId,date,status:newSt},
+      {onConflict:'branch_id,child_id,date'}
     );
-    if(attErr2) console.error('Attendance retry error:',attErr2);
+    if(attErr2){
+      console.error('Attendance retry error:',attErr2);
+      _addUnsavedFlag(childId, date, newSt);
+    }
   }
 }
 function printAtt(){
@@ -13140,6 +13251,13 @@ async function loadStaff(){
 function populateStaffBranchFilter(){
   const sel = document.getElementById('staff-branch-filter');
   if(!sel) return;
+  // Manager can only see their own branch — hide the filter
+  if(curRole==='manager'){
+    sel.style.display='none';
+    sel.value='all';
+    return;
+  }
+  sel.style.display='';
   sel.innerHTML = `<option value="all">${lang==='ar'?'كل الفروع':'All Branches'}</option>` +
     BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
 }
@@ -13187,9 +13305,41 @@ function renderStaffAlerts(){
 function renderStaff(){
   const q  = (el('staff-srch')?.value||'').toLowerCase();
   const bf = el('staff-branch-filter')?.value||'all';
-  let list = [...DB.staff];
-  if(q)      list = list.filter(s=>(s.name+s.position+s.nationality).toLowerCase().includes(q));
-  if(bf!=='all') list = list.filter(s=>s.branchId===bf);
+
+  // ── 1. Filter by branch ──────────────────────
+  // Manager: only staff whose workBranch OR branchId matches current branch
+  // Admin: all branches, or filtered by branch dropdown
+  let list = DB.staff.filter(s=>{
+    const effBranch = String(s.workBranch||s.branchId||'');
+    if(curRole==='manager'){
+      return effBranch===String(curBid);
+    }
+    if(bf!=='all') return effBranch===String(bf)||String(s.branchId)===String(bf);
+    return true;
+  });
+
+  // ── 2. Deduplicate by staff ID ──────────────
+  const seenIds = new Set();
+  list = list.filter(s=>{
+    if(!s.id) return false;
+    const key = String(s.id);
+    if(seenIds.has(key)) return false;
+    seenIds.add(key);
+    return true;
+  });
+
+  // ── 3. Deduplicate by name within same branch (catch legacy duplicates) ──
+  const seenNameBranch = new Set();
+  list = list.filter(s=>{
+    const effBranch = String(s.workBranch||s.branchId||'');
+    const key = (s.name||'').trim().toLowerCase()+'__'+effBranch;
+    if(seenNameBranch.has(key)) return false;
+    seenNameBranch.add(key);
+    return true;
+  });
+
+  // ── 4. Search filter ────────────────────────
+  if(q) list = list.filter(s=>(s.name+s.position+s.nationality).toLowerCase().includes(q));
 
   const active = list.filter(s=>!s.lastWorkingDay || s.lastWorkingDay >= today());
   const exited = list.filter(s=>s.lastWorkingDay  && s.lastWorkingDay <  today());
@@ -13210,6 +13360,23 @@ function renderStaff(){
       {k:'healthCardExpire','label':'Health Card'},
       {k:'contractEnd','label':'Contract End'},
     ];
+
+    // ── Leave balance badge (Admin only) ──
+    let leaveBadge = '';
+    if(curRole==='admin' && !isExited && s.contractStart){
+      const bal = calcLeaveBalance(s.id);
+      const alarm = bal.remaining >= 15; // Alert: 15+ days unused leave
+      const dueComp = bal.remaining > 0;
+      leaveBadge = `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">
+        <span style="background:${alarm?'#fef3c7':'#f0fdf4'};color:${alarm?'#92400e':'#065f46'};border:1px solid ${alarm?'#fde68a':'#86efac'};border-radius:7px;padding:2px 9px;font-size:.7rem;font-weight:700">
+          🏖️ ${lang==='ar'?'رصيد الإجازة':'Leave Balance'}: <b>${bal.remaining}</b> ${lang==='ar'?'يوم':'days'}
+          ${alarm ? '⚠️' : ''}
+        </span>
+        ${dueComp ? `<span style="background:#fdf4ff;color:#5b21b6;border:1px solid #e9d5ff;border-radius:7px;padding:2px 9px;font-size:.7rem;font-weight:700">💰 ${lang==='ar'?'بدل إجازة':'Compensation'}: ${fmtNum(bal.compensation)} AED</span>` : ''}
+        ${alarm ? `<span style="background:#dc2626;color:#fff;border-radius:7px;padding:2px 9px;font-size:.7rem;font-weight:800;animation:pulse 1.5s infinite">🔔 ${lang==='ar'?'يستحق إجازة / بدل':'Leave/Comp Due!'}</span>` : ''}
+      </div>`;
+    }
+
     return `<div class="rc" style="margin-bottom:9px;border-right:4px solid ${isExited?'#9ca3af':b.c};${isExited?'opacity:.85':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:7px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:9px">
@@ -13219,10 +13386,12 @@ function renderStaff(){
             <div style="font-size:.76rem;color:var(--muted)">${s.position||'—'} | ${b.icon} ${tBN(b)}</div>
             <div style="font-size:.74rem;color:var(--muted)">${s.nationality||''} ${s.contact?'📞 '+s.contact:''}</div>
             ${isExited?`<div style="font-size:.72rem;color:#dc2626;font-weight:700;margin-top:2px">🗓️ Last Day: ${fmtDate(s.lastWorkingDay)}</div>`:''}
+            ${leaveBadge}
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn bo bsm" onclick="openStaffForm('${s.id}')">✏️ Edit</button>
+          ${curRole==='admin'?`<button onclick="openStaffLeaveDashboard('${s.id}')" style="background:#ede9fe;color:#5b21b6;border:1.5px solid #c4b5fd;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">🏖️ Leave & Attendance</button>`:''}
           ${curRole==='admin'?`<button class="btn bsm" onclick="openLoanModal('${s.id}')" style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">💳 Loans</button>`:''}
           ${curRole==='admin'&&isExited?`<button class="btn bsm" onclick="calcEOGForStaff('${s.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">📋 EOS</button>`:''}
           <button class="btn bd bsm" onclick="deleteStaff('${s.id}')">🗑</button>
@@ -13263,6 +13432,211 @@ function renderStaff(){
 
   container.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════
+// STAFF LEAVE & ATTENDANCE DASHBOARD
+// ═══════════════════════════════════════════════
+function openStaffLeaveDashboard(staffId){
+  const s = DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s){ alert('Staff not found'); return; }
+  el('staff-leave-dashboard-modal').classList.add('on');
+  const body = el('staff-leave-dashboard-body');
+  body.innerHTML = '<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري الحساب...</div>';
+
+  setTimeout(()=>{
+    const bal       = calcLeaveBalance(s.id);
+    const basic     = Number(s.basicSalary||0);
+    const gross     = Number(s.grossSalary||s.basicSalary||0);
+    const dailyRate = gross/30;
+    const b         = BRANCHES.find(x=>x.id===s.branchId)||CB();
+
+    // ── Service period ──
+    const startDate = s.contractStart ? new Date(s.contractStart) : null;
+    const today_    = new Date();
+    const totalCalDays = startDate ? Math.floor((today_-startDate)/(1000*60*60*24)) : 0;
+    const totalMonths  = startDate ? (today_.getFullYear()-startDate.getFullYear())*12+(today_.getMonth()-startDate.getMonth()) : 0;
+    const yearsStr     = `${Math.floor(totalMonths/12)}y ${totalMonths%12}m`;
+
+    // ── Actual attendance ──
+    const actualWorkDays = getActualWorkDaysCount(s.id);
+    const daysBeforeSys  = Number(s.daysWorkedBefore||0);
+    const totalAttDays   = actualWorkDays + daysBeforeSys;
+
+    // ── Leave records ──
+    const allLeaves = (DB.leaves||[]).filter(l=>String(l.staffId)===String(s.id));
+    const annualLeaves  = allLeaves.filter(l=>l.type==='annual');
+    const sickLeaves    = allLeaves.filter(l=>l.type==='sick');
+    const unpaidLeaves  = allLeaves.filter(l=>l.type==='unpaid');
+    const compLeaves    = allLeaves.filter(l=>l.type==='compensation');
+    const annualDays    = annualLeaves.reduce((sum,l)=>sum+(l.days||0),0);
+    const sickDays      = sickLeaves.reduce((sum,l)=>sum+(l.days||0),0);
+    const unpaidDays    = unpaidLeaves.reduce((sum,l)=>sum+(l.days||0),0);
+
+    // ── UAE Law: leave entitlement ──
+    // <6 months: 0 | 6m–1y: 1.5 days/month | >1yr: 2.5 days/month
+    const monthsWorked = totalMonths;
+    let entitledPerMonth = 0;
+    let lawNote = '';
+    if(monthsWorked < 6){
+      entitledPerMonth=0; lawNote='أقل من 6 شهور — لا يستحق إجازة بعد';
+    } else if(monthsWorked < 12){
+      entitledPerMonth=1.5; lawNote='من 6 شهور إلى سنة — 1.5 يوم/شهر (18 يوم/سنة)';
+    } else {
+      entitledPerMonth=2.5; lawNote='أكثر من سنة — 2.5 يوم/شهر (30 يوم/سنة)';
+    }
+    const totalEntitled = Math.floor(monthsWorked * entitledPerMonth);
+    const taken         = annualDays + (Number(s.leavesTakenBefore||0));
+    const remaining     = Math.max(0, totalEntitled - taken);
+    const leaveComp     = Math.round(remaining * dailyRate * 100)/100;
+    const alarm         = remaining >= 15; // UAE law: can't accumulate more than 30 days
+
+    // ── Gratuity calculation ──
+    const gratuityYears = totalAttDays > 0 ? totalAttDays/365 : totalCalDays/365;
+    let gratuity = 0, gratuityBreakdown = '';
+    if(gratuityYears >= 1){
+      const y1to5   = Math.min(gratuityYears, 5);
+      const yAfter5 = Math.max(0, gratuityYears-5);
+      gratuity = (basic/30)*21*y1to5 + (basic/30)*30*yAfter5;
+      gratuityBreakdown = yAfter5>0
+        ? `(${y1to5.toFixed(2)} سنة × 21 يوم) + (${yAfter5.toFixed(2)} سنة × 30 يوم)`
+        : `${y1to5.toFixed(2)} سنة × 21 يوم`;
+    }
+
+    // ── Month-by-month salary history ──
+    const salHist = getSalaryHistory(s.id)||[];
+    const monthRows = salHist.map(r=>{
+      const leavesThisMonth = allLeaves.filter(l=>(l.startDate||'').startsWith(r.month));
+      const paidLeave  = leavesThisMonth.filter(l=>l.type==='annual'||l.type==='sick');
+      const unpaidLvl  = leavesThisMonth.filter(l=>l.type==='unpaid');
+      const paidDaysM  = paidLeave.reduce((s,l)=>s+(l.days||0),0);
+      const unpaidDaysM= unpaidLvl.reduce((s,l)=>s+(l.days||0),0);
+      return `<tr style="border-bottom:1px solid #f1f5f9">
+        <td style="padding:5px 8px;font-weight:700;color:#1e293b">${r.month}</td>
+        <td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700">${r.presentDays||0}</td>
+        <td style="padding:5px 8px;text-align:center;color:#dc2626">${r.absentDays||0}</td>
+        <td style="padding:5px 8px;text-align:center">
+          ${paidDaysM>0?`<span style="background:#d1fae5;color:#065f46;border-radius:6px;padding:1px 7px;font-size:.7rem;font-weight:700">✅ ${paidDaysM}d paid</span>`:''}
+          ${unpaidDaysM>0?`<span style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:1px 7px;font-size:.7rem;font-weight:700">❌ ${unpaidDaysM}d unpaid</span>`:''}
+          ${paidDaysM===0&&unpaidDaysM===0?'<span style="color:#9ca3af;font-size:.72rem">—</span>':''}
+        </td>
+        <td style="padding:5px 8px;text-align:right;font-weight:700;color:#1e3a8a">${fmtNum(r.net||r.amount||0)} AED</td>
+      </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px;background:#fdf4ff;border-radius:12px">
+      <div class="av" style="background:${b.c};width:46px;height:46px;font-size:1.2rem;flex-shrink:0">${(s.name||'?')[0]}</div>
+      <div>
+        <div style="font-weight:900;font-size:1rem;color:#1e293b">${s.name}</div>
+        <div style="font-size:.78rem;color:#6b7280">${s.position||'—'} | ${tBN(b)} | ${lang==='ar'?'بداية العقد':'Since'}: ${fmtDate(s.contractStart)} (${yearsStr})</div>
+        <div style="font-size:.76rem;color:#6b7280">${lang==='ar'?'الراتب الأساسي':'Basic'}: ${fmtNum(basic)} AED | ${lang==='ar'?'الإجمالي':'Gross'}: ${fmtNum(gross)} AED | ${lang==='ar'?'اليومي':'Daily'}: ${fmtNum(dailyRate)} AED</div>
+      </div>
+    </div>
+
+    <!-- ALARM -->
+    ${alarm ? `<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <div style="font-size:1.5rem">🔔</div>
+      <div>
+        <div style="font-weight:900;color:#92400e;font-size:.88rem">تنبيه: رصيد إجازة كبير — يستحق إجازة أو بدل!</div>
+        <div style="font-size:.78rem;color:#92400e">الموظف لديه <b>${remaining} يوم</b> إجازة غير مستخدمة. حسب القانون الإماراتي يجب منحه الإجازة أو دفع بدلها.</div>
+      </div>
+    </div>` : ''}
+
+    <!-- LEAVE BALANCE -->
+    <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:900;color:#166534;margin-bottom:10px">📊 رصيد الإجازة السنوية — Annual Leave Balance</div>
+      <div style="font-size:.72rem;color:#6b7280;margin-bottom:8px;background:#fff;padding:6px 10px;border-radius:8px">🇦🇪 ${lawNote}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+        <div class="sbox sg"><div class="sv">${totalEntitled}</div><div class="sk">إجمالي المستحق</div></div>
+        <div class="sbox" style="background:#e0f2fe"><div class="sv" style="color:#0369a1">${taken}</div><div class="sk">تم استخدامه</div></div>
+        <div class="sbox ${alarm?'sr':'sg'}"><div class="sv" style="color:${alarm?'#dc2626':'#059669'}">${remaining}</div><div class="sk">الرصيد المتبقي ${alarm?'⚠️':''}</div></div>
+        <div class="sbox" style="background:#fdf4ff"><div class="sv" style="color:#5b21b6">${fmtNum(leaveComp)}</div><div class="sk">بدل الإجازة (AED)</div></div>
+      </div>
+      ${remaining > 0 ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="openLeaveForm(null,'${s.id}','annual')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-size:.78rem;font-weight:700">🏖️ تسجيل إجازة سنوية</button>
+        <button onclick="openLeaveForm(null,'${s.id}','compensation')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:7px 14px;cursor:pointer;font-size:.78rem;font-weight:700">💰 صرف بدل إجازة (${fmtNum(leaveComp)} AED)</button>
+      </div>` : ''}
+    </div>
+
+    <!-- LEAVE BREAKDOWN -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.2rem">🏖️</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#1e3a8a">${annualDays}</div>
+        <div style="font-size:.72rem;color:#6b7280">إجازة سنوية (مدفوعة)</div>
+        <div style="font-size:.68rem;color:#9ca3af">${annualLeaves.length} ${lang==='ar'?'مرة':'records'}</div>
+      </div>
+      <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.2rem">🏥</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#0891b2">${sickDays}</div>
+        <div style="font-size:.72rem;color:#6b7280">إجازة مرضية (مدفوعة)</div>
+        <div style="font-size:.68rem;color:#9ca3af">${sickLeaves.length} ${lang==='ar'?'مرة':'records'}</div>
+      </div>
+      <div style="background:#fff;border:1.5px solid #fee2e2;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:1.2rem">⛔</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#dc2626">${unpaidDays}</div>
+        <div style="font-size:.72rem;color:#6b7280">إجازة بدون راتب</div>
+        <div style="font-size:.68rem;color:#9ca3af">${unpaidLeaves.length} ${lang==='ar'?'مرة':'records'}</div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE & GRATUITY -->
+    <div style="background:#f0f9ff;border:2px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:900;color:#0369a1;margin-bottom:10px">📋 الحضور الفعلي ومكافأة نهاية الخدمة</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-size:.7rem;color:#6b7280;margin-bottom:4px">أيام الحضور المسجلة في النظام</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#0369a1">${actualWorkDays} <span style="font-size:.8rem;font-weight:400">يوم</span></div>
+          ${daysBeforeSys>0?`<div style="font-size:.7rem;color:#6b7280">+ ${daysBeforeSys} أيام قبل النظام = <b>${totalAttDays} يوم إجمالي</b></div>`:''}
+        </div>
+        <div>
+          <div style="font-size:.7rem;color:#6b7280;margin-bottom:4px">سنوات الخدمة (حسب الحضور)</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#0369a1">${(totalAttDays/365).toFixed(2)} <span style="font-size:.8rem;font-weight:400">سنة</span></div>
+        </div>
+      </div>
+      ${gratuity > 0 ? `
+      <div style="background:#fff;border:1.5px solid #bae6fd;border-radius:10px;padding:10px">
+        <div style="font-size:.73rem;font-weight:700;color:#0369a1;margin-bottom:6px">🏁 مكافأة نهاية الخدمة التقديرية (حسب القانون الإماراتي)</div>
+        <div style="font-size:.7rem;color:#6b7280;margin-bottom:6px">${gratuityBreakdown}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:.72rem;color:#6b7280">مكافأة الخدمة</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#059669">${fmtNum(Math.round(gratuity))} AED</div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:#6b7280">+ بدل الإجازة المتبقية</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#5b21b6">${fmtNum(Math.round(leaveComp))} AED</div>
+          </div>
+          <div style="background:#1e3a8a;color:#fff;padding:8px 14px;border-radius:10px;text-align:center">
+            <div style="font-size:.7rem">الإجمالي عند انتهاء الخدمة</div>
+            <div style="font-size:1.2rem;font-weight:900">${fmtNum(Math.round(gratuity+leaveComp))} AED</div>
+          </div>
+        </div>
+      </div>` : `<div style="text-align:center;color:#9ca3af;font-size:.8rem;padding:8px">⏳ أقل من سنة — لا تستحق مكافأة نهاية الخدمة بعد</div>`}
+    </div>
+
+    <!-- MONTHLY HISTORY TABLE -->
+    ${monthRows ? `
+    <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:#1e3a8a;color:#fff;padding:10px 14px;font-weight:800;font-size:.82rem">📅 سجل الحضور والإجازات الشهري</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead><tr style="background:#f8fafc">
+            <th style="padding:8px;text-align:right;border-bottom:2px solid #e5e7eb">الشهر</th>
+            <th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;color:#059669">✅ حضور</th>
+            <th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;color:#dc2626">❌ غياب</th>
+            <th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb">🏖️ إجازة</th>
+            <th style="padding:8px;text-align:right;border-bottom:2px solid #e5e7eb">الصافي</th>
+          </tr></thead>
+          <tbody>${monthRows}</tbody>
+        </table>
+      </div>
+    </div>` : `<div style="text-align:center;color:#9ca3af;padding:14px;font-size:.82rem">لا يوجد سجل شهري محفوظ بعد</div>`}
+    `;
+  }, 50);
+}
+// ─── End Leave Dashboard ───────────────────────
 
 function calcEOGForStaff(staffId){
   showPage('staff');
@@ -20743,6 +21117,10 @@ async function openSalaryHistory(staffId){
         style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px">
         ✏️ Enter Manually — إدخال يدوي
       </button>
+      <button onclick="showSHTab('yearview','${staffId}',this)" class="sh-tab-btn"
+        style="background:#f3f4f6;color:#374151;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px">
+        📅 Year View — عرض سنوي
+      </button>
       <button onclick="showSHTab('excel','${staffId}',this)" class="sh-tab-btn"
         style="background:#f3f4f6;color:#374151;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px">
         📊 Import Excel — استيراد Excel
@@ -20885,6 +21263,46 @@ async function openSalaryHistory(staffId){
       </div>
     </div>
 
+    <!-- ── YEAR VIEW PANEL ── -->
+    <div id="sh-panel-yearview" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="font-weight:900;color:#1e3a8a;font-size:.88rem">📅 إدخال بيانات جميع الشهور</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="changeYVYear('${staffId}',-1)" style="background:#e5e7eb;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.85rem;font-weight:800">◀</button>
+          <select id="yv-year-sel" onchange="renderYearView('${staffId}')" style="padding:5px 10px;border:1.5px solid #6366f1;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:700">
+            ${(()=>{const yr=new Date().getFullYear();let opts='';for(let y=yr-3;y<=yr+2;y++){opts+=`<option value="${y}" ${y===yr?'selected':''}>${y}</option>`;}return opts;})()}
+          </select>
+          <button onclick="changeYVYear('${staffId}',1)" style="background:#e5e7eb;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.85rem;font-weight:800">▶</button>
+        </div>
+        <button onclick="saveAllYearView('${staffId}')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:7px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem;margin-right:auto">
+          💾 حفظ كل التعديلات — Save All
+        </button>
+      </div>
+      <div id="yv-save-status" style="margin-bottom:8px;font-size:.8rem;min-height:20px"></div>
+      <div style="overflow-x:auto">
+        <table id="yv-table" style="width:100%;border-collapse:collapse;font-size:.77rem;font-family:'Tajawal',sans-serif">
+          <thead>
+            <tr style="background:#1e3a8a;color:#fff;text-align:center">
+              <th style="padding:8px 6px;text-align:right;min-width:90px">📅 الشهر</th>
+              <th style="padding:8px 4px;min-width:58px">✅ حضور</th>
+              <th style="padding:8px 4px;min-width:52px">❌ غياب</th>
+              <th style="padding:8px 4px;min-width:58px">🏖️ إجازة سنوية</th>
+              <th style="padding:8px 4px;min-width:52px">🏥 مرضية</th>
+              <th style="padding:8px 4px;min-width:52px">⛔ بلا راتب</th>
+              <th style="padding:8px 4px;min-width:80px">💸 خصومات (AED)</th>
+              <th style="padding:8px 4px;min-width:80px">🎁 مكافأة (AED)</th>
+              <th style="padding:8px 4px;min-width:90px">💰 بدل إجازة مُصرف؟</th>
+              <th style="padding:8px 4px;min-width:90px">💵 الصافي (AED)</th>
+            </tr>
+          </thead>
+          <tbody id="yv-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;background:#fef9c3;border:1.5px solid #fde047;border-radius:9px;padding:8px 12px;font-size:.73rem;color:#713f12">
+        💡 اضغطي Tab للتنقل. الصافي يُحسب تلقائياً. الأشهر المستقبلية مظللة بالرمادي (يمكن إدخالها مسبقاً).
+      </div>
+    </div>
+
     <!-- ── EXCEL IMPORT PANEL ── -->
     <div id="sh-panel-excel" style="display:none">
       <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:.8rem;color:#1e3a8a;line-height:1.8">
@@ -20916,9 +21334,354 @@ async function openSalaryHistory(staffId){
 function showSHTab(tab, staffId, btn){
   el('sh-panel-manual').style.display=tab==='manual'?'':'none';
   el('sh-panel-excel').style.display=tab==='excel'?'':'none';
+  if(el('sh-panel-yearview')) el('sh-panel-yearview').style.display=tab==='yearview'?'':'none';
   document.querySelectorAll('.sh-tab-btn').forEach(b=>{b.style.background='#f3f4f6';b.style.color='#374151';});
   if(btn){btn.style.background='#1e3a8a';btn.style.color='#fff';}
+  if(tab==='yearview') renderYearView(staffId);
 }
+
+// ═══════════════════════════════════════════════
+// BULK IMPORT ALL STAFF HISTORY FROM EXCEL
+// ═══════════════════════════════════════════════
+async function bulkImportAllStaffHistory(file){
+  const XLSX=window.XLSX;
+  if(!XLSX||!file){alert('XLSX library or file missing');return;}
+
+  const progress=el('bulk-hist-progress');
+  const bar=el('bulk-hist-bar');
+  const msg=el('bulk-hist-msg');
+  const alert_=el('sal-hist-import-alert');
+  if(progress) progress.style.display='';
+  if(alert_) alert_.innerHTML='';
+
+  const setMsg=(m,pct=null)=>{
+    if(msg) msg.textContent=m;
+    if(bar&&pct!==null) bar.style.width=pct+'%';
+  };
+
+  setMsg('Reading Excel file...', 5);
+  const ab=await file.arrayBuffer();
+  const wb=XLSX.read(ab,{type:'array',cellFormula:false,cellHTML:false});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+  if(!rows.length){
+    setMsg('❌ No data found in file',0);
+    return;
+  }
+
+  setMsg(`Found ${rows.length} rows — matching staff...`, 10);
+
+  const toMonth=v=>{
+    if(!v) return null;
+    if(typeof v==='number'&&v>40000&&v<60000){
+      const d=new Date((v-25569)*86400000);
+      return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+    }
+    const s=String(v).trim();
+    if(/^\d{4}-\d{2}$/.test(s)) return s;
+    const mf=s.match(/^(\d{4})-(\d{2})-\d{2}/); if(mf) return mf[1]+'-'+mf[2];
+    const m1=s.match(/^(\d{1,2})[\/-](\d{4})$/); if(m1) return m1[2]+'-'+m1[1].padStart(2,'0');
+    const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const m2=s.toLowerCase().match(/([a-z]{3})\D*(\d{4})/); if(m2&&months[m2[1]]) return m2[2]+'-'+months[m2[1]];
+    const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return null;
+  };
+
+  const col=(keys)=>{
+    for(const k of keys){
+      const found=Object.keys(rows[0]||{}).find(h=>h.toLowerCase().includes(k.toLowerCase()));
+      if(found) return found;
+    }
+    return null;
+  };
+
+  const nameCol        =col(['name','staff','employee','موظف']);
+  const monthCol       =col(['month','date','period','شهر']);
+  const basicCol       =col(['basic','أساسي','اساسي']);
+  const grossCol       =col(['net paid','gross','paid','total','amount','إجمالي','صافي','net']);
+  const presentCol     =col(['present','حضور','attend']);
+  const absentCol      =col(['absent','غياب','absence','absent (unpaid)']);
+  const annualCol      =col(['annual leave','annual','إجازة سنوية','سنوية']);
+  const sickCol        =col(['sick','مرضية','مرض']);
+  const unpaidLvCol    =col(['unpaid leave','unpaid leave days','بدون راتب','بلا راتب']);
+  const dOtherCol      =col(['deduction','deduct other','deductions','خصومات','خصم']);
+  const dLoanCol       =col(['loan','deduct loan','قرض']);
+  const bonusCol       =col(['bonus','مكافأة']);
+  const bonusReasonCol =col(['bonus reason','reason','سبب']);
+  const compPaidCol    =col(['leave comp','comp paid','بدل إجازة','بدل اجازة']);
+
+  const getN=(row,c)=>(c&&row[c]!==''&&row[c]!==null&&row[c]!==undefined)?Number(row[c]):null;
+  const getS=(row,c)=>(c&&row[c])?String(row[c]).trim():null;
+  const getB=(row,c)=>{if(!c)return false;const v=String(row[c]||'').toLowerCase().trim();return v==='yes'||v==='1'||v==='true'||v==='نعم';};
+
+  // Staff name fuzzy match
+  const findStaff=name=>{
+    if(!name) return null;
+    const nm=String(name).trim().toLowerCase();
+    return DB.staff.find(s=>
+      s.name.toLowerCase()===nm||
+      s.name.toLowerCase().includes(nm)||
+      nm.includes(s.name.toLowerCase())||
+      s.name.toLowerCase().split(' ').some(part=>nm.includes(part)&&part.length>2)
+    );
+  };
+
+  // Build payloads
+  const payloads=[];
+  const unmatched=new Set();
+  let skipped=0;
+
+  for(const row of rows){
+    const month=toMonth(monthCol?row[monthCol]:'');
+    const rawNet=grossCol?row[grossCol]:null;
+    const amount=rawNet!==null&&rawNet!==''?Math.round(Number(rawNet)):null;
+    if(!month||amount===null||isNaN(amount)){skipped++;continue;}
+
+    const staffName=nameCol?row[nameCol]:'';
+    const found=findStaff(staffName);
+    if(!found){
+      if(staffName) unmatched.add(String(staffName).trim());
+      skipped++;
+      continue;
+    }
+
+    const basic=basicCol?Number(row[basicCol])||0:(found.basicSalary||0);
+    const presentDays=getN(row,presentCol);
+    const absentDays=getN(row,absentCol);
+    const [yr,mo]=month.split('-').map(Number);
+    const dim=new Date(yr,mo,0).getDate();
+
+    payloads.push({
+      branch_id:    found.branchId||found.workBranch||curBid,
+      staff_id:     Number(found.id),
+      month,
+      amount,
+      basic_salary: basic,
+      present_days: presentDays!==null?presentDays:(absentDays!==null?dim-absentDays:null),
+      absent_days:  absentDays,
+      annual_leave_days: getN(row,annualCol)||0,
+      sick_days:    getN(row,sickCol)||0,
+      unpaid_leave_days: getN(row,unpaidLvCol)||0,
+      deduct_loan:  getN(row,dLoanCol)||0,
+      deduct_other: getN(row,dOtherCol)||0,
+      bonus:        getN(row,bonusCol)||0,
+      bonus_reason: getS(row,bonusReasonCol),
+      leave_comp_paid: getB(row,compPaidCol),
+    });
+  }
+
+  if(!payloads.length){
+    setMsg(`❌ No valid rows (${skipped} skipped). Check staff names match exactly.`, 0);
+    if(unmatched.size) setMsg(`Unmatched names: ${[...unmatched].join(', ')}`, 0);
+    return;
+  }
+
+  setMsg(`Saving ${payloads.length} records to database...`, 30);
+
+  // Batch upsert in chunks of 100
+  const BATCH=100;
+  let ok=0, errCount=0;
+  for(let i=0;i<payloads.length;i+=BATCH){
+    const chunk=payloads.slice(i,i+BATCH);
+    const {error}=await sb.from('staff_salary_history')
+      .upsert(chunk,{onConflict:'branch_id,staff_id,month'});
+    if(error){console.error('Batch error:',error);errCount+=chunk.length;}
+    else ok+=chunk.length;
+    const pct=30+Math.round(((i+chunk.length)/payloads.length)*60);
+    setMsg(`Saved ${ok}/${payloads.length} records...`, pct);
+  }
+
+  // Update local cache
+  setMsg('Updating local cache...', 92);
+  if(!DB.salaryHistory) DB.salaryHistory={};
+  payloads.forEach(p=>{
+    const sid=String(p.staff_id);
+    if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+    const idx=DB.salaryHistory[sid].findIndex(r=>r.month===p.month);
+    const entry={
+      month:p.month,amount:p.amount,basic:p.basic_salary,
+      presentDays:p.present_days,absentDays:p.absent_days,
+      annualLeaveDays:p.annual_leave_days,sickDays:p.sick_days,
+      unpaidLeaveDays:p.unpaid_leave_days,
+      deductLoan:p.deduct_loan,deductOther:p.deduct_other,
+      bonus:p.bonus,bonusReason:p.bonus_reason,leaveCompPaid:p.leave_comp_paid,
+    };
+    if(idx>=0) DB.salaryHistory[sid][idx]=entry;
+    else DB.salaryHistory[sid].push(entry);
+  });
+
+  setMsg(`✅ Done!`, 100);
+  setTimeout(()=>{ if(progress) progress.style.display='none'; },2000);
+
+  // Show result summary
+  const unmatchedNote=unmatched.size
+    ?`<div style="color:#dc2626;font-size:.75rem;margin-top:5px">⚠️ Unmatched staff (check spelling): <b>${[...unmatched].join(', ')}</b></div>`
+    :'';
+  showAlert('sal-hist-import-alert',
+    `✅ Imported <b>${ok}</b> records for ${new Set(payloads.map(p=>p.staff_id)).size} staff members.${skipped?` ${skipped} rows skipped.`:''}${errCount?` ❌ ${errCount} errors.`:''}`,
+    false);
+  if(unmatchedNote&&alert_) alert_.innerHTML+=unmatchedNote;
+
+  // Refresh inline view if open
+  if(el('sh-tab-staff')?.value) loadSHInline();
+}
+// ─── End Bulk Import ───────────────────────────
+let _yvStaffId=null;
+
+function changeYVYear(staffId, delta){
+  const sel=el('yv-year-sel');
+  if(!sel) return;
+  sel.value=String(Number(sel.value)+delta);
+  renderYearView(staffId);
+}
+
+async function renderYearView(staffId){
+  _yvStaffId=staffId;
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+  const yr=Number(el('yv-year-sel')?.value||new Date().getFullYear());
+  const gross=Number(s.grossSalary||s.basicSalary||0);
+  const daily=gross>0?gross/30:0;
+  const now=today();
+
+  const {data:rows}=await sb.from('staff_salary_history')
+    .select('*').eq('staff_id',Number(staffId))
+    .gte('month',`${yr}-01`).lte('month',`${yr}-12`);
+  const recMap={};
+  (rows||[]).forEach(r=>{recMap[r.month]=r;});
+
+  const monthNames=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const tbody=el('yv-tbody');
+  if(!tbody) return;
+
+  let html='';
+  for(let m=1;m<=12;m++){
+    const mon=`${yr}-${String(m).padStart(2,'0')}`;
+    const r=recMap[mon]||{};
+    const isFuture=mon>now.slice(0,7);
+    const isCurrent=mon===now.slice(0,7);
+    const bg=isFuture?'#f8fafc':isCurrent?'#f0fdf4':'#fff';
+    const dim=new Date(yr,m,0).getDate();
+
+    const v=(field,fallback='')=>(r[field]!==null&&r[field]!==undefined)?r[field]:fallback;
+    const ni=(id,val,maxv=dim)=>`<input type="number" id="yv_${mon}_${id}" value="${val}" min="0" max="${maxv}" step="0.5"
+      oninput="yvCalcNet('${mon}')" onchange="yvCalcNet('${mon}')"
+      style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem;box-sizing:border-box;text-align:center;background:${bg}">`;
+
+    html+=`<tr data-mon="${mon}" style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:6px 8px;font-weight:800;color:${isCurrent?'#059669':'#1e293b'};background:${bg};white-space:nowrap">
+        ${isCurrent?'🟢 ':''}${monthNames[m-1]} ${yr}
+        ${isFuture?`<span style="font-size:.63rem;color:#94a3b8;display:block">مستقبلي</span>`:''}
+      </td>
+      <td style="padding:3px 2px;background:${bg}">${ni('present',v('present_days',''))}</td>
+      <td style="padding:3px 2px;background:${bg}">${ni('absent',v('absent_days',''))}</td>
+      <td style="padding:3px 2px;background:${bg}">${ni('annual',v('annual_leave_days',''))}</td>
+      <td style="padding:3px 2px;background:${bg}">${ni('sick',v('sick_days',''))}</td>
+      <td style="padding:3px 2px;background:${bg}">${ni('unpaid',v('unpaid_leave_days',''))}</td>
+      <td style="padding:3px 2px;background:${bg}">
+        <input type="number" id="yv_${mon}_deduct" value="${v('deduct_other','')}" min="0" step="1" max="999999"
+          oninput="yvCalcNet('${mon}')" onchange="yvCalcNet('${mon}')"
+          style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem;box-sizing:border-box;text-align:center;background:${bg}">
+      </td>
+      <td style="padding:3px 2px;background:${bg}">
+        <input type="number" id="yv_${mon}_bonus" value="${v('bonus','')}" min="0" step="1" max="999999"
+          oninput="yvCalcNet('${mon}')" onchange="yvCalcNet('${mon}')"
+          style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem;box-sizing:border-box;text-align:center;background:${bg}">
+      </td>
+      <td style="padding:3px 2px;background:${bg};text-align:center">
+        <select id="yv_${mon}_comppaid" style="padding:4px 4px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.75rem;background:${bg};width:100%">
+          <option value="0" ${!r.leave_comp_paid?'selected':''}>❌ لا</option>
+          <option value="1" ${r.leave_comp_paid?'selected':''}>✅ نعم</option>
+        </select>
+      </td>
+      <td style="padding:3px 2px;background:${bg}">
+        <input type="number" id="yv_${mon}_net" value="${v('amount','')}" min="0" step="1"
+          style="width:100%;padding:4px 5px;border:2px solid #1e3a8a;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:800;color:#1e3a8a;box-sizing:border-box;text-align:center;background:#eef2ff">
+      </td>
+    </tr>`;
+  }
+  tbody.innerHTML=html;
+  tbody.dataset.daily=daily;
+  tbody.dataset.gross=gross;
+}
+
+function yvCalcNet(mon){
+  const tbody=el('yv-tbody');
+  const daily=Number(tbody?.dataset.daily||0);
+  const gross=Number(tbody?.dataset.gross||0);
+  if(!gross||!daily) return;
+  const absent=Number(el(`yv_${mon}_absent`)?.value||0);
+  const unpaid=Number(el(`yv_${mon}_unpaid`)?.value||0);
+  const deduct=Number(el(`yv_${mon}_deduct`)?.value||0);
+  const bonus=Number(el(`yv_${mon}_bonus`)?.value||0);
+  const net=Math.max(0,gross-(absent+unpaid)*daily-deduct+bonus);
+  const netEl=el(`yv_${mon}_net`);
+  if(netEl) netEl.value=Math.round(net);
+}
+
+async function saveAllYearView(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s){alert('Staff not found');return;}
+  const yr=Number(el('yv-year-sel')?.value||new Date().getFullYear());
+  const status=el('yv-save-status');
+  if(status) status.innerHTML=`<span style="color:#0369a1">⏳ جاري الحفظ...</span>`;
+  const gross=Number(s.grossSalary||s.basicSalary||0);
+  let ok=0,err=0;
+
+  for(let m=1;m<=12;m++){
+    const mon=`${yr}-${String(m).padStart(2,'0')}`;
+    const pEl=el(`yv_${mon}_present`);
+    if(!pEl) continue;
+    // Skip if all fields empty
+    const allEmpty=[pEl,el(`yv_${mon}_absent`),el(`yv_${mon}_annual`),el(`yv_${mon}_sick`),
+      el(`yv_${mon}_unpaid`),el(`yv_${mon}_deduct`),el(`yv_${mon}_bonus`),el(`yv_${mon}_net`)]
+      .every(inp=>!inp?.value);
+    if(allEmpty) continue;
+
+    const payload={
+      branch_id:   s.branchId||s.workBranch||curBid,
+      staff_id:    Number(staffId),
+      month:       mon,
+      basic_salary: gross,
+      amount:      Number(el(`yv_${mon}_net`)?.value||0),
+      present_days: Number(el(`yv_${mon}_present`)?.value||0),
+      absent_days:  Number(el(`yv_${mon}_absent`)?.value||0),
+      annual_leave_days: Number(el(`yv_${mon}_annual`)?.value||0),
+      sick_days:    Number(el(`yv_${mon}_sick`)?.value||0),
+      unpaid_leave_days: Number(el(`yv_${mon}_unpaid`)?.value||0),
+      deduct_other: Number(el(`yv_${mon}_deduct`)?.value||0),
+      bonus:        Number(el(`yv_${mon}_bonus`)?.value||0),
+      leave_comp_paid: el(`yv_${mon}_comppaid`)?.value==='1',
+    };
+
+    const {error}=await sb.from('staff_salary_history')
+      .upsert(payload,{onConflict:'branch_id,staff_id,month'});
+    if(error){console.error(mon,error);err++;}else ok++;
+  }
+
+  // Refresh cache
+  const {data:rows}=await sb.from('staff_salary_history')
+    .select('*').eq('staff_id',Number(staffId)).order('month',{ascending:false});
+  if(rows&&DB.salaryHistory){
+    DB.salaryHistory[String(staffId)]=rows.map(x=>({
+      month:x.month,amount:Number(x.amount||0),basic:Number(x.basic_salary||0),
+      presentDays:x.present_days??0,absentDays:x.absent_days??0,
+      sickDays:x.sick_days??0,annualLeaveDays:x.annual_leave_days??0,
+      unpaidLeaveDays:x.unpaid_leave_days??0,
+      deductOther:Number(x.deduct_other||0),bonus:Number(x.bonus||0),
+      leaveCompPaid:x.leave_comp_paid||false,
+    }));
+  }
+
+  if(status){
+    status.innerHTML=err
+      ?`<span style="color:#dc2626">❌ ${err} خطأ في الحفظ — ${ok} تم</span>`
+      :`<span style="color:#059669">✅ تم حفظ ${ok} شهر بنجاح!</span>`;
+    if(!err) setTimeout(()=>{if(status)status.innerHTML='';},3000);
+  }
+  if(el('sh-inline-body')&&el('sh-tab-staff')?.value===String(staffId)) loadSHInline();
+}
+// ─── End Year View ─────────────────────────────
 
 function getTotalWorkDays(staffId){
   // Sum present days from salary history + count from DB.staffAtt
@@ -21228,17 +21991,89 @@ async function deleteSalaryHistoryEntry(staffId, month){
 function downloadSalaryHistoryTemplate(){
   const XLSX=window.XLSX;
   if(!XLSX){alert('Excel library not loaded');return;}
-  const ws=XLSX.utils.aoa_to_sheet([
-    ['Staff Name','Month (YYYY-MM)','Basic Salary (AED)','Net Paid (AED)','Days Present','Days Absent (Unpaid)','Sick Days','Deduct Days (عدد أيام الخصم)','Deduct Loan (AED)','Deduct Other (AED)','Bonus (AED)','Bonus Reason'],
-    ['John Smith','2025-01','3000','3500','26','0','0','0','0','0','0',''],
-    ['John Smith','2025-02','3000','3200','24','2','0','200','300','0','0',''],
-    ['Sara Ahmed','2025-01','2500','2900','26','0','0','0','0','0','300','Performance bonus'],
-    ['Sara Ahmed','2025-02','2500','2500','23','1','2','0','500','0','0',''],
-  ]);
-  ws['!cols']=[{wch:22},{wch:16},{wch:20},{wch:22}];
+
+  // ── Header row (bilingual) ──
+  const headers=[
+    'Staff Name — اسم الموظف',
+    'Month (YYYY-MM) — الشهر',
+    'Basic Salary AED — الراتب الأساسي',
+    'Gross/Net Paid AED — الإجمالي المدفوع',
+    'Days Present — أيام الحضور',
+    'Days Absent (Unpaid) — أيام الغياب بخصم',
+    'Annual Leave Days — إجازة سنوية',
+    'Sick Leave Days — إجازة مرضية',
+    'Unpaid Leave Days — إجازة بدون راتب',
+    'Deductions AED — خصومات',
+    'Loan Deduction AED — خصم قرض',
+    'Bonus AED — مكافأة',
+    'Bonus Reason — سبب المكافأة',
+    'Leave Comp Paid? (yes/no) — بدل إجازة مُصرف؟',
+  ];
+
+  // ── Pre-fill staff names as sample rows ──
+  const activeStaff=(DB.staff||[])
+    .filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=today())
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  const nowMon = today().slice(0,7);
+  const prevMon = (()=>{const d=new Date();d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);})();
+
+  const sampleRows = activeStaff.length
+    ? activeStaff.flatMap(s=>[
+        [s.name, prevMon, s.basicSalary||'', s.grossSalary||s.basicSalary||'', 26, 0, 0, 0, 0, 0, 0, 0, '', 'no'],
+        [s.name, nowMon,  s.basicSalary||'', s.grossSalary||s.basicSalary||'', '', '', '', '', '', '', '', '', '', 'no'],
+      ])
+    : [
+        ['John Smith',  prevMon, 3000, 3500, 26, 0, 0, 0, 0, 0, 0, 0, '', 'no'],
+        ['Sara Ahmed',  prevMon, 2500, 2900, 26, 0, 2, 0, 0, 0, 500, 300, 'Performance bonus', 'no'],
+        ['John Smith',  nowMon,  3000, 3500, 24, 0, 0, 2, 0, 0, 0, 0, '', 'no'],
+      ];
+
+  // ── Instructions sheet ──
+  const instrData=[
+    ['📋 INSTRUCTIONS — تعليمات الملء'],
+    [''],
+    ['Column','Description','Notes'],
+    ['Staff Name','Full name matching your staff records','Must match exactly or as close as possible'],
+    ['Month','Format: YYYY-MM (e.g. 2025-01)','Required'],
+    ['Basic Salary','Basic salary without allowances','Optional — used for gratuity calc'],
+    ['Gross/Net Paid','Total amount paid this month','Required'],
+    ['Days Present','Number of days attended','Counts towards gratuity'],
+    ['Days Absent (Unpaid)','Absent days that are deducted','Reduces net salary'],
+    ['Annual Leave Days','Paid annual leave taken','Counts as paid leave in law'],
+    ['Sick Leave Days','Sick leave taken (paid)','Up to 15 days full pay / UAE Law'],
+    ['Unpaid Leave Days','Leave without pay','Deducted from salary'],
+    ['Deductions AED','Fixed deductions (fines, uniform, etc.)','In AED'],
+    ['Loan Deduction AED','Monthly loan installment deducted','In AED'],
+    ['Bonus AED','Extra pay or allowance','In AED'],
+    ['Bonus Reason','Reason for bonus','e.g. Performance, Ramadan'],
+    ['Leave Comp Paid?','Was leave compensation (بدل إجازة) paid this month?','yes or no'],
+    [''],
+    ['🇦🇪 UAE Labour Law Notes:'],
+    ['Annual Leave','2.5 days/month after 1 year (30 days/year)','< 6 months: 0 days | 6m–1yr: 1.5 days/month'],
+    ['Sick Leave','First 15 days: full pay | Next 30 days: half pay | After: unpaid','Max 45 days/year'],
+    ['Leave Comp','Unused annual leave paid as cash compensation','Daily rate = Basic ÷ 30'],
+  ];
+
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Salary History');
-  XLSX.writeFile(wb,'salary_history_template.xlsx');
+
+  // Main data sheet
+  const wsData=XLSX.utils.aoa_to_sheet([headers,...sampleRows]);
+  wsData['!cols']=[
+    {wch:28},{wch:16},{wch:18},{wch:18},{wch:16},{wch:22},{wch:22},{wch:18},{wch:22},
+    {wch:18},{wch:18},{wch:14},{wch:24},{wch:24},
+  ];
+  // Freeze first row
+  wsData['!freeze']={xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+  XLSX.utils.book_append_sheet(wb,wsData,'Staff History Data');
+
+  // Instructions sheet
+  const wsInstr=XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols']=[{wch:30},{wch:50},{wch:55}];
+  XLSX.utils.book_append_sheet(wb,wsInstr,'Instructions');
+
+  XLSX.writeFile(wb,`staff_history_template_${today().slice(0,7)}.xlsx`);
+  showAlert('sal-hist-import-alert','✅ Template downloaded! Fill it and upload using the Import button.', false);
 }
 
 async function importSalaryHistoryExcel(file, targetStaffId){
@@ -21279,17 +22114,20 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     return null;
   };
-  const nameCol      =col(['name','staff','employee']);
-  const monthCol     =col(['month','date','period','شهر']);
-  const basicCol     =col(['basic','أساسي','اساسي']);
-  const grossCol     =col(['net paid','net','gross','paid','total','amount','إجمالي','صافي','اجمالي']);
-  const presentCol   =col(['present','حضور','attend']);
-  const absentCol    =col(['absent','غياب','absence','unpaid']);
-  const sickCol      =col(['sick','مرضية','مرض']);
-  const dLoanCol     =col(['deduct loan','loan']);
-  const dOtherCol    =col(['deduct other','other deduct']);
-  const bonusCol     =col(['bonus','مكافأة']);
+  const nameCol       =col(['name','staff','employee','موظف']);
+  const monthCol      =col(['month','date','period','شهر']);
+  const basicCol      =col(['basic','أساسي','اساسي']);
+  const grossCol      =col(['net paid','net','gross','paid','total','amount','إجمالي','صافي','اجمالي']);
+  const presentCol    =col(['present','حضور','attend']);
+  const absentCol     =col(['absent','غياب','absence','unpaid absent','absent (unpaid)']);
+  const annualCol     =col(['annual leave','annual','إجازة سنوية','سنوية']);
+  const sickCol       =col(['sick','مرضية','مرض']);
+  const unpaidLvCol   =col(['unpaid leave','unpaid leave days','بدون راتب','بلا راتب']);
+  const dOtherCol     =col(['deduction','deduct other','deductions','خصومات','خصم']);
+  const dLoanCol      =col(['loan','deduct loan','قرض']);
+  const bonusCol      =col(['bonus','مكافأة']);
   const bonusReasonCol=col(['bonus reason','reason','سبب']);
+  const compPaidCol   =col(['leave comp','comp paid','بدل إجازة','بدل اجازة']);
 
   // Build all payloads first
   const payloads=[];
@@ -21312,8 +22150,9 @@ async function importSalaryHistoryExcel(file, targetStaffId){
     }
     if(!staffId){skipped++;continue;}
 
-    const nv=c=>(c&&row[c]!==''&&row[c]!==null)?Number(row[c]):null;
+    const nv=c=>(c&&row[c]!==''&&row[c]!==null&&row[c]!==undefined)?Number(row[c]):null;
     const sv=c=>(c&&row[c])?String(row[c]).trim():null;
+    const bv=c=>{if(!c)return false;const v=String(row[c]||'').toLowerCase().trim();return v==='yes'||v==='1'||v==='true'||v==='نعم';};
     const basic=basicCol?Number(row[basicCol])||0:0;
     const presentDays=nv(presentCol);
     const absentDays=nv(absentCol);
@@ -21327,11 +22166,14 @@ async function importSalaryHistoryExcel(file, targetStaffId){
       basic_salary: basic||0,
       present_days: presentDays!==null ? presentDays : (absentDays!==null ? dim-absentDays : null),
       absent_days:  absentDays!==null ? absentDays : null,
-      sick_days:    nv(sickCol),
+      annual_leave_days: nv(annualCol)||0,
+      sick_days:    nv(sickCol)||0,
+      unpaid_leave_days: nv(unpaidLvCol)||0,
       deduct_loan:  nv(dLoanCol)||0,
       deduct_other: nv(dOtherCol)||0,
       bonus:        nv(bonusCol)||0,
       bonus_reason: sv(bonusReasonCol),
+      leave_comp_paid: bv(compPaidCol),
     });
   }
 
