@@ -1201,8 +1201,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <div class="page" id="pg-admin">
 
-
-<!-- INVOICE PREVIEW MODAL 2026 -->
+<!-- DB HEALTH CHECK BUTTON -->
+<div class="card" style="margin-bottom:10px">
+  <div class="ch">
+    <div class="ct">🔬 Database Health Check</div>
+  </div>
+  <p style="font-size:.82rem;color:#6b7280;margin-bottom:10px">Check record counts, find duplicate attendance, and verify storage space.</p>
+  <button onclick="runDBHealthCheck()"
+    style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
+    🔬 Run Health Check — فحص قاعدة البيانات
+  </button>
+</div>
 <div class="mover" id="ce26-inv-modal">
   <div class="modal" style="max-width:520px">
     <div class="mh">
@@ -2624,7 +2633,8 @@ async function loadFromSupa(bid) {
         .limit(3000);
       (attPg||[]).forEach(x=>{
         const d=x.date; if(!DB.attendance[d]) DB.attendance[d]={};
-        DB.attendance[d][x.child_id]=x.status;
+        DB.attendance[d][x.child_id]         = x.status; // number key (from DB)
+        DB.attendance[d][String(x.child_id)] = x.status; // string key (for onclick attrs)
       });
     }
     DB.expenses = (e.data||[]).map(x=>{
@@ -8866,48 +8876,74 @@ ${b.ar} — نتواصل معكم بخصوص *${c.name}*.
 const _attSaveQueue = new Map(); // key: childId+date → promise
 
 async function _saveAttWithRetry(childId, date, newSt, cell, maxRetries=3){
-  // Show saving indicator on cell
+  // Show saving indicator
+  let savingEl = null;
   if(cell){
-    const saving = document.createElement('div');
-    saving.id = `att-saving-${childId}-${date}`;
-    saving.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:inherit;z-index:5';
-    saving.textContent = '⏳';
+    savingEl = document.createElement('div');
+    savingEl.id = `att-saving-${childId}-${date}`;
+    savingEl.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:inherit;z-index:5;pointer-events:none';
+    savingEl.textContent = '⏳';
     cell.style.position = 'relative';
-    cell.appendChild(saving);
+    cell.appendChild(savingEl);
   }
 
+  const cid = Number(childId); // always integer to Supabase
   let lastErr = null;
+
   for(let attempt=1; attempt<=maxRetries; attempt++){
     try{
-      if(!newSt){
-        const {error} = await sb.from('attendance').delete()
-          .eq('branch_id',curBid).eq('child_id',childId).eq('date',date);
-        if(error) throw error;
-      } else {
-        const {error} = await sb.from('attendance').upsert(
-          {branch_id:curBid, child_id:childId, date, status:newSt},
-          {onConflict:'branch_id,child_id,date'}
-        );
-        if(error) throw error;
+      // Step 1: DELETE any existing record for this child+date (avoids duplicates)
+      const {error:delErr} = await sb.from('attendance')
+        .delete()
+        .eq('branch_id', curBid)
+        .eq('child_id', cid)
+        .eq('date', date);
+      if(delErr) throw delErr;
+
+      // Step 2: INSERT fresh record if status is set
+      if(newSt){
+        const {error:insErr} = await sb.from('attendance')
+          .insert({branch_id: curBid, child_id: cid, date, status: newSt});
+        if(insErr) throw insErr;
       }
-      // SUCCESS
+
+      // SUCCESS — update local cache with both key types
+      if(!DB.attendance[date]) DB.attendance[date] = {};
+      if(newSt){
+        DB.attendance[date][cid]         = newSt;
+        DB.attendance[date][String(cid)] = newSt;
+      } else {
+        delete DB.attendance[date][cid];
+        delete DB.attendance[date][String(cid)];
+      }
+
       _removeUnsavedFlag(childId, date);
       const ind = document.getElementById(`att-saving-${childId}-${date}`);
       if(ind) ind.remove();
       return true;
+
     } catch(err){
       lastErr = err;
-      if(attempt < maxRetries) await new Promise(r=>setTimeout(r, 800 * attempt));
+      console.warn(`Att save attempt ${attempt}/${maxRetries}:`, err?.message||err);
+      if(attempt < maxRetries) await new Promise(r=>setTimeout(r, 600 * attempt));
     }
   }
+
   // ALL RETRIES FAILED
-  console.error('Kids att save FAILED after retries:', lastErr, {childId, date, newSt});
+  console.error('Att save FAILED:', lastErr, {childId, date, newSt});
   _addUnsavedFlag(childId, date, newSt);
   const ind = document.getElementById(`att-saving-${childId}-${date}`);
-  if(ind){ ind.textContent='❌'; ind.style.background='rgba(220,38,38,.18)'; ind.style.color='#dc2626'; ind.title='لم يتم الحفظ — Click cell to retry'; setTimeout(()=>ind.remove(), 3000); }
+  if(ind){
+    ind.textContent = '❌';
+    ind.style.background = 'rgba(220,38,38,.2)';
+    ind.style.color = '#dc2626';
+    ind.style.pointerEvents = 'auto';
+    ind.title = 'فشل الحفظ — اضغط للمحاولة';
+    ind.onclick = () => _saveAttWithRetry(childId, date, newSt, cell, 3);
+    setTimeout(()=>{ if(ind?.parentNode) ind.remove(); }, 4000);
+  }
   return false;
 }
-
 // Track unsaved changes
 const _unsavedAtt = new Map();
 function _addUnsavedFlag(childId, date, status){ _unsavedAtt.set(`${childId}__${date}`, {childId, date, status}); _renderUnsavedBanner(); }
@@ -8944,10 +8980,17 @@ window.addEventListener('beforeunload', e=>{
 });
 
 async function toggleKidsAtt(childId, date){
-  const cur=(DB.attendance[date]||{})[String(childId)]||(DB.attendance[date]||{})[childId]||'';
-  const newSt=cur===''?'حضور':cur==='حضور'?'غياب':'';
+  const cid = Number(childId);
+  const attDay = DB.attendance[date]||{};
+  // Read with both number and string keys for safety
+  const cur = attDay[cid] || attDay[String(cid)] || '';
+  // 3-state cycle: '' → حضور → غياب → ''
+  const newSt = cur==='' ? 'حضور' : cur==='حضور' ? 'غياب' : '';
+
+  // Update local cache immediately (optimistic)
   if(!DB.attendance[date]) DB.attendance[date]={};
-  DB.attendance[date][String(childId)]=newSt;
+  DB.attendance[date][cid]         = newSt;
+  DB.attendance[date][String(cid)] = newSt;
 
   // Update cell visually immediately
   const cell=document.querySelector(`[data-kid="${childId}"][data-kdate="${date}"]`);
@@ -9004,29 +9047,24 @@ async function toggleKidsAtt(childId, date){
 }
 
 async function toggleAtt(childId,date){
-  const cur=DB.attendance[date]?.[childId]||DB.attendance[date]?.[String(childId)];
-  const newSt=cur==='حضور'?'غياب':'حضور';
+  const cid = Number(childId);
+  const attDay = DB.attendance[date]||{};
+  const cur = attDay[cid] || attDay[String(cid)] || '';
+  const newSt = cur==='حضور' ? 'غياب' : 'حضور';
   const _attChild=DB.children.find(c=>String(c.id)===String(childId));
   if(_attChild) logActivity('attendance', _attChild.name+' → '+newSt);
-  if(!DB.attendance[date])DB.attendance[date]={};
-  DB.attendance[date][String(childId)]=newSt;
+  if(!DB.attendance[date]) DB.attendance[date]={};
+  DB.attendance[date][cid]         = newSt;
+  DB.attendance[date][String(cid)] = newSt;
   renderAtt();
-  const {error:attErr}=await sb.from('attendance').upsert(
-    {branch_id:curBid,child_id:childId,date,status:newSt},
-    {onConflict:'branch_id,child_id,date'}
-  );
-  if(attErr){
-    console.error('Attendance save error:',attErr);
-    // Retry once
-    await new Promise(r=>setTimeout(r,800));
-    const {error:attErr2}=await sb.from('attendance').upsert(
-      {branch_id:curBid,child_id:childId,date,status:newSt},
-      {onConflict:'branch_id,child_id,date'}
-    );
-    if(attErr2){
-      console.error('Attendance retry error:',attErr2);
-      _addUnsavedFlag(childId, date, newSt);
-    }
+  try{
+    await sb.from('attendance').delete()
+      .eq('branch_id',curBid).eq('child_id',cid).eq('date',date);
+    const {error}=await sb.from('attendance')
+      .insert({branch_id:curBid,child_id:cid,date,status:newSt});
+    if(error){ console.error('toggleAtt save error:',error); _addUnsavedFlag(childId,date,newSt); }
+  } catch(err){
+    console.error('toggleAtt error:',err); _addUnsavedFlag(childId,date,newSt);
   }
 }
 function printAtt(){
@@ -21878,6 +21916,155 @@ function renderLeaveAttDashboard(){
   el('lad-content').innerHTML = cards || '<div class="empty"><div class="ei">👷</div><p>No staff</p></div>';
 }
 // ─── End Leave & Attendance Dashboard ──────────
+
+// ═══════════════════════════════════════════════
+// DATABASE HEALTH & STORAGE DIAGNOSTIC
+// ═══════════════════════════════════════════════
+async function runDBHealthCheck(){
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;font-family:'Tajawal',sans-serif">
+    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:14px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:900;font-size:1rem">🔬 Database Health Check</div>
+      <button onclick="this.closest('[style*=position\\\\:fixed]').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:1rem">✕</button>
+    </div>
+    <div id="dbhc-body" style="padding:16px">
+      <div style="text-align:center;padding:20px;color:#6b7280">⏳ Checking database... please wait...</div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  const body=modal.querySelector('#dbhc-body');
+  body.innerHTML='';
+  const log=(html)=>{ body.innerHTML+=html; };
+
+  // ── 1. Row counts per table ──
+  log(`<div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.9rem">📊 Record Counts per Table</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px" id="dbhc-counts"></div>`);
+
+  const tables=[
+    {name:'children',label:'👧 Children'},{name:'receipts',label:'🧾 Receipts'},
+    {name:'attendance',label:'✅ Kids Attendance'},{name:'expenses',label:'💸 Expenses'},
+    {name:'staff',label:'👷 Staff'},{name:'staff_attendance',label:'📅 Staff Attendance'},
+    {name:'staff_salary_history',label:'💰 Salary History'},{name:'staff_loans',label:'💳 Loans'},
+    {name:'leaves',label:'🏖️ Leaves'},{name:'visitors',label:'📋 Visitors'},
+  ];
+
+  const counts=[];
+  for(const t of tables){
+    try{
+      const {count,error}=await sb.from(t.name).select('*',{count:'exact',head:true});
+      counts.push({...t,count:error?'ERR':count});
+    } catch(e){ counts.push({...t,count:'ERR'}); }
+  }
+
+  const maxC=Math.max(1,...counts.filter(x=>x.count!=='ERR').map(x=>x.count));
+  const countsEl=modal.querySelector('#dbhc-counts');
+  countsEl.innerHTML=counts.map(t=>{
+    const isErr=t.count==='ERR';
+    const pct=isErr?0:Math.round((t.count/maxC)*100);
+    const color=isErr?'#dc2626':t.count>10000?'#f59e0b':t.count>5000?'#0369a1':'#059669';
+    return `<div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:.78rem;font-weight:700;color:#374151">${t.label}</span>
+        <span style="font-size:.85rem;font-weight:900;color:${color}">${isErr?'❌':Number(t.count).toLocaleString()}</span>
+      </div>
+      <div style="background:#e5e7eb;border-radius:4px;height:5px">
+        <div style="background:${color};height:5px;border-radius:4px;width:${pct}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── 2. Duplicate attendance check ──
+  log(`<div style="font-weight:800;color:#1e3a8a;margin:12px 0 8px;font-size:.9rem">🔍 Duplicate Kids Attendance Check</div>`);
+  try{
+    const {data:attAll}=await sb.from('attendance').select('id,branch_id,child_id,date,status').limit(15000);
+    if(attAll){
+      const keyMap={};
+      attAll.forEach(r=>{
+        const k=`${r.branch_id}_${r.child_id}_${r.date}`;
+        if(!keyMap[k]) keyMap[k]=[];
+        keyMap[k].push(r);
+      });
+      const dups=Object.entries(keyMap).filter(([,v])=>v.length>1);
+      if(dups.length===0){
+        log(`<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:9px 12px;margin-bottom:8px">
+          ✅ <b>No duplicate records.</b> All ${attAll.length.toLocaleString()} attendance records are unique.
+        </div>`);
+      } else {
+        window._attDups=dups;
+        log(`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+          ⚠️ Found <b style="color:#dc2626">${dups.length} duplicate groups</b> — this was causing the absence not saving correctly!
+          <button onclick="cleanDuplicateAtt()" style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:5px 14px;cursor:pointer;font-weight:700;margin-top:8px;display:block;font-family:'Tajawal',sans-serif">
+            🗑 Clean Duplicates Now — حذف السجلات المكررة
+          </button>
+        </div>`);
+        dups.slice(0,3).forEach(([,rows])=>{
+          const c=DB.children.find(x=>String(x.id)===String(rows[0].child_id));
+          log(`<div style="font-size:.72rem;color:#6b7280;background:#fff5f5;padding:5px 10px;border-radius:7px;margin-bottom:4px">
+            👤 ${c?.name||'Child '+rows[0].child_id} · 📅 ${rows[0].date} · 
+            ${rows.map(r=>`<span style="background:#fee2e2;padding:1px 6px;border-radius:5px;margin:1px">${r.status} #${r.id}</span>`).join(' ')}
+          </div>`);
+        });
+        if(dups.length>3) log(`<div style="font-size:.72rem;color:#9ca3af;margin-bottom:8px">...and ${dups.length-3} more groups</div>`);
+      }
+    }
+  } catch(e){ log(`<div style="color:#dc2626;font-size:.8rem">❌ Cannot check: ${e.message}</div>`); }
+
+  // ── 3. Storage estimate ──
+  log(`<div style="font-weight:800;color:#1e3a8a;margin:12px 0 8px;font-size:.9rem">💾 Storage Estimate</div>`);
+  const totalRecs=counts.filter(x=>x.count!=='ERR').reduce((s,x)=>s+x.count,0);
+  const estMB=Math.round(totalRecs*0.5/1024*100)/100;
+  const usedPct=Math.min(100,Math.round((estMB/500)*100));
+  log(`<div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:.82rem;font-weight:700;color:#0369a1">
+      <span>Total records: <b>${totalRecs.toLocaleString()}</b></span>
+      <span>Estimated DB size: ~${estMB} MB</span>
+    </div>
+    <div style="background:#dbeafe;border-radius:6px;height:14px;margin-bottom:6px;position:relative">
+      <div style="background:${usedPct>80?'#dc2626':usedPct>50?'#f59e0b':'#059669'};height:14px;border-radius:6px;width:${usedPct}%"></div>
+      <span style="position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:.65rem;color:#fff;font-weight:800;line-height:14px">${usedPct}%</span>
+    </div>
+    <div style="font-size:.76rem;color:#374151">
+      ${usedPct}% of free tier 500MB limit •
+      <b style="color:${usedPct>80?'#dc2626':usedPct>50?'#f59e0b':'#059669'}">
+        ${usedPct>80?'⚠️ URGENT — upgrade soon!':usedPct>50?'👀 Monitor regularly':'✅ Plenty of space remaining'}
+      </b>
+    </div>
+    <div style="font-size:.68rem;color:#9ca3af;margin-top:5px">
+      💡 For exact size: Supabase Dashboard → Settings → Database → Database size
+    </div>
+  </div>`);
+
+  // ── 4. Fix summary ──
+  log(`<div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:10px;padding:10px 14px;font-size:.78rem;line-height:1.9;margin-bottom:6px">
+    <b style="color:#166534">🩺 Attendance Bug — Root Cause & Fix:</b><br>
+    The old <code>upsert</code> method requires a database unique constraint to work. Without it, every click created a NEW record, so one child+date could have multiple records (حضور AND غياب). On reload, the wrong one could show up — making it look like غياب wasn't saved.<br><br>
+    <b>✅ Fixed:</b> Now uses DELETE→INSERT which always works reliably.<br>
+    <b>⚠️ Recommended SQL</b> (run once in Supabase SQL Editor to prevent forever):<br>
+    <code style="background:#1e293b;color:#a3e635;padding:6px 10px;border-radius:6px;display:block;margin-top:5px;font-size:.72rem">
+ALTER TABLE attendance ADD CONSTRAINT IF NOT EXISTS att_unique UNIQUE (branch_id, child_id, date);
+DELETE FROM attendance a USING attendance b WHERE a.id &lt; b.id AND a.branch_id=b.branch_id AND a.child_id=b.child_id AND a.date=b.date;</code>
+  </div>`);
+}
+
+async function cleanDuplicateAtt(){
+  if(!window._attDups||!window._attDups.length){alert('No duplicates stored. Run Health Check first.');return;}
+  const total=window._attDups.reduce((s,[,v])=>s+v.length-1,0);
+  if(!confirm(`Delete ${total} duplicate attendance records? (keeps the latest status for each child+date)`)) return;
+  let del=0,err=0;
+  for(const [,rows] of window._attDups){
+    const sorted=[...rows].sort((a,b)=>b.id-a.id);
+    for(const r of sorted.slice(1)){
+      const {error}=await sb.from('attendance').delete().eq('id',r.id);
+      if(error) err++; else del++;
+    }
+  }
+  alert(`✅ Done! Deleted ${del} duplicate records.${err?` ❌ ${err} errors.`:''} Please refresh the page.`);
+  window._attDups=null;
+}
+// ─── End DB Health ──────────────────────────────
+
 async function bulkImportAllStaffHistory(file){
   const XLSX=window.XLSX;
   if(!XLSX||!file){alert('XLSX library or file missing');return;}
