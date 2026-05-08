@@ -1440,9 +1440,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- HR Sub-tabs -->
 <div style="display:flex;gap:4px;overflow-x:auto;padding:0 2px 8px;scrollbar-width:none;flex-wrap:nowrap">
   <button class="hr-tab on" onclick="showHRTab('hr-records',this)">👷 Staff</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-leave-dashboard',this);renderLeaveAttDashboard()">🏖️ Leave & Attendance</button>
   <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-payroll',this)">💰 Payroll</button>
   <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-sal-history',this)">📋 Salary History</button>
-  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-leaves',this)">🏖️ Leave</button>
+  <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-leaves',this)">📋 Leave Records</button>
   <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-eog',this)">📋 End of Service</button>
   <button class="hr-tab hr-admin-only" onclick="showHRTab('hr-reports',this)">📊 Reports</button>
 </div>
@@ -1473,6 +1474,66 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <!-- TAB: Payroll -->
+<!-- TAB: Leave & Attendance Dashboard -->
+<div class="hr-panel" id="hr-leave-dashboard">
+<div class="card np">
+
+  <!-- Sub-view toggle -->
+  <div style="display:flex;gap:0;margin-bottom:14px;border:1.5px solid #e5e7eb;border-radius:11px;overflow:hidden;width:fit-content">
+    <button id="lad-view-overview-btn" onclick="ladShowView('overview',this)"
+      style="padding:8px 18px;background:#1e3a8a;color:#fff;border:none;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer">
+      📊 Overview — نظرة عامة
+    </button>
+    <button id="lad-view-entry-btn" onclick="ladShowView('entry',this)"
+      style="padding:8px 18px;background:#fff;color:#374151;border:none;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer">
+      📅 Monthly Entry — إدخال الشهور
+    </button>
+  </div>
+
+  <!-- ═══ VIEW 1: OVERVIEW ═══ -->
+  <div id="lad-view-overview">
+    <div class="ch" style="padding:0 0 10px">
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <select id="lad-branch-filter" onchange="renderLeaveAttDashboard()"
+          style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.8rem">
+          <option value="all">🏢 All Branches</option>
+        </select>
+        <input type="text" id="lad-search" placeholder="🔍 Search staff..." oninput="renderLeaveAttDashboard()"
+          style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.8rem;min-width:160px">
+        <button onclick="renderLeaveAttDashboard()"
+          style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">
+          🔄 Refresh
+        </button>
+      </div>
+    </div>
+    <div id="lad-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
+    <div id="lad-content"></div>
+  </div>
+
+  <!-- ═══ VIEW 2: MONTHLY ENTRY ═══ -->
+  <div id="lad-view-entry" style="display:none">
+
+    <!-- Staff selector -->
+    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:.78rem;font-weight:800;color:#0369a1;margin-bottom:8px">👤 اختاري الموظف — Select Staff Member</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="lad-entry-staff" onchange="ladLoadStaffEntry()"
+          style="flex:1;min-width:200px;padding:8px 12px;border:2px solid #0369a1;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:700">
+          <option value="">— اختاري موظف —</option>
+        </select>
+        <div id="lad-entry-staff-info" style="font-size:.75rem;color:#6b7280"></div>
+      </div>
+    </div>
+
+    <!-- Entry grid (rendered dynamically) -->
+    <div id="lad-entry-body">
+      <div style="text-align:center;padding:40px;color:#9ca3af">← اختاري موظف لعرض وإدخال بياناته</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
 <div class="hr-panel" id="hr-payroll">
 <div class="card np">
   <div class="ch">
@@ -13391,7 +13452,6 @@ function renderStaff(){
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn bo bsm" onclick="openStaffForm('${s.id}')">✏️ Edit</button>
-          ${curRole==='admin'?`<button onclick="openStaffLeaveDashboard('${s.id}')" style="background:#ede9fe;color:#5b21b6;border:1.5px solid #c4b5fd;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">🏖️ Leave & Attendance</button>`:''}
           ${curRole==='admin'?`<button class="btn bsm" onclick="openLoanModal('${s.id}')" style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">💳 Loans</button>`:''}
           ${curRole==='admin'&&isExited?`<button class="btn bsm" onclick="calcEOGForStaff('${s.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">📋 EOS</button>`:''}
           <button class="btn bd bsm" onclick="deleteStaff('${s.id}')">🗑</button>
@@ -19565,6 +19625,7 @@ function showHRTab(id, btn){
   document.querySelectorAll('.hr-tab').forEach(b=>b.classList.remove('on'));
   const p=el(id); if(p) p.classList.add('on');
   if(btn) btn.classList.add('on');
+  if(id==='hr-leave-dashboard'){ populateLADBranchFilter(); populateLADEntryStaff(); renderLeaveAttDashboard(); }
   if(id==='hr-payroll')     { populatePayrollBranch(); renderPayroll(); }
   if(id==='hr-sal-history') { populateSHStaffSelect(); }
   if(id==='hr-leaves')   { 
@@ -21340,9 +21401,483 @@ function showSHTab(tab, staffId, btn){
   if(tab==='yearview') renderYearView(staffId);
 }
 
+// ── LAD view toggle ──────────────────────────
+function ladShowView(view, btn){
+  el('lad-view-overview').style.display = view==='overview' ? '' : 'none';
+  el('lad-view-entry').style.display    = view==='entry'    ? '' : 'none';
+  el('lad-view-overview-btn').style.background = view==='overview'?'#1e3a8a':'#fff';
+  el('lad-view-overview-btn').style.color = view==='overview'?'#fff':'#374151';
+  el('lad-view-entry-btn').style.background = view==='entry'?'#1e3a8a':'#fff';
+  el('lad-view-entry-btn').style.color = view==='entry'?'#fff':'#374151';
+  if(view==='entry'){ populateLADEntryStaff(); }
+}
+
+function populateLADEntryStaff(){
+  const sel=el('lad-entry-staff');
+  if(!sel) return;
+  const cur=sel.value||'';
+  const staffList=(DB.staff||[]).filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=today());
+  // dedupe
+  const seen=new Set();
+  const deduped=staffList.filter(s=>{if(seen.has(String(s.id)))return false;seen.add(String(s.id));return true;});
+  deduped.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  sel.innerHTML=`<option value="">— اختاري موظف —</option>`+
+    deduped.map(s=>{
+      const b=BRANCHES.find(x=>x.id===s.branchId)||CB();
+      return `<option value="${s.id}" ${String(s.id)===cur?'selected':''}>${s.name} — ${tBN(b)}</option>`;
+    }).join('');
+  if(cur) ladLoadStaffEntry();
+}
+
+async function ladLoadStaffEntry(){
+  const staffId=el('lad-entry-staff')?.value;
+  const body=el('lad-entry-body');
+  const info=el('lad-entry-staff-info');
+  if(!staffId||!body){ if(body) body.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af">← اختاري موظف</div>'; return; }
+
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return;
+
+  const gross=Number(s.grossSalary||s.basicSalary||0);
+  const daily=gross>0?gross/30:0;
+
+  // Show staff info
+  const b=BRANCHES.find(x=>x.id===s.branchId)||CB();
+  if(info) info.innerHTML=`<span style="color:${b.c};font-weight:700">${b.icon} ${tBN(b)}</span> · ${s.position||'—'} · ${lang==='ar'?'بداية العقد':'Since'}: <b>${fmtDate(s.contractStart)}</b> · Gross: <b>${fmtNum(gross)} AED</b>`;
+
+  body.innerHTML=`<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري تحميل البيانات...</div>`;
+
+  // Determine year range: from contract start year (or 2020) to 2 years in future
+  const startYear = s.contractStart ? Math.min(new Date(s.contractStart).getFullYear(), new Date().getFullYear()-1) : 2020;
+  const endYear   = new Date().getFullYear()+1;
+
+  // Load ALL history from DB
+  const {data:rows}=await sb.from('staff_salary_history')
+    .select('*').eq('staff_id',Number(staffId))
+    .order('month',{ascending:true});
+  const recMap={};
+  (rows||[]).forEach(r=>{recMap[r.month]=r;});
+
+  // Build year tabs
+  const years=[];
+  for(let y=startYear;y<=endYear;y++) years.push(y);
+  const curYear=new Date().getFullYear();
+
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthNamesAr=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+  let yearTabsHtml=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">`;
+  years.forEach(y=>{
+    const isCur=y===curYear;
+    const hasSomeData=Object.keys(recMap).some(m=>m.startsWith(y+'-'));
+    yearTabsHtml+=`<button onclick="ladSwitchYear('${staffId}',${y},this)"
+      id="lad-yr-btn-${y}"
+      style="padding:5px 13px;background:${isCur?'#1e3a8a':hasSomeData?'#d1fae5':'#f3f4f6'};color:${isCur?'#fff':hasSomeData?'#065f46':'#374151'};border:${isCur?'2px solid #1e3a8a':'1.5px solid #e5e7eb'};border-radius:8px;cursor:pointer;font-weight:${isCur?'800':'600'};font-size:.8rem;font-family:'Tajawal',sans-serif">
+      ${y}${isCur?' 🟢':''}${hasSomeData?' ✓':''}
+    </button>`;
+  });
+  yearTabsHtml+=`</div>`;
+
+  // Save status
+  const saveBar=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <button onclick="ladSaveYear('${staffId}')"
+      style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:9px;padding:8px 20px;cursor:pointer;font-weight:900;font-family:'Tajawal',sans-serif;font-size:.85rem">
+      💾 حفظ هذه السنة — Save Year
+    </button>
+    <div id="lad-save-msg" style="font-size:.8rem;min-height:20px"></div>
+  </div>`;
+
+  // Build initial table for current year
+  const tableHtml=ladBuildYearTable(staffId, curYear, recMap, gross, daily, monthNames, monthNamesAr);
+
+  body.innerHTML=`
+    <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:.75rem;color:#713f12">
+      💡 <b>تعليمات:</b> اختاري السنة من الأزرار ← اكتبي البيانات ← اضغطي <b>💾 حفظ</b>. السنوات الخضراء ✓ فيها بيانات. Tab للتنقل بين الخانات. الصافي يُحسب تلقائياً.
+    </div>
+    ${yearTabsHtml}
+    ${saveBar}
+    <div id="lad-year-table-wrap">${tableHtml}</div>
+  `;
+
+  // highlight current year button
+  const curBtn=document.getElementById(`lad-yr-btn-${curYear}`);
+  if(curBtn){ curBtn.style.background='#1e3a8a'; curBtn.style.color='#fff'; }
+
+  // store for recalc
+  body.dataset.gross=gross;
+  body.dataset.daily=daily;
+  body.dataset.staffId=staffId;
+}
+
+// ── Store current year in view ──
+let _ladCurYear = new Date().getFullYear();
+let _ladRecMap  = {};
+
+function ladSwitchYear(staffId, yr, btn){
+  _ladCurYear=yr;
+  // Dim all year buttons
+  document.querySelectorAll('[id^="lad-yr-btn-"]').forEach(b=>{
+    b.style.outline='none';
+  });
+  if(btn){ btn.style.outline='3px solid #f59e0b'; }
+  // Rebuild table
+  const body=el('lad-entry-body');
+  const gross=Number(body?.dataset.gross||0);
+  const daily=Number(body?.dataset.daily||0);
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthNamesAr=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const wrap=el('lad-year-table-wrap');
+  if(wrap) wrap.innerHTML=ladBuildYearTable(staffId,yr,_ladRecMap,gross,daily,monthNames,monthNamesAr);
+}
+
+function ladBuildYearTable(staffId, yr, recMap, gross, daily, monthNames, monthNamesAr){
+  _ladRecMap=recMap; // store for later saves
+  const now=today();
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const startMon=s?.contractStart?s.contractStart.slice(0,7):`${yr}-01`;
+
+  let rows='';
+  for(let m=1;m<=12;m++){
+    const mon=`${yr}-${String(m).padStart(2,'0')}`;
+    const r=recMap[mon]||{};
+    const isFuture=mon>now.slice(0,7);
+    const isCurrent=mon===now.slice(0,7);
+    const isBeforeStart=mon<startMon;
+    const dim=new Date(yr,m,0).getDate();
+
+    const rowBg=isCurrent?'#f0fdf4':isFuture?'#f8fafc':isBeforeStart?'#fafafa':'#fff';
+    const hasData=r.amount!==undefined||r.present_days!==undefined;
+
+    const v=(f,fb='')=>r[f]!==null&&r[f]!==undefined?r[f]:fb;
+    const inp=(id,val,maxv,extra='')=>`<input type="number" id="lad_${mon}_${id}" value="${val}" min="0" max="${maxv||9999}" step="${id==='deduct'||id==='bonus'||id==='net'?1:0.5}"
+      oninput="ladCalcNet('${mon}')" onchange="ladCalcNet('${mon}')"
+      style="width:100%;padding:4px 4px;border:1.5px solid ${hasData?'#86efac':'#e2e8f0'};border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.76rem;box-sizing:border-box;text-align:center;background:${rowBg}" ${extra}>`;
+
+    rows+=`<tr style="border-bottom:1px solid #f1f5f9;${isBeforeStart?'opacity:.6':''}">
+      <td style="padding:5px 8px;font-weight:700;font-size:.8rem;white-space:nowrap;background:${rowBg};color:${isCurrent?'#059669':'#1e293b'}">
+        ${isCurrent?'🟢 ':''}${monthNamesAr[m-1]}<br>
+        <span style="font-size:.65rem;color:#94a3b8;font-weight:400">${monthNames[m-1]} ${yr}${isFuture?' •upcoming':''}${hasData?' ✓':''}</span>
+      </td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('present',v('present_days',''),dim)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('absent',v('absent_days',''),dim)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('annual',v('annual_leave_days',''),dim)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('sick',v('sick_days',''),dim)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('unpaid',v('unpaid_leave_days',''),dim)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('deduct',v('deduct_other',''),9999)}</td>
+      <td style="padding:3px 2px;background:${rowBg}">${inp('bonus',v('bonus',''),9999)}</td>
+      <td style="padding:3px 2px;text-align:center;background:${rowBg}">
+        <select id="lad_${mon}_comppaid" style="padding:3px 4px;border:1.5px solid #e2e8f0;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.73rem;background:${rowBg};width:100%">
+          <option value="0" ${!r.leave_comp_paid?'selected':''}>❌ No</option>
+          <option value="1" ${r.leave_comp_paid?'selected':''}>✅ Yes</option>
+        </select>
+      </td>
+      <td style="padding:3px 2px;background:${rowBg}">
+        <input type="number" id="lad_${mon}_net" value="${v('amount','')}" min="0" step="1"
+          style="width:100%;padding:4px 4px;border:2px solid #1e3a8a;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:800;color:#1e3a8a;box-sizing:border-box;text-align:center;background:#eef2ff">
+      </td>
+    </tr>`;
+  }
+
+  return `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.76rem;font-family:'Tajawal',sans-serif">
+      <thead>
+        <tr style="background:#1e3a8a;color:#fff;text-align:center">
+          <th style="padding:8px 6px;text-align:right;min-width:95px">📅 الشهر</th>
+          <th style="padding:8px 4px;min-width:55px">✅ حضور</th>
+          <th style="padding:8px 4px;min-width:50px">❌ غياب</th>
+          <th style="padding:8px 4px;min-width:55px">🏖️ سنوية</th>
+          <th style="padding:8px 4px;min-width:50px">🏥 مرضية</th>
+          <th style="padding:8px 4px;min-width:50px">⛔ بلا راتب</th>
+          <th style="padding:8px 4px;min-width:80px">💸 خصومات</th>
+          <th style="padding:8px 4px;min-width:75px">🎁 مكافأة</th>
+          <th style="padding:8px 4px;min-width:85px">💰 بدل إجازة؟</th>
+          <th style="padding:8px 4px;min-width:90px">💵 الصافي (AED)</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function ladCalcNet(mon){
+  const body=el('lad-entry-body');
+  const daily=Number(body?.dataset.daily||0);
+  const gross=Number(body?.dataset.gross||0);
+  if(!gross||!daily) return;
+  const absent=Number(el(`lad_${mon}_absent`)?.value||0);
+  const unpaid=Number(el(`lad_${mon}_unpaid`)?.value||0);
+  const deduct=Number(el(`lad_${mon}_deduct`)?.value||0);
+  const bonus =Number(el(`lad_${mon}_bonus`)?.value||0);
+  const net   =Math.max(0,gross-(absent+unpaid)*daily-deduct+bonus);
+  const ne=el(`lad_${mon}_net`);
+  if(ne) ne.value=Math.round(net);
+}
+
+async function ladSaveYear(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s){alert('Staff not found');return;}
+  const yr=_ladCurYear;
+  const gross=Number(s.grossSalary||s.basicSalary||0);
+  const msg=el('lad-save-msg');
+  if(msg) msg.innerHTML=`<span style="color:#0369a1">⏳ جاري الحفظ...</span>`;
+
+  const payloads=[];
+  for(let m=1;m<=12;m++){
+    const mon=`${yr}-${String(m).padStart(2,'0')}`;
+    const pEl=el(`lad_${mon}_present`);
+    if(!pEl) continue;
+    const allEmpty=[`present`,`absent`,`annual`,`sick`,`unpaid`,`deduct`,`bonus`,`net`]
+      .every(f=>!(el(`lad_${mon}_${f}`)?.value));
+    if(allEmpty) continue;
+    payloads.push({
+      branch_id:    s.branchId||s.workBranch||curBid,
+      staff_id:     Number(staffId),
+      month:        mon,
+      basic_salary: gross,
+      amount:       Number(el(`lad_${mon}_net`)?.value||0),
+      present_days: Number(el(`lad_${mon}_present`)?.value||0)||null,
+      absent_days:  Number(el(`lad_${mon}_absent`)?.value||0)||null,
+      annual_leave_days: Number(el(`lad_${mon}_annual`)?.value||0),
+      sick_days:    Number(el(`lad_${mon}_sick`)?.value||0),
+      unpaid_leave_days: Number(el(`lad_${mon}_unpaid`)?.value||0),
+      deduct_other: Number(el(`lad_${mon}_deduct`)?.value||0),
+      bonus:        Number(el(`lad_${mon}_bonus`)?.value||0),
+      leave_comp_paid: el(`lad_${mon}_comppaid`)?.value==='1',
+    });
+  }
+
+  if(!payloads.length){
+    if(msg) msg.innerHTML=`<span style="color:#9ca3af">Nothing to save — all rows empty</span>`;
+    return;
+  }
+
+  const {error}=await sb.from('staff_salary_history')
+    .upsert(payloads,{onConflict:'branch_id,staff_id,month'});
+
+  if(error){
+    if(msg) msg.innerHTML=`<span style="color:#dc2626">❌ Error: ${error.message}</span>`;
+    return;
+  }
+
+  // Update recMap so checkmarks appear
+  payloads.forEach(p=>{ _ladRecMap[p.month]=p; });
+
+  // Update DB cache
+  if(!DB.salaryHistory) DB.salaryHistory={};
+  const sid=String(staffId);
+  if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+  payloads.forEach(p=>{
+    const idx=DB.salaryHistory[sid].findIndex(r=>r.month===p.month);
+    const entry={month:p.month,amount:p.amount,basic:p.basic_salary,
+      presentDays:p.present_days,absentDays:p.absent_days,
+      annualLeaveDays:p.annual_leave_days,sickDays:p.sick_days,
+      unpaidLeaveDays:p.unpaid_leave_days,deductOther:p.deduct_other,
+      bonus:p.bonus,leaveCompPaid:p.leave_comp_paid};
+    if(idx>=0) DB.salaryHistory[sid][idx]=entry; else DB.salaryHistory[sid].push(entry);
+  });
+
+  if(msg){
+    msg.innerHTML=`<span style="color:#059669;font-weight:700">✅ تم حفظ ${payloads.length} شهر بنجاح!</span>`;
+    setTimeout(()=>{if(msg) msg.innerHTML='';},3000);
+  }
+
+  // Update year button to show checkmark
+  const yrBtn=document.getElementById(`lad-yr-btn-${yr}`);
+  if(yrBtn&&yrBtn.style.color!=='#fff'){yrBtn.style.background='#d1fae5';yrBtn.style.color='#065f46';}
+}
+// ─── End LAD Entry ──────────────────────────────
+
 // ═══════════════════════════════════════════════
-// BULK IMPORT ALL STAFF HISTORY FROM EXCEL
+// LEAVE & ATTENDANCE DASHBOARD — Overview
 // ═══════════════════════════════════════════════
+function populateLADBranchFilter(){
+  const sel=el('lad-branch-filter');
+  if(!sel) return;
+  const cur=sel.value||'all';
+  sel.innerHTML=`<option value="all">🏢 All Branches</option>`+
+    BRANCHES.map(b=>`<option value="${b.id}" ${String(b.id)===cur?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
+}
+
+function renderLeaveAttDashboard(){
+  const bf   = el('lad-branch-filter')?.value||'all';
+  const srch = (el('lad-search')?.value||'').toLowerCase();
+
+  // Filter staff
+  let staff = (DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay && s.lastWorkingDay<today()) return false;
+    if(bf!=='all' && String(s.branchId)!==String(bf) && String(s.workBranch)!==String(bf)) return false;
+    if(srch && !(s.name+s.position).toLowerCase().includes(srch)) return false;
+    return true;
+  });
+
+  // Deduplicate
+  const seen=new Set();
+  staff=staff.filter(s=>{if(seen.has(String(s.id)))return false;seen.add(String(s.id));return true;});
+  staff.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  if(!staff.length){
+    el('lad-summary').innerHTML='';
+    el('lad-content').innerHTML='<div class="empty"><div class="ei">👷</div><p>No active staff found</p></div>';
+    return;
+  }
+
+  // ── Compute stats for every staff member ──
+  const allBals = staff.map(s=>({s, bal:calcLeaveBalance(s.id)}));
+
+  const totalStaff      = staff.length;
+  const withAlarm       = allBals.filter(({bal})=>bal.remaining>=15).length;
+  const totalRemaining  = allBals.reduce((t,{bal})=>t+bal.remaining,0);
+  const totalCompDue    = allBals.reduce((t,{bal})=>t+bal.compensation,0);
+  const totalWorkDays   = allBals.reduce((t,{s})=>t+getActualWorkDaysCount(s.id),0);
+
+  // Summary boxes
+  el('lad-summary').innerHTML=`
+    <div class="sbox" style="background:#e0f2fe"><div class="sv" style="color:#0369a1">${totalStaff}</div><div class="sk">Active Staff</div></div>
+    <div class="sbox sg"><div class="sv">${totalWorkDays}</div><div class="sk">Total Work Days</div></div>
+    <div class="sbox sy"><div class="sv">${totalRemaining}</div><div class="sk">Leave Days Due</div></div>
+    <div class="sbox" style="background:#fdf4ff"><div class="sv" style="color:#5b21b6">${fmtNum(Math.round(totalCompDue))}</div><div class="sk">Comp Due (AED)</div></div>
+    ${withAlarm>0?`<div class="sbox sr"><div class="sv">${withAlarm}</div><div class="sk">⚠️ Need Action</div></div>`:''}`;
+
+  // ── Staff cards ──
+  const cards = allBals.map(({s, bal})=>{
+    const b       = BRANCHES.find(x=>x.id===s.branchId)||CB();
+    const workDays= getActualWorkDaysCount(s.id);
+    const daysB   = Number(s.daysWorkedBefore||0);
+    const totalD  = workDays+daysB;
+    const alarm   = bal.remaining>=15;
+    const start   = s.contractStart ? new Date(s.contractStart) : null;
+    const now_    = new Date();
+    const totalMo = start ? (now_.getFullYear()-start.getFullYear())*12+(now_.getMonth()-start.getMonth()) : 0;
+    const yrs     = Math.floor(totalMo/12);
+    const mos     = totalMo%12;
+
+    // Monthly summary (last 3 months)
+    const hist = getSalaryHistory(s.id)||[];
+    const recent = hist.sort((a,b)=>b.month.localeCompare(a.month)).slice(0,3);
+
+    // Leave records
+    const leaves=(DB.leaves||[]).filter(l=>String(l.staffId)===String(s.id));
+    const annualTaken = leaves.filter(l=>l.type==='annual').reduce((t,l)=>t+(l.days||0),0);
+    const sickTaken   = leaves.filter(l=>l.type==='sick').reduce((t,l)=>t+(l.days||0),0);
+    const unpaidTaken = leaves.filter(l=>l.type==='unpaid').reduce((t,l)=>t+(l.days||0),0);
+    const compPaid    = leaves.filter(l=>l.type==='compensation').reduce((t,l)=>t+(l.days||0),0);
+
+    // Gratuity estimate
+    const basic   = Number(s.basicSalary||0);
+    const gross   = Number(s.grossSalary||s.basicSalary||0);
+    const gratuityYears = totalD>0?totalD/365:totalMo/12;
+    let gratuity=0;
+    if(gratuityYears>=1){
+      const y1=Math.min(gratuityYears,5), y2=Math.max(0,gratuityYears-5);
+      gratuity=Math.round((basic/30)*21*y1+(basic/30)*30*y2);
+    }
+
+    const recentRows = recent.length ? recent.map(r=>`
+      <td style="padding:4px 6px;font-size:.72rem;color:#6b7280">${r.month}</td>
+      <td style="padding:4px 6px;text-align:center;color:#059669;font-weight:700">${r.presentDays??'—'}</td>
+      <td style="padding:4px 6px;text-align:center;color:#dc2626">${r.absentDays??'—'}</td>
+      <td style="padding:4px 6px;text-align:center;color:#5b21b6">${r.annualLeaveDays??r.sickDays??'—'}</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:700;color:#1e3a8a">${fmtNum(r.amount||0)}</td>
+    `).map(row=>`<tr style="border-bottom:1px solid #f8fafc">${row}</tr>`).join('') : `<tr><td colspan="5" style="padding:8px;text-align:center;color:#9ca3af;font-size:.72rem">No history yet</td></tr>`;
+
+    return `
+    <div style="background:#fff;border:1.5px solid ${alarm?'#fbbf24':'#e5e7eb'};border-radius:14px;margin-bottom:12px;overflow:hidden;${alarm?'box-shadow:0 0 0 2px #fde68a':''}">
+
+      <!-- Staff header -->
+      <div style="background:${alarm?'#fef9c3':'#f8fafc'};padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:1.5px solid ${alarm?'#fde068':'#e5e7eb'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="av" style="background:${b.c};width:42px;height:42px;font-size:1rem;flex-shrink:0">${(s.name||'?')[0]}</div>
+          <div>
+            <div style="font-weight:900;font-size:.95rem;color:#1e293b">${s.name}</div>
+            <div style="font-size:.74rem;color:#6b7280">${s.position||'—'} · ${b.icon} ${tBN(b)}</div>
+            <div style="font-size:.72rem;color:#6b7280">
+              ${start?`📅 Since ${fmtDate(s.contractStart)} · ${yrs>0?yrs+'y ':''}${mos}m`:'No contract date'}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${alarm?`<span style="background:#dc2626;color:#fff;border-radius:8px;padding:3px 10px;font-size:.72rem;font-weight:800">🔔 Leave Due!</span>`:''}
+          <button onclick="openSalaryHistory('${s.id}')"
+            style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Tajawal',sans-serif">
+            📅 Monthly Entry
+          </button>
+          <button onclick="openLeaveForm(null,'${s.id}','annual')"
+            style="background:#059669;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Tajawal',sans-serif">
+            🏖️ Add Leave
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0;border-bottom:1.5px solid #e5e7eb">
+
+        <div style="padding:10px 12px;border-right:1px solid #f1f5f9;text-align:center">
+          <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">✅ Work Days</div>
+          <div style="font-size:1.2rem;font-weight:900;color:#059669">${totalD}</div>
+          ${daysB>0?`<div style="font-size:.62rem;color:#9ca3af">+${daysB} before system</div>`:''}
+        </div>
+
+        <div style="padding:10px 12px;border-right:1px solid #f1f5f9;text-align:center">
+          <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">🏖️ Leave Entitlement</div>
+          <div style="font-size:1.2rem;font-weight:900;color:#1e3a8a">${bal.entitled} days</div>
+          <div style="font-size:.62rem;color:#9ca3af">${bal.yearsWorked}y × 30d/yr</div>
+        </div>
+
+        <div style="padding:10px 12px;border-right:1px solid #f1f5f9;text-align:center">
+          <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">📤 Leave Taken</div>
+          <div style="font-size:1.2rem;font-weight:900;color:#374151">${bal.taken} days</div>
+          <div style="font-size:.62rem;color:#9ca3af">${annualTaken}d annual · ${sickTaken}d sick</div>
+        </div>
+
+        <div style="padding:10px 12px;border-right:1px solid #f1f5f9;text-align:center;background:${alarm?'#fef3c7':'inherit'}">
+          <div style="font-size:.65rem;color:${alarm?'#92400e':'#6b7280'};margin-bottom:3px">⚖️ Remaining</div>
+          <div style="font-size:1.2rem;font-weight:900;color:${alarm?'#dc2626':'#059669'}">${bal.remaining} days</div>
+          ${alarm?`<div style="font-size:.62rem;color:#dc2626;font-weight:700">⚠️ Action needed</div>`:''}
+        </div>
+
+        <div style="padding:10px 12px;border-right:1px solid #f1f5f9;text-align:center;background:${bal.compensation>0?'#fdf4ff':'inherit'}">
+          <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">💰 Comp Due (AED)</div>
+          <div style="font-size:1.1rem;font-weight:900;color:#5b21b6">${fmtNum(Math.round(bal.compensation))}</div>
+          <div style="font-size:.62rem;color:#9ca3af">${fmtNum(bal.dailyRate)}/day × ${bal.remaining}d</div>
+        </div>
+
+        <div style="padding:10px 12px;text-align:center">
+          <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">🏁 Gratuity Est.</div>
+          <div style="font-size:1.1rem;font-weight:900;color:#0369a1">${gratuity>0?fmtNum(gratuity)+' AED':'< 1 year'}</div>
+          <div style="font-size:.62rem;color:#9ca3af">Based on ${totalD} days</div>
+        </div>
+      </div>
+
+      <!-- Leave breakdown pills -->
+      <div style="padding:8px 12px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid #f1f5f9">
+        <span style="background:#d1fae5;color:#065f46;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">🏖️ Annual: ${annualTaken}d</span>
+        <span style="background:#e0f2fe;color:#0369a1;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">🏥 Sick: ${sickTaken}d</span>
+        <span style="background:#fee2e2;color:#991b1b;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">⛔ Unpaid: ${unpaidTaken}d</span>
+        ${compPaid>0?`<span style="background:#fdf4ff;color:#5b21b6;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">💰 Comp Paid: ${compPaid}d</span>`:''}
+        ${gross>0?`<span style="background:#f0fdf4;color:#166534;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">💵 Gross: ${fmtNum(gross)} AED</span>`:''}
+        ${basic>0&&basic!==gross?`<span style="background:#f8fafc;color:#374151;border-radius:8px;padding:2px 10px;font-size:.71rem;font-weight:700">🧾 Basic: ${fmtNum(basic)} AED</span>`:''}
+      </div>
+
+      <!-- Recent monthly history -->
+      <div style="padding:8px 12px">
+        <div style="font-size:.7rem;font-weight:700;color:#374151;margin-bottom:5px">📅 Recent Months</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.72rem">
+          <thead><tr style="background:#f1f5f9">
+            <th style="padding:4px 6px;text-align:left;color:#6b7280;font-weight:600">Month</th>
+            <th style="padding:4px 6px;text-align:center;color:#059669;font-weight:600">Present</th>
+            <th style="padding:4px 6px;text-align:center;color:#dc2626;font-weight:600">Absent</th>
+            <th style="padding:4px 6px;text-align:center;color:#5b21b6;font-weight:600">Leave</th>
+            <th style="padding:4px 6px;text-align:right;color:#1e3a8a;font-weight:600">Net (AED)</th>
+          </tr></thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  el('lad-content').innerHTML = cards || '<div class="empty"><div class="ei">👷</div><p>No staff</p></div>';
+}
+// ─── End Leave & Attendance Dashboard ──────────
 async function bulkImportAllStaffHistory(file){
   const XLSX=window.XLSX;
   if(!XLSX||!file){alert('XLSX library or file missing');return;}
