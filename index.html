@@ -10410,6 +10410,7 @@ function showDTab(tab,btn){
              || null;
     const mgrName=mgr?.name||'';
     const ar=lang==='ar';
+    const isSuspended=c.suspendDate&&(!c.resumeDate||c.resumeDate>today());
     cont.innerHTML=`<div style="padding:10px 0">
 
 
