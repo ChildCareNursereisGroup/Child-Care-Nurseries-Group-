@@ -10412,41 +10412,6 @@ function showDTab(tab,btn){
     const ar=lang==='ar';
     cont.innerHTML=`<div style="padding:10px 0">
 
-    ${(curRole==='admin'||curRole==='manager')?`
-    <!-- ══ براءة الذمة ══ -->
-    <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:13px;padding:14px 16px;margin-bottom:14px">
-      <div style="color:#fff;font-weight:900;font-size:.95rem;margin-bottom:10px">🏅 ${ar?'براءة الذمة — شهادة إخلاء الطرف':'Financial Clearance Certificate — براءة ذمة'}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div>
-          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'حتى تاريخ':'Valid up to'}</div>
-          <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-        </div>
-        <div>
-          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'اللغة':'Language'}</div>
-          <select id="clr-lang" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem">
-            <option value="both">🌐 عربي + English</option>
-            <option value="ar">🇦🇪 عربي</option>
-            <option value="en">🇬🇧 English</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'اسم المدير/ة':'Manager'}</div>
-          <input type="text" id="clr-mgr" value="${mgrName}" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-        </div>
-        <div>
-          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'المسمى':'Position'}</div>
-          <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
-        </div>
-      </div>
-      <div style="background:rgba(255,255,255,.15);border-radius:10px;padding:10px;margin-bottom:10px">
-        <div style="font-size:.7rem;color:#e9d5ff;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني':'Signature'}</div>
-        <canvas id="clr-sig-canvas" width="380" height="80" style="border:2px solid rgba(255,255,255,.4);border-radius:8px;background:#fff;width:100%;height:80px;cursor:crosshair;touch-action:none;display:block"></canvas>
-        <button onclick="clearClrSig()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.72rem;margin-top:5px;font-family:'Tajawal',sans-serif">🗑 ${ar?'مسح':'Clear'}</button>
-      </div>
-      <button onclick="generateClearanceLetter('${c.id}')" style="width:100%;padding:11px;background:#fff;color:#5b21b6;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:900;cursor:pointer">
-        🖨️ ${ar?'إنشاء براءة الذمة PDF':'Generate Clearance Certificate PDF'}
-      </button>
-    </div>`:''}
 
     <!-- ══ Attendance Certificate ══ -->
       ${isSuspended?`<div style="background:#fef3c7;border:2px solid #fbbf24;border-radius:10px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
