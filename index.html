@@ -278,6 +278,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-ch-file').click()">📥 Import Children Excel</button>
     <button class="btn bg bsm" onclick="downloadChildTemplate()">📋 Template</button>
     <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="printClassCards()">🪪 Print Class Cards</button>
+    <button class="btn bsm" style="background:#5b21b6;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openClearancePage()">🏅 Clearance Certificate</button>
   </div>
   <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:#0369a1;font-weight:700">
     💡 اضغطي على اسم الطفل لتعديل بياناته أو حذفه
@@ -2201,18 +2202,31 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- CHILD MODAL -->
 <div class="mover" id="cmodal">
 <div class="modal">
-  <div class="mh"><div class="mt" id="mchname"></div><button class="xb" onclick="closeModal()">✕</button></div>
-  <div class="dtabs" id="child-modal-tabs">
-    <button class="dtab on" onclick="showDTab('info',this)" data-tab="info"></button>
-    <button class="dtab" onclick="showDTab('recs',this)" data-tab="recs"></button>
-    <button class="dtab" onclick="showDTab('account',this)" data-tab="account"></button>
-    <button class="dtab" onclick="showDTab('medical',this)" data-tab="medical"></button>
-    <button class="dtab" onclick="showDTab('progress',this)" data-tab="progress"></button>
-    <button class="dtab" onclick="showDTab('att',this)" data-tab="att"></button>
-    <button class="dtab" onclick="showDTab('trans',this)" data-tab="trans"></button>
-    <button class="dtab" onclick="printChildCard()" data-tab="card"></button>
-    <button class="dtab" onclick="showDTab('cert',this)" data-tab="cert"></button>
-    <button class="dtab" onclick="showDTab('payletter',this)" data-tab="payletter"></button>
+  <div class="mh" style="flex-wrap:wrap;gap:6px">
+    <div class="mt" id="mchname"></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+      <button onclick="openClearanceModal()" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.75rem;font-weight:800;font-family:'Tajawal',sans-serif;white-space:nowrap">
+        🏅 براءة ذمة
+      </button>
+      <button class="xb" onclick="closeModal()">✕</button>
+    </div>
+  </div>
+  <div style="position:relative;margin-bottom:10px">
+    <div class="dtabs" id="child-modal-tabs" style="scroll-behavior:smooth;padding-right:30px">
+      <button class="dtab on" onclick="showDTab('info',this)" data-tab="info"></button>
+      <button class="dtab" onclick="showDTab('recs',this)" data-tab="recs"></button>
+      <button class="dtab" onclick="showDTab('account',this)" data-tab="account"></button>
+      <button class="dtab" onclick="showDTab('medical',this)" data-tab="medical"></button>
+      <button class="dtab" onclick="showDTab('progress',this)" data-tab="progress"></button>
+      <button class="dtab" onclick="showDTab('att',this)" data-tab="att"></button>
+      <button class="dtab" onclick="showDTab('trans',this)" data-tab="trans"></button>
+      <button class="dtab" onclick="printChildCard()" data-tab="card"></button>
+      <button class="dtab" onclick="showDTab('cert',this)" data-tab="cert"></button>
+      <button class="dtab" onclick="showDTab('clearance',this)" data-tab="clearance" style="background:#5b21b6;color:#fff;font-weight:900;border-color:#5b21b6"></button>
+      <button class="dtab" onclick="showDTab('payletter',this)" data-tab="payletter"></button>
+    </div>
+    <button onclick="document.getElementById('child-modal-tabs').scrollBy({left:150,behavior:'smooth'})"
+      style="position:absolute;right:0;top:0;bottom:0;background:linear-gradient(to right,transparent 0%,#fff 50%);border:none;width:36px;cursor:pointer;font-size:1.1rem;color:#5b21b6;font-weight:900;z-index:5;padding:0">›</button>
   </div>
   <div id="dtcont"></div>
 </div>
@@ -2245,23 +2259,37 @@ const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// ── Universal unlimited fetch — paginates automatically ──────────
-// Usage: const rows = await fetchAll(sb.from('table').select('*').eq('x',y))
-async function fetchAll(baseQuery, pageSize=1000){
-  const all=[];
-  let page=0, hasMore=true;
-  while(hasMore){
-    const {data,error}=await baseQuery.range(page*pageSize,(page+1)*pageSize-1);
-    if(error){ console.error('fetchAll error:',error); break; }
-    if(!data||data.length===0){ hasMore=false; break; }
-    all.push(...data);
-    if(data.length<pageSize) hasMore=false;
-    else page++;
-  }
-  return all;
+// ── Universal unlimited fetch ─────────────────────────────────────
+async function fetchAll(getQuery, pageSize=1000){
+  try {
+    const fn = typeof getQuery==='function' ? getQuery : ()=>Promise.resolve(getQuery);
+    const all=[];
+    let page=0, hasMore=true;
+    while(hasMore && page<100){
+      let res;
+      try {
+        res = await fn().range(page*pageSize, (page+1)*pageSize-1);
+      } catch(e){
+        if(page===0){ try { res = await fn(); } catch(e2){ break; } }
+        else { break; }
+      }
+      const {data, error} = res||{};
+      if(error){
+        const msg = typeof error==='string'?error:(error?.message||error?.code||'');
+        if(!msg.includes('postMessage')&&!msg.includes('Headers')&&msg){
+          console.warn('fetchAll:', msg);
+        }
+        break;
+      }
+      if(!data||data.length===0){ break; }
+      all.push(...data);
+      if(data.length < pageSize) hasMore=false;
+      else page++;
+    }
+    return all;
+  } catch(e){ return []; }
 }
-// ─────────────────────────────────────────────────────────────────
-let sbOK = false;
+// ─────────────────────────────────────────────────────────────────let sbOK = false;
 
 // ═══════════════════════════════════════════════
 //  CONFIG
@@ -2583,9 +2611,9 @@ async function loadFromSupa(bid) {
   try {
     // ── Load all main tables with fetchAll (no limits) ──────────────
     const [childrenRaw, expensesRaw, visitorsRaw] = await Promise.all([
-      fetchAll(sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
-      fetchAll(sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
-      fetchAll(sb.from('visitors').select('*').eq('branch_id',bid)),
+      fetchAll(()=>sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
+      fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
+      fetchAll(()=>sb.from('visitors').select('*').eq('branch_id',bid)),
     ]);
 
     DB.visitors=(visitorsRaw||[]).map(v=>({...v,name:(v.name||'').trim()}));
@@ -2603,7 +2631,7 @@ async function loadFromSupa(bid) {
 
     // ── Load ALL receipts ──
     {
-      const allRecs = await fetchAll(sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:true}));
+      const allRecs = await fetchAll(()=>sb.from('receipts').select('*').eq('branch_id',bid).order('date',{ascending:true}));
       DB.receipts = allRecs.map(x=>({
         id:x.id, childId:x.child_id, childName:x.child_name||'', className:x.class_name||'',
         receiptNum:x.receipt_num||'', date:x.date||null, fromDate:x.from_date||null, toDate:x.to_date||null,
@@ -2644,7 +2672,7 @@ async function loadFromSupa(bid) {
         branchId:x.branch_id||'',extra};
     });
     // Load ALL staff (unlimited)
-    const allStaff = await fetchAll(sb.from('staff').select('*'));
+    const allStaff = await fetchAll(()=>sb.from('staff').select('*'));
     DB.staff = (allStaff||[]).map(x=>({
       id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
       workDays:x.work_days||'0,1,2,3,4',
@@ -2693,9 +2721,11 @@ async function loadFromSupa(bid) {
 
     hideLoad();
 
+    // Load medical & progress records
+    await loadMedicalAndProgress(bid);
+
     // Load salary history in background (unlimited)
-    fetchAll(sb.from('staff_salary_history').select('*'))
-      .then(sh=>{
+    fetchAll(()=>sb.from('staff_salary_history').select('*'))      .then(sh=>{
         if(!sh||!sh.length) return;
         DB.salaryHistory={};
         sh.forEach(x=>{
@@ -2728,9 +2758,9 @@ async function loadAllBranches() {
   const result={};
   for(const b of BRANCHES){
     const [c,r,e]=await Promise.all([
-      fetchAll(sb.from('children').select('*').eq('branch_id',b.id)),
-      fetchAll(sb.from('receipts').select('*').eq('branch_id',b.id)),
-      fetchAll(sb.from('expenses').select('*').eq('branch_id',b.id)),
+      fetchAll(()=>sb.from('children').select('*').eq('branch_id',b.id)),
+      fetchAll(()=>sb.from('receipts').select('*').eq('branch_id',b.id)),
+      fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',b.id)),
     ]);
     result[b.id]={
       children:(c.data||[]),
@@ -2847,7 +2877,7 @@ const T = {
     // Modal tabs
     tabInfo:'📋 البيانات', tabRecs:'🧾 الإيصالات', tabAccount:'💰 كشف حساب',
     tabMedical:'🏥 الصحة', tabProgress:'📈 التطور', tabAtt:'✅ الحضور',
-    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة', tabCert:'📜 شهادة', tabPayLetter:'📄 خطاب الدفع',
+    tabTrans:'🔄 نقل فرع', tabCard:'🪪 بطاقة', tabCert:'📜 شهادة', tabPayLetter:'📄 خطاب الدفع', tabClearance:'🏅 براءة ذمة',
     // Age
     ageLabel:'Age — العمر', ageMonths:'months', ageYears:'years',
     // Expenses
@@ -2938,7 +2968,7 @@ const T = {
     // Child modal tabs
     tabInfo:'📋 Info', tabRecs:'🧾 Receipts', tabAccount:'💰 Account',
     tabMedical:'🏥 Health', tabProgress:'📈 Progress', tabAtt:'✅ Attendance',
-    tabTrans:'🔄 Transfer', tabCard:'🪪 ID Card', tabCert:'📜 Certificate', tabPayLetter:'📄 Pay Letter',
+    tabTrans:'🔄 Transfer', tabCard:'🪪 ID Card', tabCert:'📜 Certificate', tabPayLetter:'📄 Pay Letter', tabClearance:'🏅 Clearance',
     // Attendance
     dailyAtt:'📋 Daily Attendance', attPresent:'✅ Present', attAbsent:'❌ Absent',
     // Expenses
@@ -8554,9 +8584,351 @@ function generatePaymentLetter(childId){
   w.document.close();
   logActivity('whatsapp',`📄 Payment Letter → ${c.name}`);
 }
-// ─── End Payment Letter ────────────────────────
+// ═══════════════════════════════════════════════
+// CLEARANCE CERTIFICATE — Children Page
+// ═══════════════════════════════════════════════
+function openClearancePage(){
+  const ar=lang==='ar';
+  const mgrDefault=DB.staff?.find(s=>s.branchId===curBid&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+  const children=(DB.children||[]).filter(c=>!c.leaveDate).sort((a,b)=>a.name.localeCompare(b.name));
 
-// OLD WA functions kept for backward compat
+  const ov=document.createElement('div');
+  ov.id='clr-page-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;max-height:92vh;overflow-y:auto;font-family:'Tajawal',sans-serif">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;padding:16px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:900;font-size:1.1rem">🏅 Clearance Certificate</div>
+          <div style="font-size:.78rem;opacity:.85;margin-top:2px">براءة الذمة — إخلاء طرف</div>
+        </div>
+        <button onclick="document.getElementById('clr-page-overlay').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1.1rem">✕</button>
+      </div>
+
+      <div style="padding:18px;display:flex;flex-direction:column;gap:13px">
+
+        <!-- 1. Child name -->
+        <div>
+          <div style="font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px">👶 ${ar?'اختاري اسم الطفل/ة':'Select Child'}</div>
+          <select id="clr-child-sel" style="width:100%;padding:9px 12px;border:2px solid #5b21b6;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:700">
+            <option value="">— ${ar?'اختاري طفل':'Select a child'} —</option>
+            ${children.map(c=>`<option value="${c.id}">${c.name} ${c.className?'('+c.className+')':''}</option>`).join('')}
+          </select>
+        </div>
+
+        <!-- 2. Language -->
+        <div>
+          <div style="font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px">🌐 ${ar?'لغة الشهادة':'Certificate Language'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <label style="border:2px solid #5b21b6;border-radius:9px;padding:8px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <input type="radio" name="clr-lang-r" value="both" checked style="accent-color:#5b21b6">
+              <span style="font-size:.8rem;font-weight:700">🌐 عربي + EN</span>
+            </label>
+            <label style="border:2px solid #e5e7eb;border-radius:9px;padding:8px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <input type="radio" name="clr-lang-r" value="ar" style="accent-color:#5b21b6">
+              <span style="font-size:.8rem;font-weight:700">🇦🇪 عربي فقط</span>
+            </label>
+            <label style="border:2px solid #e5e7eb;border-radius:9px;padding:8px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <input type="radio" name="clr-lang-r" value="en" style="accent-color:#5b21b6">
+              <span style="font-size:.8rem;font-weight:700">🇬🇧 English</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Date + Manager -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div>
+            <div style="font-size:.75rem;color:#6b7280;margin-bottom:4px">${ar?'تاريخ الشهادة':'Date'}</div>
+            <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.75rem;color:#6b7280;margin-bottom:4px">${ar?'المسمى الوظيفي':'Position'}</div>
+            <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+          </div>
+          <div style="grid-column:1/-1">
+            <div style="font-size:.75rem;color:#6b7280;margin-bottom:4px">${ar?'اسم المدير/ة':'Manager Name'}</div>
+            <input type="text" id="clr-mgr" value="${mgrDefault}" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
+          </div>
+        </div>
+
+        <!-- 4. Signature -->
+        <div>
+          <div style="font-size:.78rem;font-weight:700;color:#5b21b6;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني للمدير/ة':'Manager Electronic Signature'}</div>
+          <canvas id="clr-sig-canvas" width="460" height="100" style="border:2px solid #c4b5fd;border-radius:10px;background:#fff;width:100%;height:100px;cursor:crosshair;touch-action:none;display:block"></canvas>
+          <button onclick="clearClrSig()" style="background:#f3f4f6;color:#374151;border:none;border-radius:7px;padding:5px 14px;cursor:pointer;font-size:.78rem;margin-top:6px;font-family:'Tajawal',sans-serif">🗑 ${ar?'مسح التوقيع':'Clear'}</button>
+        </div>
+
+        <!-- 5. Generate button -->
+        <button onclick="
+          const sel=document.getElementById('clr-child-sel');
+          if(!sel.value){alert('${ar?'اختاري اسم الطفل أولاً':'Please select a child first'}');return;}
+          const lv=document.querySelector('[name=clr-lang-r]:checked')?.value||'both';
+          document.getElementById('clr-lang').value=lv;
+          generateClearanceLetter(sel.value);
+        " style="width:100%;padding:14px;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:12px;font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:900;cursor:pointer;letter-spacing:.3px">
+          🖨️ ${ar?'إنشاء وطباعة براءة الذمة PDF':'Generate & Print Clearance Certificate PDF'}
+        </button>
+
+        <!-- hidden lang selector for generateClearanceLetter -->
+        <select id="clr-lang" style="display:none"><option value="both">both</option><option value="ar">ar</option><option value="en">en</option></select>
+
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  setTimeout(()=>initClrSigCanvas(),120);
+}
+// ─── End Clearance Page ────────────────────────
+let _clrSigDrawing=false;
+function initClrSigCanvas(){
+  const canvas=el('clr-sig-canvas');
+  if(!canvas||canvas._clrInit) return;
+  canvas._clrInit=true;
+  const ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#1e3a8a'; ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.lineJoin='round';
+  const getPos=e=>{const r=canvas.getBoundingClientRect();const s=e.touches?e.touches[0]:e;return{x:(s.clientX-r.left)*(canvas.width/r.width),y:(s.clientY-r.top)*(canvas.height/r.height)};};
+  canvas.addEventListener('mousedown',e=>{_clrSigDrawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
+  canvas.addEventListener('mousemove',e=>{if(!_clrSigDrawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  canvas.addEventListener('mouseup',()=>{_clrSigDrawing=false;});
+  canvas.addEventListener('touchstart',e=>{e.preventDefault();_clrSigDrawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);},{passive:false});
+  canvas.addEventListener('touchmove',e=>{e.preventDefault();if(!_clrSigDrawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+  canvas.addEventListener('touchend',()=>{_clrSigDrawing=false;});
+}
+function clearClrSig(){const c=el('clr-sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
+function getClrSigDataURL(){const c=el('clr-sig-canvas');if(!c)return null;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return Array.from(d).some(v=>v<250)?c.toDataURL('image/png'):null;}
+
+const _clrSigObserver=new MutationObserver(()=>{ if(el('clr-sig-canvas')) initClrSigCanvas(); });
+_clrSigObserver.observe(document.body,{childList:true,subtree:true});
+
+function generateClearanceLetter(childId){
+  const c=DB.children.find(x=>String(x.id)===String(childId||curChild));
+  if(!c) return;
+  const ltrLang  = el('clr-lang')?.value||'both';
+  const clrDate  = el('clr-date')?.value||today();
+  const mgrName  = el('clr-mgr')?.value||'';
+  const mgrPos   = el('clr-pos')?.value||'Director / Manager';
+  const sigDataURL=getClrSigDataURL();
+
+  const branch   = BRANCHES.find(b=>b.id===(c.branchId||curBid))||CB();
+  const bid      = branch.id;
+  const lhImg    = LH_IMAGES?.[bid]||null;
+  const bx       = getBranchExtra?.(bid)||{};
+  const logo     = bx.logo||null;
+  const brColor  = branch.c||'#1e3a8a';
+  const nurseryEN= branch.en||branch.ar||'Child Care Nursery';
+  const nurseryAR= branch.ar||'';
+
+  // Receipts summary
+  const recs = DB.receipts.filter(r=>String(r.childId)===String(childId)&&!r.isCancelled)
+                           .sort((a,b)=>a.date>b.date?1:-1);
+  const totalPaid = recs.reduce((s,r)=>s+r.total,0);
+  const firstRec  = recs[0];
+  const lastRec   = recs[recs.length-1];
+  const fromDate  = firstRec ? (firstRec.fromDate||firstRec.date) : c.joinDate;
+  const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const fmtAR=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'numeric',month:'long',year:'numeric'}):'—';
+  const clrDateFmt=fmt(clrDate);
+  const clrDateFmtAR=fmtAR(clrDate);
+
+  const sigHtml=sigDataURL
+    ?`<img src="${sigDataURL}" style="height:40px;max-width:160px;display:block;margin-bottom:2mm" alt="Signature">`
+    :`<div style="height:12mm;width:50mm;border-bottom:1.5px solid #374151;margin-bottom:2mm"></div>`;
+
+  // Stamp
+  const makeStamp=()=>{
+    const lel=logo?`<image href="${logo}" x="30" y="28" width="140" height="80" preserveAspectRatio="xMidYMid meet"/>`:
+      `<text x="100" y="95" text-anchor="middle" font-size="40">&#x1F3EB;</text>`;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 200" width="100" height="100">
+      <defs><clipPath id="cc"><ellipse cx="100" cy="68" rx="72" ry="45"/></clipPath></defs>
+      <circle cx="100" cy="100" r="96" fill="white" stroke="${brColor}" stroke-width="4"/>
+      <g clip-path="url(#cc)">${lel}</g>
+      <line x1="22" y1="120" x2="178" y2="120" stroke="${brColor}" stroke-width="1.5"/>
+      <text x="100" y="138" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="${brColor}">${nurseryEN}</text>
+      <text x="100" y="153" text-anchor="middle" font-family="Arial" font-size="10" fill="${brColor}">${nurseryAR}</text>
+    </svg>`;
+    return`<img src="data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}" style="width:100px;height:100px" alt="Stamp">`;
+  };
+
+  const headerHTML=lhImg?`<img src="${lhImg.header}" style="width:100%;display:block">`:
+    `<div style="border-bottom:3px solid ${brColor};padding:8mm 15mm 5mm;display:flex;align-items:center;gap:8mm">
+      <div style="font-size:18pt;font-weight:900;color:${brColor}">${nurseryEN}</div>
+      <div style="margin-left:auto;font-size:8pt;color:#6b7280;text-align:right">${nurseryAR}<br>Child Care Nurseries Group</div>
+     </div>`;
+  const footerHTML=lhImg?`<img src="${lhImg.footer}" style="width:100%;display:block">`:
+    `<div style="border-top:2px solid ${brColor};padding:4mm 15mm;font-size:8pt;color:#6b7280;display:flex;justify-content:space-between">
+      <span>${nurseryEN}</span><span>Child Care Nurseries Group — مجموعة رعاية الطفل للحضانات</span>
+     </div>`;
+
+  // ─── English block ───
+  const enBlock=`
+    <p style="font-size:10.5pt;line-height:2"><strong>To Whom It May Concern,</strong></p>
+    <p style="text-align:justify;font-size:10.5pt;line-height:1.9;margin-bottom:4mm">
+      This is to certify that <span style="color:${brColor};font-weight:700">${c.name}</span>,
+      enrolled at <span style="color:${brColor};font-weight:700">${nurseryEN}</span>, has
+      <strong>no outstanding or unpaid fees</strong> as of the date of this certificate
+      (<strong>${clrDateFmt}</strong>). All dues have been settled in full and the child's
+      account is clear with no pending obligations.
+    </p>
+    <div style="background:#f8fafc;border-left:4px solid ${brColor};padding:5mm 7mm;margin:4mm 0;border-radius:0 8px 8px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3mm;font-size:9.5pt">
+        <div><span style="color:#6b7280">Child Name:</span> <strong>${c.name}</strong></div>
+        <div><span style="color:#6b7280">Branch:</span> <strong>${nurseryEN}</strong></div>
+        <div><span style="color:#6b7280">Enrollment Date:</span> <strong>${fmt(c.joinDate)}</strong></div>
+        <div><span style="color:#6b7280">Certificate Date:</span> <strong>${clrDateFmt}</strong></div>
+        <div style="grid-column:1/-1;background:#f0fdf4;padding:4px 8px;border-radius:6px;color:#166534;font-weight:800;text-align:center">
+          ✅ Account Status: CLEAR — No Outstanding Fees as of ${clrDateFmt}
+        </div>
+      </div>
+    </div>
+    <p style="text-align:justify;font-size:10.5pt;line-height:1.9;margin:3mm 0">
+      This certificate is issued upon request for official and legal purposes and is valid
+      as of the date stated above.
+    </p>`;
+
+  // ─── Arabic block ───
+  const arBlock=`
+    <div style="direction:rtl;text-align:right;margin-top:${ltrLang==='both'?'6mm':'0'}">
+      ${ltrLang==='both'?`<div style="border-top:2px dashed #d1d5db;margin:5mm 0;padding-top:5mm"></div>`:''}
+      <p style="font-size:11pt;line-height:2"><strong>إلى من يهمه الأمر،</strong></p>
+      <p style="text-align:justify;font-size:11pt;line-height:1.9;margin-bottom:4mm">
+        نشهد نحن <span style="color:${brColor};font-weight:700">${nurseryAR||nurseryEN}</span> بأن
+        الطفل/ة <span style="color:${brColor};font-weight:700">${c.name}</span> الملتحق/ة بمؤسستنا،
+        <strong>ليس عليه/عليها أي رسوم متأخرة أو غير مسددة</strong> حتى تاريخ إصدار هذه الشهادة
+        بتاريخ <strong>${clrDateFmtAR}</strong>. وقد سُدّدت جميع الرسوم المستحقة بالكامل،
+        وحساب الطفل/ة خالٍ من أي التزامات مالية معلّقة.
+      </p>
+      <div style="background:#f8fafc;border-right:4px solid ${brColor};padding:5mm 7mm;margin:4mm 0;border-radius:8px 0 0 8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3mm;font-size:10pt">
+          <div><span style="color:#6b7280">اسم الطفل/ة:</span> <strong>${c.name}</strong></div>
+          <div><span style="color:#6b7280">الفرع:</span> <strong>${nurseryAR||nurseryEN}</strong></div>
+          <div><span style="color:#6b7280">تاريخ الالتحاق:</span> <strong>${fmtAR(c.joinDate)}</strong></div>
+          <div><span style="color:#6b7280">تاريخ الشهادة:</span> <strong>${clrDateFmtAR}</strong></div>
+          <div style="grid-column:1/-1;background:#f0fdf4;padding:4px 8px;border-radius:6px;color:#166534;font-weight:800;text-align:center;font-family:'Tajawal',sans-serif">
+            ✅ الحالة المالية: مُعفى — لا توجد رسوم متأخرة حتى ${clrDateFmtAR}
+          </div>
+        </div>
+      </div>
+      <p style="text-align:justify;font-size:11pt;line-height:1.9;margin:3mm 0">
+        صدرت هذه الشهادة بناءً على طلب ولي الأمر لأغراض رسمية وقانونية،
+        وهي سارية المفعول اعتباراً من التاريخ المذكور أعلاه.
+      </p>
+    </div>`;
+
+  const bodyContent = ltrLang==='en'?enBlock : ltrLang==='ar'?arBlock : enBlock+arBlock;
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
+    @page{size:A4;margin:0}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Lato',Arial,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{width:210mm;min-height:297mm;display:flex;flex-direction:column}
+    .body{padding:7mm 15mm 5mm;flex:1}
+    .title-bar{text-align:center;border-bottom:2px solid ${brColor};padding-bottom:4mm;margin-bottom:5mm}
+    .title-bar h1{font-size:13pt;font-weight:900;color:${brColor};text-transform:uppercase;letter-spacing:.5px}
+    .title-bar p{font-size:9pt;color:#6b7280;margin-top:2mm;font-weight:700}
+    .sig-area{margin-top:auto;padding-top:6mm;display:flex;align-items:flex-end;gap:8mm}
+    .sig-block{border-top:1.5px solid #d1d5db;padding-top:3mm;flex:1}
+    .sig-name{font-size:10pt;font-weight:700;margin-top:2mm}
+    .sig-pos{font-size:8.5pt;color:#6b7280}
+    @media print{.no-print{display:none!important}}
+  </style></head><body>
+  <div class="no-print" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
+    <button onclick="window.print()" style="background:${brColor};color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print / PDF</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕ Close</button>
+  </div>
+  <div style="height:42px" class="no-print"></div>
+  <div class="page">
+    ${headerHTML}
+    <div class="body">
+      <div style="text-align:right;font-size:9pt;margin-bottom:4mm;color:#6b7280">Date / التاريخ: <strong>${clrDateFmt}</strong></div>
+      <div class="title-bar">
+        <h1>Financial Clearance Certificate</h1>
+        <p>شهادة براءة ذمة — إخلاء طرف</p>
+      </div>
+      <div>${bodyContent}</div>
+      <div class="sig-area">
+        <div class="sig-block">
+          ${sigHtml}
+          <div class="sig-name">${mgrName||'_______________________________'}</div>
+          <div class="sig-pos">${mgrPos}</div>
+          <div class="sig-pos" style="margin-top:1mm">${nurseryEN} — ${nurseryAR}</div>
+        </div>
+        <div style="flex-shrink:0;opacity:.9">${makeStamp()}</div>
+      </div>
+    </div>
+    ${footerHTML}
+  </div>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=1100');
+  w.document.write(html); w.document.close();
+  logActivity('whatsapp',`🏅 Clearance Letter → ${c.name}`);
+}
+function openClearanceModal(){
+  const c=DB.children.find(x=>String(x.id)===String(curChild));
+  if(!c) return;
+  const ar=lang==='ar';
+  const mgrDefault=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+
+  // Create overlay
+  const ov=document.createElement('div');
+  ov.id='clr-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;font-family:'Tajawal',sans-serif">
+      <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;padding:14px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:900;font-size:1rem">🏅 ${ar?'براءة الذمة':'Financial Clearance Certificate'}</div>
+          <div style="font-size:.75rem;opacity:.85;margin-top:2px">${c.name}</div>
+        </div>
+        <button onclick="document.getElementById('clr-overlay').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:1rem">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div>
+            <div style="font-size:.72rem;color:#6b7280;margin-bottom:4px">${ar?'حتى تاريخ':'Valid up to'}</div>
+            <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:#6b7280;margin-bottom:4px">${ar?'اللغة':'Language'}</div>
+            <select id="clr-lang" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem">
+              <option value="both">🌐 عربي + English</option>
+              <option value="ar">🇦🇪 عربي فقط</option>
+              <option value="en">🇬🇧 English only</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:#6b7280;margin-bottom:4px">${ar?'اسم المدير/ة':'Manager Name'}</div>
+            <input type="text" id="clr-mgr" value="${mgrDefault}" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:#6b7280;margin-bottom:4px">${ar?'المسمى الوظيفي':'Position'}</div>
+            <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:.72rem;color:#6b7280;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني':'Electronic Signature'}</div>
+          <canvas id="clr-sig-canvas" width="400" height="90" style="border:2px solid #c4b5fd;border-radius:9px;background:#fff;width:100%;height:90px;cursor:crosshair;touch-action:none;display:block"></canvas>
+          <button onclick="clearClrSig()" style="background:#f3f4f6;color:#374151;border:none;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.75rem;margin-top:6px">🗑 ${ar?'مسح':'Clear'}</button>
+        </div>
+
+        <button onclick="generateClearanceLetter('${c.id}')"
+          style="width:100%;padding:13px;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:11px;font-family:'Tajawal',sans-serif;font-size:.92rem;font-weight:900;cursor:pointer">
+          🖨️ ${ar?'إنشاء براءة الذمة PDF':'Generate Clearance Certificate PDF'}
+        </button>
+
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  // Close on backdrop click
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  setTimeout(()=>initClrSigCanvas(), 100);
+}
+// ─── End Clearance Modal ───────────────────────
 function _buildPaymentConfirmMsg(){ return ''; }
 function previewPaymentConfirmMsg(){ }
 function sendPaymentConfirmWA(){ alert('Use the Generate Letter button instead.'); }
@@ -9717,7 +10089,8 @@ function renderModalTabs(){
     {tab:'att',    key:'tabAtt'},
     {tab:'trans',  key:'tabTrans'},
     {tab:'card',   key:'tabCard'},
-    {tab:'cert',   key:'tabCert'},
+    {tab:'cert',      key:'tabCert'},
+    {tab:'clearance', key:'tabClearance'},
     {tab:'payletter', key:'tabPayLetter'},
   ];
   document.querySelectorAll('#child-modal-tabs .dtab').forEach((btn,i)=>{
@@ -9727,7 +10100,7 @@ function renderModalTabs(){
       if(tabDefs[i].tab==='account'){
         btn.style.display = curRole==='admin' ? '' : 'none';
       }
-      if(tabDefs[i].tab==='payletter'){
+      if(tabDefs[i].tab==='clearance'||tabDefs[i].tab==='payletter'){
         btn.style.display = (curRole==='admin'||curRole==='manager') ? '' : 'none';
       }
     }
@@ -9742,6 +10115,9 @@ function openChild(id){
     <div><div>${c.name}</div><div style="font-size:.72rem;color:var(--muted)">${c.className||''} | #${c.regNum||''}</div></div>
   </div>`;
   renderModalTabs();
+  // Show براءة الذمة button for admin/manager only
+  const clrBtn = el('clr-modal-btn');
+  if(clrBtn) clrBtn.style.display = (curRole==='admin'||curRole==='manager') ? '' : 'none';
   const firstTab=document.querySelector('#child-modal-tabs .dtab');
   if(firstTab) firstTab.classList.add('on');
   showDTab('info',firstTab);
@@ -9962,12 +10338,11 @@ function showDTab(tab,btn){
     const tot=recs.reduce((s,r)=>s+r.total,0);
     const isAdm=curRole==='admin';
     const isAdmOrMgr=curRole==='admin'||curRole==='manager';
-    const activeRecs=recs.filter(r=>!r.isCancelled).sort((a,b)=>b.date>a.date?1:-1);
-    const waSection='';
-        cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
+
+    cont.innerHTML=`${isAdm?`<div style="background:var(--bl);border-radius:10px;padding:12px;text-align:center;margin-bottom:11px">
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
-    </div>`:''}${waSection}
+    </div>`:''}
     ${recs.map(r=>`<div class="rc" style="margin-bottom:8px">
       <div class="rh">
         <div>#${r.receiptNum}</div>
@@ -9976,6 +10351,15 @@ function showDTab(tab,btn){
         ${isAdm?`<div style="font-weight:800;color:var(--ok)">${fmtNum(r.total)} د.إ</div>`:''}
       </div>
     </div>`).join('')||`<div class="empty"><div class="ei">🧾</div><p>${lang==='ar'?'لا توجد إيصالات':'No receipts found'}</p></div>`}`;
+
+    // براءة الذمة — insert button at top of receipts
+    if(isAdmOrMgr){
+      const btn=document.createElement('button');
+      btn.textContent='🏅 '+(lang==='ar'?'إصدار براءة الذمة — إخلاء طرف':'Issue Financial Clearance Certificate — براءة ذمة');
+      btn.style.cssText='width:100%;margin-bottom:10px;padding:10px 14px;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:10px;font-family:Tajawal,sans-serif;font-size:.88rem;font-weight:900;cursor:pointer;display:block';
+      btn.onclick=()=>generateClearanceLetter(curChild);
+      cont.insertBefore(btn, cont.firstChild);
+    }
   }
   if(tab==='att'){
     const dates=Object.keys(DB.attendance).sort().reverse().slice(0,30);
@@ -10040,9 +10424,47 @@ function showDTab(tab,btn){
     const mgr = DB.staff?.find(s=>s.branchId===branch.id&&/(manager|director|owner|مدير|مديرة)/i.test(s.position||''))
              || DB.staff?.find(s=>s.branchId===branch.id&&/(manager|director)/i.test(s.name||''))
              || null;
-    const isSuspended=c.suspendDate&&(!c.resumeDate||c.resumeDate>today());
-
+    const mgrName=mgr?.name||'';
+    const ar=lang==='ar';
     cont.innerHTML=`<div style="padding:10px 0">
+
+    ${(curRole==='admin'||curRole==='manager')?`
+    <!-- ══ براءة الذمة ══ -->
+    <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:13px;padding:14px 16px;margin-bottom:14px">
+      <div style="color:#fff;font-weight:900;font-size:.95rem;margin-bottom:10px">🏅 ${ar?'براءة الذمة — شهادة إخلاء الطرف':'Financial Clearance Certificate — براءة ذمة'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'حتى تاريخ':'Valid up to'}</div>
+          <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'اللغة':'Language'}</div>
+          <select id="clr-lang" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem">
+            <option value="both">🌐 عربي + English</option>
+            <option value="ar">🇦🇪 عربي</option>
+            <option value="en">🇬🇧 English</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'اسم المدير/ة':'Manager'}</div>
+          <input type="text" id="clr-mgr" value="${mgrName}" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:.68rem;color:#e9d5ff;margin-bottom:3px">${ar?'المسمى':'Position'}</div>
+          <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:7px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.15);border-radius:10px;padding:10px;margin-bottom:10px">
+        <div style="font-size:.7rem;color:#e9d5ff;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني':'Signature'}</div>
+        <canvas id="clr-sig-canvas" width="380" height="80" style="border:2px solid rgba(255,255,255,.4);border-radius:8px;background:#fff;width:100%;height:80px;cursor:crosshair;touch-action:none;display:block"></canvas>
+        <button onclick="clearClrSig()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.72rem;margin-top:5px;font-family:'Tajawal',sans-serif">🗑 ${ar?'مسح':'Clear'}</button>
+      </div>
+      <button onclick="generateClearanceLetter('${c.id}')" style="width:100%;padding:11px;background:#fff;color:#5b21b6;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:900;cursor:pointer">
+        🖨️ ${ar?'إنشاء براءة الذمة PDF':'Generate Clearance Certificate PDF'}
+      </button>
+    </div>`:''}
+
+    <!-- ══ Attendance Certificate ══ -->
       ${isSuspended?`<div style="background:#fef3c7;border:2px solid #fbbf24;border-radius:10px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
         <span style="font-size:1.3rem">⏸️</span>
         <div style="font-size:.78rem;color:#92400e;font-weight:700">هذا الطفل في إجازة مؤقتة منذ ${fmtDate(c.suspendDate)}${c.resumeDate?' حتى '+fmtDate(c.resumeDate):''} — سيُذكر ذلك في الشهادة</div>
@@ -10119,75 +10541,193 @@ function showDTab(tab,btn){
       </div>`}
     </div>`;
 
-    // Init signature canvas
-    if(eligible) setTimeout(()=>initCertSigCanvas(),100);
-  }
+    // Append payment letters section after cert
+    if(curRole==='admin'||curRole==='manager'){
+      const activeRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled)
+                                  .sort((a,b)=>b.date>a.date?1:-1);
+      const mgrDefault=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+      const ar2=lang==='ar';
+      cont.innerHTML += `<div style="margin-top:12px">
 
-  // ── PAYMENT CONFIRMATION LETTER ───────────────
-  if(tab==='payletter'){
-    if(curRole!=='admin'&&curRole!=='manager'){ cont.innerHTML=''; return; }
-    const activeRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled)
-                                .sort((a,b)=>b.date>a.date?1:-1);
-    const mgrDefault=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
-    const ar=lang==='ar';
-    cont.innerHTML=`<div style="padding:8px 0">
-      <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:13px;padding:13px 15px">
-        <div style="font-size:.82rem;font-weight:900;color:#166534;margin-bottom:11px">📄 ${ar?'خطاب تأكيد الدفع الرسمي':'Payment Confirmation Letter'}</div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
-          <div>
-            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🧾 ${ar?'الإيصال':'Receipt'}</div>
-            <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
-              <option value="__last__">⚡ ${ar?'آخر إيصال':'Last Receipt'}</option>
-              ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🌐 ${ar?'اللغة':'Language'}</div>
-            <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
-              <option value="en">🇬🇧 English</option>
-              <option value="ar">🇦🇪 Arabic — عربي</option>
-            </select>
-          </div>
-        </div>
-
-        <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:10px;padding:11px;margin-bottom:9px">
-          <div style="font-size:.73rem;font-weight:800;color:#1e3a8a;margin-bottom:8px">📝 ${ar?'تفاصيل الخطاب':'Letter Details'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <!-- Payment Confirmation Letter -->
+        <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:13px;padding:13px 15px;margin-bottom:10px">
+          <div style="font-size:.82rem;font-weight:900;color:#166534;margin-bottom:11px">📄 ${ar2?'خطاب تأكيد الدفع الرسمي':'Payment Confirmation Letter'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
             <div>
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'تاريخ الخطاب':'Letter Date'}</div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🧾 ${ar2?'الإيصال':'Receipt'}</div>
+              <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+                <option value="__last__">⚡ ${ar2?'آخر إيصال':'Last Receipt'}</option>
+                ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">🌐 ${ar2?'اللغة':'Language'}</div>
+              <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+                <option value="en">🇬🇧 English</option>
+                <option value="ar">🇦🇪 Arabic — عربي</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'تاريخ الخطاب':'Letter Date'}</div>
               <input type="date" id="pltr-date" value="${today()}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
             </div>
             <div>
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'اسم المدير/ة':'Manager / Director Name'}</div>
-              <input type="text" id="pltr-mgr" placeholder="${ar?'اسم المدير':'Manager name'}" value="${mgrDefault}"
-                style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'اسم المدير/ة':'Manager Name'}</div>
+              <input type="text" id="pltr-mgr" value="${mgrDefault}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
             </div>
             <div style="grid-column:1/-1">
-              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar?'المسمى الوظيفي':'Position'}</div>
+              <div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'المسمى الوظيفي':'Position'}</div>
               <input type="text" id="pltr-pos" value="Director / Manager" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
             </div>
           </div>
+          <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
+            <div style="font-size:.73rem;font-weight:800;color:#5b21b6;margin-bottom:6px">✍️ ${ar2?'التوقيع الإلكتروني':'Electronic Signature'}</div>
+            <canvas id="pltr-sig-canvas" width="380" height="80" style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;max-width:380px;height:80px;cursor:crosshair;touch-action:none;display:block"></canvas>
+            <button onclick="clearPltrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem;margin-top:5px">🗑 Clear</button>
+          </div>
+          <button onclick="generatePaymentLetter('${c.id}')" style="width:100%;padding:10px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:900;cursor:pointer">
+            📄 ${ar2?'إنشاء خطاب تأكيد الدفع':'Generate Payment Confirmation Letter'}
+          </button>
         </div>
 
-        <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
-          <div style="font-size:.73rem;font-weight:800;color:#5b21b6;margin-bottom:6px">✍️ ${ar?'التوقيع الإلكتروني':'Electronic Signature'}</div>
-          <canvas id="pltr-sig-canvas" width="380" height="90"
-            style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;max-width:380px;height:90px;cursor:crosshair;touch-action:none;display:block"></canvas>
-          <div style="display:flex;gap:6px;margin-top:5px">
-            <button onclick="clearPltrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem">🗑 ${ar?'مسح':'Clear'}</button>
-            <span style="font-size:.7rem;color:#6b7280;align-self:center">${ar?'وقّعي بالماوس أو الإصبع':'Sign with mouse or finger'}</span>
+        <!-- Clearance Letter -->
+        <div style="background:#fdf4ff;border:2px solid #c4b5fd;border-radius:13px;padding:13px 15px">
+          <div style="font-size:.82rem;font-weight:900;color:#5b21b6;margin-bottom:11px">🏅 ${ar2?'براءة الذمة — إخلاء طرف':'Financial Clearance Certificate — براءة ذمة'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
+            <div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">${ar2?'حتى تاريخ':'Up to Date'}</div>
+              <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:6px 8px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+            </div>
+            <div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">${ar2?'اللغة':'Language'}</div>
+              <select id="clr-lang" style="width:100%;padding:6px 8px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+                <option value="both">🌐 عربي + English</option>
+                <option value="ar">🇦🇪 عربي فقط</option>
+                <option value="en">🇬🇧 English only</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">${ar2?'اسم المدير/ة':'Manager Name'}</div>
+              <input type="text" id="clr-mgr" value="${mgrDefault}" style="width:100%;padding:6px 8px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+            </div>
+            <div>
+              <div style="font-size:.68rem;font-weight:700;color:#374151;margin-bottom:3px">${ar2?'المسمى الوظيفي':'Position'}</div>
+              <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:6px 8px;border:1.5px solid #c4b5fd;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+            </div>
+          </div>
+          <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
+            <div style="font-size:.73rem;font-weight:800;color:#5b21b6;margin-bottom:6px">✍️ ${ar2?'توقيع المدير/ة':'Manager Signature'}</div>
+            <canvas id="clr-sig-canvas" width="380" height="80" style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;max-width:380px;height:80px;cursor:crosshair;touch-action:none;display:block"></canvas>
+            <button onclick="clearClrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem;margin-top:5px">🗑 ${ar2?'مسح':'Clear'}</button>
+          </div>
+          <button onclick="generateClearanceLetter('${c.id}')" style="width:100%;padding:10px;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.85rem;font-weight:900;cursor:pointer">
+            🏅 ${ar2?'إنشاء براءة الذمة':'Generate Financial Clearance Certificate'}
+          </button>
+        </div>
+      </div>`;
+      setTimeout(()=>{initPltrSigCanvas();initClrSigCanvas();},100);
+    }
+
+    // Init cert signature if eligible
+    if(eligible) setTimeout(()=>initCertSigCanvas(),100);
+  }
+
+  // ── CLEARANCE CERTIFICATE TAB ─────────────────
+  if(tab==='clearance'){
+    if(curRole!=='admin'&&curRole!=='manager'){ cont.innerHTML=''; return; }
+    const ar=lang==='ar';
+    const mgrDefault=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+    cont.innerHTML=`<div style="padding:8px 0">
+      <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:14px;padding:16px;text-align:center;margin-bottom:14px">
+        <div style="font-size:1.5rem;margin-bottom:6px">🏅</div>
+        <div style="color:#fff;font-weight:900;font-size:1rem;margin-bottom:3px">${ar?'براءة الذمة — إخلاء طرف':'Financial Clearance Certificate'}</div>
+        <div style="color:#e9d5ff;font-size:.78rem">${ar?'شهادة رسمية بعدم وجود رسوم متأخرة':'Official certificate of no outstanding fees'}</div>
+      </div>
+      <div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:12px;padding:13px;margin-bottom:10px">
+        <div style="font-size:.75rem;font-weight:800;color:#374151;margin-bottom:10px">⚙️ ${ar?'إعدادات الشهادة':'Certificate Settings'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div>
+            <div style="font-size:.68rem;color:#6b7280;margin-bottom:3px">${ar?'حتى تاريخ':'Valid up to Date'}</div>
+            <input type="date" id="clr-date" value="${today()}" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:#6b7280;margin-bottom:3px">${ar?'اللغة':'Language'}</div>
+            <select id="clr-lang" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem">
+              <option value="both">🌐 عربي + English</option>
+              <option value="ar">🇦🇪 عربي فقط</option>
+              <option value="en">🇬🇧 English only</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:#6b7280;margin-bottom:3px">${ar?'اسم المدير/ة':'Manager / Director'}</div>
+            <input type="text" id="clr-mgr" value="${mgrDefault}" placeholder="Name..." style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:#6b7280;margin-bottom:3px">${ar?'المسمى الوظيفي':'Position'}</div>
+            <input type="text" id="clr-pos" value="Director / Manager" style="width:100%;padding:7px 9px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;box-sizing:border-box">
           </div>
         </div>
+      </div>
+      <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:12px;padding:13px;margin-bottom:12px">
+        <div style="font-size:.75rem;font-weight:800;color:#5b21b6;margin-bottom:8px">✍️ ${ar?'التوقيع الإلكتروني':'Manager Signature'}</div>
+        <canvas id="clr-sig-canvas" width="400" height="100" style="border:2px solid #c4b5fd;border-radius:9px;background:#fff;width:100%;height:100px;cursor:crosshair;touch-action:none;display:block"></canvas>
+        <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+          <button onclick="clearClrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.76rem;font-family:'Tajawal',sans-serif">🗑 ${ar?'مسح':'Clear'}</button>
+          <span style="font-size:.7rem;color:#9ca3af">${ar?'وقّعي بالماوس أو الإصبع':'Sign with mouse or finger'}</span>
+        </div>
+      </div>
+      <button onclick="generateClearanceLetter('${c.id}')" style="width:100%;padding:13px;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border:none;border-radius:12px;font-family:'Tajawal',sans-serif;font-size:.92rem;font-weight:900;cursor:pointer">
+        🖨️ ${ar?'إنشاء وطباعة براءة الذمة PDF':'Generate & Print Clearance Certificate PDF'}
+      </button>
+      <div style="margin-top:10px;background:#fef9c3;border:1.5px solid #fde047;border-radius:9px;padding:9px 12px;font-size:.74rem;color:#713f12">
+        📋 ${ar?'الشهادة تحتوي على الـ Letterhead والختم الرسمي وتوقيع المدير/ة بالعربي والإنجليزي':'Includes official letterhead, stamp, manager signature — Arabic & English'}
+      </div>
+    </div>`;
+    setTimeout(()=>initClrSigCanvas(), 100);
+  }
 
-        <button onclick="generatePaymentLetter('${c.id}')"
-          style="width:100%;padding:11px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:900;cursor:pointer">
-          📄 ${ar?'إنشاء خطاب تأكيد الدفع':'Generate Payment Confirmation Letter'}
+  if(tab==='payletter'){
+    const ar2=lang==='ar';
+    const mgrDef=DB.staff?.find(s=>s.branchId===(c.branchId||curBid)&&/(manager|director|مدير|مديرة)/i.test(s.position||''))?.name||'';
+    const activeRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled).sort((a,b)=>b.date>a.date?1:-1);
+    cont.innerHTML=`<div style="padding:8px 0">
+      <div style="background:#f0fdf4;border:2px solid #4ade80;border-radius:13px;padding:13px 15px">
+        <div style="font-size:.82rem;font-weight:900;color:#166534;margin-bottom:11px">📄 ${ar2?'خطاب تأكيد الدفع الرسمي':'Payment Confirmation Letter'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
+          <div><div style="font-size:.68rem;color:#374151;margin-bottom:3px">🧾 ${ar2?'الإيصال':'Receipt'}</div>
+            <select id="pmsg-rec-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+              <option value="__last__">${ar2?'⚡ آخر إيصال':'⚡ Last Receipt'}</option>
+              ${activeRecs.map(r=>`<option value="${r.id}">#${r.receiptNum} · ${fmtDate(r.date)} · ${fmtNum(r.total)} AED</option>`).join('')}
+            </select>
+          </div>
+          <div><div style="font-size:.68rem;color:#374151;margin-bottom:3px">🌐 ${ar2?'اللغة':'Language'}</div>
+            <select id="pmsg-lang-sel" style="width:100%;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.78rem">
+              <option value="en">🇬🇧 English</option><option value="ar">🇦🇪 عربي</option>
+            </select>
+          </div>
+          <div><div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'التاريخ':'Date'}</div>
+            <input type="date" id="pltr-date" value="${today()}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+          </div>
+          <div><div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'المدير/ة':'Manager'}</div>
+            <input type="text" id="pltr-mgr" value="${mgrDef}" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+          </div>
+          <div style="grid-column:1/-1"><div style="font-size:.67rem;color:#6b7280;margin-bottom:3px">${ar2?'المسمى':'Position'}</div>
+            <input type="text" id="pltr-pos" value="Director / Manager" style="width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:10px;margin-bottom:9px">
+          <div style="font-size:.73rem;font-weight:700;color:#5b21b6;margin-bottom:6px">✍️ ${ar2?'التوقيع':'Signature'}</div>
+          <canvas id="pltr-sig-canvas" width="380" height="80" style="border:2px solid #d8b4fe;border-radius:8px;background:#fff;width:100%;height:80px;cursor:crosshair;touch-action:none;display:block"></canvas>
+          <button onclick="clearPltrSig()" style="background:#e5e7eb;color:#374151;border:none;border-radius:7px;padding:4px 11px;cursor:pointer;font-size:.72rem;margin-top:5px">🗑 Clear</button>
+        </div>
+        <button onclick="generatePaymentLetter('${c.id}')" style="width:100%;padding:11px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem;font-weight:900;cursor:pointer">
+          📄 ${ar2?'إنشاء خطاب تأكيد الدفع':'Generate Payment Confirmation Letter'}
         </button>
       </div>
     </div>`;
     setTimeout(()=>initPltrSigCanvas(),100);
   }
+
   if(tab==='account'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&!r.isCancelled).sort((a,b)=>new Date(a.date)-new Date(b.date));
     const cancelledRecs=DB.receipts.filter(r=>String(r.childId)===String(curChild)&&r.isCancelled);
@@ -21774,8 +22314,189 @@ async function ladSaveYear(staffId){
 // ─── End LAD Entry ──────────────────────────────
 
 // ═══════════════════════════════════════════════
-// LEAVE & ATTENDANCE DASHBOARD — Overview
+// إقرار استلام بدل الإجازة — LEAVE COMPENSATION ACKNOWLEDGMENT
+// Legal bilingual document (Arabic + English) — Court & MOL ready
 // ═══════════════════════════════════════════════
+function generateLeaveCompAck(staffId, compAmount, leaveDays, dailyRate){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s){alert('Staff not found');return;}
+
+  const branch  = BRANCHES.find(b=>b.id===s.branchId)||CB();
+  const bid     = branch.id;
+  const lhImg   = LH_IMAGES?.[bid]||null;
+  const bx      = getBranchExtra?.(bid)||{};
+  const logo    = bx.logo||null;
+  const brColor = branch.c||'#1e3a8a';
+  const nurseryEN=branch.en||branch.ar||'Child Care Nursery';
+  const nurseryAR=branch.ar||'';
+  const gross   = Number(s.grossSalary||s.basicSalary||0);
+  const basic   = Number(s.basicSalary||0);
+  const docDate = today();
+  const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const fmtAR=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'numeric',month:'long',year:'numeric'}):'—';
+
+  const sigBlank=`<div style="height:14mm;width:55mm;border-bottom:1.5px solid #1e293b;margin-bottom:2mm"></div>`;
+
+  const makeStamp=()=>{
+    const lel=logo?`<image href="${logo}" x="30" y="28" width="140" height="80" preserveAspectRatio="xMidYMid meet"/>`:
+      `<text x="100" y="95" text-anchor="middle" font-size="40">&#x1F3EB;</text>`;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 200" width="95" height="95">
+      <defs><clipPath id="lc2"><ellipse cx="100" cy="68" rx="72" ry="45"/></clipPath></defs>
+      <circle cx="100" cy="100" r="96" fill="white" stroke="${brColor}" stroke-width="4"/>
+      <g clip-path="url(#lc2)">${lel}</g>
+      <line x1="22" y1="120" x2="178" y2="120" stroke="${brColor}" stroke-width="1.5"/>
+      <text x="100" y="138" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="${brColor}">${nurseryEN}</text>
+      <text x="100" y="152" text-anchor="middle" font-family="Arial" font-size="9" fill="${brColor}">${nurseryAR}</text>
+    </svg>`;
+    return`<img src="data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}" style="width:95px;height:95px">`;
+  };
+
+  const headerHTML=lhImg?`<img src="${lhImg.header}" style="width:100%;display:block">`:
+    `<div style="border-bottom:3px solid ${brColor};padding:7mm 15mm 4mm;display:flex;align-items:center;gap:8mm">
+      <div style="font-size:16pt;font-weight:900;color:${brColor}">${nurseryEN}</div>
+      <div style="margin-left:auto;font-size:8pt;color:#6b7280;text-align:right">${nurseryAR}<br>Child Care Nurseries Group</div>
+    </div>`;
+  const footerHTML=lhImg?`<img src="${lhImg.footer}" style="width:100%;display:block">`:
+    `<div style="border-top:2px solid ${brColor};padding:3mm 15mm;font-size:7.5pt;color:#6b7280;display:flex;justify-content:space-between">
+      <span>${nurseryEN}</span><span>Child Care Nurseries Group — مجموعة رعاية الطفل للحضانات</span>
+    </div>`;
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
+    @page{size:A4;margin:0}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Lato',Arial,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{width:210mm;min-height:297mm;display:flex;flex-direction:column}
+    .body{padding:5mm 14mm 4mm;flex:1}
+    .title-bar{text-align:center;border-bottom:2.5px solid ${brColor};padding-bottom:4mm;margin-bottom:5mm}
+    .title-bar h1{font-size:13pt;font-weight:900;color:${brColor};letter-spacing:.4px}
+    .title-bar p{font-size:10pt;color:#374151;margin-top:2mm;font-weight:700}
+    table.det{width:100%;border-collapse:collapse;margin:3mm 0;font-size:9.5pt}
+    table.det td{padding:4px 8px;border:1px solid #e5e7eb;vertical-align:top}
+    table.det td:first-child{background:#f8fafc;font-weight:700;width:38%;color:#374151}
+    .section{border:1.5px solid #e5e7eb;border-radius:8px;padding:5mm 7mm;margin:4mm 0}
+    .section-title{font-weight:900;color:${brColor};font-size:10pt;border-bottom:1.5px solid #e5e7eb;padding-bottom:2mm;margin-bottom:4mm}
+    .rtl{direction:rtl;text-align:right}
+    .sig-table{width:100%;border-collapse:collapse;margin-top:6mm}
+    .sig-table td{padding:3mm 5mm;text-align:center;vertical-align:bottom;width:50%}
+    .sig-line{height:12mm;border-bottom:1.5px solid #374151;margin-bottom:2mm}
+    .sig-label{font-size:9pt;font-weight:700;color:#374151}
+    .sig-sub{font-size:8pt;color:#6b7280}
+    .important{background:#fef9c3;border:1.5px solid #f59e0b;border-radius:7px;padding:4mm 6mm;font-size:9pt;margin:3mm 0}
+    @media print{.no-print{display:none!important}}
+  </style></head><body>
+  <div class="no-print" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
+    <button onclick="window.print()" style="background:${brColor};color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print / PDF</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕ Close</button>
+  </div>
+  <div style="height:40px" class="no-print"></div>
+  <div class="page">
+    ${headerHTML}
+    <div class="body">
+      <div style="text-align:right;font-size:8.5pt;color:#6b7280;margin-bottom:3mm">
+        Ref. No. / الرقم المرجعي: <strong>LCA-${s.id}-${docDate.replace(/-/g,'')}</strong> &nbsp;|&nbsp;
+        Date / التاريخ: <strong>${fmt(docDate)}</strong>
+      </div>
+      <div class="title-bar">
+        <h1>LEAVE COMPENSATION ACKNOWLEDGMENT</h1>
+        <p>إقرار باستلام بدل الإجازة السنوية</p>
+      </div>
+
+      <!-- ─── ENGLISH SECTION ─── -->
+      <div class="section">
+        <div class="section-title">Employee & Compensation Details — بيانات الموظف والتعويض</div>
+        <table class="det">
+          <tr><td>Full Name</td><td><strong>${s.name}</strong></td>
+              <td style="font-family:'Tajawal',sans-serif">الاسم الكامل</td><td><strong>${s.name}</strong></td></tr>
+          <tr><td>Position / Title</td><td>${s.position||'—'}</td>
+              <td style="font-family:'Tajawal',sans-serif">المسمى الوظيفي</td><td>${s.position||'—'}</td></tr>
+          <tr><td>Employer / Branch</td><td>${nurseryEN}</td>
+              <td style="font-family:'Tajawal',sans-serif">جهة العمل / الفرع</td><td style="font-family:'Tajawal',sans-serif">${nurseryAR||nurseryEN}</td></tr>
+          <tr><td>Contract Start Date</td><td>${fmt(s.contractStart)}</td>
+              <td style="font-family:'Tajawal',sans-serif">تاريخ بداية العقد</td><td>${fmtAR(s.contractStart)}</td></tr>
+          <tr><td>Basic Salary (AED)</td><td><strong>${Number(basic||gross).toLocaleString('en-AE',{minimumFractionDigits:2})} AED</strong></td>
+              <td style="font-family:'Tajawal',sans-serif">الراتب الأساسي</td><td><strong>${Number(basic||gross).toLocaleString('ar-AE',{minimumFractionDigits:2})} د.إ</strong></td></tr>
+          <tr><td>Leave Days Due</td><td><strong>${leaveDays} days</strong></td>
+              <td style="font-family:'Tajawal',sans-serif">أيام الإجازة المستحقة</td><td><strong>${leaveDays} يوم</strong></td></tr>
+          <tr><td>Daily Rate (AED)</td><td>${Number(dailyRate).toLocaleString('en-AE',{minimumFractionDigits:2})} AED</td>
+              <td style="font-family:'Tajawal',sans-serif">الأجر اليومي</td><td>${Number(dailyRate).toLocaleString('ar-AE',{minimumFractionDigits:2})} د.إ</td></tr>
+          <tr style="background:#f0fdf4">
+            <td><strong>Total Compensation (AED)</strong></td>
+            <td><strong style="color:${brColor};font-size:11pt">${Number(compAmount).toLocaleString('en-AE',{minimumFractionDigits:2})} AED</strong></td>
+            <td style="font-family:'Tajawal',sans-serif"><strong>إجمالي بدل الإجازة</strong></td>
+            <td><strong style="color:${brColor};font-size:11pt">${Number(compAmount).toLocaleString('ar-AE',{minimumFractionDigits:2})} د.إ</strong></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ─── DECLARATION TEXT ─── -->
+      <div class="section">
+        <div class="section-title">Declaration / الإقرار</div>
+        <p style="font-size:10pt;line-height:1.9;margin-bottom:3mm;text-align:justify">
+          I, the undersigned, <strong>${s.name}</strong>, hereby acknowledge and confirm that I have
+          received from <strong>${nurseryEN}</strong> the full amount of
+          <strong style="color:${brColor}">AED ${Number(compAmount).toLocaleString('en-AE',{minimumFractionDigits:2})}</strong>
+          as leave compensation (بدل إجازة سنوية) for
+          <strong>${leaveDays} accumulated leave days</strong>, calculated at a daily rate of
+          AED ${Number(dailyRate).toLocaleString('en-AE',{minimumFractionDigits:2})},
+          in accordance with Article 29 of UAE Federal Decree-Law No. 33 of 2021
+          (UAE Labour Law). I confirm that I have no further claims related to annual leave compensation
+          for the period covered by this acknowledgment.
+        </p>
+        <div class="rtl" style="font-family:'Tajawal',sans-serif;border-top:1.5px dashed #d1d5db;padding-top:3mm">
+          <p style="font-size:10.5pt;line-height:1.9;text-align:justify">
+            أقرّ أنا الموقّع أدناه <strong>${s.name}</strong>، بأنني استلمت من
+            <strong>${nurseryAR||nurseryEN}</strong> مبلغ
+            <strong style="color:${brColor}">${Number(compAmount).toLocaleString('ar-AE',{minimumFractionDigits:2})} درهماً إماراتياً</strong>
+            بدلاً عن إجازتي السنوية المتراكمة البالغة <strong>${leaveDays} يوم</strong>،
+            بأجر يومي مقداره ${Number(dailyRate).toLocaleString('ar-AE',{minimumFractionDigits:2})} درهم،
+            وذلك وفقاً لأحكام المادة (29) من قانون العمل الإماراتي
+            (المرسوم بقانون اتحادي رقم 33 لسنة 2021). وأُقرّ بأنه لا توجد لديّ أي مطالبات أخرى
+            تتعلق ببدل الإجازة السنوية عن الفترة المشمولة بهذا الإقرار.
+          </p>
+        </div>
+      </div>
+
+      <div class="important">
+        ⚖️ <strong>Legal Note / ملاحظة قانونية:</strong>
+        This document constitutes a legally binding acknowledgment under UAE Federal Decree-Law No. 33 of 2021 and is
+        admissible as evidence before UAE courts and the Ministry of Human Resources and Emiratisation (MOHRE).
+        هذه الوثيقة إقرار ملزم قانوناً وفق قانون العمل الإماراتي وتُقبل كدليل أمام المحاكم الإماراتية
+        ووزارة الموارد البشرية والتوطين.
+      </div>
+
+      <!-- ─── SIGNATURES ─── -->
+      <table class="sig-table">
+        <tr>
+          <td>
+            <div class="sig-line"></div>
+            <div class="sig-label">${s.name}</div>
+            <div class="sig-sub">Employee Signature / توقيع الموظف</div>
+            <div class="sig-sub">Date / التاريخ: ____________________</div>
+          </td>
+          <td>
+            <div class="sig-line"></div>
+            <div class="sig-label">${nurseryEN}</div>
+            <div class="sig-sub">Employer Stamp & Signature / توقيع وختم صاحب العمل</div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" style="text-align:center;padding-top:5mm">
+            ${makeStamp()}
+          </td>
+        </tr>
+      </table>
+    </div>
+    ${footerHTML}
+  </div>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=1200');
+  w.document.write(html); w.document.close();
+  logActivity('whatsapp',`📋 Leave Comp Ack → ${s.name} — AED ${compAmount}`);
+}
+// ─── End Leave Comp Acknowledgment ─────────────
 function populateLADBranchFilter(){
   const sel=el('lad-branch-filter');
   if(!sel) return;
@@ -21891,6 +22612,10 @@ function renderLeaveAttDashboard(){
             style="background:#059669;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Tajawal',sans-serif">
             🏖️ Add Leave
           </button>
+          ${bal.remaining>0?`<button onclick="generateLeaveCompAck('${s.id}',${Math.round(bal.compensation)},${bal.remaining},${bal.dailyRate})"
+            style="background:#5b21b6;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Tajawal',sans-serif">
+            📋 إقرار بدل الإجازة
+          </button>`:''}
         </div>
       </div>
 
