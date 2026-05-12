@@ -14491,6 +14491,7 @@ async function openMonthlyBusRoster(){
             ${branchOpts}
           </select>
           <button onclick="saveAllBusAssignments()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">💾 ${ar?'حفظ التعيينات':'Save Assignments'}</button>
+          <button onclick="printTwoWeekBusRoster()" style="background:#0d9488;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📆 ${ar?'كشف أسبوعين':'2-Week Roster'}</button>
           <button onclick="printMonthlyBusRoster()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🖨️ ${ar?'طباعة':'Print'}</button>
           <button onclick="document.getElementById('monthly-bus-roster').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
         </div>
@@ -14616,6 +14617,7 @@ async function saveAllBusAssignments(){
     if(!byChild[cid]) byChild[cid]={};
     byChild[cid][tripType]={busId:String(bus.id),busNumber:bus.busNumber};
   }
+  if(!Object.keys(byChild).length){showToast('⚠️ No changes to save');return;}
   let ok=0,fail=0;
   for(const [cid,types] of Object.entries(byChild)){
     if(!DB.busAssignments) DB.busAssignments={};
@@ -14627,37 +14629,35 @@ async function saveAllBusAssignments(){
     const dd=DB.busAssignments[cid].drop;
     const pBid=pd?Number(pd.busId):(dd?Number(dd.busId):null);
     const pBnum=pd?.busNumber||dd?.busNumber||'';
-    const row={
-      child_id:Number(cid),
-      bus_id:pBid,
-      bus_number:pBnum,
-      pick_bus_id:pd?Number(pd.busId):null,
-      pick_bus_number:pd?.busNumber||'',
-      drop_bus_id:dd?Number(dd.busId):null,
-      drop_bus_number:dd?.busNumber||'',
-    };
     try{
-      // Use upsert with onConflict — most reliable approach
-      const {error}=await sb.from('bus_assignments')
-        .upsert(row, {onConflict:'child_id', ignoreDuplicates:false});
+      // Delete old record first (most reliable)
+      await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
+      // Insert fresh
+      const {error,data}=await sb.from('bus_assignments').insert({
+        child_id:Number(cid),
+        bus_id:pBid,
+        bus_number:pBnum,
+        pick_bus_id:pd?Number(pd.busId):null,
+        pick_bus_number:pd?.busNumber||'',
+        drop_bus_id:dd?Number(dd.busId):null,
+        drop_bus_number:dd?.busNumber||'',
+      }).select();
       if(error){
-        // Fallback: delete then insert
-        await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
-        const {error:e2}=await sb.from('bus_assignments').insert(row);
-        if(e2){
-          // Last fallback: insert minimal row
-          const {error:e3}=await sb.from('bus_assignments').insert({child_id:Number(cid),bus_id:pBid,bus_number:pBnum});
-          if(e3){fail++;console.error('BusAssign FAIL:',e3?.message||JSON.stringify(e3),cid);
-          showToast('❌ Error: '+(e3?.message||e3?.code||'Unknown — check Supabase RLS'));}else ok++;
-        }else ok++;
-      }else ok++;
-    }catch(e){fail++;console.error('BusAssign error:',e);}
+        console.error('Bus save INSERT error:',error?.message||error,{cid,pBid,pBnum});
+        fail++;
+      } else {
+        console.log('Bus saved OK for child',cid,data);
+        ok++;
+      }
+    }catch(e){fail++;console.error('Bus save exception:',e);}
   }
+  // Force reload from Supabase to confirm
+  await loadAllBusAssignments();
+  const saved=Object.keys(DB.busAssignments).length;
+  console.log('Verified DB.busAssignments entries:',saved);
   renderMonthlyBusRoster();
-  const arL=lang==='ar';
-  showToast(fail>0
-    ? `⚠️ ${arL?`تم ${ok} وفشل ${fail} — شغّلي الـ SQL`:`Saved ${ok}, failed ${fail}`}`
-    : `✅ ${arL?`تم حفظ ${ok} تعيين`:`Saved ${ok} assignments successfully`}`);
+  if(fail>0) showToast('⚠️ Saved '+ok+', failed '+fail+' — see console');
+  else showToast('✅ Saved '+ok+' assignments ('+saved+' total in DB)');
 }
 
 function showToast(msg){
@@ -14795,6 +14795,142 @@ function suggestBusDriver(area){
       </div>`).join('');
 }
 // ─── End Auto-suggest ──────────────────────────
+
+// ═══════════════════════════════════════════════
+// 2-WEEK BUS ATTENDANCE ROSTER PRINT
+// ═══════════════════════════════════════════════
+async function printTwoWeekBusRoster(){
+  if(!_busAllBranchCache) await loadBusAllBranchData(true);
+  if(!DB.allBuses) await loadAllBuses();
+  if(!DB.busAssignments) await loadAllBusAssignments();
+  const allBuses=DB.allBuses||[];
+  if(!allBuses.length){alert('No buses found');return;}
+  // Build 2-week working days
+  const startDate=new Date(); startDate.setHours(0,0,0,0);
+  const dow=startDate.getDay();
+  const dToMon=dow===0?1:dow===1?0:8-dow;
+  startDate.setDate(startDate.getDate()+dToMon);
+  const workDays=[];
+  let d=new Date(startDate);
+  while(workDays.length<10){
+    const day=d.getDay();
+    if(day!==0&&day!==5&&day!==6) workDays.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  const fD=dt=>dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+  const fDy=dt=>dt.toLocaleDateString('en-GB',{weekday:'short'});
+  // Gather all bus children
+  let allKids=[];
+  BRANCHES.forEach(br=>{
+    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
+    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
+      allKids.push({...c,branchEN:br.en||br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon});
+    });
+  });
+  // Group by driver+trip
+  const driverTrips={};
+  BUS_TRIPS.forEach(trip=>{
+    const tType=trip.type==='pick'?'pick':'drop';
+    allKids.filter(c=>_matchTrip(c,trip)).forEach(c=>{
+      const assign=getBusAssign(String(c.id),tType);
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
+      const dk=`${bus?.driverName||'Unassigned'}|||${trip.key}`;
+      if(!driverTrips[dk]) driverTrips[dk]={driverName:bus?.driverName||'Unassigned',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',trip,kids:[]};
+      driverTrips[dk].kids.push(c);
+    });
+  });
+  const groups=Object.values(driverTrips).filter(g=>g.kids.length>0);
+  if(!groups.length){alert('No assigned children. Save assignments first.');return;}
+  const w1=workDays.slice(0,5), w2=workDays.slice(5,10);
+  const mkHead=wk=>wk.map(dt=>`<th style="min-width:34px;padding:4px 2px;text-align:center;font-size:7pt;border:1px solid rgba(255,255,255,.25)"><div style="font-weight:700">${fDy(dt)}</div><div style="font-size:6pt;opacity:.9">${fD(dt)}</div></th>`).join('');
+  const mkCells=()=>workDays.map(()=>`<td style="padding:3px;text-align:center;border:1px solid #e5e7eb"><div style="width:24px;height:22px;border:1.5px solid #cbd5e1;border-radius:4px;margin:auto"></div></td>`).join('');
+  const pages=groups.map(grp=>{
+    const trip=grp.trip, col=trip.type==='pick'?'#0d9488':trip.type==='mixed'?'#d97706':'#1d4ed8';
+    const label=trip.en||trip.labelEN||'';
+    const mkRows=wk=>grp.kids.map((c,i)=>`<tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
+      <td style="padding:5px 7px;font-weight:700;border:1px solid #e5e7eb;font-size:8pt">${i+1}. ${c.name}</td>
+      <td style="padding:4px 5px;border:1px solid #e5e7eb;font-size:7.5pt;color:#6b7280;text-align:center">${c.className||'—'}</td>
+      <td style="padding:4px 5px;border:1px solid #e5e7eb;font-size:7.5pt;color:#0369a1;font-weight:700;text-align:center">${c.kidsTime||'—'}</td>
+      <td style="padding:4px 5px;border:1px solid #e5e7eb;font-size:7.5pt;text-align:center">${c.busArea||'—'}</td>
+      <td style="padding:4px 5px;border:1px solid #e5e7eb;font-size:7.5pt;color:${c.branchColor};text-align:center">${c.branchIcon} ${c.branchEN}</td>
+      <td style="padding:4px 5px;border:1px solid #e5e7eb;font-size:7.5pt;text-align:center">${c.parentMom||c.parentDad||'—'}</td>
+      ${mkCells()}
+    </tr>`).join('');
+    return`<div style="page-break-after:always">
+      <div style="background:${col};color:#fff;padding:6mm 8mm;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:7.5pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — 2-Week Bus Attendance Roster</div>
+          <div style="font-size:13pt;font-weight:900;margin-bottom:1mm">${label}</div>
+          <div style="font-size:9pt;opacity:.9">🕐 ${trip.time} &nbsp;|&nbsp; ${trip.enSub||trip.subEN||''}</div>
+        </div>
+        <div style="text-align:right;background:rgba(255,255,255,.1);padding:5mm 8mm;border-radius:8px">
+          <div style="font-size:8pt;opacity:.8">Driver</div>
+          <div style="font-size:13pt;font-weight:900">${grp.driverName}</div>
+          <div style="font-size:8.5pt;opacity:.9">Bus ${grp.busNum}${grp.assistant?' &nbsp;|&nbsp; '+grp.assistant:''}</div>
+        </div>
+      </div>
+      <div style="background:${col}18;padding:2mm 8mm;font-size:8pt;color:${col};font-weight:700;border-bottom:2px solid ${col}33">
+        Period: ${fD(workDays[0])} – ${fD(workDays[9])} &nbsp;|&nbsp; ${grp.kids.length} Children &nbsp;|&nbsp; 10 Working Days
+      </div>
+      <div style="padding:3mm 4mm 2mm">
+        <div style="font-weight:700;font-size:8.5pt;color:${col};margin-bottom:2mm">📅 Week 1 &nbsp; ${fD(w1[0])} – ${fD(w1[4])}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:8pt">
+          <thead><tr style="background:${col};color:#fff">
+            <th style="padding:5px 7px;text-align:left;border:1px solid rgba(255,255,255,.2)">Child Name</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Cls</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Time</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Area</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Branch</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Contact</th>
+            ${mkHead(w1)}
+          </tr></thead>
+          <tbody>${mkRows(w1)}</tbody>
+        </table>
+      </div>
+      <div style="padding:1mm 4mm 2mm">
+        <div style="font-weight:700;font-size:8.5pt;color:${col};margin-bottom:2mm">📅 Week 2 &nbsp; ${fD(w2[0])} – ${fD(w2[4])}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:8pt">
+          <thead><tr style="background:${col};color:#fff">
+            <th style="padding:5px 7px;text-align:left;border:1px solid rgba(255,255,255,.2)">Child Name</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Cls</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Time</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Area</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Branch</th>
+            <th style="padding:5px 4px;text-align:center;border:1px solid rgba(255,255,255,.2)">Contact</th>
+            ${mkHead(w2)}
+          </tr></thead>
+          <tbody>${mkRows(w2)}</tbody>
+        </table>
+      </div>
+      <div style="padding:2mm 4mm;display:flex;gap:10mm">
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="font-weight:700">${grp.driverName}</div><div style="color:#6b7280;font-size:7.5pt">Driver Signature</div></div>
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="font-weight:700">${grp.assistant||'___________'}</div><div style="color:#6b7280;font-size:7.5pt">Assistant Signature</div></div>
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="font-weight:700">___________</div><div style="color:#6b7280;font-size:7.5pt">Manager Signature</div></div>
+      </div>
+      <div style="padding:1mm 4mm;font-size:6.5pt;color:#9ca3af;text-align:center">Child Care Nurseries Group | ${label} | Bus ${grp.busNum} | Printed: ${new Date().toLocaleDateString('en-GB')}</div>
+    </div>`;
+  });
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    @page{size:A4 landscape;margin:0} *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @media print{.np{display:none!important}}
+  </style></head><body>
+  <div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
+    <button onclick="window.print()" style="background:#0d9488;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print All</button>
+    <span style="color:#9ca3af;font-size:12px;align-self:center">${pages.length} pages — one per driver/trip</span>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
+  </div>
+  <div style="height:38px" class="np"></div>
+  ${pages.join('')}
+  </body></html>`;
+
+  const w=window.open('','_blank','width=1100,height=900');
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),800);
+}
 
 // STAFF LEAVE & ATTENDANCE DASHBOARD
 // ═══════════════════════════════════════════════
