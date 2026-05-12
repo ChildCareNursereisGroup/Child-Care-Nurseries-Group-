@@ -14599,7 +14599,6 @@ function renderMonthlyBusRoster(){
 async function saveAllBusAssignments(){
   const sels=document.querySelectorAll('.bus-assign-sel');
   const byChild={};
-  let saved=0;
   for(const sel of sels){
     const cid=sel.dataset.cid;
     const tripType=sel.dataset.tripType||'both';
@@ -14609,7 +14608,6 @@ async function saveAllBusAssignments(){
     if(!bus) continue;
     if(!byChild[cid]) byChild[cid]={};
     byChild[cid][tripType]={busId:String(bus.id),busNumber:bus.busNumber};
-    saved++;
   }
   let ok=0,fail=0;
   for(const [cid,types] of Object.entries(byChild)){
@@ -14622,23 +14620,36 @@ async function saveAllBusAssignments(){
     const dd=DB.busAssignments[cid].drop;
     const pBid=pd?Number(pd.busId):(dd?Number(dd.busId):null);
     const pBnum=pd?.busNumber||dd?.busNumber||'';
-    const rowFull={child_id:Number(cid),bus_id:pBid,bus_number:pBnum,
-      pick_bus_id:pd?Number(pd.busId):null,pick_bus_number:pd?.busNumber||'',
-      drop_bus_id:dd?Number(dd.busId):null,drop_bus_number:dd?.busNumber||''};
-    const rowBasic={child_id:Number(cid),bus_id:pBid,bus_number:pBnum};
+    const row={
+      child_id:Number(cid),
+      bus_id:pBid,
+      bus_number:pBnum,
+      pick_bus_id:pd?Number(pd.busId):null,
+      pick_bus_number:pd?.busNumber||'',
+      drop_bus_id:dd?Number(dd.busId):null,
+      drop_bus_number:dd?.busNumber||'',
+    };
     try{
-      await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
-      const {error}=await sb.from('bus_assignments').insert(rowFull);
+      // Use upsert with onConflict — most reliable approach
+      const {error}=await sb.from('bus_assignments')
+        .upsert(row, {onConflict:'child_id', ignoreDuplicates:false});
       if(error){
-        const {error:e2}=await sb.from('bus_assignments').insert(rowBasic);
-        if(e2){fail++;console.error('Bus save error:',e2?.message);}else ok++;
+        // Fallback: delete then insert
+        await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
+        const {error:e2}=await sb.from('bus_assignments').insert(row);
+        if(e2){
+          // Last fallback: insert minimal row
+          const {error:e3}=await sb.from('bus_assignments').insert({child_id:Number(cid),bus_id:pBid,bus_number:pBnum});
+          if(e3){fail++;console.error('BusAssign FAIL:',e3?.message,cid);}else ok++;
+        }else ok++;
       }else ok++;
-    }catch(e){fail++;console.error('Bus assign error:',e);}
+    }catch(e){fail++;console.error('BusAssign error:',e);}
   }
   renderMonthlyBusRoster();
-  const arLang=lang==='ar';
-  if(fail>0) showToast(`⚠️ ${arLang?`تم حفظ ${ok} وفشل ${fail}`:`Saved ${ok}, failed ${fail} — run SQL migration`}`);
-  else showToast(`✅ ${arLang?`تم حفظ ${ok} تعيين`:`Saved ${ok} assignments`}`);
+  const arL=lang==='ar';
+  showToast(fail>0
+    ? `⚠️ ${arL?`تم ${ok} وفشل ${fail} — شغّلي الـ SQL`:`Saved ${ok}, failed ${fail}`}`
+    : `✅ ${arL?`تم حفظ ${ok} تعيين`:`Saved ${ok} assignments successfully`}`);
 }
 
 function showToast(msg){
