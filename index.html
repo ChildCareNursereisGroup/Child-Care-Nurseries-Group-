@@ -12408,13 +12408,21 @@ async function loadAllChildren(){
 
 async function loadAllBusAssignments(){
   const {data} = await sb.from('bus_assignments').select('*');
-  // Map: childId → {busId, busNumber}
+  // Map: childId → {pick: {busId, busNumber}, drop: {busId, busNumber}}
   DB.busAssignments = {};
   (data||[]).forEach(r=>{
-    DB.busAssignments[String(r.child_id)] = {
-      busId: String(r.bus_id||''),
-      busNumber: r.bus_number||''
-    };
+    const cid=String(r.child_id);
+    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+    // Support both old format (single bus_id) and new format (pick/drop)
+    const pickBusId  = r.pick_bus_id  || r.bus_id  || null;
+    const pickBusNum = r.pick_bus_number || r.bus_number || '';
+    const dropBusId  = r.drop_bus_id  || r.bus_id  || null;
+    const dropBusNum = r.drop_bus_number || r.bus_number || '';
+    if(pickBusId) DB.busAssignments[cid].pick = {busId:String(pickBusId), busNumber:pickBusNum};
+    if(dropBusId) DB.busAssignments[cid].drop = {busId:String(dropBusId), busNumber:dropBusNum};
+    // Backward compat: keep top-level busId too
+    DB.busAssignments[cid].busId     = pickBusId ? String(pickBusId) : (r.bus_id?String(r.bus_id):'');
+    DB.busAssignments[cid].busNumber = pickBusNum || r.bus_number || '';
   });
 }
 
@@ -12443,14 +12451,41 @@ async function saveTripAttendance(tripDate, tripType, childId, busId, busNumber,
   }, {onConflict:'trip_date,trip_type,child_id'});
 }
 
-async function assignChildToBus(childId, busId, busNumber){
-  DB.busAssignments = DB.busAssignments||{};
-  DB.busAssignments[String(childId)] = {busId:String(busId), busNumber};
-  await sb.from('bus_assignments').upsert({
-    child_id: Number(childId),
-    bus_id: Number(busId),
-    bus_number: busNumber
-  }, {onConflict:'child_id'});
+async function assignChildToBus(childId, busId, busNumber, tripType){
+  // tripType: 'pick' | 'drop' | 'both' (default: both for backward compat)
+  const cid=String(childId);
+  if(!DB.busAssignments) DB.busAssignments={};
+  if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+
+  const type=tripType||'both';
+  if(type==='pick'||type==='both'){
+    DB.busAssignments[cid].pick={busId:String(busId),busNumber};
+    DB.busAssignments[cid].busId=String(busId);
+    DB.busAssignments[cid].busNumber=busNumber;
+  }
+  if(type==='drop'||type==='both'){
+    DB.busAssignments[cid].drop={busId:String(busId),busNumber};
+    if(!DB.busAssignments[cid].busId) DB.busAssignments[cid].busId=String(busId);
+  }
+
+  const pickData=DB.busAssignments[cid].pick;
+  const dropData=DB.busAssignments[cid].drop;
+
+  // Build row with both pick and drop
+  const row={
+    child_id:      Number(childId),
+    bus_id:        pickData ? Number(pickData.busId) : (dropData ? Number(dropData.busId) : Number(busId)),
+    bus_number:    pickData ? (pickData.busNumber||'') : (dropData?.busNumber||busNumber||''),
+    pick_bus_id:   pickData ? Number(pickData.busId) : null,
+    pick_bus_number: pickData?.busNumber||'',
+    drop_bus_id:   dropData ? Number(dropData.busId) : null,
+    drop_bus_number: dropData?.busNumber||'',
+  };
+
+  // DELETE then INSERT (most reliable — avoids onConflict dependency)
+  await sb.from('bus_assignments').delete().eq('child_id', Number(childId));
+  const {error}=await sb.from('bus_assignments').insert(row);
+  if(error) console.warn('assignChildToBus error:', error?.message||error);
 }
 
 function switchTripTab(tab){
@@ -14515,7 +14550,14 @@ function renderMonthlyBusRoster(){
           <tbody>
             ${kids.map((c,i)=>{
               const assign=DB.busAssignments?.[String(c.id)];
-              const assignedBusId=assign?.busId||'';
+              // Get the right assignment based on trip type (pick or drop)
+              const pickAssign=assign?.pick||{busId:assign?.busId||'',busNumber:assign?.busNumber||''};
+              const dropAssign=assign?.drop||{busId:assign?.busId||'',busNumber:assign?.busNumber||''};
+              const isDropTrip=(trip.type==='drop');
+              const isMixedDrop=(trip.type==='mixed');
+              // For mixed trip: show BOTH pick and drop dropdowns
+              const assignedBusId=isDropTrip||isMixedDrop ? (dropAssign.busId||'') : (pickAssign.busId||'');
+              const tripTypeAttr=isDropTrip?'drop':isMixedDrop?'drop':'pick';
               return`<tr style="${i%2===0?'background:rgba(255,255,255,.6)':''}">
                 <td style="padding:5px 10px;color:#9ca3af">${i+1}</td>
                 <td style="padding:5px 10px;font-weight:700">${c.name}</td>
@@ -14525,9 +14567,9 @@ function renderMonthlyBusRoster(){
                 <td style="padding:5px 10px">${c.busArea||'—'}</td>
                 <td style="padding:5px 10px;font-size:.73rem">${c.parentMom?'👩 '+c.parentMom:''}${c.parentMom&&c.parentDad?'<br>':''}${c.parentDad?'👨 '+c.parentDad:''}${!c.parentMom&&!c.parentDad?'—':''}</td>
                 <td style="padding:5px 10px">
-                  <select data-cid="${c.id}" class="bus-assign-sel"
-                    style="padding:4px 7px;border:1.5px solid ${tripColor}66;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.75rem;background:#fff;min-width:120px">
-                    <option value="">— اختر السواق —</option>
+                  <select data-cid="${c.id}" data-trip-type="${tripTypeAttr}" class="bus-assign-sel"
+                    style="padding:4px 7px;border:1.5px solid ${tripColor}66;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.75rem;background:#fff;min-width:130px">
+                    <option value="">— ${ar?'اختر السواق':'Select driver'} —</option>
                     ${busOpts.replace(`value="${assignedBusId}"`,`value="${assignedBusId}" selected`)}
                   </select>
                 </td>
@@ -14544,19 +14586,41 @@ function renderMonthlyBusRoster(){
 
 async function saveAllBusAssignments(){
   const sels=document.querySelectorAll('.bus-assign-sel');
-  let saved=0, skipped=0;
+  const byChild={};
+  let saved=0;
   for(const sel of sels){
     const cid=sel.dataset.cid;
+    const tripType=sel.dataset.tripType||'both';
     const busId=sel.value;
-    if(!busId){ skipped++; continue; }
+    if(!busId) continue;
     const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
-    if(!bus){ skipped++; continue; }
-    await assignChildToBus(cid, busId, bus.busNumber);
+    if(!bus) continue;
+    if(!byChild[cid]) byChild[cid]={};
+    byChild[cid][tripType]={busId:String(bus.id),busNumber:bus.busNumber};
     saved++;
   }
-  // Re-render with updated assignments
+  for(const [cid,types] of Object.entries(byChild)){
+    if(!DB.busAssignments) DB.busAssignments={};
+    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+    if(types.pick) DB.busAssignments[cid].pick=types.pick;
+    if(types.drop) DB.busAssignments[cid].drop=types.drop;
+    if(types.both){ DB.busAssignments[cid].pick=types.both; DB.busAssignments[cid].drop=types.both; }
+    const pickData=DB.busAssignments[cid].pick;
+    const dropData=DB.busAssignments[cid].drop;
+    const row={
+      child_id:Number(cid),
+      bus_id:pickData?Number(pickData.busId):(dropData?Number(dropData.busId):null),
+      bus_number:pickData?.busNumber||dropData?.busNumber||'',
+      pick_bus_id:pickData?Number(pickData.busId):null,
+      pick_bus_number:pickData?.busNumber||'',
+      drop_bus_id:dropData?Number(dropData.busId):null,
+      drop_bus_number:dropData?.busNumber||'',
+    };
+    await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
+    await sb.from('bus_assignments').insert(row);
+  }
   renderMonthlyBusRoster();
-  showToast(`✅ تم حفظ ${saved} تعيين${skipped?` | ⏭️ ${skipped} بدون تغيير`:''}`);
+  showToast(`✅ ${lang==='ar'?`تم حفظ ${saved} تعيين`:`Saved ${saved} assignments`}`);
 }
 
 function showToast(msg){
