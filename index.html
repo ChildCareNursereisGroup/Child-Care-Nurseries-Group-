@@ -14647,7 +14647,8 @@ async function saveAllBusAssignments(){
         if(e2){
           // Last fallback: insert minimal row
           const {error:e3}=await sb.from('bus_assignments').insert({child_id:Number(cid),bus_id:pBid,bus_number:pBnum});
-          if(e3){fail++;console.error('BusAssign FAIL:',e3?.message,cid);}else ok++;
+          if(e3){fail++;console.error('BusAssign FAIL:',e3?.message||JSON.stringify(e3),cid);
+          showToast('❌ Error: '+(e3?.message||e3?.code||'Unknown — check Supabase RLS'));}else ok++;
         }else ok++;
       }else ok++;
     }catch(e){fail++;console.error('BusAssign error:',e);}
