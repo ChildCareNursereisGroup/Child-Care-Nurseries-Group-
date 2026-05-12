@@ -12740,6 +12740,7 @@ function togglePickDropEdit(dir){
 let _busAllBranchCache = null;
 
 async function openBusChildrenReport(){
+  _busAllBranchCache = null; // force fresh load to get updated receipt data
   const mon = el('efmon')?.value || today().slice(0,7);
   el('bus-ch-rpt-mon').value = mon;
   // Pre-select current branch
@@ -12758,7 +12759,7 @@ async function loadBusAllBranchData(forceReload){
   for(const b of BRANCHES){
     const [c, r] = await Promise.all([
       sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time,parent_mom,parent_dad').eq('branch_id',b.id),
-      sb.from('receipts').select('id,child_id,date,bus,branch_id').eq('branch_id',b.id),
+      sb.from('receipts').select('id,child_id,date,from_date,to_date,bus,branch_id').eq('branch_id',b.id),
     ]);
     result[b.id]={
       children:(c.data||[]).map(x=>({
@@ -12768,7 +12769,7 @@ async function loadBusAllBranchData(forceReload){
         leaveDate:x.leave_date||null, branchId:x.branch_id, kidsTime:x.kids_time||'',
         parentMom:x.parent_mom||'', parentDad:x.parent_dad||''
       })),
-      receipts:(r.data||[]).map(x=>({id:x.id,childId:x.child_id,date:x.date||'',bus:Number(x.bus||0)}))
+      receipts:(r.data||[]).map(x=>({id:x.id,childId:x.child_id,date:x.date||'',fromDate:x.from_date||null,toDate:x.to_date||null,bus:Number(x.bus||0)}))
     };
   }
   _busAllBranchCache=result;
@@ -12906,7 +12907,7 @@ function renderBusChildrenReport(){
     const bdata = _busAllBranchCache[br.id]||{children:[],receipts:[]};
     let kids = bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate);
     kids = applyDirFilter(kids);
-    const monRecs = bdata.receipts.filter(r=>monthOf(r.date)===mon);
+    const monRecs = bdata.receipts.filter(r=>recCoversMonth(r, mon));
     const brLabel = `${br.icon} ${br.ar}`;
     const bgColor = br.l ? `linear-gradient(135deg,${br.l},${br.l}cc)` : '#fef3c7';
     html += `<div style="margin-bottom:4px">${buildTable(kids, monRecs, brLabel, bgColor)}</div>`;
