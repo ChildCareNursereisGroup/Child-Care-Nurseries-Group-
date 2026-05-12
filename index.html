@@ -12409,21 +12409,19 @@ async function loadAllChildren(){
 
 async function loadAllBusAssignments(){
   const {data} = await sb.from('bus_assignments').select('*');
-  // Map: childId → {pick: {busId, busNumber}, drop: {busId, busNumber}}
   DB.busAssignments = {};
   (data||[]).forEach(r=>{
     const cid=String(r.child_id);
     if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
-    // Support both old format (single bus_id) and new format (pick/drop)
     const pickBusId  = r.pick_bus_id  || r.bus_id  || null;
     const pickBusNum = r.pick_bus_number || r.bus_number || '';
     const dropBusId  = r.drop_bus_id  || r.bus_id  || null;
     const dropBusNum = r.drop_bus_number || r.bus_number || '';
     if(pickBusId) DB.busAssignments[cid].pick = {busId:String(pickBusId), busNumber:pickBusNum};
     if(dropBusId) DB.busAssignments[cid].drop = {busId:String(dropBusId), busNumber:dropBusNum};
-    // Backward compat: keep top-level busId too
     DB.busAssignments[cid].busId     = pickBusId ? String(pickBusId) : (r.bus_id?String(r.bus_id):'');
     DB.busAssignments[cid].busNumber = pickBusNum || r.bus_number || '';
+    DB.busAssignments[cid].stopNumber = r.stop_number || 999;
   });
 }
 
@@ -14491,6 +14489,7 @@ async function openMonthlyBusRoster(){
             ${branchOpts}
           </select>
           <button onclick="saveAllBusAssignments()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">💾 ${ar?'حفظ التعيينات':'Save Assignments'}</button>
+          <button onclick="saveStopNumbers()" style="background:#f97316;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📍 ${ar?'حفظ أرقام المحطات':'Save Stop Numbers'}</button>
           <button onclick="printTwoWeekBusRoster()" style="background:#0d9488;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📆 ${ar?'كشف أسبوعين':'2-Week Roster'}</button>
           <button onclick="printMonthlyBusRoster()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🖨️ ${ar?'طباعة':'Print'}</button>
           <button onclick="document.getElementById('monthly-bus-roster').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
@@ -14527,7 +14526,12 @@ function renderMonthlyBusRoster(){
   BUS_TRIPS.forEach(trip=>{
     const tripLabel=ar?(trip.labelAR||trip.label||''):(trip.labelEN||trip.label||'');
     const tripSub=ar?(trip.subAR||trip.sub||''):(trip.subEN||trip.sub||'');
-    const kids=allKids.filter(c=>_matchTrip(c,trip));
+    const kids=allKids.filter(c=>_matchTrip(c,trip))
+      .sort((a,b)=>{
+        const sA=DB.busAssignments?.[String(a.id)]?.stopNumber||999;
+        const sB=DB.busAssignments?.[String(b.id)]?.stopNumber||999;
+        return sA-sB || a.name.localeCompare(b.name,'ar');
+      });
     if(!kids.length){
       html+=`<div style="margin-bottom:10px">
         <div style="background:${trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fef9c3':'#fef2f2'};border-radius:10px;padding:9px 14px;opacity:.6">
@@ -14557,6 +14561,7 @@ function renderMonthlyBusRoster(){
         <table style="width:100%;border-collapse:collapse;font-size:.78rem">
           <thead>
             <tr style="background:rgba(0,0,0,.04)">
+              <th style="padding:6px 8px;text-align:center;color:#d97706;font-weight:900">Stop#</th>
               <th style="padding:6px 10px;text-align:right">#</th>
               <th style="padding:6px 10px;text-align:right">الطفل</th>
               <th style="padding:6px 10px;text-align:right">الفصل</th>
@@ -14578,7 +14583,14 @@ function renderMonthlyBusRoster(){
               // For mixed trip: show BOTH pick and drop dropdowns
               const assignedBusId=isDropTrip||isMixedDrop ? (dropAssign.busId||'') : (pickAssign.busId||'');
               const tripTypeAttr=isDropTrip?'drop':isMixedDrop?'drop':'pick';
+              const stopNum=DB.busAssignments?.[String(c.id)]?.stopNumber||'';
               return`<tr style="${i%2===0?'background:rgba(255,255,255,.6)':''}">
+                <td style="padding:5px 7px;text-align:center">
+                  <input type="number" min="1" max="99" value="${stopNum}" placeholder="—"
+                    data-cid="${c.id}" class="stop-num-inp"
+                    style="width:46px;padding:4px 4px;border:1.5px solid #fbbf24;border-radius:7px;font-size:.8rem;font-weight:900;text-align:center;color:#d97706;background:#fffbeb"
+                    oninput="this.style.borderColor=this.value?'#f59e0b':'#fbbf24'">
+                </td>
                 <td style="padding:5px 10px;color:#9ca3af">${i+1}</td>
                 <td style="padding:5px 10px;font-weight:700">${c.name}</td>
                 <td style="padding:5px 10px;color:#6b7280">${c.className||'—'}</td>
@@ -14633,6 +14645,7 @@ async function saveAllBusAssignments(){
       // Delete old record first (most reliable)
       await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
       // Insert fresh
+      const stopNum=DB.busAssignments[cid]?.stopNumber||999;
       const {error,data}=await sb.from('bus_assignments').insert({
         child_id:Number(cid),
         bus_id:pBid,
@@ -14641,6 +14654,7 @@ async function saveAllBusAssignments(){
         pick_bus_number:pd?.busNumber||'',
         drop_bus_id:dd?Number(dd.busId):null,
         drop_bus_number:dd?.busNumber||'',
+        stop_number:stopNum,
       }).select();
       if(error){
         console.error('Bus save INSERT error:',error?.message||error,{cid,pBid,pBnum});
@@ -14658,6 +14672,33 @@ async function saveAllBusAssignments(){
   renderMonthlyBusRoster();
   if(fail>0) showToast('⚠️ Saved '+ok+', failed '+fail+' — see console');
   else showToast('✅ Saved '+ok+' assignments ('+saved+' total in DB)');
+}
+
+async function saveStopNumbers(){
+  const inputs=document.querySelectorAll('.stop-num-inp');
+  if(!inputs.length){showToast('No stop numbers to save');return;}
+  let saved=0, skipped=0;
+  for(const inp of inputs){
+    const cid=inp.dataset.cid;
+    const val=parseInt(inp.value);
+    if(!cid||isNaN(val)) continue;
+    if(!DB.busAssignments) DB.busAssignments={};
+    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={stopNumber:val};
+    else DB.busAssignments[cid].stopNumber=val;
+    // Save to Supabase (update only stop_number)
+    const {error}=await sb.from('bus_assignments')
+      .update({stop_number:val})
+      .eq('child_id',Number(cid));
+    if(error){
+      // Row might not exist yet — upsert minimal
+      await sb.from('bus_assignments')
+        .upsert({child_id:Number(cid),bus_number:'',stop_number:val},{onConflict:'child_id'});
+    }
+    saved++;
+  }
+  // Re-render sorted by new stop numbers
+  renderMonthlyBusRoster();
+  showToast(`✅ Stop numbers saved for ${saved} children — sorted!`);
 }
 
 function showToast(msg){
