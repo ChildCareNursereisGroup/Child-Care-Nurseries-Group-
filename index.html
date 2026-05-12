@@ -14426,12 +14426,13 @@ async function printByTripTime(){
 // MONTHLY BUS ROSTER — كشف رحلات الباص الشهري
 // ═══════════════════════════════════════════════
 const BUS_TRIPS=[
-  {key:'t_pick_8',  ar:'🟢 رحلة الصبح 8ص',       en:'🟢 Morning Trip 8am',        arSub:'أطفال يحضرون 8ص أو قبلها',                    enSub:'Children arriving at 8am or before',          type:'pick',  startH:[6,7,8]},
-  {key:'t_pick_11', ar:'🟢 رحلة الصبح 11ص',      en:'🟢 Morning Trip 11am',       arSub:'أطفال يحضرون الساعة 11ص',                      enSub:'Children arriving at 11am',                   type:'pick',  startH:[10,11]},
-  {key:'t_mix_11',  ar:'🔄 رحلة 11ص رجوع + 1م صبح', en:'🔄 Drop 11am + Pick 1pm',  arSub:'أطفال يرجعون 11ص + أطفال يحضرون 1م في نفس الرحلة', enSub:'Children dropped at 11am + picked at 1pm same trip', type:'mixed', endH:[11,12], startH2:[13]},
-  {key:'t_drop_13', ar:'🔴 رحلة الرجوع 1م',      en:'🔴 Return Trip 1pm',         arSub:'أطفال يرجعون الساعة 1م',                       enSub:'Children going home at 1pm',                  type:'drop',  endH:[13]},
-  {key:'t_drop_15', ar:'🔴 رحلة الرجوع 3م',      en:'🔴 Return Trip 3pm',         arSub:'أطفال يرجعون الساعة 3م',                       enSub:'Children going home at 3pm',                  type:'drop',  endH:[14,15]},
-  {key:'t_drop_17', ar:'🔴 رحلة الرجوع 5م',      en:'🔴 Return Trip 5pm',         arSub:'أطفال يرجعون الساعة 4-5م',                     enSub:'Children going home at 4-5pm',                type:'drop',  endH:[17]},
+  {key:'t_pick_8',  time:'06:00 – 08:00', ar:'🟢 رحلة الصبح',           en:'🟢 Morning Pick-up',          arSub:'أطفال يحضرون 8ص أو قبلها',                    enSub:'Children arriving at 8am or before',          type:'pick',  startH:[6,7,8]},
+  {key:'t_pick_11', time:'10:00 – 11:00', ar:'🟢 رحلة الصبح',           en:'🟢 Morning Pick-up',          arSub:'أطفال يحضرون الساعة 11ص',                      enSub:'Children arriving at 11am',                   type:'pick',  startH:[10,11]},
+  {key:'t_mix_11',  time:'11:00 – 13:00', ar:'🔄 رجوع 11ص + صبح 1م',   en:'🔄 Drop 11am + Pick 1pm',     arSub:'أطفال يرجعون 11ص + أطفال يحضرون 1م نفس الرحلة',enSub:'Children dropped at 11am + picked at 1pm — same trip',type:'mixed',endH:[11,12],startH2:[13]},
+  {key:'t_pick_13', time:'13:00',          ar:'🟢 رحلة الصبح 1م',        en:'🟢 Afternoon Pick-up 1pm',    arSub:'أطفال يحضرون من الساعة 1م',                    enSub:'Children arriving at 1pm',                    type:'pick',  startH:[13]},
+  {key:'t_drop_13', time:'13:00',          ar:'🔴 رحلة الرجوع 1م',       en:'🔴 Return Trip 1pm',          arSub:'أطفال يرجعون الساعة 1م',                       enSub:'Children going home at 1pm',                  type:'drop',  endH:[13]},
+  {key:'t_drop_15', time:'14:00 – 15:00', ar:'🔴 رحلة الرجوع 3م',       en:'🔴 Return Trip 3pm',          arSub:'أطفال يرجعون الساعة 3م',                       enSub:'Children going home at 3pm',                  type:'drop',  endH:[14,15]},
+  {key:'t_drop_17', time:'17:00',          ar:'🔴 رحلة الرجوع 5م',       en:'🔴 Return Trip 5pm',          arSub:'أطفال يرجعون الساعة 4-5م',                     enSub:'Children going home at 4-5pm',                type:'drop',  endH:[16,17]},
 ];
 
 function _parseKT(t){
@@ -14533,12 +14534,16 @@ function renderMonthlyBusRoster(){
     const tripBg=trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fefce8':'#fef2f2';
 
     html+=`<div style="margin-bottom:14px">
-      <div style="background:${tripColor};color:#fff;border-radius:10px 10px 0 0;padding:9px 14px;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:900;font-size:.92rem">${tripLabel}</div>
-          <div style="font-size:.72rem;opacity:.85">${tripSub}</div>
+      <div style="background:${tripColor};color:#fff;border-radius:10px 10px 0 0">
+        <div style="background:rgba(0,0,0,.2);padding:5px 14px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:1.1rem;font-weight:900;font-family:'Courier New',monospace;letter-spacing:1px">🕐 ${trip.time||''}</span>
+          <span style="font-size:.72rem;opacity:.85;padding-right:8px;border-right:1px solid rgba(255,255,255,.3)">${trip.type==='pick'?(ar?'رحلة استقبال':'Pick-up'):trip.type==='drop'?(ar?'رحلة توصيل':'Drop-off'):(ar?'رحلة مشتركة':'Combined')}</span>
+          <span style="font-size:.72rem;opacity:.8">${tripSub}</span>
         </div>
-        <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:8px;font-weight:800">👶 ${kids.length}</span>
+        <div style="padding:7px 14px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:900;font-size:.92rem">${tripLabel}</div>
+          <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:8px;font-weight:800">👶 ${kids.length}</span>
+        </div>
       </div>
       <div style="background:${tripBg};border:1.5px solid ${tripColor}44;border-top:none;border-radius:0 0 10px 10px;overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.78rem">
@@ -14606,28 +14611,34 @@ async function saveAllBusAssignments(){
     byChild[cid][tripType]={busId:String(bus.id),busNumber:bus.busNumber};
     saved++;
   }
+  let ok=0,fail=0;
   for(const [cid,types] of Object.entries(byChild)){
     if(!DB.busAssignments) DB.busAssignments={};
     if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
     if(types.pick) DB.busAssignments[cid].pick=types.pick;
     if(types.drop) DB.busAssignments[cid].drop=types.drop;
     if(types.both){ DB.busAssignments[cid].pick=types.both; DB.busAssignments[cid].drop=types.both; }
-    const pickData=DB.busAssignments[cid].pick;
-    const dropData=DB.busAssignments[cid].drop;
-    const row={
-      child_id:Number(cid),
-      bus_id:pickData?Number(pickData.busId):(dropData?Number(dropData.busId):null),
-      bus_number:pickData?.busNumber||dropData?.busNumber||'',
-      pick_bus_id:pickData?Number(pickData.busId):null,
-      pick_bus_number:pickData?.busNumber||'',
-      drop_bus_id:dropData?Number(dropData.busId):null,
-      drop_bus_number:dropData?.busNumber||'',
-    };
-    await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
-    await sb.from('bus_assignments').insert(row);
+    const pd=DB.busAssignments[cid].pick;
+    const dd=DB.busAssignments[cid].drop;
+    const pBid=pd?Number(pd.busId):(dd?Number(dd.busId):null);
+    const pBnum=pd?.busNumber||dd?.busNumber||'';
+    const rowFull={child_id:Number(cid),bus_id:pBid,bus_number:pBnum,
+      pick_bus_id:pd?Number(pd.busId):null,pick_bus_number:pd?.busNumber||'',
+      drop_bus_id:dd?Number(dd.busId):null,drop_bus_number:dd?.busNumber||''};
+    const rowBasic={child_id:Number(cid),bus_id:pBid,bus_number:pBnum};
+    try{
+      await sb.from('bus_assignments').delete().eq('child_id',Number(cid));
+      const {error}=await sb.from('bus_assignments').insert(rowFull);
+      if(error){
+        const {error:e2}=await sb.from('bus_assignments').insert(rowBasic);
+        if(e2){fail++;console.error('Bus save error:',e2?.message);}else ok++;
+      }else ok++;
+    }catch(e){fail++;console.error('Bus assign error:',e);}
   }
   renderMonthlyBusRoster();
-  showToast(`✅ ${lang==='ar'?`تم حفظ ${saved} تعيين`:`Saved ${saved} assignments`}`);
+  const arLang=lang==='ar';
+  if(fail>0) showToast(`⚠️ ${arLang?`تم حفظ ${ok} وفشل ${fail}`:`Saved ${ok}, failed ${fail} — run SQL migration`}`);
+  else showToast(`✅ ${arLang?`تم حفظ ${ok} تعيين`:`Saved ${ok} assignments`}`);
 }
 
 function showToast(msg){
