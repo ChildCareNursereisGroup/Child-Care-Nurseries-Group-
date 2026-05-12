@@ -12427,6 +12427,16 @@ async function loadAllBusAssignments(){
   });
 }
 
+// Helper: get bus assignment for a child, respecting pick/drop split
+function getBusAssign(childId, tripType){
+  const a=(DB.busAssignments||{})[String(childId)];
+  if(!a) return null;
+  if(tripType==='pick') return a.pick || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
+  if(tripType==='drop') return a.drop || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
+  // No tripType: return pick first, then drop, then top-level
+  return a.pick || a.drop || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
+}
+
 async function loadTripAttendance(tripDate, tripType){
   const key = `${tripDate}|${tripType}`;
   if(_tripAttCache[key]) return _tripAttCache[key];
@@ -12592,17 +12602,14 @@ async function renderBusTripSheet(){
   // Buses are centralized — show all buses regardless of branch filter
   const availBuses = DB.allBuses||[];
 
-  // Group children by assigned bus → fallback to busArea
-  const busGroups = {}; // busKey → {busInfo|null, area, children[]}
+  // Group children by assigned bus — using pick/drop split
+  const busGroups = {};
   tabChildren.forEach(c=>{
-    const assign  = (DB.busAssignments||{})[String(c.id)];
+    const assign  = getBusAssign(String(c.id), tab);
     const busKey  = assign?.busNumber || (c.busArea||'').trim() || 'غير محددة';
-    const busInfo = assign ? (availBuses.find(b=>b.busNumber===assign.busNumber)||null) : null;
+    const busInfo = assign ? (availBuses.find(b=>String(b.id)===String(assign.busId))||availBuses.find(b=>b.busNumber===assign.busNumber)||null) : null;
     if(!busGroups[busKey]) busGroups[busKey]={busKey, busInfo, children:[]};
-    // Try to resolve busInfo from allBuses if not yet
-    if(!busGroups[busKey].busInfo && assign){
-      busGroups[busKey].busInfo = availBuses.find(b=>b.busNumber===assign.busNumber)||null;
-    }
+    if(!busGroups[busKey].busInfo && busInfo) busGroups[busKey].busInfo=busInfo;
     busGroups[busKey].children.push(c);
   });
 
@@ -12667,7 +12674,7 @@ async function renderBusTripSheet(){
             ${kids.map((c,i)=>{
               const br     = BRANCHES.find(b=>b.id===c.branchId);
               const status = attMap[String(c.id)]||'present';
-              const assign = (DB.busAssignments||{})[String(c.id)];
+              const assign = getBusAssign(String(c.id), tab);
               const rowBg  = status==='absent'?'background:#fff5f5':i%2===0?'background:#fafafa':'background:#fff';
               return `<tr style="${rowBg}">
                 <td style="padding:6px 8px;color:#9ca3af">${i+1}</td>
@@ -14340,8 +14347,8 @@ async function printByTripTime(){
   // Group by driver/bus
   const busMap={};
   allKids.forEach(c=>{
-    const assign=DB.busAssignments?.[String(c.id)];
-    const bus=assign?(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId)):null;
+    const assign=getBusAssign(String(c.id), tripDef.type==='pick'?'pick':'drop');
+    const bus=assign?(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId)||(b.busNumber===assign.busNumber)):null;
     const key=bus?(bus.driverName||bus.busNumber):'غير محدد';
     if(!busMap[key]) busMap[key]={driverName:bus?.driverName||'غير محدد',busNumber:bus?.busNumber||'—',assistant:bus?.assistantName||'',children:[]};
     busMap[key].children.push(c);
@@ -14561,7 +14568,7 @@ function renderMonthlyBusRoster(){
           </thead>
           <tbody>
             ${kids.map((c,i)=>{
-              const assign=DB.busAssignments?.[String(c.id)];
+              const assign=getBusAssign(String(c.id), trip.type==='pick'?'pick':'drop');
               // Get the right assignment based on trip type (pick or drop)
               const pickAssign=assign?.pick||{busId:assign?.busId||'',busNumber:assign?.busNumber||''};
               const dropAssign=assign?.drop||{busId:assign?.busId||'',busNumber:assign?.busNumber||''};
@@ -14683,8 +14690,8 @@ function printMonthlyBusRoster(){
     // Group by driver
     const byDriver={};
     kids.forEach(c=>{
-      const assign=DB.busAssignments?.[String(c.id)];
-      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))):null;
+      const assign=getBusAssign(String(c.id), trip.type==='pick'?'pick':'drop');
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||(allBuses.find(b=>b.busNumber===assign.busNumber))):null;
       const key=bus?(bus.driverName||bus.busNumber):'غير محدد';
       if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
       byDriver[key].kids.push(c);
