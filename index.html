@@ -1761,18 +1761,35 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
 <!-- BUSES PAGE -->
 <div class="page" id="pg-buses">
+
+<!-- MANAGER VIEW: only bus roster -->
+<div id="bus-manager-view" style="display:none">
+  <div class="card">
+    <div class="ch">
+      <div class="ct" id="bus-mgr-title">🚌 Bus Trip Roster — كشف رحلات الباص</div>
+    </div>
+    <p style="font-size:.82rem;color:#6b7280;margin-bottom:12px" id="bus-mgr-sub">View and assign your branch children to drivers. Organized by trip time.</p>
+    <button onclick="openMonthlyBusRoster()"
+      style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.88rem">
+      📋 Open Bus Trip Roster — كشف رحلات الباص
+    </button>
+  </div>
+</div>
+
+<!-- ADMIN VIEW: full bus management -->
+<div id="bus-admin-view">
 <div class="card np">
   <div class="ch">
     <div class="ct">🚌 Bus Fleet — أسطول الباصات</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="openBusForm(null)">➕ Add Bus</button>
-      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAutoAssignBuses()">🗺️ Auto Assign Buses</button>
-      <button class="btn bsm" style="background:#1e3a8a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 كشف الرحلة</button>
-      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🧾 كشف السواق</button>
-      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
-      <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 كشف رحلات الباص</button>
-      <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openPrintByTripTime()">🖨️ طباعة حسب الرحلة</button>
-      <button class="btn" style="background:#6b7280;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('bus-xl-inp').click()">📥 Import Excel</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAutoAssignBuses()">🗺️ Auto Assign</button>
+      <button class="btn bsm" style="background:#1e3a8a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 Trip Sheet</button>
+      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🧾 Driver Sheet</button>
+      <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 Bus Children</button>
+      <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
+      <button class="btn bsm" style="background:#b45309;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openPrintByTripTime()">🖨️ Print by Trip</button>
+      <button class="btn" style="background:#6b7280;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('bus-xl-inp').click()">📥 Import</button>
       <button class="btn bg bsm" onclick="downloadBusTemplate()">📋 Template</button>
     </div>
     <input type="file" id="bus-xl-inp" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBusesFromExcel(this.files[0])">
@@ -1780,8 +1797,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
   </div>
   <div id="bus-alerts"></div>
   <div id="bus-list"></div>
+</div><!-- end bus-admin-view -->
 </div>
-</div>
+</div><!-- end pg-buses -->
 
 <!-- SALARY HISTORY SEARCH MODAL -->
 <div class="mover" id="sal-search-modal">
@@ -3318,9 +3336,20 @@ async function showPage(page,btn){
     if(expBtn) expBtn.style.display=(curRole==='admin')?'':'none';
   }
   if(page==='licenses')renderLicenses();
-  if(page==='buses'){renderBuses();renderBusAlerts();
-    // For manager: pre-filter bus roster to their branch
-    if(curRole==='manager') setTimeout(()=>openMonthlyBusRoster(),300);
+  if(page==='buses'){
+    const isMgr=curRole==='manager';
+    const adminView=el('bus-admin-view');
+    const mgrView=el('bus-manager-view');
+    if(adminView) adminView.style.display=isMgr?'none':'block';
+    if(mgrView)   mgrView.style.display=isMgr?'block':'none';
+    if(isMgr){
+      // Manager sees only roster — in their language
+      const ar=lang==='ar';
+      if(el('bus-mgr-title')) el('bus-mgr-title').textContent=ar?'🚌 كشف رحلات الباص':'🚌 Bus Trip Roster';
+      if(el('bus-mgr-sub')) el('bus-mgr-sub').textContent=ar?'اعرضي وعيّني أطفال فرعك على السواقين — مقسمة حسب مواعيد الرحلات':'View and assign your branch children to drivers. Organized by trip time.';
+    } else {
+      renderBuses();renderBusAlerts();
+    }
   }
   if(page==='visitors'){
     const visListEl=el('vis-list');
@@ -14356,12 +14385,12 @@ async function printByTripTime(){
 // MONTHLY BUS ROSTER — كشف رحلات الباص الشهري
 // ═══════════════════════════════════════════════
 const BUS_TRIPS=[
-  {key:'t_pick_8',  label:'🟢 رحلة الصبح 8ص',       sub:'أطفال يحضرون 8ص أو قبلها',             type:'pick', startH:[6,7,8]},
-  {key:'t_pick_11', label:'🟢 رحلة الصبح 11ص',      sub:'أطفال يحضرون الساعة 11ص',             type:'pick', startH:[10,11]},
-  {key:'t_mix_11',  label:'🔄 رحلة 11ص رجوع + 1م صبح', sub:'أطفال يرجعون 11ص + أطفال يحضرون 1م في نفس الرحلة', type:'mixed', endH:[11,12], startH2:[13]},
-  {key:'t_drop_13', label:'🔴 رحلة الرجوع 1م',      sub:'أطفال يرجعون الساعة 1م',               type:'drop', endH:[13]},
-  {key:'t_drop_15', label:'🔴 رحلة الرجوع 3م',      sub:'أطفال يرجعون الساعة 3م',               type:'drop', endH:[14,15]},
-  {key:'t_drop_17', label:'🔴 رحلة الرجوع 5م',      sub:'أطفال يرجعون الساعة 4-5م',             type:'drop', endH:[16,17]},
+  {key:'t_pick_8',  ar:'🟢 رحلة الصبح 8ص',       en:'🟢 Morning Trip 8am',        arSub:'أطفال يحضرون 8ص أو قبلها',                    enSub:'Children arriving at 8am or before',          type:'pick',  startH:[6,7,8]},
+  {key:'t_pick_11', ar:'🟢 رحلة الصبح 11ص',      en:'🟢 Morning Trip 11am',       arSub:'أطفال يحضرون الساعة 11ص',                      enSub:'Children arriving at 11am',                   type:'pick',  startH:[10,11]},
+  {key:'t_mix_11',  ar:'🔄 رحلة 11ص رجوع + 1م صبح', en:'🔄 Drop 11am + Pick 1pm',  arSub:'أطفال يرجعون 11ص + أطفال يحضرون 1م في نفس الرحلة', enSub:'Children dropped at 11am + picked at 1pm same trip', type:'mixed', endH:[11,12], startH2:[13]},
+  {key:'t_drop_13', ar:'🔴 رحلة الرجوع 1م',      en:'🔴 Return Trip 1pm',         arSub:'أطفال يرجعون الساعة 1م',                       enSub:'Children going home at 1pm',                  type:'drop',  endH:[13]},
+  {key:'t_drop_15', ar:'🔴 رحلة الرجوع 3م',      en:'🔴 Return Trip 3pm',         arSub:'أطفال يرجعون الساعة 3م',                       enSub:'Children going home at 3pm',                  type:'drop',  endH:[14,15]},
+  {key:'t_drop_17', ar:'🔴 رحلة الرجوع 5م',      en:'🔴 Return Trip 5pm',         arSub:'أطفال يرجعون الساعة 4-5م',                     enSub:'Children going home at 4-5pm',                type:'drop',  endH:[16,17]},
 ];
 
 function _parseKT(t){
@@ -14388,6 +14417,7 @@ async function openMonthlyBusRoster(){
   if(!DB.busAssignments) await loadAllBusAssignments();
 
   const isMgr=curRole==='manager';
+  const ar=lang==='ar';
   const defaultBranch=isMgr?curBid:'all';
 
   const ov=document.createElement('div');
@@ -14395,23 +14425,23 @@ async function openMonthlyBusRoster(){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:12px 0';
 
   const branchOpts=isMgr
-    ? BRANCHES.filter(b=>b.id===curBid).map(b=>`<option value="${b.id}" selected>${b.icon} ${b.ar}</option>`).join('')
-    : `<option value="all">🏫 كل الفروع</option>${BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('')}`;
+    ? BRANCHES.filter(b=>b.id===curBid).map(b=>`<option value="${b.id}" selected>${b.icon} ${ar?b.ar:b.en||b.ar}</option>`).join('')
+    : `<option value="all">${ar?'🏫 كل الفروع':'🏫 All Branches'}</option>${BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${ar?b.ar:b.en||b.ar}</option>`).join('')}`;
 
   ov.innerHTML=`
     <div style="background:#fff;border-radius:16px;width:98%;max-width:1100px;margin:0 auto;font-family:'Tajawal',sans-serif">
       <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:14px 20px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
-          <div style="font-weight:900;font-size:1.1rem">🚌 كشف رحلات الباص الشهري</div>
-          <div style="font-size:.78rem;opacity:.85">عيّني كل طفل مع سواقه — 6 رحلات</div>
+          <div style="font-weight:900;font-size:1.1rem">${ar?'🚌 كشف رحلات الباص الشهري':'🚌 Monthly Bus Trip Roster'}</div>
+          <div style="font-size:.78rem;opacity:.85">${ar?'عيّني كل طفل مع سواقه — 6 رحلات':'Assign each child to a driver — 6 trips'}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <select id="mbr-branch" onchange="renderMonthlyBusRoster()"
             style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem" ${isMgr?'disabled':''}>
             ${branchOpts}
           </select>
-          <button onclick="saveAllBusAssignments()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">💾 حفظ التعيينات</button>
-          <button onclick="printMonthlyBusRoster()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🖨️ طباعة</button>
+          <button onclick="saveAllBusAssignments()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">💾 ${ar?'حفظ التعيينات':'Save Assignments'}</button>
+          <button onclick="printMonthlyBusRoster()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🖨️ ${ar?'طباعة':'Print'}</button>
           <button onclick="document.getElementById('monthly-bus-roster').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
         </div>
       </div>
@@ -14441,14 +14471,17 @@ function renderMonthlyBusRoster(){
 
   const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
 
+  const ar=lang==='ar';
   let html='';
   BUS_TRIPS.forEach(trip=>{
+    const tripLabel=ar?(trip.labelAR||trip.label||''):(trip.labelEN||trip.label||'');
+    const tripSub=ar?(trip.subAR||trip.sub||''):(trip.subEN||trip.sub||'');
     const kids=allKids.filter(c=>_matchTrip(c,trip));
     if(!kids.length){
       html+=`<div style="margin-bottom:10px">
         <div style="background:${trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fef9c3':'#fef2f2'};border-radius:10px;padding:9px 14px;opacity:.6">
-          <div style="font-weight:800;font-size:.88rem">${trip.label}</div>
-          <div style="font-size:.72rem;color:#6b7280">${trip.sub} — لا يوجد أطفال</div>
+          <div style="font-weight:800;font-size:.88rem">${tripLabel}</div>
+          <div style="font-size:.72rem;color:#6b7280">${tripSub} — ${ar?'لا يوجد أطفال':'No children'}</div>
         </div>
       </div>`;
       return;
@@ -14460,8 +14493,8 @@ function renderMonthlyBusRoster(){
     html+=`<div style="margin-bottom:14px">
       <div style="background:${tripColor};color:#fff;border-radius:10px 10px 0 0;padding:9px 14px;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-weight:900;font-size:.92rem">${trip.label}</div>
-          <div style="font-size:.72rem;opacity:.85">${trip.sub}</div>
+          <div style="font-weight:900;font-size:.92rem">${tripLabel}</div>
+          <div style="font-size:.72rem;opacity:.85">${tripSub}</div>
         </div>
         <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:8px;font-weight:800">👶 ${kids.length}</span>
       </div>
@@ -14546,6 +14579,7 @@ function printMonthlyBusRoster(){
     });
   });
 
+  const arP=lang==='ar';
   let html='';
   BUS_TRIPS.forEach(trip=>{
     const kids=allKids.filter(c=>_matchTrip(c,trip));
@@ -14565,8 +14599,8 @@ function printMonthlyBusRoster(){
 
     html+=`<div style="margin-bottom:8mm;break-inside:avoid">
       <div style="background:${col};color:#fff;padding:5px 10px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between">
-        <div style="font-weight:900;font-size:10.5pt">${trip.label}</div>
-        <div style="font-size:9pt">${trip.sub} — 👶 ${kids.length} طفل</div>
+        <div style="font-weight:900;font-size:10.5pt">${arP?(trip.labelAR||trip.label||""):(trip.labelEN||trip.label||"")}</div>
+        <div style="font-size:9pt">${arP?(trip.subAR||trip.sub||""):(trip.subEN||trip.sub||"")} — 👶 ${kids.length}</div>
       </div>
       ${Object.entries(byDriver).map(([key,grp])=>`
       <div style="background:${bgL};border:1px solid ${col}44;padding:4px 0;margin-top:3mm">
