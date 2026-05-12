@@ -12036,7 +12036,8 @@ function getTripSlots(kidsTime){
   const m=t.match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
   if(!m) return [];
   let sh=parseInt(m[1]), eh=parseInt(m[3]);
-  if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+  if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
   const slots=[];
   // Pick slot
   for(const s of TRIP_SLOTS){
@@ -12509,7 +12510,8 @@ function buildTripTimeSummary(children, tab){
     const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
     if(!m) return{startH:8,endH:13};
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
     return{startH:sh,endH:eh};
   };
   const slotKey=c=>{
@@ -12567,7 +12569,8 @@ async function renderBusTripSheet(){
       const m=t.match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
       if(!m) return{startH:8,endH:13}; // default
       let sh=parseInt(m[1]),eh=parseInt(m[3]);
-      if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+      if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
       return{startH:sh,endH:eh};
     })();
     const isPick=c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick');
@@ -12876,7 +12879,8 @@ function renderBusChildrenReport(){
     const m=t.replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
     if(!m) return{startH:99,endH:99};
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
     return{startH:sh,endH:eh};
   };
   const getTripLabel=c=>{
@@ -13025,7 +13029,8 @@ function printTripSchedule(){
     const m=t.replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
     if(!m) return{startH:99,endH:99};
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
     return{startH:sh,endH:eh};
   };
   const isPickup=c=>(c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick'));
@@ -14237,11 +14242,11 @@ function openPrintByTripTime(){
     {key:'pick_6',  label:'🟢 رحلة الصبح 6ص',  sub:'أطفال يحضرون من 6:00 – 7:00',  type:'pick',  startH:[6,7]},
     {key:'pick_8',  label:'🟢 رحلة الصبح 8ص',  sub:'أطفال يحضرون من 8:00 – 9:00',  type:'pick',  startH:[8,9]},
     {key:'pick_10', label:'🟢 رحلة الصبح 10ص', sub:'أطفال يحضرون من 10:00 – 11:00',type:'pick',  startH:[10,11]},
-    {key:'pick_13', label:'🟢 رحلة الصبح 1م',  sub:'أطفال يحضرون من 1:00 م',       type:'pick',  startH:[13,1]},
+    {key:'pick_13', label:'🟢 رحلة الصبح 1م',  sub:'أطفال يحضرون من 1:00 م',       type:'pick',  startH:[13]},
     {key:'drop_11', label:'🔴 رحلة الرجوع 11ص', sub:'أطفال يرجعون 11:00 – 12:00',   type:'drop',  endH:[11,12]},
     {key:'drop_13', label:'🔴 رحلة الرجوع 1م',  sub:'أطفال يرجعون 1:00 م',          type:'drop',  endH:[13]},
     {key:'drop_15', label:'🔴 رحلة الرجوع 3م',  sub:'أطفال يرجعون 3:00 م',          type:'drop',  endH:[15]},
-    {key:'drop_17', label:'🔴 رحلة الرجوع 5م',  sub:'أطفال يرجعون 4:00 – 5:00 م',  type:'drop',  endH:[16,17]},
+    {key:'drop_17', label:'🔴 رحلة الرجوع 5م',  sub:'أطفال يرجعون 4:00 – 5:00 م',  type:'drop',  endH:[17]},
   ];
   ov.innerHTML=`
     <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;font-family:'Tajawal',sans-serif">
@@ -14290,11 +14295,11 @@ async function printByTripTime(){
     {key:'pick_6',  label:'🟢 رحلة الصبح 6ص',  sub:'أطفال يحضرون من 6:00 – 7:00',  type:'pick', startH:[6,7]},
     {key:'pick_8',  label:'🟢 رحلة الصبح 8ص',  sub:'أطفال يحضرون من 8:00 – 9:00',  type:'pick', startH:[8,9]},
     {key:'pick_10', label:'🟢 رحلة الصبح 10ص', sub:'أطفال يحضرون من 10:00 – 11:00',type:'pick', startH:[10,11]},
-    {key:'pick_13', label:'🟢 رحلة الصبح 1م',  sub:'أطفال يحضرون من 1:00 م',       type:'pick', startH:[13,1]},
+    {key:'pick_13', label:'🟢 رحلة الصبح 1م',  sub:'أطفال يحضرون من 1:00 م',       type:'pick', startH:[13]},
     {key:'drop_11', label:'🔴 رحلة الرجوع 11ص', sub:'أطفال يرجعون 11:00 – 12:00',   type:'drop', endH:[11,12]},
     {key:'drop_13', label:'🔴 رحلة الرجوع 1م',  sub:'أطفال يرجعون 1:00 م',          type:'drop', endH:[13]},
     {key:'drop_15', label:'🔴 رحلة الرجوع 3م',  sub:'أطفال يرجعون 3:00 م',          type:'drop', endH:[15]},
-    {key:'drop_17', label:'🔴 رحلة الرجوع 5م',  sub:'أطفال يرجعون 4:00 – 5:00 م',  type:'drop', endH:[16,17]},
+    {key:'drop_17', label:'🔴 رحلة الرجوع 5م',  sub:'أطفال يرجعون 4:00 – 5:00 م',  type:'drop', endH:[17]},
   ];
   const selKey=document.querySelector('[name=trip-sel]:checked')?.value;
   const tripDef=TRIP_DEFS.find(t=>t.key===selKey);
@@ -14311,7 +14316,8 @@ async function printByTripTime(){
     const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
     if(!m) return{sh:8,eh:13};
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
     return{sh,eh};
   };
 
@@ -14425,14 +14431,15 @@ const BUS_TRIPS=[
   {key:'t_mix_11',  ar:'🔄 رحلة 11ص رجوع + 1م صبح', en:'🔄 Drop 11am + Pick 1pm',  arSub:'أطفال يرجعون 11ص + أطفال يحضرون 1م في نفس الرحلة', enSub:'Children dropped at 11am + picked at 1pm same trip', type:'mixed', endH:[11,12], startH2:[13]},
   {key:'t_drop_13', ar:'🔴 رحلة الرجوع 1م',      en:'🔴 Return Trip 1pm',         arSub:'أطفال يرجعون الساعة 1م',                       enSub:'Children going home at 1pm',                  type:'drop',  endH:[13]},
   {key:'t_drop_15', ar:'🔴 رحلة الرجوع 3م',      en:'🔴 Return Trip 3pm',         arSub:'أطفال يرجعون الساعة 3م',                       enSub:'Children going home at 3pm',                  type:'drop',  endH:[14,15]},
-  {key:'t_drop_17', ar:'🔴 رحلة الرجوع 5م',      en:'🔴 Return Trip 5pm',         arSub:'أطفال يرجعون الساعة 4-5م',                     enSub:'Children going home at 4-5pm',                type:'drop',  endH:[16,17]},
+  {key:'t_drop_17', ar:'🔴 رحلة الرجوع 5م',      en:'🔴 Return Trip 5pm',         arSub:'أطفال يرجعون الساعة 4-5م',                     enSub:'Children going home at 4-5pm',                type:'drop',  endH:[17]},
 ];
 
 function _parseKT(t){
   const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
   if(!m) return{sh:8,eh:13};
   let sh=parseInt(m[1]),eh=parseInt(m[3]);
-  if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+  if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
+  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
   return{sh,eh};
 }
 
