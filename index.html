@@ -400,7 +400,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
       </div>
       <div class="fg" style="margin:0;grid-column:1/-1">
         <label style="font-size:.75rem">منطقة السكن / Area</label>
-        <input id="fbus-area" type="text" placeholder="e.g. Al Nahda, Muwaileh..." style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box">
+        <input id="fbus-area" type="text" placeholder="e.g. Al Nahda, Muwaileh..." oninput="suggestBusDriver(this.value)" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box">
+        <div id="bus-driver-suggest" style="display:none;margin-top:5px;background:#fffbeb;border:1.5px solid #fbbf24;border-radius:8px;padding:8px 11px;font-size:.78rem"></div>
       </div>
     </div>
   </div>
@@ -1769,6 +1770,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#1e3a8a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 كشف الرحلة</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🧾 كشف السواق</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 أطفال الباص</button>
+      <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 كشف رحلات الباص</button>
       <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openPrintByTripTime()">🖨️ طباعة حسب الرحلة</button>
       <button class="btn" style="background:#6b7280;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('bus-xl-inp').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadBusTemplate()">📋 Template</button>
@@ -2345,7 +2347,7 @@ const BRANCHES = [
 ];
 const ROLES_PAGES = {
   admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','class-msg','admin'],
-  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff','class-msg'],
+  manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff','buses','class-msg'],
   visitor_reg:['visitors'],
   receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
   expenses:   ['expenses'],
@@ -3316,7 +3318,10 @@ async function showPage(page,btn){
     if(expBtn) expBtn.style.display=(curRole==='admin')?'':'none';
   }
   if(page==='licenses')renderLicenses();
-  if(page==='buses'){renderBuses();renderBusAlerts();}
+  if(page==='buses'){renderBuses();renderBusAlerts();
+    // For manager: pre-filter bus roster to their branch
+    if(curRole==='manager') setTimeout(()=>openMonthlyBusRoster(),300);
+  }
   if(page==='visitors'){
     const visListEl=el('vis-list');
     if(visListEl) visListEl.innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>';
@@ -14347,7 +14352,314 @@ async function printByTripTime(){
   w.document.write(html); w.document.close();
   setTimeout(()=>w.print(),600);
 }
-// ─── End Print By Trip Time ─────────────────────
+// ═══════════════════════════════════════════════
+// MONTHLY BUS ROSTER — كشف رحلات الباص الشهري
+// ═══════════════════════════════════════════════
+const BUS_TRIPS=[
+  {key:'t_pick_8',  label:'🟢 رحلة الصبح 8ص',       sub:'أطفال يحضرون 8ص أو قبلها',             type:'pick', startH:[6,7,8]},
+  {key:'t_pick_11', label:'🟢 رحلة الصبح 11ص',      sub:'أطفال يحضرون الساعة 11ص',             type:'pick', startH:[10,11]},
+  {key:'t_mix_11',  label:'🔄 رحلة 11ص رجوع + 1م صبح', sub:'أطفال يرجعون 11ص + أطفال يحضرون 1م في نفس الرحلة', type:'mixed', endH:[11,12], startH2:[13]},
+  {key:'t_drop_13', label:'🔴 رحلة الرجوع 1م',      sub:'أطفال يرجعون الساعة 1م',               type:'drop', endH:[13]},
+  {key:'t_drop_15', label:'🔴 رحلة الرجوع 3م',      sub:'أطفال يرجعون الساعة 3م',               type:'drop', endH:[14,15]},
+  {key:'t_drop_17', label:'🔴 رحلة الرجوع 5م',      sub:'أطفال يرجعون الساعة 4-5م',             type:'drop', endH:[16,17]},
+];
+
+function _parseKT(t){
+  const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
+  if(!m) return{sh:8,eh:13};
+  let sh=parseInt(m[1]),eh=parseInt(m[3]);
+  if(sh>=6&&sh<=11&&eh>=1&&eh<=5) eh+=12;
+  return{sh,eh};
+}
+
+function _matchTrip(c, trip){
+  const{sh,eh}=_parseKT(c.kidsTime);
+  const isPick=c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick');
+  const isDrop=c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='drop');
+  if(trip.type==='pick')  return isPick&&(trip.startH||[]).includes(sh);
+  if(trip.type==='drop')  return isDrop&&(trip.endH||[]).includes(eh);
+  if(trip.type==='mixed') return (isDrop&&(trip.endH||[]).includes(eh))||(isPick&&(trip.startH2||[]).includes(sh));
+  return false;
+}
+
+async function openMonthlyBusRoster(){
+  if(!_busAllBranchCache) await loadBusAllBranchData(true);
+  if(!DB.allBuses) await loadAllBuses();
+  if(!DB.busAssignments) await loadAllBusAssignments();
+
+  const isMgr=curRole==='manager';
+  const defaultBranch=isMgr?curBid:'all';
+
+  const ov=document.createElement('div');
+  ov.id='monthly-bus-roster';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:12px 0';
+
+  const branchOpts=isMgr
+    ? BRANCHES.filter(b=>b.id===curBid).map(b=>`<option value="${b.id}" selected>${b.icon} ${b.ar}</option>`).join('')
+    : `<option value="all">🏫 كل الفروع</option>${BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('')}`;
+
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:98%;max-width:1100px;margin:0 auto;font-family:'Tajawal',sans-serif">
+      <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:14px 20px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:900;font-size:1.1rem">🚌 كشف رحلات الباص الشهري</div>
+          <div style="font-size:.78rem;opacity:.85">عيّني كل طفل مع سواقه — 6 رحلات</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="mbr-branch" onchange="renderMonthlyBusRoster()"
+            style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem" ${isMgr?'disabled':''}>
+            ${branchOpts}
+          </select>
+          <button onclick="saveAllBusAssignments()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">💾 حفظ التعيينات</button>
+          <button onclick="printMonthlyBusRoster()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">🖨️ طباعة</button>
+          <button onclick="document.getElementById('monthly-bus-roster').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
+        </div>
+      </div>
+      <div id="mbr-body" style="padding:16px"></div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  renderMonthlyBusRoster();
+}
+
+function renderMonthlyBusRoster(){
+  const branchSel=el('mbr-branch')?.value||'all';
+  const body=el('mbr-body');
+  if(!body) return;
+
+  const targetBranches=branchSel==='all'?BRANCHES:BRANCHES.filter(b=>b.id===branchSel);
+  const allBuses=DB.allBuses||[];
+
+  // Gather all active bus children across target branches
+  let allKids=[];
+  targetBranches.forEach(br=>{
+    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
+    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
+      allKids.push({...c,branchName:br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',branchId:br.id});
+    });
+  });
+
+  const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
+
+  let html='';
+  BUS_TRIPS.forEach(trip=>{
+    const kids=allKids.filter(c=>_matchTrip(c,trip));
+    if(!kids.length){
+      html+=`<div style="margin-bottom:10px">
+        <div style="background:${trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fef9c3':'#fef2f2'};border-radius:10px;padding:9px 14px;opacity:.6">
+          <div style="font-weight:800;font-size:.88rem">${trip.label}</div>
+          <div style="font-size:.72rem;color:#6b7280">${trip.sub} — لا يوجد أطفال</div>
+        </div>
+      </div>`;
+      return;
+    }
+
+    const tripColor=trip.type==='pick'?'#059669':trip.type==='mixed'?'#d97706':'#dc2626';
+    const tripBg=trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fefce8':'#fef2f2';
+
+    html+=`<div style="margin-bottom:14px">
+      <div style="background:${tripColor};color:#fff;border-radius:10px 10px 0 0;padding:9px 14px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:900;font-size:.92rem">${trip.label}</div>
+          <div style="font-size:.72rem;opacity:.85">${trip.sub}</div>
+        </div>
+        <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:8px;font-weight:800">👶 ${kids.length}</span>
+      </div>
+      <div style="background:${tripBg};border:1.5px solid ${tripColor}44;border-top:none;border-radius:0 0 10px 10px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead>
+            <tr style="background:rgba(0,0,0,.04)">
+              <th style="padding:6px 10px;text-align:right">#</th>
+              <th style="padding:6px 10px;text-align:right">الطفل</th>
+              <th style="padding:6px 10px;text-align:right">الفصل</th>
+              ${branchSel==='all'?'<th style="padding:6px 10px;text-align:right">الفرع</th>':''}
+              <th style="padding:6px 10px;text-align:right">وقت الحضانة</th>
+              <th style="padding:6px 10px;text-align:right">المنطقة</th>
+              <th style="padding:6px 10px;text-align:right">تواصل الأهل</th>
+              <th style="padding:6px 10px;text-align:right">السواق</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${kids.map((c,i)=>{
+              const assign=DB.busAssignments?.[String(c.id)];
+              const assignedBusId=assign?.busId||'';
+              return`<tr style="${i%2===0?'background:rgba(255,255,255,.6)':''}">
+                <td style="padding:5px 10px;color:#9ca3af">${i+1}</td>
+                <td style="padding:5px 10px;font-weight:700">${c.name}</td>
+                <td style="padding:5px 10px;color:#6b7280">${c.className||'—'}</td>
+                ${branchSel==='all'?`<td style="padding:5px 10px"><span style="background:${c.branchColor}22;color:${c.branchColor};padding:1px 7px;border-radius:6px;font-size:.72rem;font-weight:700">${c.branchIcon} ${c.branchName}</span></td>`:''}
+                <td style="padding:5px 10px;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
+                <td style="padding:5px 10px">${c.busArea||'—'}</td>
+                <td style="padding:5px 10px;font-size:.73rem">${c.parentMom?'👩 '+c.parentMom:''}${c.parentMom&&c.parentDad?'<br>':''}${c.parentDad?'👨 '+c.parentDad:''}${!c.parentMom&&!c.parentDad?'—':''}</td>
+                <td style="padding:5px 10px">
+                  <select data-cid="${c.id}" class="bus-assign-sel"
+                    style="padding:4px 7px;border:1.5px solid ${tripColor}66;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.75rem;background:#fff;min-width:120px">
+                    <option value="">— اختر السواق —</option>
+                    ${busOpts.replace(`value="${assignedBusId}"`,`value="${assignedBusId}" selected`)}
+                  </select>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  body.innerHTML=html;
+}
+
+async function saveAllBusAssignments(){
+  const sels=document.querySelectorAll('.bus-assign-sel');
+  let saved=0, skipped=0;
+  for(const sel of sels){
+    const cid=sel.dataset.cid;
+    const busId=sel.value;
+    if(!busId){ skipped++; continue; }
+    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
+    if(!bus){ skipped++; continue; }
+    await assignChildToBus(cid, busId, bus.busNumber);
+    saved++;
+  }
+  // Re-render with updated assignments
+  renderMonthlyBusRoster();
+  showToast(`✅ تم حفظ ${saved} تعيين${skipped?` | ⏭️ ${skipped} بدون تغيير`:''}`);
+}
+
+function showToast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 20px;border-radius:10px;font-family:Tajawal,sans-serif;font-size:.88rem;font-weight:700;z-index:99999;white-space:nowrap';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+function printMonthlyBusRoster(){
+  const branchSel=el('mbr-branch')?.value||'all';
+  const targetBranches=branchSel==='all'?BRANCHES:BRANCHES.filter(b=>b.id===branchSel);
+  const allBuses=DB.allBuses||[];
+  let allKids=[];
+  targetBranches.forEach(br=>{
+    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
+    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
+      allKids.push({...c,branchName:br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫'});
+    });
+  });
+
+  let html='';
+  BUS_TRIPS.forEach(trip=>{
+    const kids=allKids.filter(c=>_matchTrip(c,trip));
+    if(!kids.length) return;
+    const col=trip.type==='pick'?'#059669':trip.type==='mixed'?'#d97706':'#dc2626';
+    const bgL=trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fefce8':'#fef2f2';
+
+    // Group by driver
+    const byDriver={};
+    kids.forEach(c=>{
+      const assign=DB.busAssignments?.[String(c.id)];
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))):null;
+      const key=bus?(bus.driverName||bus.busNumber):'غير محدد';
+      if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
+      byDriver[key].kids.push(c);
+    });
+
+    html+=`<div style="margin-bottom:8mm;break-inside:avoid">
+      <div style="background:${col};color:#fff;padding:5px 10px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between">
+        <div style="font-weight:900;font-size:10.5pt">${trip.label}</div>
+        <div style="font-size:9pt">${trip.sub} — 👶 ${kids.length} طفل</div>
+      </div>
+      ${Object.entries(byDriver).map(([key,grp])=>`
+      <div style="background:${bgL};border:1px solid ${col}44;padding:4px 0;margin-top:3mm">
+        <div style="padding:3px 10px;font-weight:800;font-size:9.5pt;color:${col}">🚌 ${grp.driver} (${grp.busNum}) ${grp.assistant?'| 👤 '+grp.assistant:''}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:8.5pt">
+          <thead><tr style="background:rgba(0,0,0,.05)">
+            <th style="padding:3px 8px;text-align:right">#</th>
+            <th style="padding:3px 8px;text-align:right">الطفل</th>
+            <th style="padding:3px 8px;text-align:right">الفصل</th>
+            ${branchSel==='all'?'<th style="padding:3px 8px;text-align:right">الفرع</th>':''}
+            <th style="padding:3px 8px;text-align:right">الوقت</th>
+            <th style="padding:3px 8px;text-align:right">المنطقة</th>
+            <th style="padding:3px 8px;text-align:right">تواصل</th>
+            <th style="padding:3px 8px;text-align:center;width:28px">✅</th>
+          </tr></thead>
+          <tbody>
+            ${grp.kids.map((c,i)=>`<tr style="${i%2===0?'':'background:rgba(255,255,255,.5)'}">
+              <td style="padding:3px 8px;color:#9ca3af">${i+1}</td>
+              <td style="padding:3px 8px;font-weight:700">${c.name}</td>
+              <td style="padding:3px 8px;color:#6b7280">${c.className||'—'}</td>
+              ${branchSel==='all'?`<td style="padding:3px 8px;font-size:7.5pt">${c.branchIcon} ${c.branchName}</td>`:''}
+              <td style="padding:3px 8px;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
+              <td style="padding:3px 8px">${c.busArea||'—'}</td>
+              <td style="padding:3px 8px;font-size:8pt">${c.parentMom?'👩 '+c.parentMom:''}${c.parentDad?'<br>👨 '+c.parentDad:''}${!c.parentMom&&!c.parentDad?'—':''}</td>
+              <td style="padding:3px 8px;text-align:center">□</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('')}
+    </div>`;
+  });
+
+  const brLabel=branchSel==='all'?'كل الفروع':(BRANCHES.find(b=>b.id===branchSel)?.ar||'');
+  const dateLabel=new Date().toLocaleDateString('ar-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    @page{size:A4;margin:10mm} *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Tajawal',Arial,sans-serif;font-size:9pt;color:#1f2937;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @media print{.np{display:none!important}}
+  </style></head><body>
+  <div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
+    <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print / PDF</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
+  </div>
+  <div style="height:36px" class="np"></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:5mm;padding-bottom:3mm;border-bottom:3px solid #1e3a8a">
+    <div>
+      <h1 style="font-size:13pt;font-weight:900;color:#1e3a8a;margin-bottom:1mm">🚌 كشف رحلات الباص الشهري</h1>
+      <div style="font-size:8.5pt;color:#6b7280">${brLabel} | ${dateLabel}</div>
+      <div style="font-size:8.5pt;color:#6b7280;margin-top:1mm">👶 ${allKids.length} طفل | 🚌 ${allBuses.length} باص</div>
+    </div>
+    <div style="text-align:left;font-size:8pt;color:#9ca3af">مجموعة رعاية الطفل<br>Child Care Nurseries Group</div>
+  </div>
+  ${html}
+  </body></html>`;
+
+  const w=window.open('','_blank','width=1000,height=1100');
+  w.document.write(fullHtml); w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+function suggestBusDriver(area){
+  const sugBox=el('bus-driver-suggest');
+  if(!sugBox) return;
+  if(!area||area.length<2){ sugBox.style.display='none'; return; }
+  // Find children in similar area who already have a driver assigned
+  const areaLower=area.toLowerCase();
+  if(!DB.busAssignments||!DB.allBuses||!DB.allChildren) { sugBox.style.display='none'; return; }
+  const matches=(DB.allChildren||[]).filter(c=>c.busArea&&c.busArea.toLowerCase().includes(areaLower));
+  if(!matches.length){ sugBox.style.display='none'; return; }
+  const driverCounts={};
+  matches.forEach(c=>{
+    const assign=DB.busAssignments?.[String(c.id)];
+    if(!assign) return;
+    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId));
+    if(!bus) return;
+    const key=bus.driverName||bus.busNumber;
+    if(!driverCounts[key]) driverCounts[key]={bus,count:0};
+    driverCounts[key].count++;
+  });
+  const sorted=Object.entries(driverCounts).sort((a,b)=>b[1].count-a[1].count);
+  if(!sorted.length){ sugBox.style.display='none'; return; }
+  sugBox.style.display='block';
+  sugBox.innerHTML=`<div style="font-weight:700;color:#92400e;margin-bottom:4px">💡 اقتراح السواق حسب منطقة ${area}:</div>`+
+    sorted.slice(0,3).map(([k,v])=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+        <span style="background:#fef3c7;color:#92400e;padding:2px 9px;border-radius:7px;font-weight:800">🚌 ${k} (${v.bus.busNumber})</span>
+        <span style="color:#6b7280">${v.count} طفل في نفس المنطقة</span>
+        ${v.bus.assistantName?`<span style="color:#9ca3af">👤 ${v.bus.assistantName}</span>`:''}
+      </div>`).join('');
+}
+// ─── End Auto-suggest ──────────────────────────
 
 // STAFF LEAVE & ATTENDANCE DASHBOARD
 // ═══════════════════════════════════════════════
