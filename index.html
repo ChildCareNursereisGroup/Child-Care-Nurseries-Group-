@@ -14289,16 +14289,17 @@ async function openMonthlyBusRoster(){
     const fetchBuses = DB.allBuses ? Promise.resolve() : loadAllBuses();
     const fetchAssign = DB.busAssignments ? Promise.resolve() : loadAllBusAssignments();
 
-    // Load children directly (skip heavy _busAllBranchCache)
+    // Load children directly - no filter on bus (filter in JS to handle all variations)
     const fetchKids = sb.from('children')
       .select('id,name,class_name,branch_id,bus,bus_direction,bus_pick_drop,bus_area,kids_time,parent_mom,parent_dad,leave_date')
-      .is('leave_date', null)
-      .in('bus', ['Yes','نعم']);
+      .is('leave_date', null);
 
     const [,,kidsRes] = await Promise.all([fetchBuses, fetchAssign, fetchKids]);
 
-    // Store bus children in a simple cache for the roster
-    window._rosterKids = (kidsRes.data||[]).map(x=>({
+    // Store bus children - filter for bus users in JS
+    window._rosterKids = (kidsRes.data||[])
+      .filter(x=> x.bus && String(x.bus).toLowerCase()!=='no' && x.bus!=='لا' && x.bus!==false && x.bus!==0)
+      .map(x=>({
       id: x.id, name: x.name||'', className: x.class_name||'',
       branchId: x.branch_id, bus: x.bus||'No',
       busDirection: x.bus_direction||'', busPickDrop: x.bus_pick_drop||'',
@@ -14312,6 +14313,10 @@ async function openMonthlyBusRoster(){
       if(!_busAllBranchCache[br.id]) _busAllBranchCache[br.id]={children:[],receipts:[]};
       _busAllBranchCache[br.id].children = window._rosterKids.filter(c=>c.branchId===br.id);
     });
+
+    console.log('🚌 Roster: total kids loaded:', (kidsRes.data||[]).length,
+      '| bus kids:', window._rosterKids.length,
+      '| sample bus values:', [...new Set((kidsRes.data||[]).slice(0,10).map(x=>x.bus))]);
 
     renderMonthlyBusRoster();
   } catch(e) {
@@ -14332,14 +14337,27 @@ function renderMonthlyBusRoster(){
   const targetBranches=branchSel==='all'?BRANCHES:BRANCHES.filter(b=>b.id===branchSel);
   const allBuses=DB.allBuses||[];
 
-  // Gather all active bus children across target branches
+  // Use _rosterKids if available (faster path), otherwise fall back to _busAllBranchCache
   let allKids=[];
-  targetBranches.forEach(br=>{
-    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
-    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
-      allKids.push({...c,branchName:br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',branchId:br.id});
+  if(window._rosterKids && window._rosterKids.length>0){
+    allKids = branchSel==='all'
+      ? window._rosterKids
+      : window._rosterKids.filter(c=>c.branchId===branchSel);
+    // Add branch display info
+    allKids = allKids.map(c=>{
+      const br=BRANCHES.find(b=>b.id===c.branchId)||{};
+      return{...c,branchName:br.ar||'',branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',branchId:c.branchId};
     });
-  });
+  } else {
+    targetBranches.forEach(br=>{
+      const bdata=_busAllBranchCache?.[br.id]||{children:[]};
+      bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
+        allKids.push({...c,branchName:br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',branchId:br.id});
+      });
+    });
+  }
+
+  console.log('📋 renderMonthlyBusRoster: allKids=',allKids.length,'branch=',branchSel);
 
   const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
 
