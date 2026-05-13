@@ -1784,6 +1784,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="openBusForm(null)">➕ Add Bus</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
+      <button class="btn bsm" style="background:#0f172a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openRoutePlannerDirect()">🗺️ Route Planner</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🖨️ Driver Sheet</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 Bus Children</button>
       <button class="btn bsm" style="background:#374151;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="checkBusAssignments()">🔍 Check DB</button>
@@ -15251,6 +15252,183 @@ async function printTwoWeekBusRoster(){
   w.document.write(html); w.document.close();
   setTimeout(()=>w.print(),800);
 }
+
+// ═══════════════════════════════════════════════
+// CHECK BUS ASSIGNMENTS (Diagnostic)
+// ═══════════════════════════════════════════════
+async function checkBusAssignments(){
+  const {data,error}=await sb.from('bus_assignments').select('*');
+  if(error){showToast('❌ DB Error: '+error.message);return;}
+
+
+
+
+  const rows=data||[];
+  if(!rows.length){
+    showToast('⚠️ bus_assignments is EMPTY — check Supabase permissions');
+
+
+
+
+
+
+    return;
+  }
+  await loadAllBusAssignments();
+  const allBuses=DB.allBuses||[];
+  let report=`✅ bus_assignments: ${rows.length} record(s)
+
+`;
+  rows.slice(0,10).forEach(r=>{
+    const pBus=allBuses.find(b=>b.id===r.pick_bus_id||b.id===r.bus_id);
+    report+=`Child ${r.child_id}: Pick=${pBus?.driverName||'—'} Drop=${allBuses.find(b=>b.id===r.drop_bus_id)?.driverName||'—'} Stop#=${r.stop_number||'—'}
+`;
+  });
+  if(rows.length>10) report+=`... and ${rows.length-10} more`;
+  alert(report);
+}
+
+// ═══════════════════════════════════════════════
+// ROUTE PLANNER — ترتيب محطات السواقين
+// ═══════════════════════════════════════════════
+async function openRoutePlannerDirect(){
+  if(curRole!=='admin'){showToast('Admin only');return;}
+  showToast('⏳ Loading...');
+  try{
+    await loadBuses();
+    await loadAllBusAssignments();
+    if(!window._rosterKids||!window._rosterKids.length){
+      const r=await sb.from('children').select('id,name,class_name,branch_id,bus,bus_area,kids_time,bus_direction,bus_pick_drop,parent_mom,parent_dad,leave_date').is('leave_date',null);
+      window._rosterKids=(r.data||[]).filter(x=>x.bus&&String(x.bus).toLowerCase()!=='no').map(x=>({
+        id:x.id,name:x.name||'',className:x.class_name||'',branchId:x.branch_id,
+        bus:x.bus,busArea:x.bus_area||'',kidsTime:x.kids_time||'',
+        busDirection:x.bus_direction||'',busPickDrop:x.bus_pick_drop||'',
+        parentMom:x.parent_mom||'',parentDad:x.parent_dad||''
+      }));
+    }
+  }catch(e){showToast('❌ '+e.message);return;}
+  openRoutePlanner();
+}
+
+function openRoutePlanner(){
+  const buses=DB.allBuses||[];
+  if(!buses.length){showToast('No buses. Load buses first.');return;}
+  document.getElementById('route-planner-ov')?.remove();
+  const busOpts=buses.map(b=>`<option value="${b.id}">${b.driverName||'Driver'} — Bus ${b.busNumber}</option>`).join('');
+  const tripOpts=BUS_TRIPS.map(t=>`<option value="${t.key}">${t.en||t.ar} (${t.time})</option>`).join('');
+  const ov=document.createElement('div');
+  ov.id='route-planner-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;overflow-y:auto;padding:10px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:960px;margin:0 auto;font-family:'Tajawal',sans-serif">
+      <div style="background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:13px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:900;font-size:1rem">🗺️ Route Planner — ترتيب المحطات</div>
+          <div style="font-size:.75rem;opacity:.8">اختاري السواق + الرحلة ← حطي أرقام المحطات ← احفظي</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select id="rp-bus" onchange="renderRoutePlanner()" style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;min-width:175px">
+            <option value="">— اختاري السواق —</option>${busOpts}
+          </select>
+          <select id="rp-trip" onchange="renderRoutePlanner()" style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;min-width:175px">
+            <option value="">— اختاري الرحلة —</option>${tripOpts}
+          </select>
+          <button onclick="saveRoutePlan()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📍 Save Stops</button>
+          <button onclick="document.getElementById('route-planner-ov').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
+        </div>
+      </div>
+      <div id="rp-body" style="padding:16px">
+        <div style="text-align:center;color:#9ca3af;padding:40px;font-size:.9rem">
+          🗺️ اختاري سواق ورحلة من القائمة أعلاه
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+}
+
+function renderRoutePlanner(){
+  const busId=el('rp-bus')?.value;
+  const tripKey=el('rp-trip')?.value;
+  const body=el('rp-body');
+  if(!body||!busId||!tripKey){if(body)body.innerHTML='<div style="text-align:center;color:#9ca3af;padding:30px">اختاري سواق ورحلة</div>';return;}
+  const bus=(DB.allBuses||[]).find(b=>String(b.id)===busId);
+  const trip=BUS_TRIPS.find(t=>t.key===tripKey);
+  if(!bus||!trip){body.innerHTML='<div style="color:#dc2626;padding:20px">Not found</div>';return;}
+  const tType=trip.type==='pick'?'pick':'drop';
+  const col=trip.type==='pick'?'#0d9488':trip.type==='mixed'?'#d97706':'#1d4ed8';
+  let kids=[];
+  (window._rosterKids||[]).filter(c=>_matchTrip(c,trip)).forEach(c=>{
+    const assign=getBusAssign(String(c.id),tType);
+    if(!assign) return;
+    if(String(assign.busId)!==String(bus.id)&&assign.busNumber!==bus.busNumber) return;
+    const br=BRANCHES.find(b=>b.id===c.branchId)||{};
+    kids.push({...c,branchEN:br.en||br.ar||'',branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',
+      stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
+  });
+  kids.sort((a,b)=>a.stopNum-b.stopNum||(a.busArea||'').localeCompare(b.busArea||''));
+  if(!kids.length){
+    body.innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280"><div style="font-size:2rem">🚌</div><div style="margin-top:8px;font-weight:700">لا يوجد أطفال معينون لـ ${bus.driverName} في هذه الرحلة</div><div style="font-size:.8rem;color:#9ca3af;margin-top:4px">افتحي Bus Roster وعيّني الأطفال أولاً</div></div>`;
+    return;
+  }
+  body.innerHTML=`
+    <div style="background:${col}15;border:1.5px solid ${col}44;border-radius:10px;padding:9px 14px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center">
+      <span style="font-weight:900;color:${col};font-size:.9rem">🚌 ${bus.driverName} — Bus ${bus.busNumber}${bus.assistantName?' | 👤 '+bus.assistantName:''}</span>
+      <div style="display:flex;gap:7px">
+        <span style="background:${col};color:#fff;padding:2px 12px;border-radius:8px;font-weight:800;font-size:.8rem">${trip.en||trip.ar} 🕐 ${trip.time}</span>
+        <span style="background:#f3f4f6;padding:2px 12px;border-radius:8px;font-weight:700;font-size:.8rem">👶 ${kids.length} طفل</span>
+      </div>
+    </div>
+    <div style="font-size:.78rem;color:#6b7280;margin-bottom:8px">💡 أدخلي أرقام المحطات — نفس المنطقة = نفس الرقم — اضغطي <strong>📍 Save Stops</strong></div>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <thead><tr style="background:${col};color:#fff">
+        <th style="padding:8px 10px;text-align:center;min-width:70px">Stop #</th>
+        <th style="padding:8px 10px;text-align:right">اسم الطفل</th>
+        <th style="padding:8px 8px;text-align:center">الفصل</th>
+        <th style="padding:8px 8px;text-align:center">الفرع</th>
+        <th style="padding:8px 8px;text-align:center">الوقت</th>
+        <th style="padding:8px 8px;text-align:right">المنطقة</th>
+        <th style="padding:8px 8px;text-align:right">تواصل الأهل</th>
+      </tr></thead>
+      <tbody>${kids.map((c,i)=>`
+        <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}" id="rp-row-${c.id}">
+          <td style="padding:7px 10px;text-align:center">
+            <input type="number" min="1" max="99" value="${c.stopNum<999?c.stopNum:''}" placeholder="—"
+              data-cid="${c.id}" class="rp-stop-inp"
+              style="width:56px;padding:5px 4px;border:2px solid ${col}66;border-radius:8px;font-size:.92rem;font-weight:900;text-align:center;color:${col};background:#fff"
+              oninput="this.closest('tr').style.background=this.value?'#f0fdf4':'${i%2===0?'#f8fafc':'#fff'}'">
+          </td>
+          <td style="padding:7px 10px;font-weight:700">${c.name}</td>
+          <td style="padding:7px 8px;text-align:center;color:#6b7280">${c.className||'—'}</td>
+          <td style="padding:7px 8px;text-align:center"><span style="background:${c.branchColor}22;color:${c.branchColor};padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700">${c.branchIcon} ${c.branchEN}</span></td>
+          <td style="padding:7px 8px;text-align:center;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
+          <td style="padding:7px 8px;text-align:right">${c.busArea||'—'}</td>
+          <td style="padding:7px 8px;text-align:right;font-size:.75rem">${[c.parentMom&&'👩 '+c.parentMom,c.parentDad&&'👨 '+c.parentDad].filter(Boolean).join('<br>')||'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function saveRoutePlan(){
+  const inputs=document.querySelectorAll('.rp-stop-inp');
+  if(!inputs.length){showToast('No children');return;}
+  let saved=0;
+  for(const inp of inputs){
+    const cid=inp.dataset.cid;
+    const val=parseInt(inp.value);
+    if(!cid||isNaN(val)) continue;
+    if(!DB.busAssignments) DB.busAssignments={};
+    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+    DB.busAssignments[cid].stopNumber=val;
+    const {error}=await sb.from('bus_assignments').update({stop_number:val}).eq('child_id',Number(cid));
+    if(error) await sb.from('bus_assignments').upsert({child_id:Number(cid),bus_number:'',stop_number:val},{onConflict:'child_id'});
+    saved++;
+  }
+  showToast(`✅ Saved ${saved} stop numbers`);
+  renderRoutePlanner();
+}
+// ─── End Route Planner ──────────────────────────
+
 
 // STAFF LEAVE & ATTENDANCE DASHBOARD
 // ═══════════════════════════════════════════════
