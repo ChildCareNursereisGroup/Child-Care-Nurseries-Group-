@@ -1783,13 +1783,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div class="ct">🚌 Bus Fleet — أسطول الباصات</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="openBusForm(null)">➕ Add Bus</button>
-      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAutoAssignBuses()">🗺️ Auto Assign</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🖨️ Driver Sheet</button>
-      <button class="btn bsm" style="background:#374151;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="checkBusAssignments()">🔍 Check DB</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 Bus Children</button>
-      <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
-      <button class="btn bsm" style="background:#b45309;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openPrintByTripTime()">🖨️ Print by Trip</button>
+      <button class="btn bsm" style="background:#374151;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="checkBusAssignments()">🔍 Check DB</button>
       <button class="btn" style="background:#6b7280;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem" onclick="el('bus-xl-inp').click()">📥 Import</button>
       <button class="btn bg bsm" onclick="downloadBusTemplate()">📋 Template</button>
     </div>
@@ -12191,140 +12188,130 @@ async function confirmAutoAssign(){
 
 // ── Driver Trip Sheet ─────────────────────────
 async function openDriverTripSheet(){
-  // Load fresh data
-  if(!_busAllBranchCache) await loadBusAllBranchData(true);
-  if(!DB.allBuses) await loadAllBuses();
-  if(!DB.busAssignments) await loadAllBusAssignments();
+  showToast('⏳ Loading driver data...');
+  try {
+    // Always load fresh
+    await loadBusAllBranchData(true);
+    await loadAllBuses();
+    await loadAllBusAssignments();
+  } catch(e){ console.error('Load error:', e); }
 
-  const ar=lang==='ar';
-  const allBuses=DB.allBuses||[];
+  const allBuses = DB.allBuses || [];
 
-  // Gather all bus children from all branches
-  let allKids=[];
-  BRANCHES.forEach(br=>{
-    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
-    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
-      allKids.push({...c,branchName:br.ar,branchEN:br.en||br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon});
+  // Collect all bus children from all branches
+  let allKids = [];
+  BRANCHES.forEach(br => {
+    const bdata = _busAllBranchCache?.[br.id] || {children:[]};
+    bdata.children
+      .filter(c => (c.bus==='Yes'||c.bus==='نعم') && !c.leaveDate)
+      .forEach(c => allKids.push({...c,
+        branchEN: br.en||br.ar,
+        branchAR: br.ar,
+        branchColor: br.c||'#1e3a8a',
+        branchIcon: br.icon
+      }));
+  });
+
+  // Build: driverName → trip → children (sorted by stop#)
+  const driverMap = {};
+  BUS_TRIPS.forEach(trip => {
+    const tType = trip.type==='pick' ? 'pick' : 'drop';
+    allKids.filter(c => _matchTrip(c, trip)).forEach(c => {
+      const assign = getBusAssign(String(c.id), tType);
+      const bus = assign
+        ? (allBuses.find(b=>String(b.id)===String(assign.busId)) || allBuses.find(b=>b.busNumber===assign.busNumber))
+        : null;
+      const dName = bus?.driverName || '— Unassigned';
+      const key   = dName + '|||' + trip.key;
+      if(!driverMap[key]) driverMap[key] = {dName, bus, trip, kids:[]};
+      driverMap[key].kids.push({
+        ...c,
+        stopNum: DB.busAssignments?.[String(c.id)]?.stopNumber || 999
+      });
     });
   });
 
-  // Build driver→trips→children map
-  const driverMap={}; // driverName → {bus, trips:{tripKey→{trip,children[]}}}
-  BUS_TRIPS.forEach(trip=>{
-    const tType=trip.type==='pick'?'pick':'drop';
-    const tripKids=allKids.filter(c=>_matchTrip(c,trip));
-    tripKids.forEach(c=>{
-      const assign=getBusAssign(String(c.id),tType);
-      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
-      const dk=bus?.driverName||'Unassigned';
-      if(!driverMap[dk]) driverMap[dk]={bus,trips:{}};
-      if(!driverMap[dk].trips[trip.key]) driverMap[dk].trips[trip.key]={trip,children:[]};
-      driverMap[dk].trips[trip.key].children.push({...c,
-        stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
-    });
-  });
+  // Sort children by stop#
+  Object.values(driverMap).forEach(g =>
+    g.kids.sort((a,b) => a.stopNum-b.stopNum || a.name.localeCompare(b.name,'ar'))
+  );
 
-  // Sort each trip's children by stop number
-  Object.values(driverMap).forEach(dm=>{
-    Object.values(dm.trips).forEach(t=>{
-      t.children.sort((a,b)=>a.stopNum-b.stopNum||a.name.localeCompare(b.name,'ar'));
-    });
-  });
+  const assigned = Object.values(driverMap).filter(g =>
+    g.dName !== '— Unassigned' && g.kids.length > 0
+  );
 
-  if(!Object.keys(driverMap).length){
-    alert(ar?'لا يوجد أطفال معينون — قومي بتعيين الأطفال في Bus Roster أولاً':'No children assigned. Please assign children in Bus Roster first.');
+  if(!assigned.length){
+    alert('No assigned children found.\n\nSteps:\n1. Open Bus Roster\n2. Select a driver for each child\n3. Click Save Assignments\n4. Then click Driver Sheet\n\nIf you already saved, click Check DB to diagnose.');
     return;
   }
 
-  // Generate printable HTML
-  const col_pick='#0d9488', col_drop='#1d4ed8', col_mixed='#d97706';
-  let pages='';
-  Object.entries(driverMap).sort().forEach(([dk,dm])=>{
-    Object.entries(dm.trips).forEach(([tk,tData])=>{
-      if(!tData.children.length) return;
-      const trip=tData.trip;
-      const col=trip.type==='pick'?col_pick:trip.type==='mixed'?col_mixed:col_drop;
-      const label=trip.en||trip.labelEN||trip.ar||'';
-      const bus=dm.bus;
-      const rows=tData.children.map((ch,i)=>`
-        <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
-          <td style="padding:5px 8px;text-align:center;font-weight:900;color:#d97706;border:1px solid #e5e7eb">${ch.stopNum<999?ch.stopNum:'—'}</td>
-          <td style="padding:5px 8px;font-weight:700;border:1px solid #e5e7eb">${ch.name}</td>
-          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb;color:#6b7280">${ch.className||'—'}</td>
-          <td style="padding:5px 6px;border:1px solid #e5e7eb;font-size:8.5pt;color:${ch.branchColor}">
-            ${ch.branchIcon} ${ch.branchEN}</td>
-          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb;color:#0369a1;font-weight:700">${ch.kidsTime||'—'}</td>
-          <td style="padding:5px 6px;border:1px solid #e5e7eb">${ch.busArea||'—'}</td>
-          <td style="padding:5px 6px;border:1px solid #e5e7eb;font-size:8pt">${ch.parentMom?'👩 '+ch.parentMom:''}${ch.parentMom&&ch.parentDad?'<br>':''}${ch.parentDad?'👨 '+ch.parentDad:''}${!ch.parentMom&&!ch.parentDad?'—':''}</td>
-          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb"><div style="width:22px;height:22px;border:1.5px solid #d1d5db;border-radius:4px;margin:auto"></div></td>
-        </tr>`).join('');
+  // Generate PDF pages
+  const fmtDate = () => new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const tCol = t => t.type==='pick'?'#0d9488':t.type==='mixed'?'#d97706':'#1d4ed8';
 
-      pages+=`<div style="page-break-after:always;padding:0">
-        <!-- Header bar -->
-        <div style="background:${col};color:#fff;padding:5mm 8mm;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:8pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — Driver Trip Sheet</div>
-            <div style="font-size:13pt;font-weight:900;margin-bottom:1mm">${label}</div>
-            <div style="font-size:9pt;opacity:.9">🕐 ${trip.time} &nbsp;|&nbsp; ${trip.enSub||trip.subEN||''}</div>
-          </div>
-          <div style="text-align:right;background:rgba(0,0,0,.15);padding:4mm 7mm;border-radius:8px">
-            <div style="font-size:8pt;opacity:.8">Driver / السواق</div>
-            <div style="font-size:14pt;font-weight:900">${dk}</div>
-            <div style="font-size:8.5pt;opacity:.9">
-              Bus: ${bus?.busNumber||'—'}
-              ${bus?.assistantName?' &nbsp;|&nbsp; '+bus.assistantName:''}
-            </div>
-          </div>
+  const pages = assigned.map(g => {
+    const col   = tCol(g.trip);
+    const label = g.trip.en || g.trip.labelEN || g.trip.ar || '';
+    const sub   = g.trip.enSub || g.trip.subEN || '';
+    const bus   = g.bus;
+
+    const rows = g.kids.map((ch,i) => `
+      <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
+        <td style="padding:6px 8px;text-align:center;font-weight:900;color:#d97706;border:1px solid #e5e7eb;font-size:11pt">${ch.stopNum<999?ch.stopNum:'—'}</td>
+        <td style="padding:6px 10px;font-weight:700;border:1px solid #e5e7eb">${i+1}. ${ch.name}</td>
+        <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb;color:#6b7280">${ch.className||'—'}</td>
+        <td style="padding:6px 7px;border:1px solid #e5e7eb;color:${ch.branchColor};font-weight:700;font-size:8.5pt">${ch.branchIcon} ${ch.branchEN}</td>
+        <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb;color:#0369a1;font-weight:700">${ch.kidsTime||'—'}</td>
+        <td style="padding:6px 7px;border:1px solid #e5e7eb">${ch.busArea||'—'}</td>
+        <td style="padding:6px 7px;border:1px solid #e5e7eb;font-size:8.5pt">${[ch.parentMom&&'👩 '+ch.parentMom, ch.parentDad&&'👨 '+ch.parentDad].filter(Boolean).join('<br>')||'—'}</td>
+        <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb">
+          <div style="width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;margin:auto"></div>
+        </td>
+      </tr>`).join('');
+
+    return `<div style="page-break-after:always">
+      <div style="background:${col};color:#fff;padding:6mm 8mm 5mm;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:7.5pt;opacity:.75;margin-bottom:1.5mm">Child Care Nurseries Group — Driver Trip Sheet</div>
+          <div style="font-size:14pt;font-weight:900;margin-bottom:1.5mm">${label}</div>
+          <div style="font-size:9pt;opacity:.9">🕐 ${g.trip.time} &nbsp;|&nbsp; ${sub}</div>
         </div>
-        <!-- Summary bar -->
-        <div style="background:${col}20;border-bottom:2px solid ${col}40;padding:2mm 8mm;font-size:8.5pt;color:#374151;font-weight:700;display:flex;gap:15mm">
-          <span>Date: ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</span>
-          <span>Children: ${tData.children.length}</span>
-          <span>Trip: ${trip.type==='pick'?'Pick-up ▲':'Drop-off ▼'}</span>
+        <div style="background:rgba(0,0,0,.18);padding:4mm 8mm;border-radius:10px;text-align:right">
+          <div style="font-size:7.5pt;opacity:.8">Driver / السواق</div>
+          <div style="font-size:15pt;font-weight:900">${g.dName}</div>
+          <div style="font-size:8.5pt;opacity:.9">Bus: ${bus?.busNumber||'—'}${bus?.assistantName?' &nbsp;|&nbsp; Asst: '+bus.assistantName:''}</div>
         </div>
-        <!-- Children table -->
-        <div style="padding:4mm 6mm">
-          <table style="width:100%;border-collapse:collapse;font-size:9pt">
-            <thead>
-              <tr style="background:${col};color:#fff">
-                <th style="padding:6px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:40px">Stop#</th>
-                <th style="padding:6px 8px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Contact</th>
-                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:30px">✓</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-        <!-- Signatures -->
-        <div style="padding:2mm 6mm;display:flex;gap:12mm;margin-top:2mm">
-          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
-            <div style="font-weight:700">${dk}</div>
-            <div style="color:#6b7280">Driver Signature</div>
-          </div>
-          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
-            <div style="font-weight:700">${bus?.assistantName||'___________'}</div>
-            <div style="color:#6b7280">Assistant Signature</div>
-          </div>
-          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
-            <div style="font-weight:700">___________</div>
-            <div style="color:#6b7280">Manager Signature</div>
-          </div>
-        </div>
-        <div style="padding:1mm 6mm;font-size:7pt;color:#9ca3af;text-align:center">
-          Child Care Nurseries Group | ${label} | Bus ${bus?.busNumber||'—'} | ${new Date().toLocaleDateString('en-GB')}
-        </div>
-      </div>`;
-    });
+      </div>
+      <div style="background:${col}20;border-bottom:2px solid ${col}44;padding:2.5mm 8mm;font-size:8.5pt;font-weight:700;color:#374151;display:flex;gap:20mm">
+        <span>📅 ${fmtDate()}</span>
+        <span>👶 ${g.kids.length} children</span>
+        <span>${g.trip.type==='pick'?'▲ Pick-up':'▼ Drop-off'}</span>
+      </div>
+      <div style="padding:4mm 5mm">
+        <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
+          <thead><tr style="background:${col};color:#fff">
+            <th style="padding:6px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:44px">Stop#</th>
+            <th style="padding:6px 10px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Parent Contact</th>
+            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:34px">✓</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="padding:3mm 5mm;display:flex;gap:10mm;margin-top:2mm">
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">${g.dName}</div><div style="color:#6b7280">Driver Signature</div></div>
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">${bus?.assistantName||'___________'}</div><div style="color:#6b7280">Assistant Signature</div></div>
+        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">___________</div><div style="color:#6b7280">Manager Signature</div></div>
+      </div>
+      <div style="padding:1mm 5mm;font-size:7pt;color:#9ca3af;text-align:center">Child Care Nurseries Group | ${label} | Bus ${bus?.busNumber||'—'} | ${new Date().toLocaleDateString('en-GB')}</div>
+    </div>`;
   });
 
-  if(!pages){alert('No assigned children found in any trip. Assign children first.');return;}
-
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
     @page{size:A4;margin:0} *{margin:0;padding:0;box-sizing:border-box}
@@ -12332,16 +12319,18 @@ async function openDriverTripSheet(){
     @media print{.np{display:none!important}}
   </style></head><body>
   <div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
-    <button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print All Drivers</button>
+    <button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print All Drivers (${pages.length} pages)</button>
     <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
   </div>
   <div style="height:38px" class="np"></div>
-  ${pages}
+  ${pages.join('')}
   </body></html>`;
 
-  const w=window.open('','_blank','width=900,height=1100');
-  w.document.write(html); w.document.close();
-  setTimeout(()=>w.print(),700);
+  const w = window.open('','_blank','width=900,height=1100');
+  if(!w){ alert('Popup blocked — please allow popups for this site'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 800);
 }
 
 
