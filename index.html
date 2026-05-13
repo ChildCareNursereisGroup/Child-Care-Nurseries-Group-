@@ -14286,8 +14286,8 @@ async function openMonthlyBusRoster(){
 
   // Load only what we need: buses + assignments + children (fast, parallel)
   try {
-    const fetchBuses = DB.allBuses ? Promise.resolve() : loadBuses();
-    const fetchAssign = DB.busAssignments ? Promise.resolve() : loadAllBusAssignments();
+    const fetchBuses = loadBuses(); // always reload to get DB.allBuses in sync
+    const fetchAssign = loadAllBusAssignments();
 
     // Load children directly - no filter on bus (filter in JS to handle all variations)
     const fetchKids = sb.from('children')
@@ -15392,6 +15392,7 @@ async function loadBuses(){
     assistantSharjahExpire:x.assistant_sharjah_expire||'', assistantAjmanExpire:x.assistant_ajman_expire||'',
     notes:x.notes||''
   }));
+  DB.allBuses = DB.buses; // keep both in sync
 }
 
 function renderBusAlerts(){
