@@ -2642,7 +2642,8 @@ async function loadFromSupa(bid) {
       parentMom:x.parent_mom||'', parentDad:x.parent_dad||'', email:x.email||'',
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
-      notes:x.notes||'', branchId:x.branch_id
+      notes:x.notes||'', branchId:x.branch_id,
+      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
     }));
 
     // ── Load ALL receipts ──
@@ -14510,6 +14511,7 @@ async function printByTripTime(){
 // MONTHLY BUS ROSTER — كشف رحلات الباص الشهري
 // ═══════════════════════════════════════════════
 const BUS_TRIPS=[
+  {key:'t_staff_5', time:'05:00',          ar:'🌅 رحلة الموظفين 5ص',     en:'🌅 Staff Early Trip 5am',     arSub:'موظفون شيفت 6ص',                               enSub:'Staff with 6am shift — picked up at 5am',     type:'staff_pick', startH:[5]},
   {key:'t_pick_8',  time:'06:00 – 08:00', ar:'🟢 رحلة الصبح',           en:'🟢 Morning Pick-up',          arSub:'أطفال يحضرون 8ص أو قبلها',                    enSub:'Children arriving at 8am or before',          type:'pick',  startH:[6,7,8]},
   {key:'t_pick_11', time:'10:00 – 11:00', ar:'🟢 رحلة الصبح',           en:'🟢 Morning Pick-up',          arSub:'أطفال يحضرون الساعة 11ص',                      enSub:'Children arriving at 11am',                   type:'pick',  startH:[10,11]},
   {key:'t_mix_11',  time:'11:00 – 13:00', ar:'🔄 رجوع 11ص + جاي 1م',   en:'🔄 Drop 11am + Pick 1pm',     arSub:'أطفال يرجعون 11ص + أطفال يحضرون الساعة 1م',   enSub:'Drop 11am children + Pick up 1pm arrivals — same bus trip',type:'mixed',endH:[11,12],startH2:[13]},
@@ -14528,19 +14530,44 @@ function _parseKT(t){
 }
 
 function _matchTrip(c, trip){
+  // Staff entities use different matching
+  if(c.entityType==='staff'||c.isStaff){
+    if(trip.type==='staff_pick'){
+      const sh=_parseShiftH(c.shiftStart||c.shift_start||'');
+      return sh===6&&(trip.startH||[]).includes(5);
+    }
+    if(trip.type==='pick'){
+      const sh=_parseShiftH(c.shiftStart||c.shift_start||'');
+      return (trip.startH||[]).includes(sh);
+    }
+    if(trip.type==='drop'){
+      const eh=_parseShiftH(c.shiftEnd||c.shift_end||'');
+      return (trip.endH||[]).includes(eh);
+    }
+    return false;
+  }
+  // Regular children
   const{sh,eh}=_parseKT(c.kidsTime);
   const isPick=c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick');
   const isDrop=c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='drop');
+  if(trip.type==='staff_pick') return false;
   if(trip.type==='pick')  return isPick&&(trip.startH||[]).includes(sh);
   if(trip.type==='drop')  return isDrop&&(trip.endH||[]).includes(eh);
   if(trip.type==='mixed'){
-    // Drop 11am children (endH 11-12) OR Pick 1pm children (startH2 = 13)
-    // BUT: children with endH=13 go to t_drop_13, NOT here
-    const isDropHere = isDrop&&(trip.endH||[]).includes(eh)&&eh!==13;
-    const isPickHere = isPick&&(trip.startH2||[]).includes(sh);
+    const isDropHere=isDrop&&(trip.endH||[]).includes(eh)&&eh!==13;
+    const isPickHere=isPick&&(trip.startH2||[]).includes(sh);
     return isDropHere||isPickHere;
   }
   return false;
+}
+
+function _parseShiftH(t){
+  if(!t) return 99;
+  const m=String(t).match(/(\d{1,2})/);
+  if(!m) return 99;
+  let h=parseInt(m[1]);
+  if(h>=1&&h<=5) h+=12;
+  return h;
 }
 
 async function openMonthlyBusRoster(){
@@ -14659,6 +14686,15 @@ function renderMonthlyBusRoster(){
 
   const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
 
+  // Get bus-using staff
+  const busStaff=(DB.staff||[]).filter(s=>s.usesBus&&(branchSel==='all'||s.branchId===branchSel)).map(s=>{
+    const br=BRANCHES.find(b=>b.id===s.branchId)||{};
+    return{...s,entityType:'staff',isStaff:true,
+      branchName:br.ar||'',branchColor:br.c||'#374151',branchIcon:br.icon||'🏫',
+      busArea:s.homeArea||'',busDirection:'two_way',busPickDrop:'',
+      shiftStart:s.shiftStart||'',shiftEnd:s.shiftEnd||''};
+  });
+
   const ar=lang==='ar';
   let html='';
   BUS_TRIPS.forEach(trip=>{
@@ -14758,6 +14794,48 @@ function renderMonthlyBusRoster(){
           </tbody>
         </table>
       </div>
+      ${(()=>{
+        // Staff section for this trip
+        const tripStaff=busStaff.filter(s=>_matchTrip(s,trip));
+        if(!tripStaff.length) return '';
+        const tType=trip.type==='pick'||trip.type==='staff_pick'?'pick':'drop';
+        return`<div style="background:#f0f9ff;border-top:2px dashed ${tripColor}66;padding:8px 12px">
+          <div style="font-weight:800;color:#0369a1;font-size:.78rem;margin-bottom:6px">👩‍🏫 Staff / موظفون في هذه الرحلة</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+            <thead><tr style="background:#0369a1;color:#fff">
+              <th style="padding:5px 10px;text-align:center">Stop#</th>
+              <th style="padding:5px 10px;text-align:right">الموظف</th>
+              <th style="padding:5px 8px;text-align:right">الفرع</th>
+              <th style="padding:5px 8px;text-align:center">الشيفت</th>
+              <th style="padding:5px 8px;text-align:right">المنطقة</th>
+              <th style="padding:5px 8px;text-align:right">السواق</th>
+            </tr></thead>
+            <tbody>${tripStaff.map((s,i)=>{
+              const assign=getStaffBusAssign(String(s.id),tType);
+              const assignedId=assign?.busId||'';
+              const sStopNum=(DB.staffBusAssignments||{})[String(s.id)]?.stopNumber||'';
+              return`<tr style="${i%2===0?'background:#f0f9ff':'background:#fff'}">
+                <td style="padding:4px 10px;text-align:center">
+                  <input type="number" min="1" max="99" value="${sStopNum}" placeholder="—"
+                    data-sid="${s.id}" class="staff-stop-inp"
+                    style="width:46px;padding:4px;border:1.5px solid #93c5fd;border-radius:7px;font-size:.8rem;font-weight:900;text-align:center;color:#0369a1;background:#fff">
+                </td>
+                <td style="padding:4px 10px;font-weight:700">${s.name}</td>
+                <td style="padding:4px 8px"><span style="background:${s.branchColor}22;color:${s.branchColor};padding:1px 6px;border-radius:5px;font-size:.7rem;font-weight:700">${s.branchIcon} ${s.branchName}</span></td>
+                <td style="padding:4px 8px;text-align:center;color:#0369a1;font-weight:700">${s.shiftStart||'—'}–${s.shiftEnd||'—'}</td>
+                <td style="padding:4px 8px">${s.homeArea||'—'}</td>
+                <td style="padding:4px 8px">
+                  <select data-sid="${s.id}" data-trip-type="${tType}" class="staff-assign-sel"
+                    style="padding:3px 6px;border:1.5px solid #93c5fd;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.74rem;background:#fff;min-width:120px">
+                    <option value="">— Select driver —</option>
+                    ${busOpts.replace(`value="${assignedId}"`,`value="${assignedId}" selected`)}
+                  </select>
+                </td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>`;
+      })()}
     </div>`;
   });
 
@@ -14820,6 +14898,29 @@ async function saveAllBusAssignments(){
   renderMonthlyBusRoster();
   if(fail>0) showToast('⚠️ Saved '+ok+', failed '+fail+' — see console');
   else showToast('✅ Saved '+ok+' assignments ('+saved+' total in DB)');
+  // Save staff assignments
+  const staffSels=document.querySelectorAll('.staff-assign-sel');
+  for(const sel of staffSels){
+    const sid=sel.dataset.sid; const busId=sel.value;
+    if(!busId||!sid) continue;
+    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
+    if(!bus) continue;
+    if(!DB.staffBusAssignments) DB.staffBusAssignments={};
+    if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
+    DB.staffBusAssignments[sid].pick={busId:String(bus.id),busNumber:bus.busNumber};
+    DB.staffBusAssignments[sid].drop={busId:String(bus.id),busNumber:bus.busNumber};
+    await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
+    await sb.from('bus_assignments').insert({staff_id:Number(sid),entity_type:'staff',bus_id:Number(busId),bus_number:bus.busNumber,pick_bus_id:Number(busId),pick_bus_number:bus.busNumber,drop_bus_id:Number(busId),drop_bus_number:bus.busNumber});
+  }
+  const staffStops=document.querySelectorAll('.staff-stop-inp');
+  for(const inp of staffStops){
+    const sid=inp.dataset.sid; const val=parseInt(inp.value);
+    if(!sid||isNaN(val)) continue;
+    if(!DB.staffBusAssignments) DB.staffBusAssignments={};
+    if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
+    DB.staffBusAssignments[sid].stopNumber=val;
+    await sb.from('bus_assignments').update({stop_number:val}).eq('staff_id',Number(sid)).eq('entity_type','staff');
+  }
 }
 
 async function saveStopNumbers(){
@@ -15737,6 +15838,34 @@ function openStaffForm(id){
       </div>
     </div>
     <div class="fg" style="margin-bottom:10px"><label>Notes</label><textarea id="sf_notes" rows="2">${s?.notes||''}</textarea></div>
+    <!-- Bus / Transportation section -->
+    <div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:11px 14px;margin-bottom:10px">
+      <div style="font-weight:800;color:#92400e;margin-bottom:8px;font-size:.85rem">🚌 Transportation / المواصلات</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.82rem">
+        <div>
+          <label style="font-size:.75rem;color:#6b7280">يستخدم الباص</label>
+          <select id="sf_uses_bus" style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif">
+            <option value="false" ${!s?.usesBus?'selected':''}>❌ لا</option>
+            <option value="true" ${s?.usesBus?'selected':''}>✅ نعم</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:#6b7280">بداية الشيفت</label>
+          <input type="text" id="sf_shift_start" value="${s?.shiftStart||''}" placeholder="e.g. 06:00"
+            style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:#6b7280">نهاية الشيفت</label>
+          <input type="text" id="sf_shift_end" value="${s?.shiftEnd||''}" placeholder="e.g. 17:00"
+            style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:.75rem;color:#6b7280">منطقة السكن</label>
+          <input type="text" id="sf_home_area" value="${s?.homeArea||''}" placeholder="e.g. Al Nahda, Muwaileh..."
+            style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:7px">
       <button class="btn bp" onclick="saveStaff('${id||''}')">💾 Save</button>
       <button class="btn bg" onclick="closeStaffModal()">Cancel</button>
@@ -15789,6 +15918,10 @@ async function saveStaff(id){
     spea_expire: document.getElementById('sf_spea')?.value||null,
     health_card_expire: document.getElementById('sf_health')?.value||null,
     notes: document.getElementById('sf_notes')?.value||'',
+    home_area: document.getElementById('sf_home_area')?.value?.trim()||null,
+    shift_start: document.getElementById('sf_shift_start')?.value?.trim()||null,
+    shift_end: document.getElementById('sf_shift_end')?.value?.trim()||null,
+    uses_bus: document.getElementById('sf_uses_bus')?.value==='true',
     basic_salary: Number(document.getElementById('sf_basic')?.value||0),
     gross_salary: Number(document.getElementById('sf_gross')?.value||0),
     transfer_code: document.getElementById('sf_tcode')?.value||'',
@@ -15940,22 +16073,48 @@ function getBusAssign(childId, tripType){
   if(tripType==='drop') return a.drop||fallback;
   return a.pick||a.drop||fallback;
 }
+function getStaffBusAssign(staffId, tripType){
+  const a=(DB.staffBusAssignments||{})[String(staffId)];
+  if(!a) return null;
+  const fallback=a.busId?{busId:a.busId,busNumber:a.busNumber}:null;
+  if(tripType==='pick') return a.pick||fallback;
+  if(tripType==='drop') return a.drop||fallback;
+  return a.pick||a.drop||fallback;
+}
 
 async function loadAllBusAssignments(){
   const {data} = await sb.from('bus_assignments').select('*');
   DB.busAssignments = {};
+  DB.staffBusAssignments = {};
   (data||[]).forEach(r=>{
-    const cid=String(r.child_id);
-    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
-    const pickBusId  = r.pick_bus_id  || r.bus_id  || null;
-    const pickBusNum = r.pick_bus_number || r.bus_number || '';
-    const dropBusId  = r.drop_bus_id  || r.bus_id  || null;
-    const dropBusNum = r.drop_bus_number || r.bus_number || '';
-    if(pickBusId) DB.busAssignments[cid].pick = {busId:String(pickBusId), busNumber:pickBusNum};
-    if(dropBusId) DB.busAssignments[cid].drop = {busId:String(dropBusId), busNumber:dropBusNum};
-    DB.busAssignments[cid].busId     = pickBusId ? String(pickBusId) : (r.bus_id?String(r.bus_id):'');
-    DB.busAssignments[cid].busNumber = pickBusNum || r.bus_number || '';
-    DB.busAssignments[cid].stopNumber = r.stop_number || 999;
+    const isStaff = r.entity_type==='staff' || (r.staff_id&&!r.child_id);
+    if(isStaff){
+      const sid=String(r.staff_id||'');
+      if(!sid) return;
+      if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
+      const pickBusId=r.pick_bus_id||r.bus_id||null;
+      const pickBusNum=r.pick_bus_number||r.bus_number||'';
+      const dropBusId=r.drop_bus_id||r.bus_id||null;
+      const dropBusNum=r.drop_bus_number||r.bus_number||'';
+      if(pickBusId) DB.staffBusAssignments[sid].pick={busId:String(pickBusId),busNumber:pickBusNum};
+      if(dropBusId) DB.staffBusAssignments[sid].drop={busId:String(dropBusId),busNumber:dropBusNum};
+      DB.staffBusAssignments[sid].busId=pickBusId?String(pickBusId):(r.bus_id?String(r.bus_id):'');
+      DB.staffBusAssignments[sid].busNumber=pickBusNum||r.bus_number||'';
+      DB.staffBusAssignments[sid].stopNumber=r.stop_number||999;
+    } else {
+      const cid=String(r.child_id||'');
+      if(!cid) return;
+      if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+      const pickBusId=r.pick_bus_id||r.bus_id||null;
+      const pickBusNum=r.pick_bus_number||r.bus_number||'';
+      const dropBusId=r.drop_bus_id||r.bus_id||null;
+      const dropBusNum=r.drop_bus_number||r.bus_number||'';
+      if(pickBusId) DB.busAssignments[cid].pick={busId:String(pickBusId),busNumber:pickBusNum};
+      if(dropBusId) DB.busAssignments[cid].drop={busId:String(dropBusId),busNumber:dropBusNum};
+      DB.busAssignments[cid].busId=pickBusId?String(pickBusId):(r.bus_id?String(r.bus_id):'');
+      DB.busAssignments[cid].busNumber=pickBusNum||r.bus_number||'';
+      DB.busAssignments[cid].stopNumber=r.stop_number||999;
+    }
   });
 }
 
