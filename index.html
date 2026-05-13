@@ -1784,8 +1784,9 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="openBusForm(null)">➕ Add Bus</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openAutoAssignBuses()">🗺️ Auto Assign</button>
-      <button class="btn bsm" style="background:#1e3a8a;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusTripSheet()">📋 Trip Sheet</button>
-      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🧾 Driver Sheet</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
+      <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openDriverTripSheet()">🖨️ Driver Sheet</button>
+      <button class="btn bsm" style="background:#374151;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="checkBusAssignments()">🔍 Check DB</button>
       <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusChildrenReport()">👶 Bus Children</button>
       <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openMonthlyBusRoster()">📋 Bus Roster</button>
       <button class="btn bsm" style="background:#b45309;color:#fff;border:none;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openPrintByTripTime()">🖨️ Print by Trip</button>
@@ -14629,7 +14630,43 @@ function suggestBusDriver(area){
         ${v.bus.assistantName?`<span style="color:#9ca3af">👤 ${v.bus.assistantName}</span>`:''}
       </div>`).join('');
 }
-// ─── End Auto-suggest ──────────────────────────
+async function checkBusAssignments(){
+  // Reload fresh from Supabase
+  const {data,error}=await sb.from('bus_assignments').select('*');
+  if(error){
+    alert('❌ DB Error: '+error.message+'\n\nRun this SQL in Supabase:\nALTER TABLE bus_assignments DISABLE ROW LEVEL SECURITY;\nGRANT ALL ON bus_assignments TO anon;');
+    return;
+  }
+  const rows=data||[];
+  if(!rows.length){
+    const msg='⚠️ bus_assignments table is EMPTY — save is not working.\n\nPlease run in Supabase SQL Editor:\n\n'+
+      'ALTER TABLE bus_assignments DISABLE ROW LEVEL SECURITY;\n'+
+      'GRANT ALL ON bus_assignments TO anon;\n'+
+      'GRANT USAGE, SELECT ON SEQUENCE bus_assignments_id_seq TO anon;\n'+
+      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS pick_bus_id bigint;\n'+
+      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS pick_bus_number text DEFAULT \'\';\n'+
+      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS drop_bus_id bigint;\n'+
+      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS drop_bus_number text DEFAULT \'\';\n'+
+      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS stop_number integer DEFAULT 999;';
+    alert(msg);
+    return;
+  }
+  // Update DB.busAssignments from fresh data
+  await loadAllBusAssignments();
+  const allBuses=DB.allBuses||[];
+  let report=`✅ bus_assignments has ${rows.length} row(s):\n\n`;
+  rows.forEach(r=>{
+    const pBus=allBuses.find(b=>b.id===r.pick_bus_id||b.id===r.bus_id);
+    const dBus=allBuses.find(b=>b.id===r.drop_bus_id||b.id===r.bus_id);
+    report+=`Child ID ${r.child_id}:\n`;
+    report+=`  Pick: ${pBus?.driverName||'—'} (Bus ${r.pick_bus_number||r.bus_number||'—'})\n`;
+    report+=`  Drop: ${dBus?.driverName||'—'} (Bus ${r.drop_bus_number||'—'})\n`;
+    report+=`  Stop#: ${r.stop_number||'—'}\n\n`;
+  });
+  alert(report);
+}
+
+// ─── End Bus Assignment Check ───────────────────
 
 // ═══════════════════════════════════════════════
 // 2-WEEK BUS ATTENDANCE ROSTER PRINT
