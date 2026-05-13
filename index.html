@@ -12189,366 +12189,160 @@ async function confirmAutoAssign(){
 }
 
 // ── Driver Trip Sheet ─────────────────────────
-function openDriverTripSheet(){
-  const buses=DB.allBuses||DB.buses||[];
-  if(!buses.length){alert('لا توجد باصات — قومي بتحميل بيانات الباصات أولاً');return;}
-
-  const box=document.createElement('div');
-  box.id='driver-sheet-overlay';
-  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  box.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)">
-    <div style="background:linear-gradient(135deg,#059669,#047857);padding:14px 18px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center">
-      <div style="color:#fff;font-weight:900;font-size:.95rem">🧾 كشف السواق — Driver Trip Sheet</div>
-      <button onclick="document.getElementById('driver-sheet-overlay').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:1rem">✕</button>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div>
-        <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🚌 اختار الباص / السواق</label>
-        <select id="ds-bus" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:Tajawal,sans-serif">
-          ${buses.map(b=>`<option value="${b.id}">${b.driverName||'No Driver'} — باص ${b.busNumber}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">⏰ اختار الرحلة</label>
-        <select id="ds-trip" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:Tajawal,sans-serif">
-          ${TRIP_SLOTS.map(s=>`<option value="${s.key}">${s.label} (${s.type==='pick'?'Pick ▲':s.type==='drop'?'Drop ▼':'Pick+Drop'})</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📅 التاريخ</label>
-        <input type="date" id="ds-date" value="${today()}" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:Tajawal,sans-serif">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px">
-        <button onclick="generateDriverSheet('print')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:9px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.8rem;font-weight:700">🖨️ Print</button>
-        <button onclick="generateDriverSheet('pdf')" style="background:#dc2626;color:#fff;border:none;border-radius:9px;padding:9px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.8rem;font-weight:700">📄 PDF</button>
-        <button onclick="generateDriverSheet('excel')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:9px;cursor:pointer;font-family:Tajawal,sans-serif;font-size:.8rem;font-weight:700">📊 Excel</button>
-      </div>
-    </div>
-  </div>`;
-  document.body.appendChild(box);
-}
-
-async function generateDriverSheet(exportType){
-  const busId=el('ds-bus')?.value;
-  const tripKey=el('ds-trip')?.value;
-  const tripDate=el('ds-date')?.value||today();
-
-  if(!DB.allChildren) await loadAllChildren();
+async function openDriverTripSheet(){
+  // Load fresh data
+  if(!_busAllBranchCache) await loadBusAllBranchData(true);
   if(!DB.allBuses) await loadAllBuses();
   if(!DB.busAssignments) await loadAllBusAssignments();
 
-  const bus=(DB.allBuses||DB.buses||[]).find(b=>String(b.id)===String(busId));
-  const trip=TRIP_SLOTS.find(s=>s.key===tripKey);
-  if(!bus||!trip) return;
+  const ar=lang==='ar';
+  const allBuses=DB.allBuses||[];
 
-  const [ty,tm,td]=tripDate.split('-');
-  const dateLabel=`${td}/${tm}/${ty}`;
-
-  // Get kids assigned to this bus who have this trip slot
-  const kids=(DB.allChildren||[]).filter(c=>{
-    if(c.bus!=='Yes'&&c.bus!=='نعم') return false;
-    const assigned=DB.busAssignments[String(c.id)];
-    if(!assigned||String(assigned.busId)!==String(busId)) return false;
-    const slots=getTripSlots(c.kidsTime);
-    return slots.includes(tripKey);
+  // Gather all bus children from all branches
+  let allKids=[];
+  BRANCHES.forEach(br=>{
+    const bdata=_busAllBranchCache?.[br.id]||{children:[]};
+    bdata.children.filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).forEach(c=>{
+      allKids.push({...c,branchName:br.ar,branchEN:br.en||br.ar,branchColor:br.c||'#1e3a8a',branchIcon:br.icon});
+    });
   });
 
-  // Sort by area group
-  kids.sort((a,b)=>getAreaGroup(a.busArea)-getAreaGroup(b.busArea));
+  // Build driver→trips→children map
+  const driverMap={}; // driverName → {bus, trips:{tripKey→{trip,children[]}}}
+  BUS_TRIPS.forEach(trip=>{
+    const tType=trip.type==='pick'?'pick':'drop';
+    const tripKids=allKids.filter(c=>_matchTrip(c,trip));
+    tripKids.forEach(c=>{
+      const assign=getBusAssign(String(c.id),tType);
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
+      const dk=bus?.driverName||'Unassigned';
+      if(!driverMap[dk]) driverMap[dk]={bus,trips:{}};
+      if(!driverMap[dk].trips[trip.key]) driverMap[dk].trips[trip.key]={trip,children:[]};
+      driverMap[dk].trips[trip.key].children.push({...c,
+        stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
+    });
+  });
 
-  const branchFor=bid=>BRANCHES.find(b=>b.id===bid)?.ar||bid;
-  const branchColor=bid=>BRANCHES.find(b=>b.id===bid)?.c||'#1e3a8a';
+  // Sort each trip's children by stop number
+  Object.values(driverMap).forEach(dm=>{
+    Object.values(dm.trips).forEach(t=>{
+      t.children.sort((a,b)=>a.stopNum-b.stopNum||a.name.localeCompare(b.name,'ar'));
+    });
+  });
 
-  if(exportType==='excel'){
-    const XLSX=window.XLSX; if(!XLSX) return;
-    const rows=[
-      [`كشف رحلة — Driver Trip Sheet`],
-      [`الباص: ${bus.busNumber}`, `السواق: ${bus.driverName||'—'}`, `المشرفة: ${bus.assistantName||'—'}`],
-      [`الرحلة: ${trip.label}`, `التاريخ: ${dateLabel}`, `عدد الأطفال: ${kids.length}`],
-      [],
-      ['#','اسم الطفل','الفصل','الفرع','المنطقة','وقت الحضانة','الاتجاه','حضور/غياب'],
-      ...kids.map((c,i)=>[i+1, c.name, c.className||'—', branchFor(c.branchId), c.busArea||'—', c.kidsTime||'—',
-        c.busDirection==='two_way'?'اتجاهين':c.busPickDrop==='pick'?'Pick استقبال':'Drop توصيل',''])
-    ];
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:4},{wch:22},{wch:8},{wch:14},{wch:18},{wch:14},{wch:14},{wch:12}];
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,`${bus.busNumber} ${trip.time}`);
-    XLSX.writeFile(wb,`Driver_Sheet_${bus.busNumber}_${trip.time}_${tripDate}.xlsx`);
-    document.getElementById('driver-sheet-overlay')?.remove();
+  if(!Object.keys(driverMap).length){
+    alert(ar?'لا يوجد أطفال معينون — قومي بتعيين الأطفال في Bus Roster أولاً':'No children assigned. Please assign children in Bus Roster first.');
     return;
   }
 
-  // HTML for Print/PDF
-  const tripTypeColor=trip.type==='pick'?'#059669':trip.type==='drop'?'#dc2626':'#d97706';
-  const tripTypeLabel=trip.type==='pick'?'▲ Pick — استقبال':trip.type==='drop'?'▼ Drop — توصيل':'▲▼ Pick + Drop';
+  // Generate printable HTML
+  const col_pick='#0d9488', col_drop='#1d4ed8', col_mixed='#d97706';
+  let pages='';
+  Object.entries(driverMap).sort().forEach(([dk,dm])=>{
+    Object.entries(dm.trips).forEach(([tk,tData])=>{
+      if(!tData.children.length) return;
+      const trip=tData.trip;
+      const col=trip.type==='pick'?col_pick:trip.type==='mixed'?col_mixed:col_drop;
+      const label=trip.en||trip.labelEN||trip.ar||'';
+      const bus=dm.bus;
+      const rows=tData.children.map((ch,i)=>`
+        <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
+          <td style="padding:5px 8px;text-align:center;font-weight:900;color:#d97706;border:1px solid #e5e7eb">${ch.stopNum<999?ch.stopNum:'—'}</td>
+          <td style="padding:5px 8px;font-weight:700;border:1px solid #e5e7eb">${ch.name}</td>
+          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb;color:#6b7280">${ch.className||'—'}</td>
+          <td style="padding:5px 6px;border:1px solid #e5e7eb;font-size:8.5pt;color:${ch.branchColor}">
+            ${ch.branchIcon} ${ch.branchEN}</td>
+          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb;color:#0369a1;font-weight:700">${ch.kidsTime||'—'}</td>
+          <td style="padding:5px 6px;border:1px solid #e5e7eb">${ch.busArea||'—'}</td>
+          <td style="padding:5px 6px;border:1px solid #e5e7eb;font-size:8pt">${ch.parentMom?'👩 '+ch.parentMom:''}${ch.parentMom&&ch.parentDad?'<br>':''}${ch.parentDad?'👨 '+ch.parentDad:''}${!ch.parentMom&&!ch.parentDad?'—':''}</td>
+          <td style="padding:5px 6px;text-align:center;border:1px solid #e5e7eb"><div style="width:22px;height:22px;border:1.5px solid #d1d5db;border-radius:4px;margin:auto"></div></td>
+        </tr>`).join('');
 
-  const rows=kids.map((c,i)=>`<tr>
-    <td>${i+1}</td>
-    <td class="b">${c.name}</td>
-    <td>${c.className||'—'}</td>
-    <td><span style="background:${branchColor(c.branchId)}22;color:${branchColor(c.branchId)};padding:2px 6px;border-radius:5px;font-size:.7rem;font-weight:700">${branchFor(c.branchId)}</span></td>
-    <td>${c.busArea||'—'}</td>
-    <td class="t">${c.kidsTime||'—'}</td>
-    <td>${c.busDirection==='two_way'?'↔':'▲/▼'} ${c.busPickDrop||''}</td>
-    <td style="text-align:center"><span style="display:inline-block;width:16px;height:16px;border:1.5px solid #374151;border-radius:3px"></span></td>
-    <td>${c.parentMom||'—'}</td>
-  </tr>`).join('');
+      pages+=`<div style="page-break-after:always;padding:0">
+        <!-- Header bar -->
+        <div style="background:${col};color:#fff;padding:5mm 8mm;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:8pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — Driver Trip Sheet</div>
+            <div style="font-size:13pt;font-weight:900;margin-bottom:1mm">${label}</div>
+            <div style="font-size:9pt;opacity:.9">🕐 ${trip.time} &nbsp;|&nbsp; ${trip.enSub||trip.subEN||''}</div>
+          </div>
+          <div style="text-align:right;background:rgba(0,0,0,.15);padding:4mm 7mm;border-radius:8px">
+            <div style="font-size:8pt;opacity:.8">Driver / السواق</div>
+            <div style="font-size:14pt;font-weight:900">${dk}</div>
+            <div style="font-size:8.5pt;opacity:.9">
+              Bus: ${bus?.busNumber||'—'}
+              ${bus?.assistantName?' &nbsp;|&nbsp; '+bus.assistantName:''}
+            </div>
+          </div>
+        </div>
+        <!-- Summary bar -->
+        <div style="background:${col}20;border-bottom:2px solid ${col}40;padding:2mm 8mm;font-size:8.5pt;color:#374151;font-weight:700;display:flex;gap:15mm">
+          <span>Date: ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</span>
+          <span>Children: ${tData.children.length}</span>
+          <span>Trip: ${trip.type==='pick'?'Pick-up ▲':'Drop-off ▼'}</span>
+        </div>
+        <!-- Children table -->
+        <div style="padding:4mm 6mm">
+          <table style="width:100%;border-collapse:collapse;font-size:9pt">
+            <thead>
+              <tr style="background:${col};color:#fff">
+                <th style="padding:6px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:40px">Stop#</th>
+                <th style="padding:6px 8px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3)">Contact</th>
+                <th style="padding:6px 6px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:30px">✓</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <!-- Signatures -->
+        <div style="padding:2mm 6mm;display:flex;gap:12mm;margin-top:2mm">
+          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
+            <div style="font-weight:700">${dk}</div>
+            <div style="color:#6b7280">Driver Signature</div>
+          </div>
+          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
+            <div style="font-weight:700">${bus?.assistantName||'___________'}</div>
+            <div style="color:#6b7280">Assistant Signature</div>
+          </div>
+          <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt">
+            <div style="font-weight:700">___________</div>
+            <div style="color:#6b7280">Manager Signature</div>
+          </div>
+        </div>
+        <div style="padding:1mm 6mm;font-size:7pt;color:#9ca3af;text-align:center">
+          Child Care Nurseries Group | ${label} | Bus ${bus?.busNumber||'—'} | ${new Date().toLocaleDateString('en-GB')}
+        </div>
+      </div>`;
+    });
+  });
 
-  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
+  if(!pages){alert('No assigned children found in any trip. Assign children first.');return;}
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
-    @page{size:A4;margin:8mm}
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Tajawal',Arial,sans-serif;font-size:9pt;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .hdr{background:#1e3a8a;color:#fff;padding:8px 12px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center}
-    .hdr-main{font-size:12pt;font-weight:900}
-    .hdr-sub{font-size:8pt;opacity:.8;margin-top:2px}
-    .info-bar{background:#f0f4ff;padding:7px 12px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;border-radius:0 0 8px 8px}
-    .info-cell{font-size:7.5pt;color:#6b7280}.info-val{font-weight:800;color:#1e3a8a;font-size:9pt}
-    .trip-badge{background:${tripTypeColor};color:#fff;padding:2px 10px;border-radius:12px;font-size:9pt;font-weight:900}
-    table{width:100%;border-collapse:collapse;font-size:8.5pt}
-    th{background:#1e3a8a;color:#fff;padding:5px 7px;text-align:right;border:1px solid #3b5998}
-    td{padding:4px 7px;border:1px solid #e5e7eb;text-align:right}
-    tr:nth-child(even)td{background:#f8faff}
-    .b{font-weight:700}.t{color:#0369a1;font-weight:700}
-    .footer{margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-    .sig-box{border-top:1.5px solid #374151;padding-top:3mm;margin-top:10mm;font-size:8pt;color:#6b7280}
-    @media print{.np{display:none}}
-    .count-badge{background:${tripTypeColor}22;color:${tripTypeColor};padding:3px 10px;border-radius:10px;font-size:9pt;font-weight:900}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    @page{size:A4;margin:0} *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @media print{.np{display:none!important}}
   </style></head><body>
-  <div class="np" style="background:#1f2937;padding:6px;text-align:center;margin-bottom:6px">
-    <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;padding:5px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;margin-right:6px">🖨️ Print / PDF</button>
-    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">✕</button>
+  <div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
+    <button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">🖨️ Print All Drivers</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
   </div>
-
-  <div class="hdr">
-    <div>
-      <div class="hdr-main">🚌 ${bus.busNumber} &nbsp;|&nbsp; <span class="trip-badge">${trip.label}</span></div>
-      <div class="hdr-sub">مجموعة رعاية الطفل للحضانات — Child Care Nurseries Group</div>
-    </div>
-    <div style="text-align:left;font-size:8pt;opacity:.85">${dateLabel}<br>${tripTypeLabel}</div>
-  </div>
-
-  <div class="info-bar">
-    <div class="info-cell">السواق<div class="info-val">${bus.driverName||'—'}</div></div>
-    <div class="info-cell">المشرفة<div class="info-val">${bus.assistantName||'—'}</div></div>
-    <div class="info-cell">رقم الباص<div class="info-val">${bus.busNumber}</div></div>
-    <div class="info-cell">عدد الأطفال<div class="info-val"><span class="count-badge">${kids.length} طفل</span></div></div>
-  </div>
-
-  <table>
-    <thead><tr>
-      <th style="width:25px">#</th>
-      <th>اسم الطفل</th>
-      <th>الفصل</th>
-      <th>الفرع</th>
-      <th>المنطقة</th>
-      <th>وقت الحضانة</th>
-      <th>الاتجاه</th>
-      <th style="width:30px;text-align:center">✓</th>
-      <th>هاتف ولي الأمر</th>
-    </tr></thead>
-    <tbody>${rows||`<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:14px">— لا يوجد أطفال لهذه الرحلة —</td></tr>`}</tbody>
-  </table>
-
-  <div class="footer">
-    <div class="sig-box">توقيع السواق — Driver Signature<br><b>${bus.driverName||'_______________'}</b></div>
-    <div class="sig-box">توقيع المشرفة — Assistant Signature<br><b>${bus.assistantName||'_______________'}</b></div>
-  </div>
-
-  <div style="margin-top:6mm;font-size:7pt;color:#9ca3af;text-align:center">
-    كشف رحلة تلقائي — ${bus.busNumber} — ${trip.label} — ${dateLabel} | Child Care Nurseries Group
-  </div>
+  <div style="height:38px" class="np"></div>
+  ${pages}
   </body></html>`;
 
-  document.getElementById('driver-sheet-overlay')?.remove();
-  const w=window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  if(exportType==='print') setTimeout(()=>w.print(),500);
+  const w=window.open('','_blank','width=900,height=1100');
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),700);
 }
 
-async function openBusTripSheet(){
-  el('trip-date').value = today();
-  const sel = el('trip-branch-filter');
-  sel.innerHTML = `<option value="all">كل الفروع — All Branches</option>`
-    + BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${b.ar}</option>`).join('');
-  await loadAllBuses();
-  await loadAllBusAssignments();
-  DB.allChildren = null; // force fresh load
-  await loadAllChildren();
-  _tripTab = 'pick';
-  switchTripTab('pick');
-  el('bus-trip-modal').style.display = 'flex';
-}
-
-async function loadAllBuses(){
-  const {data} = await sb.from('buses').select('*');
-  DB.allBuses = (data||[]).map(x=>({
-    id:x.id, branchId:x.branch_id,
-    busNumber:x.bus_number||'',
-    driverName:x.driver_name||'',
-    driverContact:x.driver_contact||'',
-    assistantName:x.assistant_name||'',
-  }));
-}
-
-async function loadAllChildren(){
-  const {data} = await sb.from('children').select('*').is('leave_date',null);
-  DB.allChildren = (data||[]).map(x=>({
-    id:String(x.id), branchId:x.branch_id,
-    name:x.name||'', className:x.class_name||'',
-    bus:x.bus||'No',
-    busDirection:x.bus_direction||'',
-    busPickDrop:x.bus_pick_drop||'',
-    busArea:x.bus_area||'',
-    parentMom:x.parent_mom||'',
-  }));
-}
-
-async function loadAllBusAssignments(){
-  const {data} = await sb.from('bus_assignments').select('*');
-  DB.busAssignments = {};
-  (data||[]).forEach(r=>{
-    const cid=String(r.child_id);
-    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
-    const pickBusId  = r.pick_bus_id  || r.bus_id  || null;
-    const pickBusNum = r.pick_bus_number || r.bus_number || '';
-    const dropBusId  = r.drop_bus_id  || r.bus_id  || null;
-    const dropBusNum = r.drop_bus_number || r.bus_number || '';
-    if(pickBusId) DB.busAssignments[cid].pick = {busId:String(pickBusId), busNumber:pickBusNum};
-    if(dropBusId) DB.busAssignments[cid].drop = {busId:String(dropBusId), busNumber:dropBusNum};
-    DB.busAssignments[cid].busId     = pickBusId ? String(pickBusId) : (r.bus_id?String(r.bus_id):'');
-    DB.busAssignments[cid].busNumber = pickBusNum || r.bus_number || '';
-    DB.busAssignments[cid].stopNumber = r.stop_number || 999;
-  });
-}
-
-// Helper: get bus assignment for a child, respecting pick/drop split
-function getBusAssign(childId, tripType){
-  const a=(DB.busAssignments||{})[String(childId)];
-  if(!a) return null;
-  if(tripType==='pick') return a.pick || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
-  if(tripType==='drop') return a.drop || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
-  // No tripType: return pick first, then drop, then top-level
-  return a.pick || a.drop || (a.busId?{busId:a.busId,busNumber:a.busNumber}:null);
-}
-
-async function loadTripAttendance(tripDate, tripType){
-  const key = `${tripDate}|${tripType}`;
-  if(_tripAttCache[key]) return _tripAttCache[key];
-  const {data} = await sb.from('bus_trip_attendance')
-    .select('*').eq('trip_date', tripDate).eq('trip_type', tripType);
-  const map = {};
-  (data||[]).forEach(r=>{ map[String(r.child_id)] = r.status||'present'; });
-  _tripAttCache[key] = map;
-  return map;
-}
-
-async function saveTripAttendance(tripDate, tripType, childId, busId, busNumber, status){
-  const key = `${tripDate}|${tripType}`;
-  if(!_tripAttCache[key]) _tripAttCache[key] = {};
-  _tripAttCache[key][String(childId)] = status;
-  await sb.from('bus_trip_attendance').upsert({
-    trip_date: tripDate,
-    trip_type: tripType,
-    child_id: Number(childId),
-    bus_id: busId ? Number(busId) : null,
-    bus_number: busNumber||'',
-    status: status
-  }, {onConflict:'trip_date,trip_type,child_id'});
-}
-
-async function assignChildToBus(childId, busId, busNumber, tripType){
-  // tripType: 'pick' | 'drop' | 'both' (default: both for backward compat)
-  const cid=String(childId);
-  if(!DB.busAssignments) DB.busAssignments={};
-  if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
-
-  const type=tripType||'both';
-  if(type==='pick'||type==='both'){
-    DB.busAssignments[cid].pick={busId:String(busId),busNumber};
-    DB.busAssignments[cid].busId=String(busId);
-    DB.busAssignments[cid].busNumber=busNumber;
-  }
-  if(type==='drop'||type==='both'){
-    DB.busAssignments[cid].drop={busId:String(busId),busNumber};
-    if(!DB.busAssignments[cid].busId) DB.busAssignments[cid].busId=String(busId);
-  }
-
-  const pickData=DB.busAssignments[cid].pick;
-  const dropData=DB.busAssignments[cid].drop;
-
-  // Build row with both pick and drop
-  const row={
-    child_id:      Number(childId),
-    bus_id:        pickData ? Number(pickData.busId) : (dropData ? Number(dropData.busId) : Number(busId)),
-    bus_number:    pickData ? (pickData.busNumber||'') : (dropData?.busNumber||busNumber||''),
-    pick_bus_id:   pickData ? Number(pickData.busId) : null,
-    pick_bus_number: pickData?.busNumber||'',
-    drop_bus_id:   dropData ? Number(dropData.busId) : null,
-    drop_bus_number: dropData?.busNumber||'',
-  };
-
-  // DELETE then INSERT (most reliable — avoids onConflict dependency)
-  await sb.from('bus_assignments').delete().eq('child_id', Number(childId));
-  const {error}=await sb.from('bus_assignments').insert(row);
-  if(error) console.warn('assignChildToBus error:', error?.message||error);
-}
-
-function switchTripTab(tab){
-  _tripTab = tab;
-  const pickBtn = el('trip-tab-pick');
-  const dropBtn = el('trip-tab-drop');
-  const on = 'flex:1;padding:8px;border-radius:9px;border:2px solid VAR;background:VAR;color:#fff;cursor:pointer;font-family:Tajawal,sans-serif;font-weight:800;font-size:.85rem';
-  const off = 'flex:1;padding:8px;border-radius:9px;border:2px solid #e5e7eb;background:#f9fafb;color:#6b7280;cursor:pointer;font-family:Tajawal,sans-serif;font-weight:800;font-size:.85rem';
-  if(tab==='pick'){
-    pickBtn.style.cssText = on.replace(/VAR/g,'#10b981');
-    dropBtn.style.cssText = off;
-  } else {
-    dropBtn.style.cssText = on.replace(/VAR/g,'#ef4444');
-    pickBtn.style.cssText = off;
-  }
-  renderBusTripSheet();
-}
-
-function buildTripTimeSummary(children, tab){
-  const pT=t=>{
-    const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
-    if(!m) return{startH:8,endH:13};
-    let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
-  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
-    return{startH:sh,endH:eh};
-  };
-  const slotKey=c=>{
-    const{startH,endH}=pT(c.kidsTime);
-    if(tab==='pick'){
-      if(startH<=7) return '🟢 رحلة 6ص';
-      if(startH<=9) return '🟢 رحلة 8-9ص';
-      if(startH<=11) return '🟢 رحلة 10-11ص';
-      return '🟢 رحلة 1م';
-    } else {
-      if(endH<=11) return '🔴 رحلة 11ص';
-      if(endH<=12) return '🔴 رحلة 12م';
-      if(endH<=13) return '🔴 رحلة 1م';
-      if(endH<=15) return '🔴 رحلة 3م';
-      return '🔴 رحلة 5م';
-    }
-  };
-  const slotMap={};
-  children.forEach(c=>{const k=slotKey(c);if(!slotMap[k])slotMap[k]=0;slotMap[k]++;});
-  const color=tab==='pick'?'#dcfce7':'#fee2e2';
-  const txtColor=tab==='pick'?'#166534':'#991b1b';
-  const badges=Object.entries(slotMap).sort().map(([k,n])=>
-    `<span style="background:${color};color:${txtColor};padding:3px 11px;border-radius:8px;font-size:.76rem;font-weight:800">${k}: ${n} طفل</span>`
-  ).join('');
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:10px;border:1px solid #e5e7eb">
-    <div style="font-size:.72rem;font-weight:700;color:#374151;width:100%;margin-bottom:4px">🕐 توزيع الأطفال على رحلات اليوم</div>
-    ${badges||'<span style="color:#9ca3af;font-size:.75rem">لا يوجد أطفال</span>'}
-  </div>`;
-}
 
 async function renderBusTripSheet(){
   const body = el('bus-trip-body');
