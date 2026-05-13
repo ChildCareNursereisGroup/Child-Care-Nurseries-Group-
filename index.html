@@ -2237,6 +2237,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="dtab" onclick="showDTab('trans',this)" data-tab="trans"></button>
       <button class="dtab" onclick="printChildCard()" data-tab="card"></button>
       <button class="dtab" onclick="showDTab('cert',this)" data-tab="cert"></button>
+      <button class="dtab" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.72rem;font-weight:700" onclick="printRegReceiptFromChild()" title="Registration Receipt">📋</button>
+      <button class="dtab" style="background:#d97706;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.72rem;font-weight:700" onclick="printTransportReceiptFromChild()" title="Transport Receipt">🚌</button>
     </div>
     <button onclick="document.getElementById('child-modal-tabs').scrollBy({left:150,behavior:'smooth'})"
       style="position:absolute;right:0;top:0;bottom:0;background:linear-gradient(to right,transparent 0%,#fff 50%);border:none;width:36px;cursor:pointer;font-size:1.1rem;color:#5b21b6;font-weight:900;z-index:5;padding:0">›</button>
@@ -3665,26 +3667,32 @@ async function saveChild(){
   if(error){showAlert('addalert','❌ Error: '+error.message,true);return;}
   showAlert('addalert',`✅ Registered! Reg No: ${v('fr')}`,false);
 
-  // Save bus assignment if driver was selected
-  if(data?.id && window._selectedBusId){
-    await assignChildToBus(data.id, window._selectedBusId, window._selectedBusNum||'', 'both');
-    // Auto stop number based on existing stops in same area
+  // Save bus assignment if driver was selected (pick and/or drop separately)
+  if(data?.id && (window._selectedPickBusId||window._selectedDropBusId||window._selectedBusId)){
+    const pickBusId=window._selectedPickBusId||window._selectedBusId;
+    const dropBusId=window._selectedDropBusId||window._selectedBusId;
+    const pickBusNum=window._selectedPickBusNum||window._selectedBusNum||'';
+    const dropBusNum=window._selectedDropBusNum||window._selectedBusNum||'';
+    if(pickBusId) await assignChildToBus(data.id, pickBusId, pickBusNum, 'pick');
+    if(dropBusId&&dropBusId!==pickBusId) await assignChildToBus(data.id, dropBusId, dropBusNum, 'drop');
+    else if(dropBusId) await assignChildToBus(data.id, dropBusId, dropBusNum, 'both');
+    // Auto stop number
     const area=(el('fbus-area')?.value||'').trim().toLowerCase();
+    const primBusId=pickBusId||dropBusId;
     const existingStops=Object.entries(DB.busAssignments||{})
       .filter(([cid,a])=>{
         const assign=a.pick||a;
-        if(!assign.busId||String(assign.busId)!==String(window._selectedBusId)) return false;
+        if(!assign.busId||String(assign.busId)!==String(primBusId)) return false;
         const kid=(window._rosterKids||[]).find(k=>String(k.id)===cid);
         return kid&&area&&kid.busArea&&kid.busArea.toLowerCase().includes(area);
-      })
-      .map(([,a])=>a.stopNumber||999).filter(n=>n<999);
+      }).map(([,a])=>a.stopNumber||999).filter(n=>n<999);
     const autoStop=existingStops.length?Math.max(...existingStops)+1:
-      Object.values(DB.busAssignments||{}).filter(a=>{
-        const assign=a.pick||a;return assign.busId&&String(assign.busId)===String(window._selectedBusId);
-      }).length+1;
+      Object.values(DB.busAssignments||{}).filter(a=>{const assign=a.pick||a;return assign.busId&&String(assign.busId)===String(primBusId);}).length+1;
     await sb.from('bus_assignments').update({stop_number:autoStop}).eq('child_id',Number(data.id));
-    if(DB.busAssignments[String(data.id)]) DB.busAssignments[String(data.id)].stopNumber=autoStop;
-    window._selectedBusId=null; window._selectedBusNum=null; window._selectedDriverName=null;
+    // Clear selections
+    window._selectedBusId=window._selectedBusNum=window._selectedDriverName=null;
+    window._selectedPickBusId=window._selectedPickBusNum=window._selectedPickDriver=null;
+    window._selectedDropBusId=window._selectedDropBusNum=window._selectedDropDriver=null;
   }
 
   // Show print options
@@ -3907,6 +3915,33 @@ function printTransportReceipt(ch){
   if(!w){alert('Allow popups to print');return;}
   w.document.write(html); w.document.close();
   setTimeout(()=>w.print(),600);
+}
+function printRegReceiptFromChild(){
+  const c=DB.children.find(x=>String(x.id)===String(curChild));
+  if(!c) return;
+  const assign=getBusAssign(String(c.id),'pick')||getBusAssign(String(c.id),'drop');
+  const bus=assign?(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId)):null;
+  printRegReceipt({
+    name:c.name, class_name:c.className, reg_num:c.regNum,
+    nationality:c.nationality, dob:c.dob, joinDate:c.joinDate,
+    kidsTime:c.kidsTime, parentMom:c.parentMom, parentDad:c.parentDad,
+    fee:c.fee, busFee:c.busFee, bus:c.bus, busDirection:c.busDirection,
+    busArea:c.busArea, driverName:bus?.driverName||''
+  });
+}
+function printTransportReceiptFromChild(){
+  const c=DB.children.find(x=>String(x.id)===String(curChild));
+  if(!c){return;}
+  if(c.bus!=='Yes'&&c.bus!=='نعم'){showToast('⚠️ This child does not use the bus');return;}
+  const assign=getBusAssign(String(c.id),'pick')||getBusAssign(String(c.id),'drop');
+  const bus=assign?(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId)):null;
+  printTransportReceipt({
+    name:c.name, class_name:c.className, reg_num:c.regNum,
+    nationality:c.nationality, dob:c.dob, joinDate:c.joinDate,
+    kidsTime:c.kidsTime, parentMom:c.parentMom, parentDad:c.parentDad,
+    busFee:c.busFee, bus:c.bus, busDirection:c.busDirection,
+    busArea:c.busArea, driverName:bus?.driverName||''
+  });
 }
 // ─── End Registration Receipts ───────────────────
 async function getNextSerialAsync(payMethod){
@@ -14910,55 +14945,109 @@ async function smartBusSuggest(){
     }));
   }
 
-  const allBuses=DB.allBuses||[];
-  if(!allBuses.length){sugBox.style.display='none';return;}
+  const parseT=t=>{
+    const m=(t||'').replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
+    if(!m) return null;
+    let sh=parseInt(m[1]),eh=parseInt(m[3]);
+    if(sh>=1&&sh<=5) sh+=12; if(eh>=1&&eh<=5) eh+=12;
+    return{sh,eh};
+  };
+  const parsed=parseT(kidsTime);
+  const busDir=el('fbus-dir')?.value||el('fbus-direction')?.value||'two_way';
+  const pickDrop=el('fbus-pickdrop')?.value||'pick';
+  const isTwoWay=busDir==='two_way'||busDir==='اتجاهين';
+  const needPick=isTwoWay||(busDir==='one_way'&&pickDrop==='pick');
+  const needDrop=isTwoWay||(busDir==='one_way'&&pickDrop==='drop');
 
+  // Find trips
+  const pickTrip=parsed&&needPick?BUS_TRIPS?.find(t=>t.type==='pick'&&(t.startH||[]).includes(parsed.sh)):null;
+  const dropTrip=parsed&&needDrop?BUS_TRIPS?.find(t=>t.type==='drop'&&(t.endH||[]).includes(parsed.eh)):null;
+  const allBuses=DB.allBuses||[];
   const areaLower=area.toLowerCase();
-  const scored=allBuses.map(bus=>{
-    const assignedKids=(window._rosterKids||[]).filter(c=>{
-      const a=(DB.busAssignments||{})[String(c.id)];
-      return a&&(String(a.busId)===String(bus.id)||a.busNumber===bus.busNumber
-        ||a.pick?.busId===String(bus.id)||a.drop?.busId===String(bus.id));
+
+  // Score buses for a specific trip type
+  const scoreBuses=(tripObj,tType)=>allBuses.map(bus=>{
+    let tripCount=0, sameAreaCount=0;
+    (window._rosterKids||[]).forEach(c=>{
+      const assign=getBusAssign(String(c.id),tType);
+      if(!assign||(String(assign.busId)!==String(bus.id)&&assign.busNumber!==bus.busNumber)) return;
+      const fakeChild={kidsTime:c.kidsTime,busDirection:c.busDirection,busPickDrop:''};
+      if(!tripObj||(_matchTrip&&_matchTrip(fakeChild,tripObj))){
+        tripCount++;
+        if(areaLower&&c.busArea&&c.busArea.toLowerCase().includes(areaLower)) sameAreaCount++;
+      }
     });
-    const total=assignedKids.length;
-    const same=area?assignedKids.filter(c=>c.busArea&&c.busArea.toLowerCase().includes(areaLower)).length:0;
-    return{bus,total,same,remaining:25-total,score:same*10-(total*0.5)};
+    return{bus,tripCount,sameAreaCount,remaining:25-tripCount,score:sameAreaCount*10+(25-tripCount)*0.5};
   }).sort((a,b)=>b.score-a.score).slice(0,4);
+
+  // Build driver cards for one direction
+  const buildCards=(scored,tType)=>scored.map(({bus,tripCount,sameAreaCount,remaining})=>{
+    const dc=getDriverColor(bus.driverName);
+    const full=remaining<=0, warn=remaining<=5&&!full;
+    return`<div style="background:${dc.light};border:2px solid ${full?'#f87171':warn?'#fbbf24':dc.bg};border-radius:10px;padding:9px 11px;cursor:pointer"
+      onclick="selectBusDriver('${bus.id}','${bus.busNumber}','${bus.driverName.replace(/'/g,'')}','${tType}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-weight:900;color:${dc.bg};font-size:.88rem">${bus.driverName||'—'}</span>
+        <span style="background:${full?'#fef2f2':warn?'#fffbeb':'#f0fdf4'};border:1px solid ${full?'#fca5a5':warn?'#fcd34d':'#86efac'};color:${full?'#dc2626':warn?'#92400e':'#065f46'};padding:1px 8px;border-radius:6px;font-size:.72rem;font-weight:800">${tripCount}/25${full?' ⚠️':''}</span>
+      </div>
+      <div style="font-size:.73rem;color:#6b7280;margin-bottom:4px">Bus ${bus.busNumber}${bus.assistantName?' | '+bus.assistantName:''}</div>
+      ${sameAreaCount>0?`<div style="background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:5px;font-size:.7rem;font-weight:700;margin-bottom:4px">📍 ${sameAreaCount} nearby</div>`:''}
+      <div style="background:${dc.bg};color:#fff;text-align:center;border-radius:6px;padding:4px;font-size:.75rem;font-weight:800">
+        ${full?'⚠️ Select (over capacity)':'✓ Select for this trip'}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Build section for one direction
+  const buildSection=(trip,tType,icon,label,col)=>{
+    const scored=scoreBuses(trip,tType);
+    return`<div style="background:${col}12;border:1.5px solid ${col}44;border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="font-weight:800;color:${col};font-size:.82rem;margin-bottom:6px">
+        ${icon} ${label}${trip?` — ${trip.en||trip.ar} (${trip.time})`:''}
+      </div>
+      <div id="bus-selected-${tType}" style="display:none;background:#d1fae5;border:1.5px solid #059669;border-radius:7px;padding:6px 10px;font-size:.8rem;color:#065f46;font-weight:700;margin-bottom:6px"></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">${buildCards(scored,tType)}</div>
+    </div>`;
+  };
 
   sugBox.style.display='block';
   sugBox.innerHTML=`<div style="font-family:Tajawal,sans-serif">
-    <div style="font-weight:800;color:#1e3a8a;font-size:.82rem;margin-bottom:7px">
-      🚌 Suggested Drivers ${area?'for <b>'+area+'</b>':''}
+    <div style="font-weight:800;color:#1e3a8a;font-size:.84rem;margin-bottom:8px">
+      🚌 Suggested Drivers${area?' for <b>'+area+'</b>':''}
+      ${isTwoWay?'<span style="background:#e0f2fe;color:#0369a1;padding:1px 9px;border-radius:8px;font-size:.73rem;font-weight:700;margin-right:6px">🔄 Two-way</span>':''}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">
-      ${scored.map(({bus,total,same,remaining})=>{
-        const dc=getDriverColor(bus.driverName);
-        const full=remaining<=0;
-        const warn=remaining<=5&&!full;
-        return`<div style="background:${dc.light};border:2px solid ${full?'#dc2626':warn?'#f59e0b':dc.bg};border-radius:10px;padding:9px 11px"
-          onclick="${full?'':("selectBusDriver('"+bus.id+"','"+bus.busNumber+"','"+bus.driverName.replace(/'/g,"")+"')")}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-            <span style="font-weight:900;color:${dc.bg};font-size:.88rem">${bus.driverName||'—'}</span>
-            <span style="background:${full?'#dc2626':warn?'#f59e0b':'#d1fae5'};color:${full?'#fff':warn?'#1c1917':'#065f46'};padding:1px 8px;border-radius:6px;font-size:.72rem;font-weight:800">${total}/25</span>
-          </div>
-          <div style="font-size:.73rem;color:#6b7280;margin-bottom:5px">Bus ${bus.busNumber}${bus.assistantName?' | '+bus.assistantName:''}</div>
-          ${same>0?`<div style="background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:5px;font-size:.7rem;font-weight:700;margin-bottom:5px">📍 ${same} child${same>1?'ren':''} nearby</div>`:''}
-          ${full
-            ?`<div style="background:#dc2626;color:#fff;text-align:center;border-radius:6px;padding:3px 0;font-size:.72rem;font-weight:700">Full — Unavailable</div>`
-            :`<div style="background:${dc.bg};color:#fff;text-align:center;border-radius:6px;padding:4px 0;font-size:.75rem;font-weight:800;cursor:pointer" onclick="selectBusDriver('${bus.id}','${bus.busNumber}','${bus.driverName.replace(/'/g,'')}')">✓ Select</div>`}
-        </div>`;
-      }).join('')}
-    </div>
-    <div id="bus-selected-info" style="display:none;margin-top:7px;background:#d1fae5;border:1.5px solid #059669;border-radius:8px;padding:7px 11px;font-size:.82rem;color:#065f46;font-weight:700"></div>
+    ${needPick?buildSection(pickTrip,'pick','🟢','Morning Pick-up / استقبال','#059669'):''}
+    ${needDrop?buildSection(dropTrip,'drop','🔴','Afternoon Drop-off / توصيل','#dc2626'):''}
   </div>`;
 }
 
-function selectBusDriver(busId,busNumber,driverName){
-  window._selectedBusId=busId;
-  window._selectedBusNum=busNumber;
-  window._selectedDriverName=driverName;
-  const info=el('bus-selected-info');
-  if(info){info.style.display='block';info.textContent='✅ Selected: '+driverName+' — Bus '+busNumber;}
+function selectBusDriver(busId,busNumber,driverName,tripType){
+  const tType=tripType||'both';
+  if(tType==='pick'||tType==='both'){
+    window._selectedPickBusId=busId;
+    window._selectedPickBusNum=busNumber;
+    window._selectedPickDriver=driverName;
+  }
+  if(tType==='drop'||tType==='both'){
+    window._selectedDropBusId=busId;
+    window._selectedDropBusNum=busNumber;
+    window._selectedDropDriver=driverName;
+  }
+  // For backward compat
+  window._selectedBusId=window._selectedPickBusId||window._selectedDropBusId;
+  window._selectedBusNum=window._selectedPickBusNum||window._selectedDropBusNum;
+  window._selectedDriverName=window._selectedPickDriver||window._selectedDropDriver;
+
+  const info=el('bus-selected-'+tType);
+  if(info){info.style.display='block';info.textContent='✅ '+driverName+' — Bus '+busNumber;}
+  // Also update the generic info box
+  const infoGeneral=el('bus-selected-info');
+  if(infoGeneral){
+    const parts=[];
+    if(window._selectedPickDriver) parts.push('🟢 Pick: '+window._selectedPickDriver);
+    if(window._selectedDropDriver) parts.push('🔴 Drop: '+window._selectedDropDriver);
+    if(parts.length){infoGeneral.style.display='block';infoGeneral.textContent=parts.join(' | ');}
+  }
 }
 
 // ─── End Route Planner ──────────────────────────
