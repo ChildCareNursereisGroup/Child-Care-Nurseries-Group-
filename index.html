@@ -3664,6 +3664,40 @@ async function saveChild(){
   setSyncing(false);
   if(error){showAlert('addalert','❌ Error: '+error.message,true);return;}
   showAlert('addalert',`✅ Registered! Reg No: ${v('fr')}`,false);
+
+  // Save bus assignment if driver was selected
+  if(data?.id && window._selectedBusId){
+    await assignChildToBus(data.id, window._selectedBusId, window._selectedBusNum||'', 'both');
+    // Auto stop number based on existing stops in same area
+    const area=(el('fbus-area')?.value||'').trim().toLowerCase();
+    const existingStops=Object.entries(DB.busAssignments||{})
+      .filter(([cid,a])=>{
+        const assign=a.pick||a;
+        if(!assign.busId||String(assign.busId)!==String(window._selectedBusId)) return false;
+        const kid=(window._rosterKids||[]).find(k=>String(k.id)===cid);
+        return kid&&area&&kid.busArea&&kid.busArea.toLowerCase().includes(area);
+      })
+      .map(([,a])=>a.stopNumber||999).filter(n=>n<999);
+    const autoStop=existingStops.length?Math.max(...existingStops)+1:
+      Object.values(DB.busAssignments||{}).filter(a=>{
+        const assign=a.pick||a;return assign.busId&&String(assign.busId)===String(window._selectedBusId);
+      }).length+1;
+    await sb.from('bus_assignments').update({stop_number:autoStop}).eq('child_id',Number(data.id));
+    if(DB.busAssignments[String(data.id)]) DB.busAssignments[String(data.id)].stopNumber=autoStop;
+    window._selectedBusId=null; window._selectedBusNum=null; window._selectedDriverName=null;
+  }
+
+  // Show print options
+  const childData={...row,id:data?.id,
+    name:v('fn'),nationality:v('fnat'),dob:el('fdob')?.value,
+    joinDate:el('fjoin')?.value,kidsTime:v('fktime'),
+    parentMom:v('fmom'),parentDad:v('fdad'),fee:v('ffee'),busFee:v('fbfee'),
+    bus:el('fbus')?.value,busDirection:el('fbus-dir')?.value||el('fbus-direction')?.value,
+    busArea:el('fbus-area')?.value,
+    driverName:window._lastSelectedDriver||''
+  };
+  showRegPrintOptions(childData);
+
   clearAdd();
   await loadFromSupa(curBid);
   renderChildren();renderDashboard();
@@ -3680,8 +3714,201 @@ function clearAdd(){
 }
 
 // ═══════════════════════════════════════════════
-//  RECEIPTS
+// REGISTRATION RECEIPTS
 // ═══════════════════════════════════════════════
+function showRegPrintOptions(childData){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const useBus=childData.bus==='Yes'||childData.bus==='نعم';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:420px;font-family:'Tajawal',sans-serif;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#059669,#0d9488);color:#fff;padding:14px 18px">
+        <div style="font-weight:900;font-size:1rem">✅ ${childData.name} — Registered!</div>
+        <div style="font-size:.78rem;opacity:.85;margin-top:2px">Print receipts for the departments</div>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <button onclick="printRegReceipt(${JSON.stringify(childData).replace(/"/g,'&quot;')})"
+          style="width:100%;padding:12px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer;text-align:right">
+          📋 Print Registration Receipt &nbsp; — &nbsp; قسم التسجيل
+        </button>
+        ${useBus?`<button onclick="printTransportReceipt(${JSON.stringify(childData).replace(/"/g,'&quot;')})"
+          style="width:100%;padding:12px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer;text-align:right">
+          🚌 Print Transport Receipt &nbsp; — &nbsp; قسم المواصلات
+        </button>`:'<div style="text-align:center;color:#9ca3af;font-size:.82rem;padding:4px">No bus required — transport receipt skipped</div>'}
+        <button onclick="this.closest(\'div[style*=fixed]\').remove()"
+          style="width:100%;padding:10px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.85rem;cursor:pointer">
+          ✕ Close
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+}
+
+function printRegReceipt(ch){
+  if(typeof ch==='string') try{ch=JSON.parse(ch);}catch(e){return;}
+  const branch=BRANCHES.find(b=>b.id===curBid)||CB();
+  const col=branch.c||'#1e3a8a';
+  const bx=getBranchExtra?.(curBid)||{};
+  const logo=bx.logo||null;
+  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const fmtAR=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'numeric',month:'long',year:'numeric'}):'—';
+  const useBus=ch.bus==='Yes'||ch.bus==='نعم';
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&family=Inter:wght@400;600;700;900&display=swap');
+    @page{size:A5;margin:0} *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;width:148mm;min-height:210mm}
+    @media print{.np{display:none!important}}
+  </style></head><body>
+  <div class="np" style="background:#1f2937;padding:7px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:8px">
+    <button onclick="window.print()" style="background:${col};color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ Print</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">✕</button>
+  </div>
+  <div style="height:32px" class="np"></div>
+  <!-- Header -->
+  <div style="background:${col};color:#fff;padding:6mm 7mm;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:7pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group</div>
+      <div style="font-size:13pt;font-weight:900">${branch.en||branch.ar}</div>
+      <div style="font-size:8.5pt;opacity:.9;font-family:'Tajawal',sans-serif">${branch.ar}</div>
+    </div>
+    ${logo?`<img src="${logo}" style="height:40px;border-radius:8px;background:#fff;padding:4px">`:`<div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏫</div>`}
+  </div>
+  <!-- Title bar -->
+  <div style="background:${col}22;border-bottom:2px solid ${col}44;padding:3mm 7mm;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-weight:900;font-size:10pt;color:${col}">📋 Registration Receipt / إشعار تسجيل</div>
+    <div style="font-size:8pt;color:#6b7280">${fmtD(ch.joinDate)}</div>
+  </div>
+  <!-- Child info -->
+  <div style="padding:5mm 7mm">
+    <div style="background:${col}10;border-right:3px solid ${col};padding:5mm;border-radius:0 8px 8px 0;margin-bottom:4mm">
+      <div style="font-size:13pt;font-weight:900;color:${col}">${ch.name}</div>
+      <div style="font-size:8.5pt;color:#6b7280;margin-top:1mm">Reg# ${ch.reg_num||ch.regNum||'—'} &nbsp;|&nbsp; Class: ${ch.class_name||ch.className||'—'}</div>
+    </div>
+    <table style="width:100%;font-size:9pt;border-collapse:collapse">
+      ${[
+        ['Nationality / الجنسية', ch.nationality||'—'],
+        ['Date of Birth / تاريخ الميلاد', fmtD(ch.dob)],
+        ['Registration Date / تاريخ التسجيل', fmtD(ch.joinDate)],
+        ['Hours / المواعيد', ch.kidsTime||'—'],
+        ['Mother Contact / رقم الأم', ch.parentMom||'—'],
+        ['Father Contact / رقم الأب', ch.parentDad||'—'],
+        ['Bus Required / مواصلات', useBus?'✅ Yes — '+((ch.busDirection==='two_way'||ch.busDirection==='اتجاهين')?'Two-way':'One-way'):'❌ No'],
+        ['Monthly Fees / الرسوم الشهرية', ch.fee?Number(ch.fee).toLocaleString()+' AED':'—'],
+        ['Bus Fees / رسوم الباص', ch.busFee&&useBus?Number(ch.busFee).toLocaleString()+' AED':'—'],
+      ].map(([l,v],i)=>`<tr style="${i%2===0?'background:#f8fafc':''}">
+        <td style="padding:4px 7px;font-weight:700;color:#374151;border:1px solid #e5e7eb;width:45%">${l}</td>
+        <td style="padding:4px 7px;border:1px solid #e5e7eb;font-weight:${l.includes('Fees')?'700':'400'};color:${l.includes('Fees')?col:'#1f2937'}">${v}</td>
+      </tr>`).join('')}
+    </table>
+    <div style="margin-top:5mm;padding:4mm 6mm;background:#fef3c7;border-radius:8px;border:1px solid #fbbf24;font-size:8pt;color:#92400e">
+      📌 All fees are non-refundable — جميع الرسوم غير مستردة
+    </div>
+    <!-- Signatures -->
+    <div style="margin-top:6mm;display:flex;gap:8mm">
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Parent / ولي الأمر</div></div>
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Manager / المدير</div></div>
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Admin / المسؤول</div></div>
+    </div>
+  </div>
+  <div style="padding:2mm 7mm;font-size:7pt;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb">
+    ${branch.en||branch.ar} | Child Care Nurseries Group | Printed: ${new Date().toLocaleDateString('en-GB')}
+  </div>
+  </body></html>`;
+  const w=window.open('','_blank','width=700,height=900');
+  if(!w){alert('Allow popups to print receipts');return;}
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+
+function printTransportReceipt(ch){
+  if(typeof ch==='string') try{ch=JSON.parse(ch);}catch(e){return;}
+  const branch=BRANCHES.find(b=>b.id===curBid)||CB();
+  const bx=getBranchExtra?.(curBid)||{};
+  const logo=bx.logo||null;
+  const driver=ch.driverName||(window._selectedDriverName)||'—';
+  const dc=getDriverColor(driver);
+  const col=dc.bg;
+  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const dirLabel=d=>d==='two_way'||d==='اتجاهين'?'🔄 Two-way — اتجاهين':'➡️ One-way — اتجاه واحد';
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&family=Inter:wght@400;600;700;900&display=swap');
+    @page{size:A5;margin:0} *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;width:148mm;min-height:210mm}
+    @media print{.np{display:none!important}}
+  </style></head><body>
+  <div class="np" style="background:#1f2937;padding:7px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:8px">
+    <button onclick="window.print()" style="background:${col};color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ Print</button>
+    <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">✕</button>
+  </div>
+  <div style="height:32px" class="np"></div>
+  <!-- Header with driver color -->
+  <div style="background:${col};color:#fff;padding:6mm 7mm;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:7pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — Transport Dept.</div>
+      <div style="font-size:13pt;font-weight:900">${branch.en||branch.ar}</div>
+      <div style="font-size:8.5pt;opacity:.9;font-family:'Tajawal',sans-serif">${branch.ar}</div>
+    </div>
+    ${logo?`<img src="${logo}" style="height:40px;border-radius:8px;background:#fff;padding:4px">`:`<div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🚌</div>`}
+  </div>
+  <div style="background:${col}dd;color:#fff;padding:4mm 7mm;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-weight:900;font-size:10pt">🚌 Transport Receipt / إشعار مواصلات</div>
+    <div style="font-size:8pt;opacity:.9">${fmtD(ch.joinDate)}</div>
+  </div>
+  <div style="padding:5mm 7mm">
+    <!-- Child name block -->
+    <div style="background:${col}15;border-right:3px solid ${col};padding:5mm;border-radius:0 8px 8px 0;margin-bottom:4mm">
+      <div style="font-size:13pt;font-weight:900;color:${col}">${ch.name}</div>
+      <div style="font-size:8.5pt;color:#6b7280;margin-top:1mm">Class: ${ch.class_name||ch.className||'—'}</div>
+    </div>
+    <!-- Driver highlight -->
+    <div style="background:${col};color:#fff;border-radius:10px;padding:5mm 7mm;margin-bottom:4mm;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:8pt;opacity:.8">Assigned Driver / السواق</div>
+        <div style="font-size:14pt;font-weight:900">${driver}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:8pt;opacity:.8">Direction / الاتجاه</div>
+        <div style="font-size:10pt;font-weight:700">${dirLabel(ch.busDirection)}</div>
+      </div>
+    </div>
+    <table style="width:100%;font-size:9pt;border-collapse:collapse">
+      ${[
+        ['Nationality / الجنسية', ch.nationality||'—'],
+        ['Date of Birth / تاريخ الميلاد', fmtD(ch.dob)],
+        ['Registration Date / التسجيل', fmtD(ch.joinDate)],
+        ['Hours / المواعيد', ch.kidsTime||'—'],
+        ['Mother Contact / رقم الأم', ch.parentMom||'—'],
+        ['Father Contact / رقم الأب', ch.parentDad||'—'],
+        ['Area / المنطقة', ch.busArea||'—'],
+        ['Bus Fees / رسوم الباص', ch.busFee?Number(ch.busFee).toLocaleString()+' AED':'—'],
+      ].map(([l,v],i)=>`<tr style="${i%2===0?'background:#f8fafc':''}">
+        <td style="padding:4px 7px;font-weight:700;border:1px solid #e5e7eb;width:45%">${l}</td>
+        <td style="padding:4px 7px;border:1px solid #e5e7eb">${v}</td>
+      </tr>`).join('')}
+    </table>
+    <div style="margin-top:5mm;padding:4mm 6mm;background:${col}15;border-radius:8px;border:1px solid ${col}44;font-size:8pt;color:${col};font-weight:700">
+      🚌 Stop# will be assigned by the transport coordinator
+    </div>
+    <div style="margin-top:5mm;display:flex;gap:8mm">
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Parent / ولي الأمر</div></div>
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Driver / السواق</div></div>
+      <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8pt"><div style="color:#6b7280">Transport Manager</div></div>
+    </div>
+  </div>
+  <div style="padding:2mm 7mm;font-size:7pt;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb">
+    ${branch.en||branch.ar} | Transport Dept | Printed: ${new Date().toLocaleDateString('en-GB')}
+  </div>
+  </body></html>`;
+  const w=window.open('','_blank','width=700,height=900');
+  if(!w){alert('Allow popups to print');return;}
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+// ─── End Registration Receipts ───────────────────
 async function getNextSerialAsync(payMethod){
   const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
   // Query ONLY current branch receipts with this prefix
@@ -14646,232 +14873,94 @@ function printMonthlyBusRoster(){
   w.document.write(fullHtml); w.document.close();
   setTimeout(()=>w.print(),600);
 }
-function suggestBusDriver(area){
+// ── Driver color map ─────────────────────────
+const DRIVER_COLORS={
+  'Abid':  {bg:'#dc2626',light:'#fef2f2'},
+  'Asif':  {bg:'#2563eb',light:'#eff6ff'},
+  'Abid':  {bg:'#dc2626',light:'#fef2f2'},
+  'Habib': {bg:'#059669',light:'#f0fdf4'},
+  'Omar':  {bg:'#0369a1',light:'#e0f2fe'},
+  'Umar':  {bg:'#7c3aed',light:'#f5f3ff'},
+};
+function getDriverColor(name){
+  if(!name) return{bg:'#6b7280',light:'#f9fafb'};
+  const key=Object.keys(DRIVER_COLORS).find(k=>name.toLowerCase().includes(k.toLowerCase()));
+  return key?DRIVER_COLORS[key]:{bg:'#6b7280',light:'#f9fafb'};
+}
+
+// Old simple suggest (kept for backward compat)
+function suggestBusDriver(area){ smartBusSuggest(); }
+
+async function smartBusSuggest(){
+  const area=(el('fbus-area')?.value||'').trim();
+  const kidsTime=(el('fktime')?.value||'').trim();
+  const busVal=el('fbus')?.value;
   const sugBox=el('bus-driver-suggest');
   if(!sugBox) return;
-  if(!area||area.length<2){ sugBox.style.display='none'; return; }
-  // Find children in similar area who already have a driver assigned
-  const areaLower=area.toLowerCase();
-  if(!DB.busAssignments||!DB.allBuses||!DB.allChildren) { sugBox.style.display='none'; return; }
-  const matches=(DB.allChildren||[]).filter(c=>c.busArea&&c.busArea.toLowerCase().includes(areaLower));
-  if(!matches.length){ sugBox.style.display='none'; return; }
-  const driverCounts={};
-  matches.forEach(c=>{
-    const assign=DB.busAssignments?.[String(c.id)];
-    if(!assign) return;
-    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(assign.busId));
-    if(!bus) return;
-    const key=bus.driverName||bus.busNumber;
-    if(!driverCounts[key]) driverCounts[key]={bus,count:0};
-    driverCounts[key].count++;
-  });
-  const sorted=Object.entries(driverCounts).sort((a,b)=>b[1].count-a[1].count);
-  if(!sorted.length){ sugBox.style.display='none'; return; }
-  sugBox.style.display='block';
-  sugBox.innerHTML=`<div style="font-weight:700;color:#92400e;margin-bottom:4px">💡 اقتراح السواق حسب منطقة ${area}:</div>`+
-    sorted.slice(0,3).map(([k,v])=>`
-      <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
-        <span style="background:#fef3c7;color:#92400e;padding:2px 9px;border-radius:7px;font-weight:800">🚌 ${k} (${v.bus.busNumber})</span>
-        <span style="color:#6b7280">${v.count} طفل في نفس المنطقة</span>
-        ${v.bus.assistantName?`<span style="color:#9ca3af">👤 ${v.bus.assistantName}</span>`:''}
-      </div>`).join('');
-}
-async function checkBusAssignments(){
-  // Reload fresh from Supabase
-  const {data,error}=await sb.from('bus_assignments').select('*');
-  if(error){
-    alert('❌ DB Error: '+error.message+'\n\nRun this SQL in Supabase:\nALTER TABLE bus_assignments DISABLE ROW LEVEL SECURITY;\nGRANT ALL ON bus_assignments TO anon;');
-    return;
+  if(busVal!=='Yes'&&busVal!=='نعم'){sugBox.style.display='none';return;}
+  if(!area&&!kidsTime){sugBox.style.display='none';return;}
+
+  if(!DB.allBuses||!DB.allBuses.length) await loadBuses().catch(()=>{});
+  if(!DB.busAssignments) await loadAllBusAssignments().catch(()=>{});
+  if(!window._rosterKids||!window._rosterKids.length){
+    const r=await sb.from('children').select('id,bus,bus_area,kids_time,bus_direction,branch_id').is('leave_date',null);
+    window._rosterKids=(r.data||[]).filter(x=>x.bus&&String(x.bus).toLowerCase()!=='no').map(x=>({
+      id:x.id,bus:x.bus,busArea:x.bus_area||'',kidsTime:x.kids_time||'',
+      busDirection:x.bus_direction||'',branchId:x.branch_id
+    }));
   }
-  const rows=data||[];
-  if(!rows.length){
-    const msg='⚠️ bus_assignments table is EMPTY — save is not working.\n\nPlease run in Supabase SQL Editor:\n\n'+
-      'ALTER TABLE bus_assignments DISABLE ROW LEVEL SECURITY;\n'+
-      'GRANT ALL ON bus_assignments TO anon;\n'+
-      'GRANT USAGE, SELECT ON SEQUENCE bus_assignments_id_seq TO anon;\n'+
-      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS pick_bus_id bigint;\n'+
-      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS pick_bus_number text DEFAULT \'\';\n'+
-      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS drop_bus_id bigint;\n'+
-      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS drop_bus_number text DEFAULT \'\';\n'+
-      'ALTER TABLE bus_assignments ADD COLUMN IF NOT EXISTS stop_number integer DEFAULT 999;';
-    alert(msg);
-    return;
-  }
-  // Update DB.busAssignments from fresh data
-  await loadAllBusAssignments();
+
   const allBuses=DB.allBuses||[];
-  let report=`✅ bus_assignments has ${rows.length} row(s):\n\n`;
-  rows.forEach(r=>{
-    const pBus=allBuses.find(b=>b.id===r.pick_bus_id||b.id===r.bus_id);
-    const dBus=allBuses.find(b=>b.id===r.drop_bus_id||b.id===r.bus_id);
-    report+=`Child ID ${r.child_id}:\n`;
-    report+=`  Pick: ${pBus?.driverName||'—'} (Bus ${r.pick_bus_number||r.bus_number||'—'})\n`;
-    report+=`  Drop: ${dBus?.driverName||'—'} (Bus ${r.drop_bus_number||'—'})\n`;
-    report+=`  Stop#: ${r.stop_number||'—'}\n\n`;
-  });
-  alert(report);
-}
+  if(!allBuses.length){sugBox.style.display='none';return;}
 
-// ═══════════════════════════════════════════════
-// ROUTE PLANNER — Admin assigns stop numbers
-// ═══════════════════════════════════════════════
-function openRoutePlanner(){
-  const buses=DB.allBuses||[];
-  if(!buses.length){showToast('No buses loaded');return;}
-
-  const ov=document.createElement('div');
-  ov.id='route-planner-ov';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;overflow-y:auto;padding:12px';
-
-  const busOpts=buses.map(b=>`<option value="${b.id}">${b.driverName||'Driver'} — Bus ${b.busNumber}</option>`).join('');
-  const tripOpts=BUS_TRIPS.map(t=>`<option value="${t.key}">${t.en||t.ar} (${t.time})</option>`).join('');
-
-  ov.innerHTML=`
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:900px;margin:0 auto;font-family:'Tajawal',sans-serif">
-      <div style="background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:14px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div>
-          <div style="font-weight:900;font-size:1rem">🗺️ Route Planner — Admin Only</div>
-          <div style="font-size:.75rem;opacity:.8">Select driver + trip → assign stop numbers → save route</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="rp-bus" onchange="renderRoutePlanner()" style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;min-width:180px">
-            <option value="">— Select Driver —</option>
-            ${busOpts}
-          </select>
-          <select id="rp-trip" onchange="renderRoutePlanner()" style="padding:6px 10px;border:none;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.82rem;min-width:180px">
-            <option value="">— Select Trip —</option>
-            ${tripOpts}
-          </select>
-          <button onclick="saveRoutePlan()" style="background:#fbbf24;color:#1c1917;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.82rem">📍 Save Stop Numbers</button>
-          <button onclick="document.getElementById('route-planner-ov').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:1rem">✕</button>
-        </div>
-      </div>
-      <div id="rp-body" style="padding:16px">
-        <div style="text-align:center;color:#9ca3af;padding:40px">Select a driver and trip to view and arrange children</div>
-      </div>
-    </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
-}
-
-function renderRoutePlanner(){
-  const busId=el('rp-bus')?.value;
-  const tripKey=el('rp-trip')?.value;
-  const body=el('rp-body');
-  if(!body) return;
-  if(!busId||!tripKey){
-    body.innerHTML='<div style="text-align:center;color:#9ca3af;padding:40px">Select a driver and trip above</div>';
-    return;
-  }
-
-  const bus=(DB.allBuses||[]).find(b=>String(b.id)===busId);
-  const trip=BUS_TRIPS.find(t=>t.key===tripKey);
-  if(!bus||!trip){ body.innerHTML='<div style="text-align:center;color:#dc2626;padding:20px">Not found</div>'; return; }
-
-  const tType=trip.type==='pick'?'pick':'drop';
-
-  // Gather ALL children from ALL branches for this driver+trip
-  let allKids=[];
-  BRANCHES.forEach(br=>{
-    const kids=window._rosterKids||[];
-    kids.filter(c=>c.branchId===br.id && _matchTrip(c,trip)).forEach(c=>{
-      const assign=getBusAssign(String(c.id),tType);
-      if(assign&&(String(assign.busId)===String(bus.id)||assign.busNumber===bus.busNumber)){
-        const brInfo=BRANCHES.find(b=>b.id===c.branchId)||{};
-        allKids.push({...c,
-          branchName:brInfo.ar||'',branchEN:brInfo.en||brInfo.ar||'',
-          branchColor:brInfo.c||'#1e3a8a',branchIcon:brInfo.icon||'🏫',
-          stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999
-        });
-      }
+  const areaLower=area.toLowerCase();
+  const scored=allBuses.map(bus=>{
+    const assignedKids=(window._rosterKids||[]).filter(c=>{
+      const a=(DB.busAssignments||{})[String(c.id)];
+      return a&&(String(a.busId)===String(bus.id)||a.busNumber===bus.busNumber
+        ||a.pick?.busId===String(bus.id)||a.drop?.busId===String(bus.id));
     });
-  });
+    const total=assignedKids.length;
+    const same=area?assignedKids.filter(c=>c.busArea&&c.busArea.toLowerCase().includes(areaLower)).length:0;
+    return{bus,total,same,remaining:25-total,score:same*10-(total*0.5)};
+  }).sort((a,b)=>b.score-a.score).slice(0,4);
 
-  // Sort by stop number
-  allKids.sort((a,b)=>a.stopNum-b.stopNum||a.busArea?.localeCompare(b.busArea||'')||0);
-
-  const col=trip.type==='pick'?'#0d9488':trip.type==='mixed'?'#d97706':'#1d4ed8';
-
-  if(!allKids.length){
-    body.innerHTML=`<div style="text-align:center;padding:30px;color:#6b7280">
-      <div style="font-size:2rem;margin-bottom:8px">🚌</div>
-      <div>No children assigned to <strong>${bus.driverName}</strong> for this trip.</div>
-      <div style="font-size:.8rem;margin-top:6px;color:#9ca3af">Go back to Bus Roster and assign children to this driver first.</div>
-    </div>`;
-    return;
-  }
-
-  body.innerHTML=`
-    <div style="background:${col}18;border:1.5px solid ${col}44;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div>
-        <span style="font-weight:900;font-size:.95rem;color:${col}">🚌 ${bus.driverName} — Bus ${bus.busNumber}</span>
-        ${bus.assistantName?`<span style="color:#6b7280;font-size:.8rem;margin-right:8px"> | 👤 ${bus.assistantName}</span>`:''}
-      </div>
-      <div style="display:flex;gap:10px;font-size:.82rem">
-        <span style="background:${col};color:#fff;padding:2px 12px;border-radius:8px;font-weight:800">${trip.en||trip.ar} 🕐 ${trip.time}</span>
-        <span style="background:#f3f4f6;padding:2px 12px;border-radius:8px;font-weight:700">👶 ${allKids.length} children from ${[...new Set(allKids.map(c=>c.branchId))].length} branches</span>
-      </div>
+  sugBox.style.display='block';
+  sugBox.innerHTML=`<div style="font-family:Tajawal,sans-serif">
+    <div style="font-weight:800;color:#1e3a8a;font-size:.82rem;margin-bottom:7px">
+      🚌 Suggested Drivers ${area?'for <b>'+area+'</b>':''}
     </div>
-    <div style="font-size:.78rem;color:#6b7280;margin-bottom:8px;padding:0 2px">
-      💡 Enter stop numbers in order of the route. Same area = same stop. Click <strong>📍 Save Stop Numbers</strong> when done.
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">
+      ${scored.map(({bus,total,same,remaining})=>{
+        const dc=getDriverColor(bus.driverName);
+        const full=remaining<=0;
+        const warn=remaining<=5&&!full;
+        return`<div style="background:${dc.light};border:2px solid ${full?'#dc2626':warn?'#f59e0b':dc.bg};border-radius:10px;padding:9px 11px"
+          onclick="${full?'':("selectBusDriver('"+bus.id+"','"+bus.busNumber+"','"+bus.driverName.replace(/'/g,"")+"')")}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-weight:900;color:${dc.bg};font-size:.88rem">${bus.driverName||'—'}</span>
+            <span style="background:${full?'#dc2626':warn?'#f59e0b':'#d1fae5'};color:${full?'#fff':warn?'#1c1917':'#065f46'};padding:1px 8px;border-radius:6px;font-size:.72rem;font-weight:800">${total}/25</span>
+          </div>
+          <div style="font-size:.73rem;color:#6b7280;margin-bottom:5px">Bus ${bus.busNumber}${bus.assistantName?' | '+bus.assistantName:''}</div>
+          ${same>0?`<div style="background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:5px;font-size:.7rem;font-weight:700;margin-bottom:5px">📍 ${same} child${same>1?'ren':''} nearby</div>`:''}
+          ${full
+            ?`<div style="background:#dc2626;color:#fff;text-align:center;border-radius:6px;padding:3px 0;font-size:.72rem;font-weight:700">Full — Unavailable</div>`
+            :`<div style="background:${dc.bg};color:#fff;text-align:center;border-radius:6px;padding:4px 0;font-size:.75rem;font-weight:800;cursor:pointer" onclick="selectBusDriver('${bus.id}','${bus.busNumber}','${bus.driverName.replace(/'/g,'')}')">✓ Select</div>`}
+        </div>`;
+      }).join('')}
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
-      <thead>
-        <tr style="background:${col};color:#fff">
-          <th style="padding:8px 10px;text-align:center;min-width:60px">Stop #</th>
-          <th style="padding:8px 10px;text-align:right">Child Name</th>
-          <th style="padding:8px 8px;text-align:center">Class</th>
-          <th style="padding:8px 8px;text-align:center">Branch</th>
-          <th style="padding:8px 8px;text-align:center">Hours</th>
-          <th style="padding:8px 8px;text-align:right">Area</th>
-          <th style="padding:8px 8px;text-align:right">Parent Contact</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${allKids.map((c,i)=>`
-          <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}" id="rp-row-${c.id}">
-            <td style="padding:7px 10px;text-align:center">
-              <input type="number" min="1" max="99" value="${c.stopNum<999?c.stopNum:''}" placeholder="—"
-                data-cid="${c.id}" class="rp-stop-inp"
-                style="width:52px;padding:5px;border:2px solid ${col}66;border-radius:7px;font-size:.88rem;font-weight:900;text-align:center;color:${col};background:#fff"
-                oninput="document.getElementById('rp-row-${c.id}').style.background=this.value?'#f0fdf4':'${i%2===0?'#f8fafc':'#fff'}'">
-            </td>
-            <td style="padding:7px 10px;font-weight:700">${c.name}</td>
-            <td style="padding:7px 8px;text-align:center;color:#6b7280">${c.className||'—'}</td>
-            <td style="padding:7px 8px;text-align:center">
-              <span style="background:${c.branchColor}22;color:${c.branchColor};padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700">${c.branchIcon} ${c.branchEN}</span>
-            </td>
-            <td style="padding:7px 8px;text-align:center;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
-            <td style="padding:7px 8px;text-align:right">${c.busArea||'—'}</td>
-            <td style="padding:7px 8px;text-align:right;font-size:.75rem">
-              ${c.parentMom?'👩 '+c.parentMom:''}${c.parentMom&&c.parentDad?'<br>':''}${c.parentDad?'👨 '+c.parentDad:''}
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <div id="bus-selected-info" style="display:none;margin-top:7px;background:#d1fae5;border:1.5px solid #059669;border-radius:8px;padding:7px 11px;font-size:.82rem;color:#065f46;font-weight:700"></div>
+  </div>`;
 }
 
-async function saveRoutePlan(){
-  const inputs=document.querySelectorAll('.rp-stop-inp');
-  if(!inputs.length){showToast('No children to save');return;}
-  let saved=0;
-  for(const inp of inputs){
-    const cid=inp.dataset.cid;
-    const val=parseInt(inp.value);
-    if(!cid||isNaN(val)) continue;
-    if(!DB.busAssignments) DB.busAssignments={};
-    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={stopNumber:val};
-    else DB.busAssignments[cid].stopNumber=val;
-    const {error}=await sb.from('bus_assignments').update({stop_number:val}).eq('child_id',Number(cid));
-    if(error){
-      await sb.from('bus_assignments').upsert({child_id:Number(cid),bus_number:'',stop_number:val},{onConflict:'child_id'});
-    }
-    saved++;
-  }
-  showToast(`✅ Route saved — ${saved} stop numbers updated`);
-  // Re-sort the table
-  renderRoutePlanner();
+function selectBusDriver(busId,busNumber,driverName){
+  window._selectedBusId=busId;
+  window._selectedBusNum=busNumber;
+  window._selectedDriverName=driverName;
+  const info=el('bus-selected-info');
+  if(info){info.style.display='block';info.textContent='✅ Selected: '+driverName+' — Bus '+busNumber;}
 }
+
 // ─── End Route Planner ──────────────────────────
 
 // ═══════════════════════════════════════════════
@@ -14951,7 +15040,10 @@ async function printTwoWeekBusRoster(){
         Period: ${fD(workDays[0])} – ${fD(workDays[9])} &nbsp;|&nbsp; ${grp.kids.length} Children &nbsp;|&nbsp; 10 Working Days
       </div>
       <div style="padding:3mm 4mm 2mm">
-        <div style="font-weight:700;font-size:8.5pt;color:${col};margin-bottom:2mm">📅 Week 1 &nbsp; ${fD(w1[0])} – ${fD(w1[4])}</div>
+        <div style="background:${col};color:#fff;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;margin-bottom:2mm">
+          <span style="font-weight:900;font-size:9pt">📅 Week 1</span>
+          <span style="opacity:.85;font-size:8.5pt">${fD(w1[0])} – ${fD(w1[4])}</span>
+        </div>
         <table style="width:100%;border-collapse:collapse;font-size:8pt">
           <thead><tr style="background:${col};color:#fff">
             <th style="padding:5px 7px;text-align:left;border:1px solid rgba(255,255,255,.2)">Child Name</th>
@@ -14965,8 +15057,11 @@ async function printTwoWeekBusRoster(){
           <tbody>${mkRows(w1)}</tbody>
         </table>
       </div>
-      <div style="padding:1mm 4mm 2mm">
-        <div style="font-weight:700;font-size:8.5pt;color:${col};margin-bottom:2mm">📅 Week 2 &nbsp; ${fD(w2[0])} – ${fD(w2[4])}</div>
+      <div style="padding:2mm 4mm 2mm">
+        <div style="background:${col};color:#fff;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;margin-bottom:2mm">
+          <span style="font-weight:900;font-size:9pt">📅 Week 2</span>
+          <span style="opacity:.85;font-size:8.5pt">${fD(w2[0])} – ${fD(w2[4])}</span>
+        </div>
         <table style="width:100%;border-collapse:collapse;font-size:8pt">
           <thead><tr style="background:${col};color:#fff">
             <th style="padding:5px 7px;text-align:left;border:1px solid rgba(255,255,255,.2)">Child Name</th>
