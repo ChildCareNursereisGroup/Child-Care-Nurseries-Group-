@@ -12050,7 +12050,7 @@ function getTripSlots(kidsTime){
 }
 
 async function openAutoAssignBuses(){
-  if(!DB.allBuses) await loadAllBuses();
+  if(!DB.allBuses) await loadBuses();
   if(!DB.allChildren) await loadAllChildren();
 
   const busKids=(DB.allChildren||[]).filter(c=>c.bus==='Yes'||c.bus==='نعم');
@@ -12192,7 +12192,7 @@ async function openDriverTripSheet(){
   try {
     // Always load fresh
     await loadBusAllBranchData(true);
-    await loadAllBuses();
+    await loadBuses();
     await loadAllBusAssignments();
   } catch(e){ console.error('Load error:', e); }
 
@@ -12339,7 +12339,7 @@ async function renderBusTripSheet(){
   body.innerHTML = `<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري التحميل...</div>`;
 
   if(!DB.allChildren) await loadAllChildren();
-  if(!DB.allBuses)    await loadAllBuses();
+  if(!DB.allBuses)    await loadBuses();
   if(!DB.busAssignments) await loadAllBusAssignments();
 
   const branchFilter = el('trip-branch-filter')?.value||'all';
@@ -14101,7 +14101,7 @@ async function printByTripTime(){
   const branchFilter=el('trip-print-branch')?.value||'all';
 
   if(!_busAllBranchCache) await loadBusAllBranchData(true);
-  if(!DB.allBuses) await loadAllBuses();
+  if(!DB.allBuses) await loadBuses();
   if(!DB.busAssignments) await loadAllBusAssignments();
 
   const parseKT=t=>{
@@ -14286,7 +14286,7 @@ async function openMonthlyBusRoster(){
 
   // Load only what we need: buses + assignments + children (fast, parallel)
   try {
-    const fetchBuses = DB.allBuses ? Promise.resolve() : loadAllBuses();
+    const fetchBuses = DB.allBuses ? Promise.resolve() : loadBuses();
     const fetchAssign = DB.busAssignments ? Promise.resolve() : loadAllBusAssignments();
 
     // Load children directly - no filter on bus (filter in JS to handle all variations)
@@ -14718,7 +14718,7 @@ async function checkBusAssignments(){
 // ═══════════════════════════════════════════════
 async function printTwoWeekBusRoster(){
   if(!_busAllBranchCache) await loadBusAllBranchData(true);
-  if(!DB.allBuses) await loadAllBuses();
+  if(!DB.allBuses) await loadBuses();
   if(!DB.busAssignments) await loadAllBusAssignments();
   const allBuses=DB.allBuses||[];
   if(!allBuses.length){alert('No buses found');return;}
