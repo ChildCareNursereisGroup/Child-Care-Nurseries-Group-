@@ -15350,6 +15350,34 @@ async function saveLicenseForm(branchId){
 // ═══════════════════════════════════════════════
 //  BUS FUNCTIONS
 // ═══════════════════════════════════════════════
+// Helper: get bus assignment for a child, respecting pick/drop split
+function getBusAssign(childId, tripType){
+  const a=(DB.busAssignments||{})[String(childId)];
+  if(!a) return null;
+  const fallback=a.busId?{busId:a.busId,busNumber:a.busNumber}:null;
+  if(tripType==='pick') return a.pick||fallback;
+  if(tripType==='drop') return a.drop||fallback;
+  return a.pick||a.drop||fallback;
+}
+
+async function loadAllBusAssignments(){
+  const {data} = await sb.from('bus_assignments').select('*');
+  DB.busAssignments = {};
+  (data||[]).forEach(r=>{
+    const cid=String(r.child_id);
+    if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
+    const pickBusId  = r.pick_bus_id  || r.bus_id  || null;
+    const pickBusNum = r.pick_bus_number || r.bus_number || '';
+    const dropBusId  = r.drop_bus_id  || r.bus_id  || null;
+    const dropBusNum = r.drop_bus_number || r.bus_number || '';
+    if(pickBusId) DB.busAssignments[cid].pick = {busId:String(pickBusId), busNumber:pickBusNum};
+    if(dropBusId) DB.busAssignments[cid].drop = {busId:String(dropBusId), busNumber:dropBusNum};
+    DB.busAssignments[cid].busId     = pickBusId ? String(pickBusId) : (r.bus_id?String(r.bus_id):'');
+    DB.busAssignments[cid].busNumber = pickBusNum || r.bus_number || '';
+    DB.busAssignments[cid].stopNumber = r.stop_number || 999;
+  });
+}
+
 async function loadBuses(){
   // Buses are centralized — all stored under Al Saada (b2) and shared across all branches
   const {data} = await sb.from('buses').select('*');
