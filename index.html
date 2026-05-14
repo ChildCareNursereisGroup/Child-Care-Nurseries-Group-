@@ -2707,7 +2707,8 @@ async function loadFromSupa(bid) {
       lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
       leavesTakenBefore:Number(x.leaves_taken_before||0),
       daysWorkedBefore:Number(x.days_worked_before||0),
-      notes:x.notes||''
+      notes:x.notes||'',
+      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
     }));
 
     // Load staffAtt using staff_id IN query (bypasses branch_id RLS)
