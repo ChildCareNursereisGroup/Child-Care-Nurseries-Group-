@@ -2643,7 +2643,7 @@ async function loadFromSupa(bid) {
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id,
-      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
+      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
     // ── Load ALL receipts ──
@@ -2708,7 +2708,7 @@ async function loadFromSupa(bid) {
       leavesTakenBefore:Number(x.leaves_taken_before||0),
       daysWorkedBefore:Number(x.days_worked_before||0),
       notes:x.notes||'',
-      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
+      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
     // Load staffAtt using staff_id IN query (bypasses branch_id RLS)
@@ -14129,7 +14129,7 @@ async function loadStaff(){
       leavesTakenBefore:Number(x.leaves_taken_before||0),
     daysWorkedBefore:Number(x.days_worked_before||0),
     notes:x.notes||'',
-    homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
+    homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
   }));
 }
 
@@ -14532,20 +14532,28 @@ function _parseKT(t){
 }
 
 function _matchTrip(c, trip){
-  // Staff entities use different matching
   if(c.entityType==='staff'||c.isStaff){
-    if(trip.type==='staff_pick'){
-      const sh=_parseShiftH(c.shiftStart||c.shift_start||'');
-      return sh===6&&(trip.startH||[]).includes(5);
-    }
-    if(trip.type==='pick'){
-      const sh=_parseShiftH(c.shiftStart||c.shift_start||'');
-      return (trip.startH||[]).includes(sh);
-    }
-    if(trip.type==='drop'){
-      const eh=_parseShiftH(c.shiftEnd||c.shift_end||'');
-      return (trip.endH||[]).includes(eh);
-    }
+    // Use busPickupTime if set, otherwise derive from shiftStart
+    const pickupStr = c.busPickupTime||c.bus_pickup_time||'';
+    const shiftStr  = c.shiftStart||c.shift_start||'';
+    const endStr    = c.shiftEnd||c.shift_end||'';
+
+    // Parse pickup hour (for pick trips)
+    const pickH = pickupStr ? _parseShiftH(pickupStr) :
+      (() => {
+        const sh=_parseShiftH(shiftStr);
+        // Auto: 6am shift → 5am pickup; 7am shift → 6am pickup (default)
+        if(sh===6) return 5;
+        if(sh===7) return 6;
+        return sh>0?sh-1:sh;
+      })();
+
+    const dropH = _parseShiftH(endStr);
+
+    if(trip.type==='staff_pick') return pickH===5&&(trip.startH||[]).includes(5);
+    if(trip.type==='pick')       return (trip.startH||[]).includes(pickH);
+    if(trip.type==='drop')       return (trip.endH||[]).includes(dropH);
+    if(trip.type==='mixed')      return (trip.endH||[]).includes(dropH)||(trip.startH2||[]).includes(pickH);
     return false;
   }
   // Regular children
@@ -14616,14 +14624,29 @@ async function openMonthlyBusRoster(){
     const fetchBuses = loadBuses(); // always reload to get DB.allBuses in sync
     const fetchAssign = loadAllBusAssignments();
 
-    // Load children directly - no filter on bus (filter in JS to handle all variations)
+    // Load children directly
     const fetchKids = sb.from('children')
       .select('id,name,class_name,branch_id,bus,bus_direction,bus_pick_drop,bus_area,kids_time,parent_mom,parent_dad,leave_date')
       .is('leave_date', null);
 
-    const [,,kidsRes] = await Promise.all([fetchBuses, fetchAssign, fetchKids]);
+    // Load staff who use bus
+    const fetchStaff = sb.from('staff')
+      .select('id,name,position,branch_id,uses_bus,home_area,shift_start,shift_end,bus_pickup_time,leave_date')
+      .eq('uses_bus', true)
+      .is('leave_date', null);
 
-    // Store bus children - filter for bus users in JS
+    const [,,kidsRes,staffRes] = await Promise.all([fetchBuses, fetchAssign, fetchKids, fetchStaff]);
+
+    // Store bus staff
+    window._rosterStaff = (staffRes.data||[]).map(x=>({
+      id: x.id, name: x.name||'', position: x.position||'',
+      branchId: x.branch_id, usesBus: true,
+      homeArea: x.home_area||'', shiftStart: x.shift_start||'', shiftEnd: x.shift_end||'',
+      busPickupTime: x.bus_pickup_time||'',
+      entityType: 'staff', isStaff: true,
+    }));
+
+    // Store bus children
     window._rosterKids = (kidsRes.data||[])
       .filter(x=> x.bus && String(x.bus).toLowerCase()!=='no' && x.bus!=='لا' && x.bus!==false && x.bus!==0)
       .map(x=>({
@@ -14688,14 +14711,18 @@ function renderMonthlyBusRoster(){
 
   const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
 
-  // Get bus-using staff
-  const busStaff=(DB.staff||[]).filter(s=>s.usesBus&&(branchSel==='all'||s.branchId===branchSel)).map(s=>{
-    const br=BRANCHES.find(b=>b.id===s.branchId)||{};
-    return{...s,entityType:'staff',isStaff:true,
-      branchName:br.ar||'',branchColor:br.c||'#374151',branchIcon:br.icon||'🏫',
-      busArea:s.homeArea||'',busDirection:'two_way',busPickDrop:'',
-      shiftStart:s.shiftStart||'',shiftEnd:s.shiftEnd||''};
-  });
+  // Get bus-using staff from fresh load or DB
+  const rawStaff = window._rosterStaff || (DB.staff||[]).filter(s=>s.usesBus);
+  const busStaff = rawStaff
+    .filter(s=> branchSel==='all' || s.branchId===branchSel)
+    .map(s=>{
+      const br=BRANCHES.find(b=>b.id===s.branchId)||{};
+      return{...s,
+        entityType:'staff', isStaff:true,
+        branchName:br.ar||'', branchColor:br.c||'#374151', branchIcon:br.icon||'🏫',
+        busArea:s.homeArea||'', busDirection:'two_way', busPickDrop:'',
+      };
+    });
 
   const ar=lang==='ar';
   let html='';
@@ -14802,11 +14829,12 @@ function renderMonthlyBusRoster(){
         if(!tripStaff.length) return '';
         const tType=trip.type==='pick'||trip.type==='staff_pick'?'pick':'drop';
         return`<div style="background:#f0f9ff;border-top:2px dashed ${tripColor}66;padding:8px 12px">
-          <div style="font-weight:800;color:#0369a1;font-size:.78rem;margin-bottom:6px">👩‍🏫 Staff / موظفون في هذه الرحلة</div>
+          <div style="font-weight:800;color:#0369a1;font-size:.78rem;margin-bottom:6px">👩‍🏫 Staff in this trip — الموظفون في هذه الرحلة (${tripStaff.length})</div>
           <table style="width:100%;border-collapse:collapse;font-size:.76rem">
             <thead><tr style="background:#0369a1;color:#fff">
               <th style="padding:5px 10px;text-align:center">Stop#</th>
               <th style="padding:5px 10px;text-align:right">الموظف</th>
+              <th style="padding:5px 8px;text-align:right">الوظيفة</th>
               <th style="padding:5px 8px;text-align:right">الفرع</th>
               <th style="padding:5px 8px;text-align:center">الشيفت</th>
               <th style="padding:5px 8px;text-align:right">المنطقة</th>
@@ -14823,12 +14851,13 @@ function renderMonthlyBusRoster(){
                     style="width:46px;padding:4px;border:1.5px solid #93c5fd;border-radius:7px;font-size:.8rem;font-weight:900;text-align:center;color:#0369a1;background:#fff">
                 </td>
                 <td style="padding:4px 10px;font-weight:700">${s.name}</td>
+                <td style="padding:4px 8px;color:#6b7280;font-size:.73rem">${s.position||'—'}</td>
                 <td style="padding:4px 8px"><span style="background:${s.branchColor}22;color:${s.branchColor};padding:1px 6px;border-radius:5px;font-size:.7rem;font-weight:700">${s.branchIcon} ${s.branchName}</span></td>
-                <td style="padding:4px 8px;text-align:center;color:#0369a1;font-weight:700">${s.shiftStart||'—'}–${s.shiftEnd||'—'}</td>
+                <td style="padding:4px 8px;text-align:center;color:#0369a1;font-weight:700">${s.shiftStart||'?'}–${s.shiftEnd||'?'}</td>
                 <td style="padding:4px 8px">${s.homeArea||'—'}</td>
                 <td style="padding:4px 8px">
                   <select data-sid="${s.id}" data-trip-type="${tType}" class="staff-assign-sel"
-                    style="padding:3px 6px;border:1.5px solid #93c5fd;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.74rem;background:#fff;min-width:120px">
+                    style="padding:3px 6px;border:1.5px solid #93c5fd;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.74rem;background:#fff;min-width:130px">
                     <option value="">— Select driver —</option>
                     ${busOpts.replace(`value="${assignedId}"`,`value="${assignedId}" selected`)}
                   </select>
@@ -15861,7 +15890,19 @@ function openStaffForm(id){
           <input type="text" id="sf_shift_end" value="${s?.shiftEnd||''}" placeholder="e.g. 17:00"
             style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
         </div>
-        <div style="grid-column:1/-1">
+        <div>
+          <label style="font-size:.75rem;color:#6b7280">⏰ وقت استقبال الباص</label>
+          <select id="sf_bus_pickup_time" style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif">
+            <option value="" ${!s?.busPickupTime?'selected':''}>— تلقائي حسب الشيفت —</option>
+            <option value="05:00" ${s?.busPickupTime==='05:00'?'selected':''}>🌅 5:00 ص</option>
+            <option value="06:00" ${s?.busPickupTime==='06:00'?'selected':''}>🟢 6:00 ص</option>
+            <option value="07:00" ${s?.busPickupTime==='07:00'?'selected':''}>🟢 7:00 ص</option>
+            <option value="08:00" ${s?.busPickupTime==='08:00'?'selected':''}>🟢 8:00 ص</option>
+            <option value="10:00" ${s?.busPickupTime==='10:00'?'selected':''}>🟢 10:00 ص</option>
+            <option value="13:00" ${s?.busPickupTime==='13:00'?'selected':''}>🟢 1:00 م</option>
+          </select>
+        </div>
+        <div style="grid-column:2/-1">
           <label style="font-size:.75rem;color:#6b7280">منطقة السكن</label>
           <input type="text" id="sf_home_area" value="${s?.homeArea||''}" placeholder="e.g. Al Nahda, Muwaileh..."
             style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
@@ -15924,6 +15965,7 @@ async function saveStaff(id){
     shift_start: document.getElementById('sf_shift_start')?.value?.trim()||null,
     shift_end: document.getElementById('sf_shift_end')?.value?.trim()||null,
     uses_bus: document.getElementById('sf_uses_bus')?.value==='true',
+    bus_pickup_time: document.getElementById('sf_bus_pickup_time')?.value?.trim()||null,
     basic_salary: Number(document.getElementById('sf_basic')?.value||0),
     gross_salary: Number(document.getElementById('sf_gross')?.value||0),
     transfer_code: document.getElementById('sf_tcode')?.value||'',
@@ -15953,7 +15995,8 @@ async function saveStaff(id){
         labour_expire:row.labour_expire,spea_expire:row.spea_expire,
         health_card_expire:row.health_card_expire,notes:row.notes,
         home_area:row.home_area||null, shift_start:row.shift_start||null,
-        shift_end:row.shift_end||null, uses_bus:row.uses_bus||false};
+        shift_end:row.shift_end||null, uses_bus:row.uses_bus||false,
+        bus_pickup_time:row.bus_pickup_time||null};
       // Try adding salary fields one by one
       if(row.basic_salary!==undefined) safeRow.basic_salary=row.basic_salary;
       if(row.gross_salary!==undefined) safeRow.gross_salary=row.gross_salary;
