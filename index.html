@@ -4581,13 +4581,24 @@ function printVATReport(exportType='print'){
       [],
       // Detail rows
       [isAr?'#إيصال':'Receipt#', isAr?'الطفل':'Child', isAr?'الفصل':'Class', isAr?'التاريخ':'Date',
-       isAr?'طريقة الدفع':'Pay Method', isAr?'الرسوم':'Fees', isAr?'تسجيل':'Reg',
-       isAr?'مواصلات':'Transport', isAr?'ملابس':'Uniforms', isAr?'أدوات':'Stationary',
-       isAr?'الضريبة':'VAT', isAr?'الإجمالي':'Total'],
+       isAr?'طريقة الدفع':'Pay Method',
+       isAr?'الرسوم الشهرية':'Monthly Fees',
+       isAr?'تسجيل':'Reg',
+       isAr?'مواصلات':'Transport',
+       isAr?'ملابس':'Uniforms',
+       isAr?'أدوات':'Stationary',
+       isAr?'جمعة':'Fri Fee',
+       isAr?'سبت':'Sat Fee',
+       isAr?'أحد':'Sun Fee',
+       isAr?'ساعات إضافية':'Hour Fee',
+       isAr?'أوفرتايم':'Overtime',
+       isAr?'الضريبة':'VAT',
+       isAr?'الإجمالي':'Total'],
       ...list.map(r=>[
         r.receiptNum, r.childName, r.className||'', fmtDate(r.date),
         payLabel(r.payMethod),
         r.fee||0, r.reg||0, r.bus||0, r.clothes||0, r.tools||0,
+        r.friFee||0, r.satFee||0, r.sunFee||0, r.hourFee||0, r.overtimeFee||0,
         r.vatAmount||0, r.total
       ])
     ];
