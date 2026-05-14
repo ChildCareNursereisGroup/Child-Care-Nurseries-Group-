@@ -14128,7 +14128,8 @@ async function loadStaff(){
     lastWorkingDay:x.last_working_day||getStaffSalaryLocal(x.id).lastDay||'',
       leavesTakenBefore:Number(x.leaves_taken_before||0),
     daysWorkedBefore:Number(x.days_worked_before||0),
-    notes:x.notes||''
+    notes:x.notes||'',
+    homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus
   }));
 }
 
@@ -15938,8 +15939,11 @@ async function saveStaff(id){
     });
   }
   if(id){
+    const debugMsg=`Saving: home_area="${row.home_area}" shift="${row.shift_start}-${row.shift_end}" uses_bus=${row.uses_bus}`;
     const {error:uerr} = await sb.from('staff').update(row).eq('id',id);
     if(uerr){
+      showAlert('staff-save-alert','❌ Save Error: '+uerr.message+'\n\nDebug: '+debugMsg,true);
+      return;
       // Some columns may not exist yet — retry with safe subset
       const safeRow={branch_id:row.branch_id,name:row.name,position:row.position,
         nationality:row.nationality,dob:row.dob,contact:row.contact,email:row.email,
@@ -15947,7 +15951,9 @@ async function saveStaff(id){
         contract_start:row.contract_start,contract_end:row.contract_end,
         passport_expire:row.passport_expire,id_expire:row.id_expire,
         labour_expire:row.labour_expire,spea_expire:row.spea_expire,
-        health_card_expire:row.health_card_expire,notes:row.notes};
+        health_card_expire:row.health_card_expire,notes:row.notes,
+        home_area:row.home_area||null, shift_start:row.shift_start||null,
+        shift_end:row.shift_end||null, uses_bus:row.uses_bus||false};
       // Try adding salary fields one by one
       if(row.basic_salary!==undefined) safeRow.basic_salary=row.basic_salary;
       if(row.gross_salary!==undefined) safeRow.gross_salary=row.gross_salary;
