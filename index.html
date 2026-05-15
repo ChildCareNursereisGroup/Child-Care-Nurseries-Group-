@@ -3741,6 +3741,9 @@ async function saveChild(){
     parentMom:v('fmom'),parentDad:v('fdad'),fee:v('ffee'),busFee:v('fbfee'),
     bus:el('fbus')?.value,busDirection:el('fbus-dir')?.value||el('fbus-direction')?.value,
     busArea:el('fbus-area')?.value,
+    busCity:el('fbus-city')?.value||'',
+    busBuilding:el('fbus-building')?.value||'',
+    busLandmark:el('fbus-landmark')?.value||'',
     driverName:window._lastSelectedDriver||''
   };
   showRegPrintOptions(childData);
@@ -3974,10 +3977,10 @@ function printTransportReceipt(ch){
     <div class="row"><span class="lbl">Direction / الاتجاه</span><span class="val">${isTwoWay?'🔄 Two-way / اتجاهين':'➡️ One-way / اتجاه واحد'}</span></div>
     <div class="row"><span class="lbl">Mother / الأم</span><span class="val">👩 ${ch.parentMom||'—'}</span></div>
     <div class="row"><span class="lbl">Father / الأب</span><span class="val">👨 ${ch.parentDad||'—'}</span></div>
-    <div class="row"><span class="lbl">Area / المنطقة</span><span class="val">${ch.busArea||ch.busCity||'—'}</span></div>
-    ${ch.busBuilding?`<div class="row"><span class="lbl">Building / المبنى</span><span class="val">${ch.busBuilding}</span></div>`:''}
-    ${ch.busLandmark?`<div class="row"><span class="lbl">Landmark / المعلم</span><span class="val">🗺️ ${ch.busLandmark}</span></div>`:''}
-    ${ch.busFee?`<div class="row"><span class="lbl">Bus Fees / رسوم الباص</span><span class="val" style="color:${col};font-weight:700">${Number(ch.busFee).toLocaleString()} AED</span></div>`:''}
+    <div class="row"><span class="lbl">🏙️ City / المدينة</span><span class="val">${ch.busCity||'—'}</span></div>
+    <div class="row"><span class="lbl">📍 Area / المنطقة</span><span class="val">${ch.busArea||(ch.busCity?ch.busCity:'')||'—'}</span></div>
+    <div class="row"><span class="lbl">🏢 Building / المبنى</span><span class="val">${ch.busBuilding||'—'}</span></div>
+    <div class="row"><span class="lbl">🗺️ Landmark / أقرب معلم</span><span class="val">${ch.busLandmark||'—'}</span></div>
   </div>
 
   <div style="margin:4mm 7mm;padding:3mm 5mm;background:${col}12;border-radius:8px;border:1px solid ${col}44;font-size:7.5pt;color:${col};font-weight:700;font-family:Tajawal">
@@ -4018,8 +4021,9 @@ function printTransportReceiptFromChild(){
     name:c.name, class_name:c.className, reg_num:c.regNum,
     nationality:c.nationality, dob:c.dob, joinDate:c.joinDate,
     kidsTime:c.kidsTime, parentMom:c.parentMom, parentDad:c.parentDad,
-    busFee:c.busFee, bus:c.bus, busDirection:c.busDirection,
-    busArea:c.busArea, driverName:bus?.driverName||''
+    bus:c.bus, busDirection:c.busDirection, busPickDrop:c.busPickDrop,
+    busArea:c.busArea, busCity:c.busCity||'', busBuilding:c.busBuilding||'', busLandmark:c.busLandmark||'',
+    driverName:bus?.driverName||''
   });
 }
 // ─── End Registration Receipts ───────────────────
