@@ -399,9 +399,38 @@ main{padding:12px;max-width:960px;margin:0 auto}
         </select>
       </div>
       <div class="fg" style="margin:0;grid-column:1/-1">
-        <label style="font-size:.75rem">منطقة السكن / Area</label>
-        <input id="fbus-area" type="text" placeholder="e.g. Al Nahda, Muwaileh..." oninput="suggestBusDriver(this.value)" style="font-family:'Tajawal',sans-serif;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;width:100%;box-sizing:border-box">
-        <div id="bus-driver-suggest" style="display:none;margin-top:5px;background:#fffbeb;border:1.5px solid #fbbf24;border-radius:8px;padding:8px 11px;font-size:.78rem"></div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:.75rem">🏙️ City / المدينة</label>
+            <select id="fbus-city" onchange="updateBusAreaDropdown()"
+              style="width:100%;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+              <option value="">— Select City —</option>
+              <option value="Sharjah">🌆 Sharjah — الشارقة</option>
+              <option value="Ajman">🏙️ Ajman — عجمان</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem">📍 Area / المنطقة</label>
+            <select id="fbus-area-select"
+              style="width:100%;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+              <option value="">— Select City First —</option>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="fbus-area">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+          <div>
+            <label style="font-size:.75rem">🏢 Building / Street</label>
+            <input type="text" id="fbus-building" placeholder="e.g. Al Noor Tower, Villa 5..."
+              style="width:100%;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:.75rem">🗺️ Landmark / أقرب معلم</label>
+            <input type="text" id="fbus-landmark" placeholder="e.g. Near City Centre Sharjah..."
+              style="width:100%;padding:7px 9px;border:1.5px solid #fcd34d;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+        </div>
+        <div id="bus-driver-suggest" style="display:none;margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -2643,7 +2672,7 @@ async function loadFromSupa(bid) {
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', branchId:x.branch_id,
-      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
+      homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
     // ── Load ALL receipts ──
@@ -2708,7 +2737,7 @@ async function loadFromSupa(bid) {
       leavesTakenBefore:Number(x.leaves_taken_before||0),
       daysWorkedBefore:Number(x.days_worked_before||0),
       notes:x.notes||'',
-      homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
+      homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
     // Load staffAtt using staff_id IN query (bypasses branch_id RLS)
@@ -3662,7 +3691,14 @@ async function saveChild(){
     bus:el('fbus').value,
     bus_direction: el('fbus').value==='Yes' ? (el('fbus-dir')?.value||'') : '',
     bus_pick_drop: el('fbus').value==='Yes' && el('fbus-dir')?.value==='one_way' ? (el('fbus-pickdrop')?.value||'') : '',
-    bus_area: el('fbus').value==='Yes' ? (el('fbus-area')?.value?.trim()||'') : '',
+    bus_area: el('fbus').value==='Yes' ? (()=>{
+      const city=el('fbus-city')?.value||'';
+      const area=el('fbus-area-select')?.value||'';
+      return [city,area].filter(Boolean).join(' — ');
+    })() : '',
+    bus_city: el('fbus').value==='Yes' ? (el('fbus-city')?.value||'') : '',
+    bus_building: el('fbus').value==='Yes' ? (el('fbus-building')?.value?.trim()||'') : '',
+    bus_landmark: el('fbus').value==='Yes' ? (el('fbus-landmark')?.value?.trim()||'') : '',
     notes:v('fnotes')
   };
   const {data,error}=await sb.from('children').insert(row).select().single();
@@ -3719,6 +3755,14 @@ function clearAdd(){
   if(el('fbus-dir'))el('fbus-dir').value='';
   if(el('fbus-pickdrop'))el('fbus-pickdrop').value='pick';
   if(el('fbus-area'))el('fbus-area').value='';
+  if(el('fbus-city'))el('fbus-city').value='';
+  if(el('fbus-building'))el('fbus-building').value='';
+  if(el('fbus-landmark'))el('fbus-landmark').value='';
+  if(el('fbus-area-select'))el('fbus-area-select').innerHTML='<option value="">— Select City First —</option>';
+  if(el('fbus-city'))el('fbus-city').value='';
+  if(el('fbus-building'))el('fbus-building').value='';
+  if(el('fbus-landmark'))el('fbus-landmark').value='';
+  if(el('fbus-area-select'))el('fbus-area-select').innerHTML='<option value="">— Select City First —</option>';
   if(el('fbus-extra'))el('fbus-extra').style.display='none';
   if(el('fbus-pickdrop-wrap'))el('fbus-pickdrop-wrap').style.display='none';
   initAddForm();
@@ -3930,7 +3974,10 @@ function printTransportReceipt(ch){
     <div class="row"><span class="lbl">Direction / الاتجاه</span><span class="val">${isTwoWay?'🔄 Two-way / اتجاهين':'➡️ One-way / اتجاه واحد'}</span></div>
     <div class="row"><span class="lbl">Mother / الأم</span><span class="val">👩 ${ch.parentMom||'—'}</span></div>
     <div class="row"><span class="lbl">Father / الأب</span><span class="val">👨 ${ch.parentDad||'—'}</span></div>
-    <div class="row"><span class="lbl">Area / المنطقة</span><span class="val">${ch.busArea||'—'}</span></div>
+    <div class="row"><span class="lbl">Area / المنطقة</span><span class="val">${ch.busArea||ch.busCity||'—'}</span></div>
+    ${ch.busBuilding?`<div class="row"><span class="lbl">Building / المبنى</span><span class="val">${ch.busBuilding}</span></div>`:''}
+    ${ch.busLandmark?`<div class="row"><span class="lbl">Landmark / المعلم</span><span class="val">🗺️ ${ch.busLandmark}</span></div>`:''}
+    ${ch.busFee?`<div class="row"><span class="lbl">Bus Fees / رسوم الباص</span><span class="val" style="color:${col};font-weight:700">${Number(ch.busFee).toLocaleString()} AED</span></div>`:''}
   </div>
 
   <div style="margin:4mm 7mm;padding:3mm 5mm;background:${col}12;border-radius:8px;border:1px solid ${col}44;font-size:7.5pt;color:${col};font-weight:700;font-family:Tajawal">
@@ -12933,6 +12980,7 @@ async function loadBusAllBranchData(forceReload){
         id:x.id, name:x.name||'', className:x.class_name||'',
         bus:x.bus||'No', busFee:Number(x.bus_fee||0),
         busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
+        busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'',
         leaveDate:x.leave_date||null, branchId:x.branch_id, kidsTime:x.kids_time||'',
         parentMom:x.parent_mom||'', parentDad:x.parent_dad||''
       })),
@@ -14140,7 +14188,7 @@ async function loadStaff(){
       leavesTakenBefore:Number(x.leaves_taken_before||0),
     daysWorkedBefore:Number(x.days_worked_before||0),
     notes:x.notes||'',
-    homeArea:x.home_area||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
+    homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
   }));
 }
 
@@ -14642,7 +14690,7 @@ async function openMonthlyBusRoster(){
 
     // Load staff who use bus
     const fetchStaff = sb.from('staff')
-      .select('id,name,position,branch_id,uses_bus,home_area,shift_start,shift_end,bus_pickup_time,leave_date')
+      .select('id,name,position,branch_id,uses_bus,home_area,bus_city,bus_building,bus_landmark,shift_start,shift_end,bus_pickup_time,leave_date')
       .eq('uses_bus', true)
       .is('leave_date', null);
 
@@ -14652,7 +14700,8 @@ async function openMonthlyBusRoster(){
     window._rosterStaff = (staffRes.data||[]).map(x=>({
       id: x.id, name: x.name||'', position: x.position||'',
       branchId: x.branch_id, usesBus: true,
-      homeArea: x.home_area||'', shiftStart: x.shift_start||'', shiftEnd: x.shift_end||'',
+      homeArea: x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'',
+      shiftStart: x.shift_start||'', shiftEnd: x.shift_end||'',
       busPickupTime: x.bus_pickup_time||'',
       entityType: 'staff', isStaff: true,
     }));
@@ -14737,6 +14786,67 @@ function renderMonthlyBusRoster(){
 
   const ar=lang==='ar';
   let html='';
+
+  // ── Fixed Staff Section — all bus staff regardless of trip ──
+  if(busStaff.length){
+    const bOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'Driver'} (${b.busNumber})</option>`).join('');
+    html+=`<div style="margin-bottom:14px;border:2px solid #3b82f6;border-radius:12px;overflow:hidden">
+      <div style="background:#1d4ed8;color:#fff;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:900;font-size:.88rem">👩‍🏫 Bus Staff — موظفون يستخدمون الباص</span>
+        <span style="background:rgba(255,255,255,.2);padding:2px 12px;border-radius:8px;font-weight:800">👤 ${busStaff.length}</span>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
+        <thead><tr style="background:#1e40af;color:#fff">
+          <th style="padding:6px 8px;min-width:50px">Stop#</th>
+          <th style="padding:6px 10px;text-align:right">الموظف</th>
+          <th style="padding:6px 7px">الفرع</th>
+          <th style="padding:6px 7px">الشيفت</th>
+          <th style="padding:6px 7px;text-align:right">المنطقة</th>
+          <th style="padding:6px 7px;text-align:right">المبنى</th>
+          <th style="padding:6px 7px;text-align:right">معلم</th>
+          <th style="padding:6px 7px">🟢 سواق الصبح</th>
+          <th style="padding:6px 7px">🔴 سواق الرجوع</th>
+        </tr></thead>
+        <tbody>${busStaff.map((s,i)=>{
+          const pA=getStaffBusAssign(String(s.id),'pick');
+          const dA=getStaffBusAssign(String(s.id),'drop');
+          const stop=(DB.staffBusAssignments||{})[String(s.id)]?.stopNumber||'';
+          return`<tr style="${i%2===0?'background:#eff6ff':'background:#fff'}">
+            <td style="padding:4px 8px;text-align:center">
+              <input type="number" min="1" max="99" value="${stop}" placeholder="—"
+                data-sid="${s.id}" class="staff-stop-inp"
+                style="width:44px;padding:3px;border:1.5px solid #93c5fd;border-radius:6px;font-size:.78rem;font-weight:900;text-align:center;color:#1d4ed8">
+            </td>
+            <td style="padding:4px 10px;font-weight:700">${s.name}<br><span style="color:#6b7280;font-size:.7rem">${s.position||''}</span></td>
+            <td style="padding:4px 7px"><span style="background:${s.branchColor}22;color:${s.branchColor};padding:1px 6px;border-radius:5px;font-size:.7rem;font-weight:700">${s.branchIcon} ${s.branchName}</span></td>
+            <td style="padding:4px 7px;color:#1d4ed8;font-weight:700;text-align:center">${s.shiftStart||'?'}–${s.shiftEnd||'?'}</td>
+            <td style="padding:4px 7px;font-size:.72rem">${s.homeArea||'—'}</td>
+            <td style="padding:4px 7px;font-size:.7rem;color:#6b7280">${s.busBuilding||'—'}</td>
+            <td style="padding:4px 7px;font-size:.7rem;color:#6b7280">${s.busLandmark||'—'}</td>
+            <td style="padding:4px 7px">
+              <select data-sid="${s.id}" data-trip-type="pick" class="staff-assign-sel"
+                style="padding:3px 5px;border:1.5px solid #86efac;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;min-width:120px">
+                <option value="">— Pickup driver —</option>
+                ${bOpts.replace(`value="${pA?.busId||''}"`,`value="${pA?.busId||''}" selected`)}
+              </select>
+            </td>
+            <td style="padding:4px 7px">
+              <select data-sid="${s.id}" data-trip-type="drop" class="staff-assign-sel"
+                style="padding:3px 5px;border:1.5px solid #fca5a5;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.72rem;min-width:120px">
+                <option value="">— Drop driver —</option>
+                ${bOpts.replace(`value="${dA?.busId||''}"`,`value="${dA?.busId||''}" selected`)}
+              </select>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  } else {
+    html+=`<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:.8rem;color:#92400e">
+      ⚠️ No bus staff found — go to Staff and enable "يستخدم الباص ✅ نعم" + set shift times
+    </div>`;
+  }
+
   BUS_TRIPS.forEach(trip=>{
     const tripLabel=ar?(trip.labelAR||trip.label||''):(trip.labelEN||trip.label||'');
     const tripSub=ar?(trip.subAR||trip.sub||''):(trip.subEN||trip.sub||'');
@@ -15097,6 +15207,48 @@ function printMonthlyBusRoster(){
   setTimeout(()=>w.print(),600);
 }
 // ── Driver color map ─────────────────────────
+const SHARJAH_AREAS=['Al Majaz','Al Khan','Al Taawun','Al Nahda Sharjah','Al Qasimia','Abu Shagara','Al Yarmook','Rolla','Muwaileh','Muwaileh Commercial','Al Juraina','Al Suyoh','Al Rahmaniya','Hoshi','Al Talaa','Al Zahia','Aljada','Al Nouf','Al Ghafia','Al Ramtha','Al Fayha','Al Shahba','Halwan','Al Qulayaa','Al Mareija','Al Sharq','Al Nad','Al Musalla','Al Fisht','Al Qadisiyah','Al Soor','Al Ghuwair','Al Abar','Wasit','Al Tai','Al Sajaa','Al Hamriyah','Al Zubair','Barashi','Umm Fannain','Al Bataeh','Al Dhaid','Maleha','Khor Fakkan','Kalba','Dibba Al Hisn','Al Layyah','Abu Danig','Industrial Area 1-18','Hamriyah Free Zone','SAIF Zone','Al Nabba','Al Tarfa','Al Hazannah','Al Mansoura','Al Seef','Al Jubail','Al Shuwaiheen','Al Majjarah','Abu Tina','Al Nasserya','Al Sharqan','Mughaidir Suburb','Rahmaniya Suburb','Muwaileh Suburb','Wasit Suburb','Halwan Suburb','Al Heerah Suburb'];
+const AJMAN_AREAS=['Al Nuaimiya 1','Al Nuaimiya 2','Al Nuaimiya 3','Al Rashidiya 1','Al Rashidiya 2','Al Rashidiya 3','Al Rumaila 1','Al Rumaila 2','Al Jurf 1','Al Jurf 2','Al Jurf 3','Al Mowaihat 1','Al Mowaihat 2','Al Mowaihat 3','Al Rawda 1','Al Rawda 2','Al Rawda 3','Al Hamidiya 1','Al Hamidiya 2','Al Hamidiya 3','Al Zahra','Al Bustan','Al Nakheel 1','Al Nakheel 2','Al Sawan','Al Karama','Al Helio 1','Al Helio 2','Al Yasmeen','Emirates City','Ajman Downtown','Al Amerah','Al Alia','Al Tallah 1','Al Tallah 2','Musherief','Garden City','Al Manama','Masfout','Liwara 1','Liwara 2','Industrial Area 1','Industrial Area 2','New Industrial Area','Al Raqaib 1','Al Raqaib 2','Al Bahia','Al Zorah','Al Hamriya','Ajman Corniche','Al Humaid City','Sheikh Maktoum Bin Rashid Street Area','Al Ittihad Area','Al Jerf Industrial Area','Al Owan','Al Khor','Al Mirgab','Al Gurum','Al Salamah','Al Hosn','Al Jarn','Al Sabkha','Al Shorouq','Al Bahia Hills','Al Helio Downtown','Uptown Ajman','Ajman One Area'];
+
+function updateBusAreaDropdown(){
+  const city=el('fbus-city')?.value||'';
+  const areaSelect=el('fbus-area-select');
+  if(!areaSelect) return;
+  const areas=city==='Sharjah'?SHARJAH_AREAS:city==='Ajman'?AJMAN_AREAS:[];
+  if(!areas.length){areaSelect.innerHTML='<option value="">— Select city first —</option>';return;}
+  areaSelect.innerHTML='<option value="">— Select area —</option>'+
+    areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+  // Also update fbus-area hidden input
+  areaSelect.onchange=()=>{
+    const combo=[city,areaSelect.value].filter(Boolean).join(' — ');
+    if(el('fbus-area')) el('fbus-area').value=combo;
+    smartBusSuggest();
+  };
+}
+
+
+function _areaOpts(city,selected){
+  const areas=city==='Sharjah'?SHARJAH_AREAS:city==='Ajman'?AJMAN_AREAS:[];
+  return '<option value="">— Select area —</option>'+areas.map(a=>`<option value="${a}"${a===selected?' selected':''}>${a}</option>`).join('');
+}
+function updateBusAreaDropdown(){
+  const city=el('fbus-city')?.value||'';
+  const sel=el('fbus-area-select');
+  if(!sel) return;
+  sel.innerHTML=_areaOpts(city,'');
+  sel.onchange=()=>{
+    if(el('fbus-area')) el('fbus-area').value=[city,sel.value].filter(Boolean).join(' — ');
+    smartBusSuggest();
+  };
+}
+function updateStaffAreaDropdown(){
+  const city=el('sf_bus_city')?.value||'';
+  const sel=el('sf_bus_area_select');
+  if(!sel) return;
+  sel.innerHTML=_areaOpts(city,'');
+  if(el('sf_home_area')) el('sf_home_area').value='';
+}
+
 const DRIVER_COLORS={
   'Abid':  {bg:'#dc2626',light:'#fef2f2'},
   'Asif':  {bg:'#2563eb',light:'#eff6ff'},
@@ -15913,10 +16065,32 @@ function openStaffForm(id){
             <option value="13:00" ${s?.busPickupTime==='13:00'?'selected':''}>🟢 1:00 م</option>
           </select>
         </div>
-        <div style="grid-column:2/-1">
-          <label style="font-size:.75rem;color:#6b7280">منطقة السكن</label>
-          <input type="text" id="sf_home_area" value="${s?.homeArea||''}" placeholder="e.g. Al Nahda, Muwaileh..."
-            style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+        <div style="grid-column:1/-1">
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:6px">
+            <div><label style="font-size:.75rem;color:#6b7280">🏙️ City</label>
+              <select id="sf_bus_city" onchange="updateStaffAreaDropdown()" style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif">
+                <option value="">— City —</option>
+                <option value="Sharjah" ${s?.busCity==='Sharjah'?'selected':''}>🌆 Sharjah</option>
+                <option value="Ajman" ${s?.busCity==='Ajman'?'selected':''}>🏙️ Ajman</option>
+              </select>
+            </div>
+            <div><label style="font-size:.75rem;color:#6b7280">📍 Area / المنطقة</label>
+              <select id="sf_bus_area_select" style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif">
+                ${_areaOpts(s?.busCity||'', s?.homeArea||'')}
+              </select>
+            </div>
+          </div>
+          <input type="hidden" id="sf_home_area" value="${s?.homeArea||''}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><label style="font-size:.75rem;color:#6b7280">🏢 Building / Street</label>
+              <input type="text" id="sf_bus_building" value="${s?.busBuilding||''}" placeholder="Villa 5, Al Noor Tower..."
+                style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            </div>
+            <div><label style="font-size:.75rem;color:#6b7280">🗺️ Landmark</label>
+              <input type="text" id="sf_bus_landmark" value="${s?.busLandmark||''}" placeholder="Near City Centre..."
+                style="width:100%;padding:6px;border:1.5px solid #fcd34d;border-radius:7px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -15972,7 +16146,10 @@ async function saveStaff(id){
     spea_expire: document.getElementById('sf_spea')?.value||null,
     health_card_expire: document.getElementById('sf_health')?.value||null,
     notes: document.getElementById('sf_notes')?.value||'',
-    home_area: document.getElementById('sf_home_area')?.value?.trim()||null,
+    home_area: document.getElementById('sf_bus_area_select')?.value?.trim()||document.getElementById('sf_home_area')?.value?.trim()||null,
+    bus_city: document.getElementById('sf_bus_city')?.value||null,
+    bus_building: document.getElementById('sf_bus_building')?.value?.trim()||null,
+    bus_landmark: document.getElementById('sf_bus_landmark')?.value?.trim()||null,
     shift_start: document.getElementById('sf_shift_start')?.value?.trim()||null,
     shift_end: document.getElementById('sf_shift_end')?.value?.trim()||null,
     uses_bus: document.getElementById('sf_uses_bus')?.value==='true',
@@ -16007,7 +16184,7 @@ async function saveStaff(id){
         health_card_expire:row.health_card_expire,notes:row.notes,
         home_area:row.home_area||null, shift_start:row.shift_start||null,
         shift_end:row.shift_end||null, uses_bus:row.uses_bus||false,
-        bus_pickup_time:row.bus_pickup_time||null};
+        bus_pickup_time:row.bus_pickup_time||null, bus_city:row.bus_city||null, bus_building:row.bus_building||null, bus_landmark:row.bus_landmark||null};
       // Try adding salary fields one by one
       if(row.basic_salary!==undefined) safeRow.basic_salary=row.basic_salary;
       if(row.gross_salary!==undefined) safeRow.gross_salary=row.gross_salary;
