@@ -14648,6 +14648,7 @@ async function openMonthlyBusRoster(){
   const ar=lang==='ar';
 
   document.getElementById('monthly-bus-roster')?.remove();
+  window._rosterStaff = null; // force fresh load
 
   const ov=document.createElement('div');
   ov.id='monthly-bus-roster';
@@ -14692,23 +14693,40 @@ async function openMonthlyBusRoster(){
       .select('id,name,class_name,branch_id,bus,bus_direction,bus_pick_drop,bus_area,kids_time,parent_mom,parent_dad,leave_date')
       .is('leave_date', null);
 
-    // Load staff who use bus
+    // Load staff who use bus - simple query to avoid missing column errors
     const fetchStaff = sb.from('staff')
-      .select('id,name,position,branch_id,uses_bus,home_area,bus_city,bus_building,bus_landmark,shift_start,shift_end,bus_pickup_time,leave_date')
-      .eq('uses_bus', true)
-      .is('leave_date', null);
+      .select('id,name,position,branch_id,uses_bus,home_area,shift_start,shift_end,last_working_day')
+      .eq('uses_bus', true);
 
     const [,,kidsRes,staffRes] = await Promise.all([fetchBuses, fetchAssign, fetchKids, fetchStaff]);
 
-    // Store bus staff
-    window._rosterStaff = (staffRes.data||[]).map(x=>({
-      id: x.id, name: x.name||'', position: x.position||'',
-      branchId: x.branch_id, usesBus: true,
-      homeArea: x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'',
-      shiftStart: x.shift_start||'', shiftEnd: x.shift_end||'',
-      busPickupTime: x.bus_pickup_time||'',
-      entityType: 'staff', isStaff: true,
-    }));
+    // Load extra staff bus fields separately (in case columns don't exist yet)
+    let staffExtraMap={};
+    try{
+      const {data:extraData}=await sb.from('staff').select('id,bus_city,bus_building,bus_landmark,bus_pickup_time').eq('uses_bus',true);
+      (extraData||[]).forEach(x=>{ staffExtraMap[x.id]=x; });
+    }catch(e){ console.log('Extra staff columns not available yet'); }
+
+    // Store bus staff - exclude those whose contract ended
+    const today=new Date().toISOString().slice(0,10);
+    window._rosterStaff = (staffRes.data||[])
+      .filter(x=> !x.last_working_day || x.last_working_day >= today)
+      .map(x=>{
+        const ex=staffExtraMap[x.id]||{};
+        return{
+          id: x.id, name: x.name||'', position: x.position||'',
+          branchId: x.branch_id, usesBus: true,
+          homeArea: x.home_area||'',
+          busCity: ex.bus_city||'', busBuilding: ex.bus_building||'', busLandmark: ex.bus_landmark||'',
+          shiftStart: x.shift_start||'', shiftEnd: x.shift_end||'',
+          busPickupTime: ex.bus_pickup_time||'',
+          entityType: 'staff', isStaff: true,
+        };
+      });
+
+    console.log('🧑‍🏫 Bus staff loaded:', window._rosterStaff.length);
+    // Force fresh load next time
+    window._rosterKidsStale = false;
 
     // Store bus children
     window._rosterKids = (kidsRes.data||[])
@@ -14777,16 +14795,16 @@ function renderMonthlyBusRoster(){
 
   // Get bus-using staff from fresh load or DB
   const rawStaff = window._rosterStaff || (DB.staff||[]).filter(s=>s.usesBus);
-  const busStaff = rawStaff
-    .filter(s=> branchSel==='all' || s.branchId===branchSel)
-    .map(s=>{
-      const br=BRANCHES.find(b=>b.id===s.branchId)||{};
-      return{...s,
-        entityType:'staff', isStaff:true,
-        branchName:br.ar||'', branchColor:br.c||'#374151', branchIcon:br.icon||'🏫',
-        busArea:s.homeArea||'', busDirection:'two_way', busPickDrop:'',
-      };
-    });
+  // Show all staff regardless of branch filter (buses are shared across branches)
+  const busStaff = rawStaff.map(s=>{
+    const br=BRANCHES.find(b=>b.id===s.branchId)||{};
+    return{...s,
+      entityType:'staff', isStaff:true,
+      branchName:br.ar||s.branchId||'', branchColor:br.c||'#374151', branchIcon:br.icon||'🏫',
+      busArea:s.homeArea||'', busDirection:'two_way', busPickDrop:'',
+    };
+  });
+  console.log('🧑 Bus staff in roster:', rawStaff.length, '| branch filter:', branchSel);
 
   const ar=lang==='ar';
   let html='';
@@ -14846,8 +14864,12 @@ function renderMonthlyBusRoster(){
       </table></div>
     </div>`;
   } else {
-    html+=`<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:.8rem;color:#92400e">
-      ⚠️ No bus staff found — go to Staff and enable "يستخدم الباص ✅ نعم" + set shift times
+    html+=`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:8px;padding:9px 14px;margin-bottom:12px;font-size:.82rem;color:#92400e">
+      ⚠️ <strong>No bus staff found.</strong> To add staff to the roster:<br>
+      1. Go to <strong>Staff</strong> page → Edit any staff member<br>
+      2. Under <strong>🚌 Transportation</strong> → set <strong>يستخدم الباص = ✅ نعم</strong><br>
+      3. Add shift start/end times → Save<br>
+      4. Come back here and reopen Bus Roster
     </div>`;
   }
 
