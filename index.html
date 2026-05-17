@@ -17828,17 +17828,41 @@ async function confirmImportReceipts(rows){
           .gte('date', monthStart)
           .lte('date', monthEnd)
           .limit(1);
-        if(dup && dup.length > 0){ err++; continue; } // skip duplicate within same month
+        if(dup && dup.length > 0){
+          err++;
+          if(!window._skippedRecRows) window._skippedRecRows=[];
+          window._skippedRecRows.push({receiptNum:r.receipt_num||'—',childName:cname||'—',date:r.date||'—',total:r.total||0});
+          continue;
+        }
       }
       await sb.from('receipts').insert(r); ok++;
       if(!child && cname) notFound.push(cname);
     }catch(e){ err++; }
   }
-  
+
   await loadFromSupa(curBid);
-  const msg=`✅ Imported ${ok} receipts${err?' | ⚠️ '+err+' errors':''}${notFound.length?' | ⚠️ Children not found: '+[...new Set(notFound)].slice(0,3).join(', '):''}`;
+  const msg=`✅ Imported ${ok} receipts${err?' | ⏭ '+err+' skipped (duplicate)':''}${notFound.length?' | ⚠️ '+[...new Set(notFound)].length+' children not found':''}`;
+
+  let recSkipHtml='';
+  if(window._skippedRecRows?.length){
+    recSkipHtml=`<div style="margin-top:10px;background:#fef3c7;border:1px solid #fbbf24;border-radius:9px;padding:10px;font-size:.75rem">
+      <div style="font-weight:800;color:#92400e;margin-bottom:6px">⏭️ Skipped — موجودة مسبقاً (${window._skippedRecRows.length})</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f59e0b;color:#fff">
+          <th style="padding:4px 7px">Receipt#</th><th style="padding:4px 7px">Child</th>
+          <th style="padding:4px 7px">Date</th><th style="padding:4px 7px">Total</th>
+        </tr></thead>
+        <tbody>${window._skippedRecRows.map((r,i)=>`<tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
+          <td style="padding:3px 7px;font-weight:700">${r.receiptNum}</td>
+          <td style="padding:3px 7px">${r.childName}</td>
+          <td style="padding:3px 7px">${r.date}</td>
+          <td style="padding:3px 7px">${r.total}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+  let notFoundHtml=notFound.length?`<div style="margin-top:8px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;font-size:.75rem;color:#dc2626">⚠️ Not found: ${[...new Set(notFound)].join(', ')}</div>`:'';
   showAlert('rec-imp-alert', msg, err>0||notFound.length>0);
-  document.getElementById('rec-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>`;
+  document.getElementById('rec-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>${recSkipHtml}${notFoundHtml}`;
 }
 
 // ═══════════════════════════════════════════════
@@ -18034,6 +18058,7 @@ async function confirmImportExpenses(rows){
 
   let ok=0,err=0,skipped=0;
   window._failedExpRows=[];
+  window._skippedExpRows=[];
   showAlert('exp-imp-alert','⏳ Importing...', false);
 
   // Detect if rows are pre-processed (new format) or raw (old format)
@@ -18106,13 +18131,18 @@ async function confirmImportExpenses(rows){
         if(subType)  dupQuery=dupQuery.eq('sub_type',subType);
       }
       const {data:existing}=await dupQuery.limit(1);
-      if(existing?.length){skipped++;continue;}
+      if(existing?.length){
+        skipped++;
+        window._skippedExpRows.push({cat,dateStr,amt,supplier,reason,invoiceNo,subType,cause:'Already exists in DB'});
+        continue;
+      }
 
       const {error:insErr}=await sb.from('expenses').insert(r);
       if(insErr){
         if(insErr.code==='23505'||String(insErr.message||'').includes('duplicate key')){
           // Already exists — skip, don't insert again
           skipped++;
+          window._skippedExpRows.push({cat,dateStr,amt,supplier,reason,invoiceNo,subType,cause:'Duplicate key on insert'});
         } else {
           console.error('Insert error:',insErr,r);
           _failedExpRows.push({sheet:cat,date:dateStr,amount:amt,supplier:supplier,
@@ -18125,6 +18155,36 @@ async function confirmImportExpenses(rows){
   
   await loadFromSupa(curBid);
   const msg=`✅ Imported ${ok} expense records${skipped?' | ⏭ '+skipped+' already existed (skipped)':''}${err?' | ⚠️ '+err+' errors':''}`;
+  
+  // Build skipped rows details
+  let skippedDetails='';
+  if(window._skippedExpRows?.length){
+    skippedDetails=`<div style="margin-top:10px;background:#fef3c7;border:1px solid #fbbf24;border-radius:9px;padding:10px;font-size:.75rem">
+      <div style="font-weight:800;color:#92400e;margin-bottom:6px">⏭️ الصفوف المتخطاة — Skipped (${window._skippedExpRows.length}) <span style="font-weight:400;font-size:.72rem">موجودة مسبقاً في النظام</span></div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.72rem">
+        <thead><tr style="background:#f59e0b;color:#fff">
+          <th style="padding:4px 7px;text-align:right">Category</th>
+          <th style="padding:4px 7px">Date</th>
+          <th style="padding:4px 7px;text-align:right">Amount</th>
+          <th style="padding:4px 7px;text-align:right">Supplier</th>
+          <th style="padding:4px 7px;text-align:right">Invoice / Reason</th>
+          <th style="padding:4px 7px;text-align:right">السبب</th>
+        </tr></thead>
+        <tbody>${window._skippedExpRows.map((r,i)=>`
+          <tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
+            <td style="padding:3px 7px;font-weight:700">${r.cat||'—'}</td>
+            <td style="padding:3px 7px">${r.dateStr||'—'}</td>
+            <td style="padding:3px 7px;font-weight:700">${r.amt||0}</td>
+            <td style="padding:3px 7px">${(r.supplier||'—').substring(0,20)}</td>
+            <td style="padding:3px 7px;color:#6b7280">${r.invoiceNo||r.reason?.substring(0,25)||'—'}</td>
+            <td style="padding:3px 7px;color:#92400e">${r.cause||'Duplicate'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>`;
+  }
   let errDetails='';
   if(window._failedExpRows&&window._failedExpRows.length){
     errDetails=`<div style="margin-top:10px;background:#fff5f5;border-radius:9px;padding:10px;font-size:.75rem">
@@ -18135,7 +18195,7 @@ async function confirmImportExpenses(rows){
       </table>
     </div>`;
   }
-  document.getElementById('exp-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>${errDetails}`;
+  document.getElementById('exp-imp-preview').innerHTML=`<div style="background:#f0fdf4;border-radius:9px;padding:11px;color:#059669;font-weight:700">${msg}</div>${skippedDetails}${errDetails}`;
 }
 
 // ═══════════════════════════════════════════════
