@@ -4380,19 +4380,32 @@ function printVATReport(exportType='print'){
 
   // Split by VAT type — based on actual content not stored vatType
   // 5%: has clothes or tools
-  const vatFive   = list.filter(r => (r.clothes||0)+(r.tools||0) > 0);
-  // Exempt: has ONLY transportation (no fees, no reg, no clothes/tools)
-  const vatExempt = list.filter(r => (r.bus||0)>0 && (r.fee||0)===0 && (r.reg||0)===0 && (r.clothes||0)===0 && (r.tools||0)===0);
-  // Zero-Rated: has monthly fees OR registration (may also have bus)
-  const vatZero   = list.filter(r => (r.fee||0)+(r.reg||0) > 0 && (r.clothes||0)+(r.tools||0) === 0);
+  // Helper: sum of all zero-rated items in a receipt
+  const zeroItems = r => (r.fee||0)+(r.reg||0)+(r.friFee||0)+(r.satFee||0)+(r.sunFee||0)+(r.hourFee||0)+(r.overtimeFee||0);
+  const taxItems  = r => (r.clothes||0)+(r.tools||0);
 
-  // For amounts: calculate each component separately across ACTIVE receipts only
-  const totalFees   = list.reduce((s,r)=>s+(r.fee||0),0);
-  const totalReg    = list.reduce((s,r)=>s+(r.reg||0),0);
-  const totalBus    = list.reduce((s,r)=>s+(r.bus||0),0);
-  const totalUni    = list.reduce((s,r)=>s+(r.clothes||0),0);
-  const totalStat   = list.reduce((s,r)=>s+(r.tools||0),0);
-  const totalWkFee  = list.reduce((s,r)=>s+((r.friFee||0)+(r.satFee||0)+(r.sunFee||0)),0);
+  // 5%: has clothes or tools (taxable items)
+  const vatFive   = list.filter(r => taxItems(r) > 0);
+  // Exempt: has ONLY transportation — no educational fees at all
+  const vatExempt = list.filter(r => (r.bus||0)>0 && zeroItems(r)===0 && taxItems(r)===0);
+  // Zero-Rated: has any educational fees (fees/reg/extra days/hours/overtime), no taxable items
+  const vatZero   = list.filter(r => zeroItems(r) > 0 && taxItems(r) === 0);
+  // Receipts not in any category (edge case — bus only with fees is caught by vatZero)
+  const vatUncategorized = list.filter(r => zeroItems(r)===0 && taxItems(r)===0 && (r.bus||0)===0);
+
+  // For amounts: calculate each component across ALL active receipts
+  const totalFees     = list.reduce((s,r)=>s+(r.fee||0),0);
+  const totalReg      = list.reduce((s,r)=>s+(r.reg||0),0);
+  const totalBus      = list.reduce((s,r)=>s+(r.bus||0),0);
+  const totalUni      = list.reduce((s,r)=>s+(r.clothes||0),0);
+  const totalStat     = list.reduce((s,r)=>s+(r.tools||0),0);
+  const totalWkFee    = list.reduce((s,r)=>s+((r.friFee||0)+(r.satFee||0)+(r.sunFee||0)),0);
+  const totalHourFee  = list.reduce((s,r)=>s+(r.hourFee||0),0);
+  const totalOvertime = list.reduce((s,r)=>s+(r.overtimeFee||0),0);
+
+  // Sum helpers
+  const sumZeroAmt = arr => arr.reduce((s,r)=>s+zeroItems(r),0);
+  const sumTaxAmt  = arr => arr.reduce((s,r)=>s+taxItems(r),0);
 
   const sum = arr => arr.reduce((s,r) => s + (r.total||0), 0);
   const sumVat = arr => arr.reduce((s,r) => s + (r.vatAmount||0), 0);
@@ -4418,7 +4431,7 @@ function printVATReport(exportType='print'){
     total:   isAr ? 'الإجمالي' : 'Total',
     subtotal:isAr ? 'المجموع' : 'Sub-Total',
     taxable5:isAr ? 'خاضع للضريبة 5%' : 'Taxable at 5% VAT',
-    zeroR:   isAr ? 'خاضع بنسبة 0% (رسوم + تسجيل)' : 'Zero-Rated 0% (Fees & Reg)',
+    zeroR:   isAr ? 'خاضع بنسبة 0% (رسوم + تسجيل + ساعات)' : 'Zero-Rated 0% (Fees, Reg, Hours)',
     exempt_: isAr ? 'معفى (مواصلات)' : 'Exempt (Transportation)',
     grandPre:isAr ? 'إجمالي قبل الضريبة' : 'Grand Total Pre-Tax',
     grandVat:isAr ? 'إجمالي الضريبة' : 'Total VAT',
@@ -4466,9 +4479,11 @@ function printVATReport(exportType='print'){
 
   const mkPaySection = (payM, rows) => {
     if(!rows.length) return '';
-    const fiveR = rows.filter(r=>r.vatType==='5');
-    const zeroR = rows.filter(r=>r.vatType==='zero');
-    const exR   = rows.filter(r=>!r.vatType||r.vatType==='exempt');
+    // Use content-based categorization (consistent with vatFive/vatZero/vatExempt above)
+    const fiveR = rows.filter(r => taxItems(r) > 0);
+    const zeroR = rows.filter(r => zeroItems(r) > 0 && taxItems(r) === 0);
+    const exR   = rows.filter(r => (r.bus||0)>0 && zeroItems(r)===0 && taxItems(r)===0);
+    const otherR= rows.filter(r => zeroItems(r)===0 && taxItems(r)===0 && (r.bus||0)===0);
     return `
     <div style="margin-bottom:25px;border:2px solid #e5e7eb;border-radius:10px;overflow:hidden">
       <div style="background:#1e3a8a;color:#fff;padding:9px 14px;font-weight:900;font-size:.95rem">
@@ -4478,7 +4493,8 @@ function printVATReport(exportType='print'){
         ${mkTable(fiveR, T.taxable5, '#d97706', true)}
         ${mkTable(zeroR, T.zeroR, '#0891b2', false)}
         ${mkTable(exR, T.exempt_, '#059669', false)}
-        ${!fiveR.length&&!zeroR.length&&!exR.length?`<p style="color:#9ca3af;font-style:italic">${T.noRec}</p>`:''}
+        ${otherR.length?mkTable(otherR, isAr?'غير مصنف':'Uncategorized', '#6b7280', false):''}
+        ${!fiveR.length&&!zeroR.length&&!exR.length&&!otherR.length?`<p style="color:#9ca3af;font-style:italic">${T.noRec}</p>`:''}
         <!-- Payment sub-summary -->
         <div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;font-size:.82rem">
           <span>${T.grandPre}: <b>${fmt(sumPre(rows))} AED</b></span>
@@ -4563,7 +4579,7 @@ function printVATReport(exportType='print'){
     </div>
     <div class="brow" style="margin-top:6px">
       <span>🔵 ${T.zeroR}</span>
-      <span>${fmt(totalFees+totalReg+totalWkFee)} AED</span>
+      <span>${fmt(totalFees+totalReg+totalWkFee+totalHourFee+totalOvertime)} AED</span>
     </div>
     <div class="brow" style="padding-right:12px">
       <span style="color:#6b7280;font-size:.78rem">— ${isAr?'الرسوم الشهرية':'Monthly Fees'}</span>
@@ -4576,6 +4592,14 @@ function printVATReport(exportType='print'){
     ${totalWkFee>0?`<div class="brow" style="padding-right:12px">
       <span style="color:#6b7280;font-size:.78rem">— ${isAr?'رسوم الويكند':'Weekend Fees'}</span>
       <span style="color:#6b7280">${fmt(totalWkFee)} AED</span>
+    </div>`:''}
+    ${totalHourFee>0?`<div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'رسوم الساعات':'Hour Fees'}</span>
+      <span style="color:#6b7280">${fmt(totalHourFee)} AED</span>
+    </div>`:''}
+    ${totalOvertime>0?`<div class="brow" style="padding-right:12px">
+      <span style="color:#6b7280;font-size:.78rem">— ${isAr?'أوفرتايم':'Overtime'}</span>
+      <span style="color:#6b7280">${fmt(totalOvertime)} AED</span>
     </div>`:''}
     <div class="brow" style="margin-top:6px">
       <span>🟢 ${T.exempt_}</span>
@@ -4605,6 +4629,8 @@ function printVATReport(exportType='print'){
       <div>${isAr?'🔵 رسوم شهرية (0%)':'🔵 Monthly Fees (0%)'}: <b>${fmt(totalFees)} AED</b></div>
       <div>${isAr?'🔵 رسوم التسجيل (0%)':'🔵 Registration (0%)'}: <b>${fmt(totalReg)} AED</b></div>
       ${totalWkFee>0?`<div>${isAr?'🔵 رسوم الويكند (0%)':'🔵 Weekend Fees (0%)'}: <b>${fmt(totalWkFee)} AED</b></div>`:''}
+      ${totalHourFee>0?`<div>${isAr?'🔵 رسوم ساعات (0%)':'🔵 Hour Fees (0%)'}: <b>${fmt(totalHourFee)} AED</b></div>`:''}
+      ${totalOvertime>0?`<div>${isAr?'🔵 أوفرتايم (0%)':'🔵 Overtime (0%)'}: <b>${fmt(totalOvertime)} AED</b></div>`:''}
       <div>${isAr?'🟢 مواصلات (معفى)':'🟢 Transport (Exempt)'}: <b>${fmt(totalBus)} AED</b></div>
       <div>${isAr?'🟡 ملابس+أدوات':'🟡 Uniforms+Stationary'}: <b>${fmt(totalUni+totalStat)} AED</b></div>
       <div style="color:#fde68a">${T.grandVat} (5%): <b>${fmt(grandVAT)} AED</b></div>
@@ -4625,7 +4651,7 @@ function printVATReport(exportType='print'){
       [],
       [isAr?'نوع الضريبة':'VAT Type', isAr?'عدد الإيصالات':'Receipts', isAr?'قبل الضريبة':'Pre-Tax', isAr?'مبلغ الضريبة':'VAT Amt', isAr?'الإجمالي':'Total'],
       [T.taxable5+' (Uniforms+Stationary)', vatFive.length, totalUni+totalStat, grandVAT, totalUni+totalStat+grandVAT],
-      [T.zeroR+' (Fees+Reg+Weekend)', vatZero.length, totalFees+totalReg+totalWkFee, 0, totalFees+totalReg+totalWkFee],
+      [T.zeroR+' (Fees+Reg+Weekend+Hours)', vatZero.length, totalFees+totalReg+totalWkFee+totalHourFee+totalOvertime, 0, totalFees+totalReg+totalWkFee+totalHourFee+totalOvertime],
       [T.exempt_+' (Transport)', vatExempt.length, totalBus, 0, totalBus],
       [],
       [isAr?'الإجمالي':'Grand Total', list.length, grandPreTax, grandVAT, grandTotal],
