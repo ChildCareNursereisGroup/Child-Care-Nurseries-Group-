@@ -15102,29 +15102,54 @@ async function saveAllBusAssignments(){
   renderMonthlyBusRoster();
   if(fail>0) showToast('⚠️ Saved '+ok+', failed '+fail+' — see console');
   else showToast('✅ Saved '+ok+' assignments ('+saved+' total in DB)');
-  // Save staff assignments
+  // Save staff assignments — collect all selects per staff first, then save once per staff
   const staffSels=document.querySelectorAll('.staff-assign-sel');
-  for(const sel of staffSels){
-    const sid=sel.dataset.sid; const busId=sel.value;
-    if(!busId||!sid) continue;
-    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
-    if(!bus) continue;
-    if(!DB.staffBusAssignments) DB.staffBusAssignments={};
-    if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
-    DB.staffBusAssignments[sid].pick={busId:String(bus.id),busNumber:bus.busNumber};
-    DB.staffBusAssignments[sid].drop={busId:String(bus.id),busNumber:bus.busNumber};
-    await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
-    await sb.from('bus_assignments').insert({staff_id:Number(sid),entity_type:'staff',bus_id:Number(busId),bus_number:bus.busNumber,pick_bus_id:Number(busId),pick_bus_number:bus.busNumber,drop_bus_id:Number(busId),drop_bus_number:bus.busNumber});
-  }
-  const staffStops=document.querySelectorAll('.staff-stop-inp');
-  for(const inp of staffStops){
+  const staffMap={}; // sid → {pickBusId, pickBusNum, dropBusId, dropBusNum, stopNum}
+  staffSels.forEach(sel=>{
+    const sid=sel.dataset.sid;
+    const tType=sel.dataset.tripType||'pick';
+    const busId=sel.value;
+    if(!sid) return;
+    if(!staffMap[sid]) staffMap[sid]={};
+    if(busId){
+      const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
+      if(bus){
+        if(tType==='pick'){ staffMap[sid].pickBusId=bus.id; staffMap[sid].pickBusNum=bus.busNumber; }
+        if(tType==='drop'){ staffMap[sid].dropBusId=bus.id; staffMap[sid].dropBusNum=bus.busNumber; }
+      }
+    }
+  });
+  document.querySelectorAll('.staff-stop-inp').forEach(inp=>{
     const sid=inp.dataset.sid; const val=parseInt(inp.value);
-    if(!sid||isNaN(val)) continue;
+    if(sid&&!isNaN(val)){ if(!staffMap[sid]) staffMap[sid]={}; staffMap[sid].stopNum=val; }
+  });
+
+  let staffSaved=0;
+  for(const [sid,sm] of Object.entries(staffMap)){
+    const hasBus=sm.pickBusId||sm.dropBusId;
+    if(!hasBus&&!sm.stopNum) continue;
     if(!DB.staffBusAssignments) DB.staffBusAssignments={};
     if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
-    DB.staffBusAssignments[sid].stopNumber=val;
-    await sb.from('bus_assignments').update({stop_number:val}).eq('staff_id',Number(sid)).eq('entity_type','staff');
+    if(sm.pickBusId) DB.staffBusAssignments[sid].pick={busId:String(sm.pickBusId),busNumber:sm.pickBusNum};
+    if(sm.dropBusId) DB.staffBusAssignments[sid].drop={busId:String(sm.dropBusId),busNumber:sm.dropBusNum};
+    if(sm.stopNum)   DB.staffBusAssignments[sid].stopNumber=sm.stopNum;
+    // One delete + insert per staff (avoid race condition from multiple selects)
+    await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
+    if(hasBus){
+      const pickId=sm.pickBusId||sm.dropBusId;
+      const dropId=sm.dropBusId||sm.pickBusId;
+      const {error}=await sb.from('bus_assignments').insert({
+        staff_id:Number(sid), entity_type:'staff',
+        bus_id:Number(pickId), bus_number:sm.pickBusNum||sm.dropBusNum||'',
+        pick_bus_id:Number(pickId), pick_bus_number:sm.pickBusNum||'',
+        drop_bus_id:Number(dropId), drop_bus_number:sm.dropBusNum||'',
+        stop_number:sm.stopNum||null,
+      });
+      if(error) console.error('Staff assign error:',sid,error.message);
+      else staffSaved++;
+    }
   }
+  if(staffSaved>0) showToast('✅ Staff: saved '+staffSaved+' assignments');
 }
 
 async function saveStopNumbers(){
@@ -16377,7 +16402,7 @@ async function loadAllBusAssignments(){
   DB.busAssignments = {};
   DB.staffBusAssignments = {};
   (data||[]).forEach(r=>{
-    const isStaff = r.entity_type==='staff' || (r.staff_id&&!r.child_id);
+    const isStaff = r.entity_type==='staff' || (r.staff_id != null && !r.child_id);
     if(isStaff){
       const sid=String(r.staff_id||'');
       if(!sid) return;
