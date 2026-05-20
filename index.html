@@ -10126,6 +10126,25 @@ async function saveExp(){
     extra
   };
   // ── Duplicate check ──────────────────────────
+  // For salary: check same month + same amount + similar supplier name (across all branches)
+  if(expCat==='salary' && supplier && date){
+    const mon=date.substring(0,7);
+    const baseName=supplier.trim().split(/\s+/).slice(0,3).join(' ').toLowerCase();
+    const salDup=DB.expenses.find(e=>{
+      if(e.category!=='salary') return false;
+      if(Math.abs((e.amount||0)-amount)>0.01) return false;
+      if((e.date||'').substring(0,7)!==mon) return false;
+      const eName=(e.supplierName||e.supplier_name||'').toLowerCase();
+      return eName.includes(baseName)||baseName.includes(eName.split(/\s+/).slice(0,3).join(' '));
+    });
+    if(salDup){
+      showAlert('expalert', lang==='ar'
+        ? `⚠️ راتب ${supplier} لشهر ${mon} مسجل مسبقاً! (${fmtNum(amount)} د.إ)`
+        : `⚠️ Salary for ${supplier} in ${mon} already exists! (${fmtNum(amount)} AED)`, true);
+      setSyncing(false);
+      return;
+    }
+  }
   const dupExp = DB.expenses.find(e=>
     e.branch_id === curBid &&
     e.category === expCat &&
@@ -18170,7 +18189,24 @@ async function confirmImportExpenses(rows){
       let dupQuery=sb.from('expenses').select('id')
         .eq('branch_id',branchId).eq('category',cat).eq('date',dateStr).eq('amount',amt);
       
-      if(invoiceNo){
+      // Special check for salary: same month + same amount + similar supplier name
+      if(cat==='salary' && supplier && dateStr){
+        const mon=dateStr.substring(0,7); // YYYY-MM
+        // Get first 2 words of supplier name for fuzzy match
+        const baseName=supplier.trim().split(/\s+/).slice(0,3).join(' ').toLowerCase();
+        const {data:salDup}=await sb.from('expenses').select('id,supplier_name')
+          .eq('category','salary').eq('amount',amt)
+          .gte('date',mon+'-01').lte('date',mon+'-31');
+        const nameMatch=(salDup||[]).find(r=>{
+          const rName=(r.supplier_name||'').toLowerCase();
+          return rName.includes(baseName)||baseName.includes(rName.split(/\s+/).slice(0,3).join(' '));
+        });
+        if(nameMatch){
+          skipped++;
+          window._skippedExpRows.push({cat,dateStr,amt,supplier,reason,invoiceNo,subType,cause:'Salary already exists for this month'});
+          continue;
+        }
+      } else if(invoiceNo){
         // If we have an invoice number, use it as the primary unique key
         dupQuery=sb.from('expenses').select('id')
           .eq('branch_id',branchId).eq('category',cat).eq('date',dateStr)
