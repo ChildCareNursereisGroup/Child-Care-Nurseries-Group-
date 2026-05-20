@@ -2651,17 +2651,15 @@ async function setPW(bid,role,pw){
 // ═══════════════════════════════════════════════
 async function loadFromSupa(bid) {
   bid=bid||curBid;
-  _busAllBranchCache = null; // Invalidate bus report cache on data reload
-  showLoad(lang==='ar'?'جاري تحميل البيانات...':'Loading data...');
+  _busAllBranchCache = null;
+  showLoad(lang==='ar'?'جاري التحميل...':'Loading...');
   try {
-    // ── Load all main tables with fetchAll (no limits) ──────────────
-    const [childrenRaw, expensesRaw, visitorsRaw] = await Promise.all([
+    // ── Load critical data first (parallel) ──────────────────────────
+    const [childrenRaw, expensesRaw] = await Promise.all([
       fetchAll(()=>sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
-      fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
-      fetchAll(()=>sb.from('visitors').select('*').eq('branch_id',bid)),
+      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(500),
     ]);
-
-    DB.visitors=(visitorsRaw||[]).map(v=>({...v,name:(v.name||'').trim()}));
+    const expensesData = expensesRaw?.data || expensesRaw || [];
     DB.children = (childrenRaw||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
@@ -2707,7 +2705,7 @@ async function loadFromSupa(bid) {
         DB.attendance[d][String(x.child_id)]=x.status;
       });
     }
-    DB.expenses = (expensesRaw||[]).map(x=>{
+    DB.expenses = (expensesData||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
       return{id:x.id,category:x.category||'',type:x.type||'',
         amount:Number(x.amount||0),vatType:x.vat_type||'معفى (0%)',vatAmount:Number(x.vat_amount||0),
@@ -2740,31 +2738,8 @@ async function loadFromSupa(bid) {
       homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
-    // Load staffAtt using staff_id IN query (bypasses branch_id RLS)
-    DB.staffAtt={};
-    if(DB.staff.length > 0){
-      const now=new Date();
-      const months=[];
-      for(let i=2;i>=0;i--){
-        const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-        const yr=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0');
-        const lastDay=new Date(yr,d.getMonth()+1,0).getDate();
-        months.push({from:`${yr}-${mo}-01`,to:`${yr}-${mo}-${lastDay}`});
-      }
-      const allIds=DB.staff.map(s=>s.id).filter(Boolean);
-      for(let bi=0;bi<allIds.length;bi+=50){
-        const batch=allIds.slice(bi,bi+50);
-        const res=await Promise.all(months.map(({from,to})=>
-          sb.from('staff_attendance').select('staff_id,date,status')
-            .in('staff_id',batch).gte('date',from).lte('date',to)
-        ));
-        res.forEach(({data})=>{(data||[]).forEach(x=>{
-          if(!DB.staffAtt[x.date])DB.staffAtt[x.date]={};
-          DB.staffAtt[x.date][String(x.staff_id)]=x.status;
-        });});
-      }
-      console.log('staffAtt loaded via staff_id IN, total keys:', Object.keys(DB.staffAtt).length);
-    }
+    // Staff attendance loaded lazily when staff page is opened
+    DB.staffAtt=DB.staffAtt||{};
 
     hideLoad();
 
@@ -14217,7 +14192,7 @@ function getStaffSalaryLocal(id){ try{return JSON.parse(localStorage.getItem('st
 function setStaffSalaryLocal(id,d){ localStorage.setItem('staff_sal_'+id,JSON.stringify(d)); }
 
 async function loadStaff(){
-  // Load ALL staff - we need those contracted elsewhere but working here
+  // Load ALL staff
   const {data} = await sb.from('staff').select('*');
   DB.staff = (data||[]).map(x=>({
     id:x.id, branchId:x.branch_id, workBranch:x.work_branch||null,
@@ -14239,6 +14214,38 @@ async function loadStaff(){
     notes:x.notes||'',
     homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
   }));
+  // Load staff attendance lazily
+  if(!window._staffAttLoaded) await loadStaffAttendance();
+}
+
+let _staffAttLoading=false;
+async function loadStaffAttendance(){
+  if(_staffAttLoading||!DB.staff?.length) return;
+  _staffAttLoading=true;
+  DB.staffAtt=DB.staffAtt||{};
+  const now=new Date();
+  const months=[];
+  for(let i=2;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const yr=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0');
+    const lastDay=new Date(yr,d.getMonth()+1,0).getDate();
+    months.push({from:`${yr}-${mo}-01`,to:`${yr}-${mo}-${lastDay}`});
+  }
+  const allIds=DB.staff.map(s=>s.id).filter(Boolean);
+  // Load in batches of 50, all months in parallel
+  for(let bi=0;bi<allIds.length;bi+=50){
+    const batch=allIds.slice(bi,bi+50);
+    const res=await Promise.all(months.map(({from,to})=>
+      sb.from('staff_attendance').select('staff_id,date,status')
+        .in('staff_id',batch).gte('date',from).lte('date',to)
+    ));
+    res.forEach(({data})=>{(data||[]).forEach(x=>{
+      if(!DB.staffAtt[x.date])DB.staffAtt[x.date]={};
+      DB.staffAtt[x.date][String(x.staff_id)]=x.status;
+    });});
+  }
+  window._staffAttLoaded=true;
+  _staffAttLoading=false;
 }
 
 function populateStaffBranchFilter(){
