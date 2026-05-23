@@ -278,6 +278,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-ch-file').click()">📥 Import Children Excel</button>
     <button class="btn bg bsm" onclick="downloadChildTemplate()">📋 Template</button>
     <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="printClassCards()">🪪 Print Class Cards</button>
+    <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openAutoAssignClasses()">🎓 Auto Assign Classes</button>
   </div>
   <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:#0369a1;font-weight:700">
     💡 اضغطي على اسم الطفل لتعديل بياناته أو حذفه
@@ -15826,6 +15827,141 @@ async function saveRoutePlan(){
   renderRoutePlanner();
 }
 // ─── End Route Planner ──────────────────────────
+
+// ═══════════════════════════════════════════════
+// AUTO ASSIGN CLASSES
+// ═══════════════════════════════════════════════
+function calcAgeMonths(dob){
+  if(!dob) return 999;
+  const d=new Date(dob+'T00:00:00');
+  if(isNaN(d)) return 999;
+  const now=new Date();
+  return (now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());
+}
+
+function suggestClass(child){
+  const ageM=calcAgeMonths(child.dob);
+  const kt=_parseKT(child.kidsTime||'');
+  const sh=kt.sh, eh=kt.eh;
+  if(ageM<18) return 'A';
+  const isMorningLong  = sh>=6&&sh<=9&&eh>=13;
+  const isMidday       = sh>=10&&sh<=11&&eh>=15;
+  const isMorningShort = sh>=6&&sh<=8&&eh===11;
+  const isAfternoon    = sh>=13;
+  if(ageM<30){
+    if(isMorningLong)  return 'C';
+    if(isMidday)       return 'CF';
+    if(isMorningShort) return 'CS';
+    return 'C';
+  }
+  if(ageM<36){
+    if(isMorningLong)  return 'D';
+    if(isMidday)       return 'F';
+    if(isMorningShort) return 'S';
+    if(isAfternoon)    return 'M';
+    return 'D';
+  }
+  if(isMorningLong)  return 'E';
+  if(isMidday)       return 'H';
+  if(isMorningShort) return 'G';
+  if(isAfternoon)    return 'N';
+  return 'E';
+}
+
+function openAutoAssignClasses(){
+  const children=(DB.children||[]).filter(c=>!c.leaveDate);
+  if(!children.length){showToast('No active children');return;}
+  const suggestions=children.map(c=>({
+    ...c, ageM:calcAgeMonths(c.dob),
+    suggested:suggestClass(c),
+    changed:suggestClass(c)!==c.className
+  })).sort((a,b)=>a.suggested.localeCompare(b.suggested)||(a.ageM-b.ageM));
+  const classCounts={};
+  suggestions.forEach(c=>{classCounts[c.suggested]=(classCounts[c.suggested]||0)+1;});
+  const changed=suggestions.filter(c=>c.changed);
+  const unchanged=suggestions.filter(c=>!c.changed);
+  const summaryHtml=Object.keys(classCounts).sort().map(k=>{
+    const cnt=classCounts[k];
+    const col=cnt>15?'#dc2626':cnt>12?'#d97706':'#059669';
+    return`<span style="background:${col}20;border:1.5px solid ${col};border-radius:7px;padding:2px 10px;font-size:.8rem;font-weight:800;color:${col}">${k}: ${cnt}${cnt>15?' ⚠️':''}</span>`;
+  }).join(' ');
+  const ov=document.createElement('div');
+  ov.id='auto-class-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:12px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;max-width:1000px;margin:0 auto;font-family:'Tajawal',sans-serif">
+      <div style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;padding:14px 18px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:900;font-size:1rem">🎓 Auto Assign Classes</div>
+          <div style="font-size:.78rem;opacity:.85">${changed.length} تغيير / ${unchanged.length} صح / ${suggestions.length} إجمالي</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="applyAutoAssignClasses()" style="background:#fff;color:#d97706;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">✅ Apply All Changes</button>
+          <button onclick="document.getElementById('auto-class-ov').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <div style="padding:10px 14px;background:#fefce8;border-bottom:1px solid #fbbf24;display:flex;flex-wrap:wrap;gap:5px;align-items:center">
+        <span style="font-weight:800;color:#92400e;font-size:.8rem;margin-left:6px">Class counts:</span>
+        ${summaryHtml}
+      </div>
+      ${changed.length?`
+      <div style="padding:10px 14px 6px">
+        <div style="font-weight:800;color:#d97706;margin-bottom:6px">🔄 Children to change (${changed.length})</div>
+        <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem">
+          <thead><tr style="background:#d97706;color:#fff">
+            <th style="padding:7px 10px;text-align:right">الطفل</th>
+            <th style="padding:7px 8px;text-align:center">العمر</th>
+            <th style="padding:7px 8px;text-align:center">الدوام</th>
+            <th style="padding:7px 8px;text-align:center">الفصل الحالي</th>
+            <th style="padding:7px 8px;text-align:center">الفصل الجديد</th>
+            <th style="padding:7px 8px;text-align:center">تجاهل؟</th>
+          </tr></thead>
+          <tbody>${changed.map((c,i)=>{
+            const ageStr=Math.floor(c.ageM/12)+'y '+c.ageM%12+'m';
+            return`<tr style="${i%2===0?'background:#fffbeb':'background:#fff'}">
+              <td style="padding:5px 10px;font-weight:700">${c.name}</td>
+              <td style="padding:5px 8px;text-align:center;color:#6b7280;font-size:.75rem">${ageStr}</td>
+              <td style="padding:5px 8px;text-align:center;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
+              <td style="padding:5px 8px;text-align:center">
+                <span style="background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:6px;font-weight:800">${c.className||'—'}</span>
+              </td>
+              <td style="padding:5px 8px;text-align:center">
+                <span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:6px;font-weight:800">${c.suggested}</span>
+              </td>
+              <td style="padding:5px 8px;text-align:center">
+                <input type="checkbox" data-cid="${c.id}" class="skip-class-chk" style="width:16px;height:16px;cursor:pointer">
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>`:`<div style="padding:20px;text-align:center;color:#059669;font-weight:700;font-size:.9rem">✅ All children already in correct classes!</div>`}
+      ${unchanged.length?`<div style="padding:6px 14px 14px">
+        <div style="font-weight:700;color:#059669;font-size:.8rem;margin-bottom:4px">✅ Already correct (${unchanged.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${unchanged.map(c=>`<span style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:2px 8px;font-size:.73rem">${c.suggested} — ${c.name}</span>`).join('')}</div>
+      </div>`:''}
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
+  window._autoClassSuggestions=suggestions;
+}
+
+async function applyAutoAssignClasses(){
+  const suggestions=window._autoClassSuggestions||[];
+  const skipIds=new Set([...document.querySelectorAll('.skip-class-chk:checked')].map(e=>e.dataset.cid));
+  const toChange=suggestions.filter(c=>c.changed&&!skipIds.has(String(c.id)));
+  if(!toChange.length){showToast('Nothing to apply');return;}
+  let ok=0,fail=0;
+  for(const c of toChange){
+    const{error}=await sb.from('children').update({class_name:c.suggested}).eq('id',c.id);
+    if(error){fail++;console.error(c.name,error.message);}
+    else{ok++;const local=DB.children.find(x=>x.id===c.id);if(local)local.className=c.suggested;}
+  }
+  document.getElementById('auto-class-ov')?.remove();
+  showToast(`✅ Updated ${ok} children${fail?` | ❌ ${fail} failed`:''}`);
+  renderChildren();
+}
+// ─── End Auto Assign Classes ─────────────────────
+
 
 
 // STAFF LEAVE & ATTENDANCE DASHBOARD
