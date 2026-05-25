@@ -2785,18 +2785,18 @@ async function loadFromSupa(bid) {
 
 async function loadAllBranches() {
   const result={};
-  for(const b of BRANCHES){
+  await Promise.all(BRANCHES.map(async b=>{
     const [c,r,e]=await Promise.all([
       fetchAll(()=>sb.from('children').select('*').eq('branch_id',b.id)),
-      fetchAll(()=>sb.from('receipts').select('*').eq('branch_id',b.id)),
-      fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',b.id)),
+      fetchAll(()=>sb.from('receipts').select('id,child_id,child_name,date,from_date,to_date,total,fee,bus,clothes,tools,reg,vat_type,vat_amount,is_cancelled,branch_id').eq('branch_id',b.id)),
+      fetchAll(()=>sb.from('expenses').select('id,date,amount,total_amount,category,branch_id').eq('branch_id',b.id)),
     ]);
     result[b.id]={
-      children:(c.data||[]),
-      receipts:(r.data||[]).map(x=>({...x,total:Number(x.total||0)})),
-      expenses:(e.data||[]).map(x=>({...x,amount:Number(x.amount||0)})),
+      children: Array.isArray(c)?c:(c?.data||[]),
+      receipts: (Array.isArray(r)?r:(r?.data||[])).map(x=>({...x,total:Number(x.total||0)})),
+      expenses: (Array.isArray(e)?e:(e?.data||[])).map(x=>({...x,amount:Number(x.amount||0),totalAmount:Number(x.total_amount||x.amount||0)})),
     };
-  }
+  }));
   return result;
 }
 
