@@ -17971,195 +17971,187 @@ function downloadChildExp2026Template(){
 function downloadExpensesTemplate(){
   const XLSX=window.XLSX; if(!XLSX) return;
 
-  // Common columns that appear in all expense forms
-  const commonCols=['Invoice No.','Supplier / Entity Name','Supplier TRN','Reason for Payment','VAT Type (exempt/5/15)','VAT Amount (AED)','Paid By (owner/accountant/petty)','Branch ID (b1-b5, optional)'];
-
-  const wb=XLSX.utils.book_new();
-
-  // ── Sheet 1: Bus Expenses ──
-  const busData=[
-    ['🚌 Bus Expenses — مصاريف الباص'],
-    ['Bus No.','Expense Type (Fuel/Maintenance/Insurance/Fines/Wash/Other)','Amount (AED)','Extra Expenses (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['BUS-01','Fuel','300','0','10/04/2026','INV-001','ADNOC','','Fuel April','exempt','0','accountant','b1'],
-    ['BUS-02','Maintenance','500','50','15/04/2026','INV-002','Al Futtaim','100123456700003','AC repair','5','27.5','owner','b2'],
+  // Common columns for all sheets
+  const AMT_NOTE = 'Amount BEFORE VAT (AED)';
+  const TOTAL_NOTE = 'Total AFTER VAT (AED)';
+  const commonCols = [
+    'Invoice Date\n(DD/MM/YYYY)',
+    'Invoice No.',
+    'Supplier / Entity Name',
+    'Supplier TRN',
+    'Reason for Payment',
+    'VAT Type\n(exempt/5/15)',
+    AMT_NOTE,
+    'VAT Amount (AED)',
+    TOTAL_NOTE,
+    'Paid By\n(owner/accountant/petty)',
+    'Branch ID\n(b1-b5)'
   ];
-  const wsBus=XLSX.utils.aoa_to_sheet(busData);
-  wsBus['!cols']=[{wch:10},{wch:30},{wch:14},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
-  wsBus['A1'].s={font:{bold:true,sz:13},fill:{fgColor:{rgb:'E8F4FD'}}};
+
+  const note = '⚠️ Amount = BEFORE VAT  |  Total = auto-calculate (Amount + VAT)  |  Example: Invoice 121 AED → Amount=115.5, VAT=5.5, Total=121';
+
+  const wb = XLSX.utils.book_new();
+
+  // Helper
+  const mkSheet = (title, firstCol, ex1, ex2) => {
+    const cols = firstCol ? [firstCol, ...commonCols] : commonCols;
+    const hdr1 = [title];
+    const hdr2 = [note];
+    const headers = cols;
+    const data = [hdr1, hdr2, headers, ex1, ex2];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = cols.map((_,i) => ({wch: i===0?22 : i===6||i===8?18 : i===4?26 : 14}));
+    return ws;
+  };
+
+  // ── Bus ──
+  const wsBus = mkSheet('🚌 Bus Expenses — مصاريف الباص',
+    'Bus No. / Type',
+    ['BUS-38612','10/04/2026','INV-001','ADNOC','','Fuel refill Apr','exempt',300,0,300,'accountant','b2'],
+    ['BUS-38612','15/04/2026','INV-002','Al Futtaim','100123456700003','AC repair','5',500,25,525,'owner','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsBus,'Bus');
 
-  // ── Sheet 2: Purchases ──
-  const purchData=[
-    ['🛒 Purchases — المشتريات'],
-    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['School Stationery','500','05/04/2026','INV-003','ABC Stationery','','Stationery KG1','exempt','0','owner','b1'],
-    ['Cleaning Supplies','200','10/04/2026','INV-004','Clean Co.','','Monthly supplies','exempt','0','petty','b1'],
-  ];
-  const wsPurch=XLSX.utils.aoa_to_sheet(purchData);
-  wsPurch['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Purchases ──
+  const wsPurch = mkSheet('🛒 Purchases — المشتريات',
+    'Item Name',
+    ['Stationery','05/04/2026','INV-003','ABC Co.','','Class stationery','exempt',200,0,200,'petty','b1'],
+    ['Cleaning Supplies','10/04/2026','INV-004','Clean LLC','100234567800003','Monthly cleaning','5',100,5,105,'owner','b1']
+  );
   XLSX.utils.book_append_sheet(wb,wsPurch,'Purchases');
 
-  // ── Sheet 3: Staff Salaries ──
-  const salaryData=[
+  // ── Staff Salaries ──
+  const salCols = ['Employee Name','Job Title','Invoice Date\n(DD/MM/YYYY)','Invoice No.','Supplier / Entity Name','Supplier TRN','Reason for Payment','VAT Type\n(exempt/5/15)',AMT_NOTE,'VAT Amount (AED)',TOTAL_NOTE,'Paid By\n(owner/accountant/petty)','Branch ID\n(b1-b5)'];
+  const salData = [
     ['👷 Staff Salaries — رواتب العاملين'],
-    ['Employee Name','Job Title','Salary (AED)','Payment Date (DD/MM/YYYY)',...commonCols],
-    ['Jane Smith','Teacher','4000','30/04/2026','SAL-001','','','April salary','exempt','0','accountant','b1'],
-    ['John Doe','Driver','2500','30/04/2026','SAL-002','','','April salary','exempt','0','accountant','b2'],
+    [note],
+    salCols,
+    ['JEAN VALLE CABEROY','Bus Assistant','30/03/2026','SAL-001','','','March salary','exempt',1700,0,1700,'accountant','b5'],
+    ['EMILY SANTOS','Teacher','30/03/2026','SAL-002','','','March salary','exempt',2500,0,2500,'accountant','b2'],
   ];
-  const wsSalary=XLSX.utils.aoa_to_sheet(salaryData);
-  wsSalary['!cols']=[{wch:22},{wch:18},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,wsSalary,'Staff Salaries');
+  const wsSal = XLSX.utils.aoa_to_sheet(salData);
+  wsSal['!cols'] = salCols.map((_,i)=>({wch:i===0?26:i===1?18:14}));
+  XLSX.utils.book_append_sheet(wb,wsSal,'Staff Salaries');
 
-  // ── Sheet 4: Annual Contracts ──
-  const contractData=[
-    ['📄 Annual Contracts — عقود سنوية'],
-    ['Contract Name','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
-    ['Security Contract','12000','01/01/2026','01/01/2026','31/12/2026','CON-001','G4S','100234567800003','Annual security','5','600','owner','b1'],
-  ];
-  const wsContract=XLSX.utils.aoa_to_sheet(contractData);
-  wsContract['!cols']=[{wch:22},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Annual Contracts ──
+  const wsContract = mkSheet('📄 Annual Contracts — عقود سنوية',
+    'Contract Name',
+    ['Security Contract','01/01/2026','CONT-001','SecureCo','100345678900003','Annual security service','5',10000,500,10500,'owner','b2'],
+    ['Cleaning Contract','01/01/2026','CONT-002','CleanPro','','Annual cleaning service','exempt',6000,0,6000,'owner','b1']
+  );
   XLSX.utils.book_append_sheet(wb,wsContract,'Annual Contracts');
 
-  // ── Sheet 5: Maintenance ──
-  const maintData=[
-    ['🔧 Maintenance — الصيانة'],
-    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['AC Service','800','12/04/2026','MNT-001','Cool Tech','','AC maintenance classrooms','5','40','owner','b1'],
-  ];
-  const wsMaint=XLSX.utils.aoa_to_sheet(maintData);
-  wsMaint['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Maintenance ──
+  const wsMaint = mkSheet('🔧 Maintenance — الصيانة',
+    'Item / Description',
+    ['AC Repair','15/04/2026','MNT-001','Fix It LLC','','AC maintenance','5',500,25,525,'owner','b1'],
+    ['Plumbing','20/04/2026','MNT-002','Plumb Co.','','Water leak fix','exempt',300,0,300,'petty','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsMaint,'Maintenance');
 
-  // ── Sheet 6: Utilities ──
-  const utilData=[
-    ['💡 Utilities — الكهرباء والماء'],
-    ['Type (كهرباء/ماء/كهرباء وماء/غاز)','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['كهرباء وماء','1200','01/04/2026','DEWA-001','DEWA','','March utilities','exempt','0','owner','b1'],
-  ];
-  const wsUtil=XLSX.utils.aoa_to_sheet(utilData);
-  wsUtil['!cols']=[{wch:28},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Utilities ──
+  const wsUtil = mkSheet('💡 Utilities — الكهرباء والماء',
+    'Provider / Type',
+    ['SEWA - Electricity & Water','01/04/2026','SEWA-APR-26','SEWA','100456789000003','Electricity & Water Apr','5',1317.70,64.30,1382,'accountant','b2'],
+    ['DEWA','01/04/2026','DEWA-APR-26','DEWA','100567890100003','Electricity Apr','5',800,40,840,'accountant','b1']
+  );
   XLSX.utils.book_append_sheet(wb,wsUtil,'Utilities');
 
-  // ── Sheet 7: Communications ──
-  const telData=[
-    ['📱 Communications — الاتصالات'],
-    ['Service / Subscription No.','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['050-4053818','110','01/04/2026','ETI-001','Etisalat','','April phone bill','5','5.5','owner','b1'],
-  ];
-  const wsTel=XLSX.utils.aoa_to_sheet(telData);
-  wsTel['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,wsTel,'Communications');
+  // ── Communications ──
+  const wsComm = mkSheet('📱 Communications — الاتصالات',
+    'Service / Subscription No.',
+    ['050-4742500','01/04/2026','INV2022358212','Etisalat (e&)','100002336000023','Business Mobile Postpaid Mar 2026','5',110,5.5,115.5,'owner','b2'],
+    ['056-7076419','01/04/2026','INV2022945728','Etisalat (e&)','100002336000023','Business Mobile Postpaid Mar 2026','5',110,5.5,115.5,'owner','b2']
+  );
+  XLSX.utils.book_append_sheet(wb,wsComm,'Communications');
 
-  // ── Sheet 8: Rent ──
-  const rentData=[
-    ['🏠 Rent Fees — رسوم الإيجار'],
-    ['Property / Description','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
-    ['Shop G16 CBD2 Sharjah','15000','01/04/2026','01/04/2026','30/04/2026','RENT-001','Allsopp & Allsopp','','April rent','exempt','0','owner','b1'],
-  ];
-  const wsRent=XLSX.utils.aoa_to_sheet(rentData);
-  wsRent['!cols']=[{wch:26},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Rent ──
+  const wsRent = mkSheet('🏠 Rent Fees — رسوم الإيجار',
+    'Property / Location',
+    ['Al Farha Building - Floor 1','01/04/2026','RENT-APR-001','Landlord LLC','','Monthly rent Apr 2026','exempt',15000,0,15000,'owner','b1'],
+    ['Al Saada Building','01/04/2026','RENT-APR-002','Al Saada Owner','','Monthly rent Apr 2026','exempt',12000,0,12000,'owner','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsRent,'Rent');
 
-  // ── Sheet 9: Government Fees ──
-  const govtData=[
-    ['🏛️ Government Fees — مصاريف حكومية'],
-    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['Trade License Renewal','3000','15/04/2026','GOV-001','DED','','License renewal 2026','exempt','0','owner','b1'],
-  ];
-  const wsGovt=XLSX.utils.aoa_to_sheet(govtData);
-  wsGovt['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Government Fees ──
+  const wsGovt = mkSheet('🏛️ Government Fees — مصاريف حكومية',
+    'Fee Type / Description',
+    ['SPEA Annual License','01/01/2026','SPEA-2026-001','SPEA','','Annual SPEA license','exempt',5000,0,5000,'owner','b1'],
+    ['Trade License Renewal','15/01/2026','DED-2026-001','DED','','Annual trade license','exempt',3000,0,3000,'owner','b1']
+  );
   XLSX.utils.book_append_sheet(wb,wsGovt,'Government Fees');
 
-  // ── Sheet 10: Advertising ──
-  const adsData=[
-    ['📢 Advertising — الإعلانات'],
-    ['Channel / Platform','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['Meta (Facebook/Instagram)','2000','01/04/2026','META-001','Meta Ireland','','April ads campaign','5','100','owner','b1'],
-  ];
-  const wsAds=XLSX.utils.aoa_to_sheet(adsData);
-  wsAds['!cols']=[{wch:26},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Advertising ──
+  const wsAds = mkSheet('📢 Advertising — الإعلانات',
+    'Channel / Platform',
+    ['Instagram / Facebook Ads','01/04/2026','META-APR-001','Meta','100678901200003','Social media ads Apr','5',500,25,525,'owner','b2'],
+    ['Google Ads','01/04/2026','GOOG-APR-001','Google Ireland','','Google advertising Apr','5',300,15,315,'owner','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsAds,'Advertising');
 
-  // ── Sheet 11: Bank Charges ──
-  const bankData=[
-    ['🏦 Bank Charges — رسوم البنك'],
-    ['Type (رسوم بنك/تحويل رواتب/رسوم بطاقة/فوائد/أخرى)','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['تحويل رواتب','25','30/04/2026','BNK-001','Emirates NBD','','Salary transfer fees April','exempt','0','owner','b1'],
-  ];
-  const wsBank=XLSX.utils.aoa_to_sheet(bankData);
-  wsBank['!cols']=[{wch:40},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Bank Charges ──
+  const wsBank = mkSheet('🏦 Bank Charges — رسوم البنك',
+    'Charge Type',
+    ['WPS Salary Transfer Fee','30/03/2026','','Emirates NBD','','March WPS transfer','exempt',50,0,50,'accountant','b2'],
+    ['Bank Service Fee','30/03/2026','','Emirates NBD','','Monthly bank charges','exempt',30,0,30,'accountant','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsBank,'Bank Charges');
 
-  // ── Sheet 12: Typing Work ──
-  const printData=[
-    ['✍️ Typing Work — أعمال التايبينج'],
-    ['Description','No. of Items','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['Child contracts typing','20','100','10/04/2026','TYP-001','Smart Typing','','Typing new contracts','exempt','0','owner','b1'],
-  ];
-  const wsPrint=XLSX.utils.aoa_to_sheet(printData);
-  wsPrint['!cols']=[{wch:26},{wch:14},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,wsPrint,'Typing Work');
+  // ── Typing Work ──
+  const wsType = mkSheet('✍️ Typing Work — أعمال التايبينج',
+    'Description',
+    ['Visa Application Typing','15/04/2026','TYP-001','Al Ittihad Typing','','Visa typing - 2 employees','5',100,5,105,'owner','b1'],
+    ['Labour Contract Renewal','20/04/2026','TYP-002','PRO Services','','Labour contract - 3 staff','5',150,7.5,157.5,'owner','b2']
+  );
+  XLSX.utils.book_append_sheet(wb,wsType,'Typing Work');
 
-  // ── Sheet 13: License Fees ──
-  const licenseData=[
-    ['📋 License Fees — رسوم الترخيص'],
-    ['License Type','Amount (AED)','Invoice Date (DD/MM/YYYY)','From Date (DD/MM/YYYY)','To Date (DD/MM/YYYY)',...commonCols],
-    ['SPEA Operating License','5000','01/01/2026','01/01/2026','31/12/2026','LIC-001','SPEA','','Annual nursery license 2026','exempt','0','owner','b1'],
-  ];
-  const wsLicense=XLSX.utils.aoa_to_sheet(licenseData);
-  wsLicense['!cols']=[{wch:26},{wch:14},{wch:18},{wch:18},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,wsLicense,'License Fees');
+  // ── License Fees ──
+  const wsLic = mkSheet('📋 License Fees — رسوم الترخيص',
+    'License Type / Description',
+    ['SPEA Renewal Fee','01/01/2026','LIC-2026-001','SPEA Authority','','Annual SPEA license fee','exempt',2000,0,2000,'owner','b1'],
+    ['Health Certificate','01/03/2026','LIC-2026-002','Health Authority','','Staff health certificates','exempt',500,0,500,'owner','b2']
+  );
+  XLSX.utils.book_append_sheet(wb,wsLic,'License Fees');
 
-  // ── Sheet 14: Other ──
-  const otherData=[
-    ['📝 Other — أخرى'],
-    ['Item Name','Amount (AED)','Invoice Date (DD/MM/YYYY)',...commonCols],
-    ['Office Coffee & Tea','80','20/04/2026','OTH-001','LuLu','','Staff refreshments','exempt','0','petty','b1'],
-  ];
-  const wsOther=XLSX.utils.aoa_to_sheet(otherData);
-  wsOther['!cols']=[{wch:22},{wch:14},{wch:18},{wch:14},{wch:24},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20},{wch:12}];
+  // ── Other ──
+  const wsOther = mkSheet('📝 Other — أخرى',
+    'Item / Description',
+    ['First Aid Supplies','10/04/2026','PH-001','Pharmacy Plus','','Medical supplies - kits','5',100,5,105,'petty','b1'],
+    ['Office Furniture','15/04/2026','FURN-001','IKEA UAE','100789012300003','Small chairs for office','5',500,25,525,'owner','b2']
+  );
   XLSX.utils.book_append_sheet(wb,wsOther,'Other');
 
-  // ── Sheet 15: HOW TO USE ──
-  const helpData=[
-    ['📖 HOW TO USE THIS TEMPLATE — كيفية الاستخدام'],
-    [],
-    ['IMPORTANT NOTES:'],
-    ['1. Each sheet = one expense category. Use the correct sheet for each expense.'],
-    ['2. Row 1 is the title, Row 2 is the header — DO NOT delete them.'],
-    ['3. Add your data from Row 3 onwards.'],
-    ['4. DATE format: DD/MM/YYYY (e.g. 25/04/2026)'],
-    ['5. VAT Type: use "exempt" for 0%, "5" for 5%, "15" for 15%'],
-    ['6. Paid By: use "owner", "accountant", or "petty"'],
-    ['7. Branch ID: b1=الفرحة, b2=السعادة, b3=الدولفين, b4=السعادة للأطفال, b5=أبطال البراعم'],
-    ['8. Leave optional fields blank — do not delete the column.'],
-    [],
-    ['CATEGORIES (Sheet names):'],
-    ['Bus → Bus expenses (fuel, maintenance, etc.)'],
-    ['Purchases → Buying supplies and materials'],
-    ['Staff Salaries → Monthly staff salaries'],
-    ['Annual Contracts → Security, cleaning, etc.'],
-    ['Maintenance → Repairs and maintenance'],
-    ['Utilities → Electricity, water, gas'],
-    ['Communications → Phone, internet bills'],
-    ['Rent → Monthly or annual rent'],
-    ['Government Fees → Government transactions'],
-    ['Advertising → Marketing expenses'],
-    ['Bank Charges → Bank fees and transfers'],
-    ['Typing Work → Typing/printing services'],
-    ['License Fees → SPEA, trade license, etc.'],
-    ['Other → Any other expenses'],
+  // ── HOW TO USE ──
+  const howData = [
+    ['📖 HOW TO USE — كيفية الاستخدام'],
+    [''],
+    ['⚠️  MOST IMPORTANT: Amount Before VAT vs Total After VAT'],
+    [''],
+    ['❌  WRONG (old way): Invoice total = 121 → Amount = 121, VAT = 5.5 → System calculates Total = 126.5 (WRONG!)'],
+    ['✅  CORRECT (new way): Invoice total = 121 → Amount Before VAT = 115.5, VAT = 5.5, Total After VAT = 121'],
+    [''],
+    ['How to find Amount Before VAT from your invoice:'],
+    ['   If invoice shows total including VAT: Amount Before VAT = Total ÷ 1.05 (for 5% VAT)'],
+    ['   Example: Invoice = 121 AED → 121 ÷ 1.05 = 115.24 AED (before VAT)'],
+    ['   Or: Invoice shows both figures → just use the "before VAT" number directly'],
+    [''],
+    ['GENERAL RULES:'],
+    ['1. Each sheet = one expense category'],
+    ['2. Row 1=title, Row 2=note, Row 3=headers — DO NOT delete them'],
+    ['3. Add data from Row 4 onwards (Rows 4-5 are examples — delete before importing)'],
+    ['4. Date format: DD/MM/YYYY (e.g. 01/04/2026)'],
+    ['5. VAT Type: "exempt" for 0%, "5" for 5%, "15" for 15%'],
+    ['6. Paid By: "owner", "accountant", or "petty"'],
+    ['7. Branch: b1=الفرحة, b2=السعادة, b3=الدولفين, b4=السعادة للأطفال, b5=أبطال البراعم'],
+    ['8. Leave optional fields blank — never delete the column'],
   ];
-  const wsHelp=XLSX.utils.aoa_to_sheet(helpData);
-  wsHelp['!cols']=[{wch:80}];
-  XLSX.utils.book_append_sheet(wb,wsHelp,'📖 HOW TO USE');
+  const wsHow = XLSX.utils.aoa_to_sheet(howData);
+  wsHow['!cols'] = [{wch:90}];
+  XLSX.utils.book_append_sheet(wb,wsHow,'📖 HOW TO USE');
 
-  XLSX.writeFile(wb,'expenses_import_template_v2.xlsx');
+  XLSX.writeFile(wb, 'Expenses_Template.xlsx');
 }
 
-// ═══════════════════════════════════════════════
-//  IMPORT RECEIPTS FROM EXCEL
-// ═══════════════════════════════════════════════
 function handleReceiptsDrop(e){
   e.preventDefault();
   const file=e.dataTransfer.files[0]; if(file) importReceiptsExcel(file);
@@ -18392,19 +18384,38 @@ async function importExpensesExcel(file){
         // Get amount (first numeric-looking column after name columns)
         // Get amount — avoid matching 'VAT Amount' or 'Total Amount' or 'Extra Expenses'
         const getAmt=()=>{
-          // Priority: Salary, then Amount (excluding VAT/Total/Extra columns)
-          const amtCols=['Salary (AED)','Amount (AED)','Amount'];
-          for(const colName of amtCols){
-            const idx=headers.findIndex(h=>String(h).toLowerCase()===colName.toLowerCase());
-            if(idx>=0 && row[idx]!==undefined && row[idx]!=='') return parseFloat(String(row[idx]).replace(/,/g,''))||0;
-          }
-          // Fallback: first 'amount' col that doesn't have vat/total/extra
-          const fallback=headers.findIndex(h=>{
+          // Priority 1: explicit "Amount Before VAT" column
+          const beforeVatIdx=headers.findIndex(h=>{
             const hl=String(h).toLowerCase();
-            return hl.includes('amount') && !hl.includes('vat') && !hl.includes('total') && !hl.includes('extra');
+            return (hl.includes('before vat')||hl.includes('before tax')||hl.includes('قبل الضريبة'));
           });
-          if(fallback>=0) return parseFloat(String(row[fallback]).replace(/,/g,''))||0;
+          if(beforeVatIdx>=0 && row[beforeVatIdx]!==undefined && row[beforeVatIdx]!=='')
+            return parseFloat(String(row[beforeVatIdx]).replace(/,/g,''))||0;
+          // Priority 2: Salary column
+          const salIdx=headers.findIndex(h=>String(h).toLowerCase().includes('salary'));
+          if(salIdx>=0 && row[salIdx]!==undefined && row[salIdx]!=='')
+            return parseFloat(String(row[salIdx]).replace(/,/g,''))||0;
+          // Priority 3: Amount (AED) but NOT total/vat/extra
+          const amtIdx=headers.findIndex(h=>{
+            const hl=String(h).toLowerCase();
+            return hl.includes('amount') && !hl.includes('vat') && !hl.includes('total') && !hl.includes('extra') && !hl.includes('after');
+          });
+          if(amtIdx>=0 && row[amtIdx]!==undefined && row[amtIdx]!=='')
+            return parseFloat(String(row[amtIdx]).replace(/,/g,''))||0;
           return 0;
+        };
+
+        // Get total — use "Total After VAT" if available, else amt+vat
+        const getTotalAmt=(amt,vat)=>{
+          const totalIdx=headers.findIndex(h=>{
+            const hl=String(h).toLowerCase();
+            return hl.includes('total') && (hl.includes('after')||hl.includes('vat')||hl.includes('بعد'));
+          });
+          if(totalIdx>=0 && row[totalIdx]!==undefined && row[totalIdx]!==''){
+            const t=parseFloat(String(row[totalIdx]).replace(/,/g,''));
+            if(!isNaN(t)&&t>0) return t;
+          }
+          return amt+(vat||0);
         };
         const amt=getAmt();
         if(!amt && !getCol(row,'Invoice No','Invoice','Date')) continue; // skip empty rows
@@ -18425,13 +18436,13 @@ async function importExpensesExcel(file){
         if(!['owner','accountant','petty'].includes(paidBy)) paidBy='owner';
 
         const vatType=String(getCol(row,'VAT Type','vat type','vattype')||'exempt').toLowerCase().trim();
-        const vatAmt=parseFloat(String(getCol(row,'VAT Amount','vat amount')).replace(/,/g,''))||0;
-        const totalAmt=parseFloat(String(getCol(row,'Total Amount','total')).replace(/,/g,''))||amt+vatAmt;
+        const vatAmt=parseFloat(String(getCol(row,'VAT Amount','vat amount')||'0').replace(/,/g,''))||0;
+        const totalAmt=getTotalAmt(amt,vatAmt);
         const supplier=String(getCol(row,'Supplier','supplier','Entity')||'').trim();
         const taxNo=String(getCol(row,'TRN','Tax No','Supplier TRN','Supplier Tax')||'').trim();
         const reason=String(getCol(row,'Reason','Description','description','reason','Notes')||'').trim();
         const invoiceNo=String(getCol(row,'Invoice No','Invoice No.','invoice')||'').trim();
-        const subType=String(getCol(row,'Sub Type','Bus No','Expense Type','Item','Employee','Job Title','License','Contract','Property','Type','Service','Channel')||'').trim();
+        const subType=String(getCol(row,'Sub Type','Bus No','Expense Type','Item','Employee','Job Title','License','Contract','Property','Type','Service / Subscription No.','Service','Channel')||'').trim();
         const extra=String(getCol(row,'Extra Expenses','extra')||'0');
 
         // Build type/label
