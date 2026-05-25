@@ -588,6 +588,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
       <input type="month" id="rfmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderRecs()">
+      <select id="rfyear-view" style="padding:4px 8px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:700;color:#d97706;display:none" onchange="renderRecs()">
+        <option value="">— Year View —</option>
+      </select>
+      <button onclick="toggleYearView()" style="padding:4px 10px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#d97706;background:#fffbeb;cursor:pointer" title="View all months for a year">📅 Year View</button>
       <span id="rectot-wrap" style="font-weight:800;color:var(--ok);display:none">إجمالي: <span id="rectot">0</span> د.إ</span>
       <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
         <option value="all">💰 All Payments</option>
@@ -2660,9 +2664,9 @@ async function loadFromSupa(bid) {
     // ── Load critical data first (parallel) ──────────────────────────
     const [childrenRaw, expensesRaw] = await Promise.all([
       fetchAll(()=>sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
-      sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false}).limit(500),
+      fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
     ]);
-    const expensesData = expensesRaw?.data || expensesRaw || [];
+
     DB.children = (childrenRaw||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
       idNumber:x.id_number||'', gender:x.gender||'', nationality:x.nationality||'', religion:x.religion||'',
@@ -2708,7 +2712,7 @@ async function loadFromSupa(bid) {
         DB.attendance[d][String(x.child_id)]=x.status;
       });
     }
-    DB.expenses = (expensesData||[]).map(x=>{
+    DB.expenses = (expensesRaw||[]).map(x=>{
       let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
       return{id:x.id,category:x.category||'',type:x.type||'',
         amount:Number(x.amount||0),vatType:x.vat_type||'معفى (0%)',vatAmount:Number(x.vat_amount||0),
@@ -4247,10 +4251,17 @@ const PAY_LABELS={'cash':'💵 كاش','bank':'🏦 تحويل بنكي','card':
 const VAT_LABELS={'exempt':'معفى','zero':'0%','5':'5%'};
 
 function renderRecs(){
-  const fm=el('rfmon')?.value||monthOf(new Date()); // default to current month
-  // Always ensure rfmon has a value
+  const yearView=el('rfyear-view')?.value;
+  const fm=el('rfmon')?.value||monthOf(new Date());
   if(el('rfmon')&&!el('rfmon').value) el('rfmon').value=fm;
-  let list=DB.receipts.filter(r=>monthOf(r.date)===fm);
+
+  let list;
+  if(yearView){
+    // Year view: show ALL months of the selected year
+    list=DB.receipts.filter(r=>(r.date||'').startsWith(yearView));
+  } else {
+    list=DB.receipts.filter(r=>monthOf(r.date)===fm);
+  }
   // Sort by date DESC (newest first), then by receipt number
   list.sort((a,b)=>{
     const dd=new Date(b.date||0)-new Date(a.date||0);
@@ -15964,8 +15975,35 @@ async function applyAutoAssignClasses(){
 }
 // ─── End Auto Assign Classes ─────────────────────
 
-// ═══════════════════════════════════════════════
-// MONTHLY RECEIPT CHECK
+function toggleYearView(){
+  const mon=el('rfmon');
+  const yearSel=el('rfyear-view');
+  if(!mon||!yearSel) return;
+
+  if(yearSel.style.display==='none'){
+    // Switch to year view
+    mon.style.display='none';
+    yearSel.style.display='';
+
+    // Build year options from available receipts
+    const years=[...new Set((DB.receipts||[]).map(r=>(r.date||'').slice(0,4)).filter(Boolean))].sort().reverse();
+    if(!years.length) years.push(new Date().getFullYear().toString());
+    yearSel.innerHTML=years.map(y=>`<option value="${y}">${y} — كل السنة</option>`).join('');
+
+    // Pre-select year from current month
+    const curYear=(mon.value||'').slice(0,4)||new Date().getFullYear().toString();
+    if(years.includes(curYear)) yearSel.value=curYear;
+    renderRecs();
+  } else {
+    // Switch back to month view
+    yearSel.style.display='none';
+    mon.style.display='';
+    yearSel.value='';
+    renderRecs();
+  }
+}
+
+// ── End Monthly/Year receipt view ──────────────
 // ═══════════════════════════════════════════════
 function openMonthlyReceiptCheck(){
   const mon=el('rec-month')?.value || new Date().toISOString().slice(0,7);
