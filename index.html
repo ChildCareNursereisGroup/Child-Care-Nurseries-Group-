@@ -592,6 +592,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="">— Year View —</option>
       </select>
       <button onclick="toggleYearView()" style="padding:4px 10px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#d97706;background:#fffbeb;cursor:pointer" title="View all months for a year">📅 Year View</button>
+      ${curRole==='admin'?'':''}
+      <button onclick="printAllMonthlyReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#059669;cursor:pointer" title="Print all receipts for this month">🖨️ Print All</button>
       <span id="rectot-wrap" style="font-weight:800;color:var(--ok);display:none">إجمالي: <span id="rectot">0</span> د.إ</span>
       <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
         <option value="all">💰 All Payments</option>
@@ -669,17 +671,50 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 
 <div class="mover" id="vat-report-modal">
-  <div class="mbox" style="max-width:500px">
+  <div class="mbox" style="max-width:520px">
     <div class="mh">
       <div class="mt">🧾 VAT Report Options</div>
       <button class="xb" onclick="el('vat-report-modal').classList.remove('on')">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-      <div class="g3" style="grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg">
-          <label>Month — الشهر</label>
+      <!-- Period selector -->
+      <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:10px 12px">
+        <label style="font-size:.8rem;font-weight:700;color:#0369a1;display:block;margin-bottom:8px">📅 Period — الفترة الزمنية</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;font-weight:600">
+            <input type="radio" name="vat-period-type" value="month" checked onchange="toggleVATperiod(this.value)" style="width:16px;height:16px">
+            شهر واحد
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;font-weight:600">
+            <input type="radio" name="vat-period-type" value="quarter" onchange="toggleVATperiod(this.value)" style="width:16px;height:16px">
+            ربع سنوي (3 شهور) — Quarter
+          </label>
+        </div>
+        <!-- Month view -->
+        <div id="vat-period-month">
           <input type="month" id="vat-rep-month" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
         </div>
+        <!-- Quarter view -->
+        <div id="vat-period-quarter" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:.75rem;color:#6b7280">From — من</label>
+              <input type="month" id="vat-rep-from" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #bae6fd;border-radius:8px;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:.75rem;color:#6b7280">To — إلى</label>
+              <input type="month" id="vat-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #bae6fd;border-radius:8px;box-sizing:border-box">
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button onclick="setVATQuarter('Q1')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 يناير–مارس</button>
+            <button onclick="setVATQuarter('Q2')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 أبريل–يونيو</button>
+            <button onclick="setVATQuarter('Q3')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 يوليو–سبتمبر</button>
+            <button onclick="setVATQuarter('Q4')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q4 أكتوبر–ديسمبر</button>
+          </div>
+        </div>
+      </div>
+      <div class="g3" style="grid-template-columns:1fr;gap:8px">
         <div class="fg">
           <label>Payment Method — طريقة الدفع</label>
           <select id="vat-rep-pay" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid var(--border);border-radius:8px;box-sizing:border-box">
@@ -2694,7 +2729,7 @@ async function loadFromSupa(bid) {
         vatType:x.vat_type||'exempt', vatAmount:Number(x.vat_amount||0),
         payMethod:x.pay_method||'cash',
         total:Number(x.total||0), notes:x.notes||'', branchId:x.branch_id||'',
-        isCancelled:x.is_cancelled||false, cancelReason:x.cancel_reason||'', cancelDate:x.cancel_date||null,
+        isCancelled:x.is_cancelled||false, cancelReason:x.cancel_reason||'', cancelDate:x.cancel_date||null, cancelledBy:x.cancelled_by||'',
         createdAt:x.created_at||null
       }));
     }
@@ -4304,7 +4339,7 @@ function renderRecs(){
           ${!r.childId&&!(r.hourFee>0)&&!r.isCancelled?'<span style="background:#fef3c7;color:#92400e;font-size:.62rem;padding:1px 5px;border-radius:5px;margin-right:3px">👶 زائر</span>':''}
         </div>
         <div style="font-size:.68rem;color:var(--muted)">${r.className||''} · #${r.receiptNum}</div>
-        ${r.isCancelled&&r.cancelReason?`<div style="font-size:.62rem;color:#dc2626">سبب الإلغاء: ${r.cancelReason}</div>`:''}
+        ${r.isCancelled&&r.cancelReason?`<div style="font-size:.62rem;color:#dc2626">سبب الإلغاء: ${r.cancelReason}${r.cancelledBy?' — بواسطة: '+r.cancelledBy:''}${r.cancelDate?' ('+r.cancelDate+')':''}</div>`:''}
       </div>
       <!-- Date -->
       <div style="text-align:center;min-width:70px">
@@ -4340,6 +4375,17 @@ function renderRecs(){
     </div>`).join('');
 }
 
+function toggleVATperiod(type){
+  el('vat-period-month').style.display=type==='month'?'':'none';
+  el('vat-period-quarter').style.display=type==='quarter'?'':'none';
+}
+function setVATQuarter(q){
+  const yr=new Date().getFullYear();
+  const qMap={Q1:[yr+'-01',yr+'-03'],Q2:[yr+'-04',yr+'-06'],Q3:[yr+'-07',yr+'-09'],Q4:[yr+'-10',yr+'-12']};
+  const[f,t]=qMap[q]||[yr+'-01',yr+'-03'];
+  if(el('vat-rep-from'))el('vat-rep-from').value=f;
+  if(el('vat-rep-to'))el('vat-rep-to').value=t;
+}
 function openVATReportModal(){
   const m=el('vat-rep-month');
   if(m&&!m.value) m.value=el('rfmon')?.value||monthOf(new Date());
@@ -4347,7 +4393,20 @@ function openVATReportModal(){
 }
 
 function printVATReport(exportType='print'){
-  const fm = el('vat-rep-month')?.value || el('rfmon')?.value || monthOf(new Date());
+  // Determine period
+  const periodType=document.querySelector('input[name="vat-period-type"]:checked')?.value||'month';
+  let fm,dateFrom,dateTo,periodLabel;
+  if(periodType==='quarter'){
+    dateFrom=el('vat-rep-from')?.value||monthOf(new Date());
+    dateTo=el('vat-rep-to')?.value||dateFrom;
+    periodLabel=dateFrom+' → '+dateTo;
+    fm=null;
+  } else {
+    fm=el('vat-rep-month')?.value||el('rfmon')?.value||monthOf(new Date());
+    dateFrom=fm; dateTo=fm;
+    periodLabel=fm;
+  }
+
   const payF = el('vat-rep-pay')?.value || 'all';
   const rLang = document.querySelector('input[name="vat-lang"]:checked')?.value || 'en';
   const isAr = rLang === 'ar';
@@ -4355,13 +4414,15 @@ function printVATReport(exportType='print'){
   const b = CB();
   const bx = getBranchExtra(b.id);
 
-  // Filter by month + payment method
-  let listAll = DB.receipts.filter(r => monthOf(r.date) === fm);
+  // Filter by period + payment method
+  let listAll = DB.receipts.filter(r=>{
+    const rm=monthOf(r.date);
+    return rm>=dateFrom && rm<=dateTo;
+  });
   if(payF !== 'all') listAll = listAll.filter(r => r.payMethod === payF);
-
-  // Exclude cancelled from totals — show them separately
   let list = listAll.filter(r => !r.isCancelled);
   const cancelledRecs = listAll.filter(r => r.isCancelled);
+
 
   // Split by payment method for sections
   const byPay = {cash:[], bank:[], card:[]};
@@ -5090,50 +5151,67 @@ async function restoreRec(id){
 }
 
 async function delRec(id){
-  // Admin and manager can cancel receipts
-  if(curRole!=='admin' && curRole!=='manager'){
-    alert('❌ صلاحيات الإدارة فقط — Admin access required');
-    return;
-  }
+  if(curRole!=='admin'&&curRole!=='manager'){showToast('❌ صلاحيات الإدارة فقط');return;}
   const r=DB.receipts.find(x=>String(x.id)===String(id));
   if(!r) return;
-
-  // Show cancel dialog
-  const reason=prompt(
-    `إلغاء الإيصال #${r.receiptNum}\nالطفل: ${r.childName}\nالمبلغ: ${r.total} د.إ\n\nاكتبي سبب الإلغاء (إلزامي):`,
-    ''
-  );
-  if(reason===null) return; // User pressed Cancel
-  if(!reason.trim()){
-    alert('⚠️ سبب الإلغاء مطلوب');
-    return;
-  }
-
-  const cancelNote=`[ملغي بتاريخ ${today()} — السبب: ${reason.trim()}]`;
-  const {error}=await sb.from('receipts').update({
-    is_cancelled: true,
-    cancel_reason: reason.trim(),
-    cancel_date: today(),
-    notes: ((r.notes||'')+'\n'+cancelNote).trim()
-  }).eq('id',id);
-
-  if(error){
-    // Field might not exist yet — show SQL to add it
-    alert(`❌ خطأ: ${error.message}\n\nتأكدي من تطبيق الـ SQL في Supabase أولاً:\n\nALTER TABLE receipts\n  ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false,\n  ADD COLUMN IF NOT EXISTS cancel_reason text,\n  ADD COLUMN IF NOT EXISTS cancel_date date;`);
-    return;
-  }
-
-  // Update local cache
-  if(r) { r.isCancelled=true; r.cancelReason=reason.trim(); r.cancelDate=today(); }
-  renderRecs();
-  renderDashboard();
-  alert(`✅ تم إلغاء الإيصال #${r.receiptNum} — الرقم التسلسلي محفوظ في السجل`);
+  document.getElementById('cancel-rec-modal')?.remove();
+  const ov=document.createElement('div');
+  ov.id='cancel-rec-modal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;font-family:'Tajawal',sans-serif;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;padding:14px 18px">
+        <div style="font-weight:900;font-size:1rem">🚫 إلغاء إيصال</div>
+        <div style="font-size:.8rem;opacity:.85;margin-top:2px">#${r.receiptNum} — ${r.childName} — ${r.total} AED</div>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">👤 اسمك <span style="color:#dc2626">*</span></label>
+          <input id="cancel-by-name" type="text" placeholder="اكتبي اسمك هنا..."
+            style="width:100%;padding:9px 12px;border:2px solid #fca5a5;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 سبب الإلغاء <span style="color:#dc2626">*</span></label>
+          <textarea id="cancel-reason-txt" rows="3" placeholder="اكتبي سبب الإلغاء..."
+            style="width:100%;padding:9px 12px;border:2px solid #fca5a5;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem;box-sizing:border-box;resize:vertical"></textarea>
+        </div>
+        <div id="cancel-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:.82rem;font-weight:700"></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="confirmCancelRec('${id}')"
+            style="flex:1;padding:11px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer">🚫 تأكيد الإلغاء</button>
+          <button onclick="document.getElementById('cancel-rec-modal').remove()"
+            style="flex:1;padding:11px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;cursor:pointer">← رجوع</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  setTimeout(()=>document.getElementById('cancel-by-name')?.focus(),100);
 }
 
-// ═══════════════════════════════════════════════
-//  ATTENDANCE
-// ─── Weekend Filter ───────────────────────────
-let weekendFilterOn = false;
+async function confirmCancelRec(id){
+  const r=DB.receipts.find(x=>String(x.id)===String(id));
+  if(!r) return;
+  const cancelledBy=(document.getElementById('cancel-by-name')?.value||'').trim();
+  const reason=(document.getElementById('cancel-reason-txt')?.value||'').trim();
+  const errEl=document.getElementById('cancel-error');
+  if(!cancelledBy){errEl.style.display='block';errEl.textContent='⚠️ الاسم مطلوب';document.getElementById('cancel-by-name')?.focus();return;}
+  if(!reason){errEl.style.display='block';errEl.textContent='⚠️ سبب الإلغاء مطلوب';document.getElementById('cancel-reason-txt')?.focus();return;}
+  const cancelNote=`[ملغي ${today()} بواسطة ${cancelledBy}: ${reason}]`;
+  const updateObj={is_cancelled:true,cancel_reason:reason,cancel_date:today(),cancelled_by:cancelledBy,notes:((r.notes||'')+'\n'+cancelNote).trim()};
+  const {error}=await sb.from('receipts').update(updateObj).eq('id',id);
+  if(error){
+    // Try without cancelled_by if column doesn't exist
+    const updateObj2={is_cancelled:true,cancel_reason:reason+' — بواسطة: '+cancelledBy,cancel_date:today(),notes:((r.notes||'')+'\n'+cancelNote).trim()};
+    const {error:e2}=await sb.from('receipts').update(updateObj2).eq('id',id);
+    if(e2){errEl.style.display='block';errEl.textContent='❌ خطأ: '+e2.message;return;}
+  }
+  r.isCancelled=true;r.cancelReason=reason;r.cancelDate=today();r.cancelledBy=cancelledBy;
+  document.getElementById('cancel-rec-modal')?.remove();
+  renderRecs();renderDashboard();
+  showToast(`✅ تم إلغاء #${r.receiptNum} — بواسطة: ${cancelledBy}`);
+}
+
 function toggleWeekendFilter(){
   weekendFilterOn = !weekendFilterOn;
   const btn = el('weekend-filter-btn');
@@ -16005,6 +16083,73 @@ function toggleYearView(){
 
 // ── End Monthly/Year receipt view ──────────────
 // ═══════════════════════════════════════════════
+function printAllMonthlyReceipts(){
+  const yearView=el('rfyear-view')?.value;
+  const fm=el('rfmon')?.value||monthOf(new Date());
+  let list=DB.receipts.filter(r=>!r.isCancelled&&(yearView?(r.date||'').startsWith(yearView):monthOf(r.date)===fm));
+  list.sort((a,b)=>(a.childName||'').localeCompare(b.childName||'','ar'));
+  if(!list.length){showToast('لا يوجد إيصالات');return;}
+  const branch=CB();const bx=getBranchExtra?.(curBid)||{};const logo=bx.logo||null;const col=branch?.c||'#1e3a8a';
+  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const fmtMon=m=>{const[y,mo]=m.split('-');return months[parseInt(mo)-1]+' '+y;};
+  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:0,maximumFractionDigits:2});
+  const payLbl=p=>p==='cash'?'💵 نقداً':p==='bank'?'🏦 تحويل':p==='card'?'💳 بطاقة':'';
+  const cards=list.map(r=>{
+    const colEsc=col.replace(/#/g,'%23');
+    return('<div style="border:1.5px solid '+col+'44;border-radius:10px;overflow:hidden;break-inside:avoid;margin-bottom:8px">'+
+      '<div style="background:'+col+';color:#fff;padding:5px 10px;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:8pt;font-weight:700">'+(branch?.en||branch?.ar||'')+'</span>'+
+        '<span style="font-size:7.5pt;opacity:.85">'+r.receiptNum+'</span>'+
+      '</div>'+
+      '<div style="padding:7px 10px;display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center">'+
+        '<div>'+
+          '<div style="font-size:10pt;font-weight:900;color:#1e3a8a">'+(r.childName||'—')+'</div>'+
+          '<div style="font-size:7.5pt;color:#6b7280;margin-top:1px">'+(r.className||'')+' | '+fmtD(r.date)+' | '+payLbl(r.payMethod)+'</div>'+
+          (r.fromDate?'<div style="font-size:7pt;color:#6b7280">الفترة: '+fmtD(r.fromDate)+' — '+fmtD(r.toDate)+'</div>':'')+
+          ((r.fee||0)>0?'<div style="font-size:7pt;color:#374151">رسوم: '+fmt(r.fee)+' AED'+((r.bus||0)>0?' | مواصلات: '+fmt(r.bus)+' AED':'')+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:15pt;font-weight:900;color:'+col+'">'+fmt(r.total)+'</div>'+
+          '<div style="font-size:7.5pt;color:#6b7280">AED</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="border-top:1px dashed '+col+'44;padding:4px 10px;display:flex;justify-content:space-between;font-size:7pt;color:#9ca3af">'+
+        '<span>توقيع ولي الأمر: _______________</span><span>✓</span>'+
+      '</div>'+
+    '</div>');
+  }).join('');
+  const total=list.reduce((s,r)=>s+(r.total||0),0);
+  const label=yearView||fmtMon(fm);
+  const printDate=new Date().toLocaleDateString('ar-AE',{day:'2-digit',month:'long',year:'numeric'});
+  const html=['<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    '<style>',
+    '@page{size:A4;margin:10mm}*{margin:0;padding:0;box-sizing:border-box}',
+    'body{font-family:Tajawal,Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;direction:rtl}',
+    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+    '@media print{.np{display:none!important}}',
+    '</style></head><body>',
+    '<div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px;direction:ltr">',
+    '<button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ طباعة '+list.length+' إيصال</button>',
+    '<button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer">✕</button>',
+    '</div><div style="height:36px" class="np"></div>',
+    '<div style="background:'+col+';color:#fff;padding:8px 14px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">',
+    '<div><div style="font-size:9pt;opacity:.8">مجموعة رعاية الطفل للحضانات</div><div style="font-size:13pt;font-weight:900">'+(branch?.ar||branch?.en||'')+'</div></div>',
+    '<div style="text-align:left"><div style="font-size:10pt;font-weight:800">كشف إيصالات — '+label+'</div>',
+    '<div style="font-size:8pt;opacity:.85">'+list.length+' إيصال | إجمالي: '+fmt(total)+' AED</div>',
+    '<div style="font-size:7.5pt;opacity:.8">طُبع: '+printDate+'</div></div>',
+    (logo?'<img src="'+logo+'" style="height:40px;border-radius:8px;background:#fff;padding:3px">':''),
+    '</div>',
+    '<div class="grid">'+cards+'</div>',
+    '<div style="margin-top:10px;padding:8px 14px;background:#f0fdf4;border:2px solid '+col+';border-radius:10px;display:flex;justify-content:space-between;align-items:center">',
+    '<span style="font-size:10pt;font-weight:800;color:'+col+'">الإجمالي الكلي</span>',
+    '<span style="font-size:14pt;font-weight:900;color:'+col+'">'+fmt(total)+' AED</span>',
+    '</div></body></html>'
+  ].join('');
+  w.document.write(html);w.document.close();setTimeout(()=>w.print(),700);
+}
+
+
 function openMonthlyReceiptCheck(){
   const mon=el('rec-month')?.value || new Date().toISOString().slice(0,7);
   const children=(DB.children||[]).filter(c=>!c.leaveDate);
@@ -16091,118 +16236,206 @@ function openMonthlyReceiptCheck(){
 // VAT 5% MONTHLY REPORT
 // ═══════════════════════════════════════════════
 function openVAT5Report(){
-  const mon=el('rec-month')?.value || new Date().toISOString().slice(0,7);
-  const allRec=(DB.receipts||[]);
-  const branch=CB();
-
-  // Filter: VAT 5%, this month
-  const vatRecs=allRec.filter(r=>{
-    const inMonth=(r.date||'').startsWith(mon)||(r.fromDate||'').startsWith(mon);
-    const has5=(r.vatAmount||0)>0 && ((r.clothes||0)+(r.tools||0))>0;
-    return inMonth&&has5;
-  }).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-
-  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
-  const fmtN=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const fmtMon=(m)=>{ const [y,mo]=m.split('-'); const months=['January','February','March','April','May','June','July','August','September','October','November','December']; return months[parseInt(mo)-1]+' '+y; };
-
-  const totalPre=vatRecs.reduce((s,r)=>{const taxable=(r.clothes||0)+(r.tools||0);return s+taxable;},0);
-  const totalVAT=vatRecs.reduce((s,r)=>s+(r.vatAmount||0),0);
-  const totalPost=totalPre+totalVAT;
-
-  const rows=vatRecs.map((r,i)=>{
-    const preTax=(r.clothes||0)+(r.tools||0);
-    const vat=r.vatAmount||0;
-    const child=DB.children?.find(c=>c.id===r.childId||c.id===r.child_id);
-    return`<tr style="${i%2===0?'background:#f9fafb':'background:#fff'}">
-      <td style="padding:7px 10px;color:#6b7280;font-size:.8rem">${fmtD(r.date||r.fromDate)}</td>
-      <td style="padding:7px 10px;font-weight:700">${r.childName||child?.name||'—'}</td>
-      <td style="padding:7px 8px;text-align:center;color:#6b7280;font-size:.75rem">—</td>
-      <td style="padding:7px 10px;text-align:center;font-size:.78rem;color:#374151">${(r.clothes||0)>0?'Uniforms ':''} ${(r.tools||0)>0?'Stationary':''}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:700">${fmtN(preTax)}</td>
-      <td style="padding:7px 10px;text-align:right;color:#d97706;font-weight:700">${fmtN(vat)}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:900;color:#1e3a8a">${fmtN(preTax+vat)}</td>
-    </tr>`;
-  }).join('');
-
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-    @page{size:A4;margin:15mm} *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Inter',Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    table{border-collapse:collapse;width:100%}
-    th,td{border:1px solid #e5e7eb}
-    @media print{.np{display:none!important}}
-  </style></head><body>
-  <div class="np" style="background:#7c3aed;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">
-    <button onclick="window.print()" style="background:#fff;color:#7c3aed;border:none;padding:6px 18px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ Print / PDF</button>
-    <button onclick="window.close()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:6px 12px;border-radius:7px;cursor:pointer">✕</button>
-  </div>
-  <div style="height:36px" class="np"></div>
-
-  <!-- Header -->
-  <div style="text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #7c3aed">
-    <div style="font-size:8pt;color:#6b7280;margin-bottom:4px">مجموعة رعاية الطفل للحضانات — Child Care Nurseries Group</div>
-    <div style="font-size:15pt;font-weight:900;color:#1e3a8a">${branch?.en||branch?.ar||''}</div>
-    <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-top:6px">VAT 5% Tax Report — تقرير ضريبة القيمة المضافة 5%</div>
-    <div style="font-size:10pt;color:#374151;margin-top:3px">${fmtMon(mon)}</div>
-  </div>
-
-  <!-- Summary boxes -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-    ${[
-      ['Taxable Receipts','#1e3a8a',vatRecs.length+' receipts'],
-      ['Amount Before Tax','#0369a1',fmtN(totalPre)+' AED'],
-      ['VAT Amount (5%)','#d97706',fmtN(totalVAT)+' AED'],
-      ['Total After Tax','#059669',fmtN(totalPost)+' AED'],
-    ].map(([l,c,v])=>`<div style="border:2px solid ${c};border-radius:8px;padding:10px;text-align:center">
-      <div style="font-size:8pt;color:#6b7280;margin-bottom:4px">${l}</div>
-      <div style="font-size:12pt;font-weight:900;color:${c}">${v}</div>
-    </div>`).join('')}
-  </div>
-
-  <!-- Table -->
-  <table>
-    <thead>
-      <tr style="background:#7c3aed;color:#fff">
-        <th style="padding:8px 10px;text-align:left">Date / التاريخ</th>
-        <th style="padding:8px 10px;text-align:left">Customer / العميل</th>
-        <th style="padding:8px 8px;text-align:center">TRN / الرقم الضريبي</th>
-        <th style="padding:8px 8px;text-align:center">Reason / السبب</th>
-        <th style="padding:8px 10px;text-align:right">Pre-Tax / قبل الضريبة</th>
-        <th style="padding:8px 10px;text-align:right">VAT 5% / الضريبة</th>
-        <th style="padding:8px 10px;text-align:right">Total / الإجمالي</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows||`<tr><td colspan="7" style="padding:20px;text-align:center;color:#9ca3af">No VAT 5% receipts for ${fmtMon(mon)}</td></tr>`}
-    </tbody>
-    <tfoot>
-      <tr style="background:#1e3a8a;color:#fff;font-weight:900">
-        <td colspan="4" style="padding:8px 10px">Total / الإجمالي</td>
-        <td style="padding:8px 10px;text-align:right">${fmtN(totalPre)} AED</td>
-        <td style="padding:8px 10px;text-align:right">${fmtN(totalVAT)} AED</td>
-        <td style="padding:8px 10px;text-align:right">${fmtN(totalPost)} AED</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <div style="margin-top:14px;font-size:8pt;color:#6b7280;text-align:center">
-    ${branch?.en||''} | VAT Registration: __________ | Generated: ${new Date().toLocaleDateString('en-GB')}
-  </div>
-  </body></html>`;
-
-  const w=window.open('','_blank','width=1000,height=800');
-  if(!w){alert('Allow popups');return;}
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(),600);
+  // Build and show the modal
+  document.getElementById('exp-vat5-modal')?.remove();
+  const now = new Date();
+  const ym = y=>String(y).padStart(4,'0'), mo=x=>String(x).padStart(2,'0');
+  const curYM = ym(now.getFullYear())+'-'+mo(now.getMonth()+1);
+  const ov=document.createElement('div');
+  ov.id='exp-vat5-modal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;font-family:'Tajawal',sans-serif;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:900;font-size:1rem">🧾 Expenses VAT 5% Report</div>
+          <div style="font-size:.78rem;opacity:.85">تقرير فواتير ضريبة القيمة المضافة 5%</div>
+        </div>
+        <button onclick="document.getElementById('exp-vat5-modal').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <!-- Period selector -->
+        <div style="background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:10px;padding:10px 12px">
+          <label style="font-size:.8rem;font-weight:700;color:#5b21b6;display:block;margin-bottom:8px">📅 الفترة الزمنية — Period</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;font-weight:600">
+              <input type="radio" name="exp-vat-period" value="month" checked onchange="toggleExpVATperiod(this.value)" style="width:16px;height:16px"> شهر واحد
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;font-weight:600">
+              <input type="radio" name="exp-vat-period" value="quarter" onchange="toggleExpVATperiod(this.value)" style="width:16px;height:16px"> ربع سنوي (3 شهور)
+            </label>
+          </div>
+          <div id="exp-vat-month-wrap">
+            <input type="month" id="exp-vat-month" value="${curYM}" style="width:100%;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div id="exp-vat-quarter-wrap" style="display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+              <div><label style="font-size:.75rem;color:#6b7280">From — من</label>
+                <input type="month" id="exp-vat-from" value="${curYM}" style="width:100%;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+              </div>
+              <div><label style="font-size:.75rem;color:#6b7280">To — إلى</label>
+                <input type="month" id="exp-vat-to" value="${curYM}" style="width:100%;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button onclick="setExpVATQuarter('Q1')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 يناير–مارس</button>
+              <button onclick="setExpVATQuarter('Q2')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 أبريل–يونيو</button>
+              <button onclick="setExpVATQuarter('Q3')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 يوليو–سبتمبر</button>
+              <button onclick="setExpVATQuarter('Q4')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q4 أكتوبر–ديسمبر</button>
+            </div>
+          </div>
+        </div>
+        <!-- Branch -->
+        <div>
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🏫 الفرع — Branch</label>
+          <select id="exp-vat-branch" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+            <option value="">— الفرع الحالي (${CB()?.ar||CB()?.en||''}) —</option>
+            ${BRANCHES.map(b=>'<option value="'+b.id+'">'+b.icon+' '+tBN(b)+'</option>').join('')}
+            <option value="all">🏢 كل الفروع</option>
+          </select>
+        </div>
+        <button onclick="printExpVAT5Report()" style="padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:800;cursor:pointer">
+          🖨️ طباعة التقرير / Print Report
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
 }
 
+function toggleExpVATperiod(type){
+  const mw=document.getElementById('exp-vat-month-wrap');
+  const qw=document.getElementById('exp-vat-quarter-wrap');
+  if(mw) mw.style.display=type==='month'?'':'none';
+  if(qw) qw.style.display=type==='quarter'?'':'none';
+}
 
+function setExpVATQuarter(q){
+  const yr=new Date().getFullYear();
+  const qMap={Q1:[yr+'-01',yr+'-03'],Q2:[yr+'-04',yr+'-06'],Q3:[yr+'-07',yr+'-09'],Q4:[yr+'-10',yr+'-12']};
+  const[f,t]=qMap[q]||[];
+  if(f&&document.getElementById('exp-vat-from')) document.getElementById('exp-vat-from').value=f;
+  if(t&&document.getElementById('exp-vat-to'))   document.getElementById('exp-vat-to').value=t;
+}
 
-// STAFF LEAVE & ATTENDANCE DASHBOARD
-// ═══════════════════════════════════════════════
+async function printExpVAT5Report(){
+  const periodType=document.querySelector('input[name="exp-vat-period"]:checked')?.value||'month';
+  let dateFrom,dateTo,periodLabel;
+  if(periodType==='quarter'){
+    dateFrom=document.getElementById('exp-vat-from')?.value||monthOf(new Date());
+    dateTo=document.getElementById('exp-vat-to')?.value||dateFrom;
+    const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    const f=months[parseInt(dateFrom.split('-')[1])-1]+' '+dateFrom.split('-')[0];
+    const t=months[parseInt(dateTo.split('-')[1])-1]+' '+dateTo.split('-')[0];
+    periodLabel=f+' → '+t;
+  } else {
+    dateFrom=document.getElementById('exp-vat-month')?.value||monthOf(new Date());
+    dateTo=dateFrom;
+    const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    periodLabel=months[parseInt(dateFrom.split('-')[1])-1]+' '+dateFrom.split('-')[0];
+  }
+
+  const branchSel=document.getElementById('exp-vat-branch')?.value||'';
+  const isAllBranch=branchSel==='all';
+  let expenses=[];
+
+  if(isAllBranch){
+    // Load all branches
+    const allData=await Promise.all(BRANCHES.map(b=>sb.from('expenses').select('*').eq('branch_id',b.id).gte('date',dateFrom+'-01').lte('date',dateTo+'-31')));
+    allData.forEach(({data})=>{if(data)expenses.push(...data);});
+  } else {
+    const bid=branchSel||curBid;
+    const{data}=await sb.from('expenses').select('*').eq('branch_id',bid).gte('date',dateFrom+'-01').lte('date',dateTo+'-31');
+    expenses=data||[];
+  }
+
+  // Filter 5% VAT only
+  const vatRecs=expenses.filter(e=>(e.vat_amount||0)>0 && (e.vat_type||'').includes('5')).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+  document.getElementById('exp-vat5-modal')?.remove();
+
+  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const EXP_LABELS={'bus':'مصاريف الباص','purch':'مشتريات','salary':'رواتب','contract':'عقود سنوية','printing':'تايبينج','maint':'صيانة','tel':'اتصالات','util':'مرافق','govt':'رسوم حكومية','bank':'رسوم بنكية','ads':'إعلانات','rent':'إيجار','license':'ترخيص','other':'أخرى'};
+
+  const totalPre=vatRecs.reduce((s,r)=>s+(r.amount||0),0);
+  const totalVAT=vatRecs.reduce((s,r)=>s+(r.vat_amount||0),0);
+  const totalPost=vatRecs.reduce((s,r)=>s+(r.total_amount||r.amount||0),0);
+
+  const branch=isAllBranch?{ar:'كل الفروع',en:'All Branches'}:(BRANCHES.find(b=>b.id===(branchSel||curBid))||CB());
+
+  const rows=vatRecs.map((r,i)=>{
+    const cat=EXP_LABELS[r.category]||r.category||'—';
+    const bg=i%2===0?'#f9fafb':'#fff';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:7px 10px;font-size:.78rem;color:#6b7280">'+fmtD(r.date)+'</td>'+
+      '<td style="padding:7px 10px;font-size:.78rem;font-weight:700">'+((r.supplier_name||'—'))+'</td>'+
+      '<td style="padding:7px 10px;font-size:.75rem;color:#0369a1;font-weight:600;direction:ltr">'+((r.supplier_tax_no||r.trn||'—'))+'</td>'+
+      '<td style="padding:7px 10px;font-size:.75rem;color:#374151">'+cat+'</td>'+
+      '<td style="padding:7px 10px;font-size:.75rem;color:#374151">'+((r.reason||r.note||'—'))+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;font-weight:700">'+fmt(r.amount||0)+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;color:#d97706;font-weight:700">'+fmt(r.vat_amount||0)+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;font-weight:900;color:#1e3a8a">'+fmt(r.total_amount||r.amount||0)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  const html=['<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    '<style>',
+    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&family=Inter:wght@400;600;700&display=swap");',
+    '@page{size:A4 landscape;margin:10mm}',
+    '*{margin:0;padding:0;box-sizing:border-box}',
+    'body{font-family:Tajawal,Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;direction:rtl}',
+    'table{border-collapse:collapse;width:100%}',
+    'th{background:#5b21b6;color:#fff;padding:8px 10px;font-size:.78rem;text-align:right}',
+    '@media print{.np{display:none!important}}',
+    '</style></head><body>',
+    '<div class="np" style="background:#5b21b6;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px;direction:ltr">',
+    '<button onclick="window.print()" style="background:#fff;color:#5b21b6;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ طباعة / PDF</button>',
+    '<button onclick="window.close()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer">✕</button>',
+    '</div><div style="height:36px" class="np"></div>',
+    // Header
+    '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;padding:12px 16px;border-radius:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">',
+    '<div>',
+    '<div style="font-size:9pt;opacity:.8">مجموعة رعاية الطفل للحضانات</div>',
+    '<div style="font-size:13pt;font-weight:900">'+(branch?.ar||branch?.en||'')+'</div>',
+    '</div>',
+    '<div style="text-align:left">',
+    '<div style="font-size:10pt;font-weight:800">تقرير فواتير ضريبة 5% — VAT 5% Expenses Report</div>',
+    '<div style="font-size:8pt;opacity:.85">'+periodLabel+' | '+vatRecs.length+' فاتورة</div>',
+    '<div style="font-size:7.5pt;opacity:.8">طُبع: '+new Date().toLocaleDateString('ar-AE')+'</div>',
+    '</div></div>',
+    // Summary boxes
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px">',
+    ...['عدد الفواتير:#1e3a8a:'+vatRecs.length,'قبل الضريبة:#0369a1:'+fmt(totalPre)+' AED','الضريبة 5%:#d97706:'+fmt(totalVAT)+' AED','الإجمالي الكلي:#059669:'+fmt(totalPost)+' AED'].map(s=>{const[l,col,v]=s.split(':');return'<div style="border:2px solid '+col+';border-radius:8px;padding:10px;text-align:center"><div style="font-size:8pt;color:#6b7280;margin-bottom:4px">'+l+'</div><div style="font-size:12pt;font-weight:900;color:'+col+'">'+v+'</div></div>';}),
+    '</div>',
+    // Table
+    '<table>',
+    '<thead><tr>',
+    '<th>التاريخ</th><th>اسم الجهة / Supplier</th><th>الرقم الضريبي / TRN</th><th>النوع</th><th>سبب الدفع</th>',
+    '<th style="text-align:right">قبل الضريبة</th><th style="text-align:right">الضريبة 5%</th><th style="text-align:right">الإجمالي</th>',
+    '</tr></thead>',
+    '<tbody>',
+    rows||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca3af">لا توجد فواتير بضريبة 5% في هذه الفترة</td></tr>',
+    '</tbody>',
+    '<tfoot><tr style="background:#1e3a8a;color:#fff;font-weight:900">',
+    '<td colspan="5" style="padding:8px 10px">الإجمالي — Total</td>',
+    '<td style="padding:8px 10px;text-align:right">'+fmt(totalPre)+' AED</td>',
+    '<td style="padding:8px 10px;text-align:right">'+fmt(totalVAT)+' AED</td>',
+    '<td style="padding:8px 10px;text-align:right">'+fmt(totalPost)+' AED</td>',
+    '</tr></tfoot>',
+    '</table>',
+    '<div style="margin-top:12px;font-size:7.5pt;color:#9ca3af;text-align:center">',
+    (branch?.en||'')+(isAllBranch?'':', TRN: __________ ')+' | '+periodLabel+' | UAE VAT Return Period',
+    '</div>',
+    '</body></html>'
+  ].join('');
+
+  const w=window.open('','_blank','width=1200,height=900');
+  if(!w){alert('اسمح لـ Popups');return;}
+  w.document.write(html);w.document.close();
+  setTimeout(()=>w.print(),700);
+}
+
 function openStaffLeaveDashboard(staffId){
   const s = DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s){ alert('Staff not found'); return; }
