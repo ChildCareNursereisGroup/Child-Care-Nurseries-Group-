@@ -16512,12 +16512,12 @@ async function printExpVAT5Report(){
 
   if(isAllBranch){
     const allData=await Promise.all(BRANCHES.map(b=>
-      sb.from('expenses').select('*').eq('branch_id',b.id).gte('date',dateFrom+'-01').lte('date',dateTo+'-31')
+      sb.from('expenses').select('*').eq('branch_id',b.id).gte('date',repFrom).lte('date',repTo)
     ));
     allData.forEach(({data})=>{if(data)expenses.push(...data);});
   } else {
     const bid=branchSel||curBid;
-    const{data}=await sb.from('expenses').select('*').eq('branch_id',bid).gte('date',dateFrom+'-01').lte('date',dateTo+'-31');
+    const{data}=await sb.from('expenses').select('*').eq('branch_id',bid).gte('date',repFrom).lte('date',repTo);
     expenses=data||[];
   }
 
