@@ -2736,10 +2736,9 @@ async function loadFromSupa(bid) {
     DB.attendance={};
     // Load ALL children attendance with fetchAll (no limits)
     {
-      const attRows = await fetchAll(
-        sb.from('attendance').select('child_id,date,status')
-          .eq('branch_id', bid)
-          .order('date', {ascending: false})
+      const attRows = await fetchAll(()=>sb.from('attendance').select('child_id,date,status')
+        .eq('branch_id', bid)
+        .order('date', {ascending: false})
       );
       attRows.forEach(x=>{
         const d=x.date; if(!DB.attendance[d]) DB.attendance[d]={};
@@ -5222,7 +5221,7 @@ async function confirmCancelRec(id){
 }
 
 function toggleWeekendFilter(){
-  weekendFilterOn = !weekendFilterOn;
+  window.weekendFilterOn = !window.weekendFilterOn;
   const btn = el('weekend-filter-btn');
   if(btn){
     btn.style.background = weekendFilterOn ? '#d97706' : '#fff';
