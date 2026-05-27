@@ -16175,6 +16175,7 @@ function printAllMonthlyReceipts(){
   w.document.write(html);
   w.document.close();
   setTimeout(()=>w.print(),700);
+}
 
 function openMonthlyReceiptCheck(){
   const mon=el('rec-month')?.value || new Date().toISOString().slice(0,7);
@@ -27176,8 +27177,6 @@ function renderTodaySummary(){
 
   html += '</div>';
   card.innerHTML = html;
-}
-
 }
 
 boot();
