@@ -459,7 +459,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-rec-file2').click()">📥 Import Excel</button>
     <button class="btn bg bsm" onclick="downloadReceiptsTemplate()">📋 Template</button>
     <button class="btn bsm" style="background:#0369a1;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openMonthlyReceiptCheck()">📋 Monthly Check</button>
-    <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openVAT5Report()">🧾 VAT 5% Report</button>
   </div>
   <input type="file" id="xl-rec-file2" accept=".xlsx,.xls,.csv" style="display:none" onchange="importReceiptsExcel(this.files[0])">
 
@@ -1059,6 +1058,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#6366f1;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openScan('invoice')">🤖 AI Scan Invoice</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-exp-file2').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadExpensesTemplate()">📋 Template</button>
+      <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openVAT5Report()">🧾 VAT 5% Report</button>
     </div>
     <input type="file" id="xl-exp-file2" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExpensesExcel(this.files[0])">
     <div id="eformbody"></div>
@@ -5258,6 +5258,7 @@ function setKidsAttView(v){
 }
 
 function renderKidsWeek(){
+  try {
   const dateEl=el('attdate');
   if(!dateEl.value) dateEl.value=today();
   const selDate=new Date(dateEl.value+'T00:00:00');
@@ -5479,9 +5480,22 @@ function renderKidsWeek(){
       ${lang==='ar'?'= ويك إند حضر — مدفوع ✅':'= Weekend attended — paid ✅'}
     </span>
   </div>`;
+  } catch(err) {
+    console.error('renderKidsWeek error:', err);
+    const attEl = el('attlist');
+    if(attEl) attEl.innerHTML = `<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:16px;color:#dc2626;font-family:monospace;font-size:.8rem">
+      ❌ Attendance Error: ${err?.message||err}<br><br>
+      <button onclick="renderKidsWeek()" style="background:#dc2626;color:#fff;border:none;padding:6px 12px;border-radius:7px;cursor:pointer">🔄 Retry</button>
+    </div>`;
+  }
 }
 
 function renderAtt(){
+  if(!DB.children || !DB.children.length){
+    // Data not loaded yet - retry in 500ms
+    setTimeout(()=>renderKidsWeek(), 500);
+    return;
+  }
   return renderKidsWeek(); // Always week view
   // Set default date if empty
   if(!el('attdate').value) el('attdate').value=today();
