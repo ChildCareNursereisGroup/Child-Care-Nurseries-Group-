@@ -591,8 +591,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="">— Year View —</option>
       </select>
       <button onclick="toggleYearView()" style="padding:4px 10px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#d97706;background:#fffbeb;cursor:pointer" title="View all months for a year">📅 Year View</button>
-      <button onclick="printAllMonthlyReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#059669;cursor:pointer" title="Print all receipts for this month">🖨️ Print All</button>
-      <button onclick="batchDownloadReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#7c3aed;cursor:pointer" title="Download all receipts as PDF">📥 Download All Receipts</button>
+      <button onclick="printAllMonthlyReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#059669;cursor:pointer" title="Print all receipts for this month" class="admin-only-btn">🖨️ Print All</button>
+      <button onclick="batchDownloadReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#7c3aed;cursor:pointer" title="Download all receipts as PDF" class="admin-only-btn">📥 Download All Receipts</button>
       <span id="rectot-wrap" style="font-weight:800;color:var(--ok);display:none">إجمالي: <span id="rectot">0</span> د.إ</span>
       <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
         <option value="all">💰 All Payments</option>
@@ -3357,6 +3357,8 @@ async function showPage(page,btn){
     const tw=el('rectot-wrap'); if(tw) tw.style.display=curRole==='admin'?'':'none';
     const vb=el('vat-report-btn'); if(vb) vb.style.display=curRole==='admin'?'':'none';
     const rb=el('rec-report-btn'); if(rb) rb.style.display=curRole==='admin'?'':'none';
+    // Admin-only buttons (Print All / Download All)
+    document.querySelectorAll('.admin-only-btn').forEach(b=>b.style.display=curRole==='admin'?'':'none');
   }
   if(page==='attendance'){
     if(!el('attdate').value) el('attdate').value=today();
@@ -16404,17 +16406,17 @@ function openVAT5Report(){
               <select id="exp-vat-year" style="padding:5px 8px;border:1.5px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;font-weight:700;color:#5b21b6">
                 ${[2025,2026,2027].map(y=>`<option value="${y}" ${y===new Date().getFullYear()?'selected':''}>${y}</option>`).join('')}
               </select>
-              <button onclick="setExpVATQuarter('Q1')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 يناير–مارس</button>
-              <button onclick="setExpVATQuarter('Q2')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 أبريل–يونيو</button>
-              <button onclick="setExpVATQuarter('Q3')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 يوليو–سبتمبر</button>
-              <button onclick="setExpVATQuarter('Q4')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q4 أكتوبر–ديسمبر</button>
+              <button onclick="setExpVATQuarter('Q1')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 فبراير–أبريل</button>
+              <button onclick="setExpVATQuarter('Q2')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 مايو–يوليو</button>
+              <button onclick="setExpVATQuarter('Q3')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 أغسطس–أكتوبر</button>
+              <button onclick="setExpVATQuarter('Q4')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q4 نوفمبر–يناير</button>
             </div>
           </div>
         </div>
         <!-- Branch -->
         <div>
           <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">🏫 الفرع — Branch</label>
-          <select id="exp-vat-branch" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          <select id="exp-vat-branch" onchange="updateExpVATQuarterLabels()" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
             <option value="">— الفرع الحالي (${CB()?.ar||CB()?.en||''}) —</option>
             ${BRANCHES.map(b=>'<option value="'+b.id+'">'+b.icon+' '+tBN(b)+'</option>').join('')}
             <option value="all">🏢 كل الفروع</option>
@@ -16427,6 +16429,7 @@ function openVAT5Report(){
     </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  setTimeout(updateExpVATQuarterLabels, 50);
 }
 
 function toggleExpVATperiod(type){
@@ -16439,10 +16442,42 @@ function toggleExpVATperiod(type){
 function setExpVATQuarter(q){
   const yrSel=document.getElementById('exp-vat-year');
   const yr=yrSel?parseInt(yrSel.value)||new Date().getFullYear():new Date().getFullYear();
-  const qMap={Q1:[yr+'-01',yr+'-03'],Q2:[yr+'-04',yr+'-06'],Q3:[yr+'-07',yr+'-09'],Q4:[yr+'-10',yr+'-12']};
-  const[f,t]=qMap[q]||[];
+  const branchSel=document.getElementById('exp-vat-branch')?.value||curBid;
+
+  // Dolphin (b3): Mar-May, Jun-Aug, Sep-Nov, Dec-Feb
+  // All others: Feb-Apr, May-Jul, Aug-Oct, Nov-Jan
+  let qMap;
+  if(branchSel==='b3'||(!branchSel&&curBid==='b3')){
+    qMap={
+      Q1:[yr+'-03', yr+'-05'],
+      Q2:[yr+'-06', yr+'-08'],
+      Q3:[yr+'-09', yr+'-11'],
+      Q4:[yr+'-12', (yr+1)+'-02'],
+    };
+  } else {
+    qMap={
+      Q1:[yr+'-02', yr+'-04'],
+      Q2:[yr+'-05', yr+'-07'],
+      Q3:[yr+'-08', yr+'-10'],
+      Q4:[yr+'-11', (yr+1)+'-01'],
+    };
+  }
+  const[f,t]=qMap[q]||[yr+'-01',yr+'-03'];
   if(f&&document.getElementById('exp-vat-from')) document.getElementById('exp-vat-from').value=f;
   if(t&&document.getElementById('exp-vat-to'))   document.getElementById('exp-vat-to').value=t;
+}
+
+// Update quarter labels dynamically when branch changes
+function updateExpVATQuarterLabels(){
+  const branchSel=document.getElementById('exp-vat-branch')?.value||curBid;
+  const isDolphin=branchSel==='b3'||(!branchSel&&curBid==='b3');
+  const labels=isDolphin
+    ?['Q1 مارس–مايو','Q2 يونيو–أغسطس','Q3 سبتمبر–نوفمبر','Q4 ديسمبر–فبراير']
+    :['Q1 فبراير–أبريل','Q2 مايو–يوليو','Q3 أغسطس–أكتوبر','Q4 نوفمبر–يناير'];
+  ['Q1','Q2','Q3','Q4'].forEach((q,i)=>{
+    const btn=document.querySelector(`button[onclick="setExpVATQuarter('${q}')"]`);
+    if(btn) btn.textContent=labels[i];
+  });
 }
 
 async function printExpVAT5Report(){
