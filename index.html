@@ -592,7 +592,6 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="">— Year View —</option>
       </select>
       <button onclick="toggleYearView()" style="padding:4px 10px;border:1.5px solid #d97706;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#d97706;background:#fffbeb;cursor:pointer" title="View all months for a year">📅 Year View</button>
-      ${curRole==='admin'?'':''}
       <button onclick="printAllMonthlyReceipts()" style="padding:4px 10px;border:none;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:700;color:#fff;background:#059669;cursor:pointer" title="Print all receipts for this month">🖨️ Print All</button>
       <span id="rectot-wrap" style="font-weight:800;color:var(--ok);display:none">إجمالي: <span id="rectot">0</span> د.إ</span>
       <select id="rPayFilter" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.8rem" onchange="renderRecs()">
@@ -5154,6 +5153,7 @@ async function delRec(id){
   if(curRole!=='admin'&&curRole!=='manager'){showToast('❌ صلاحيات الإدارة فقط');return;}
   const r=DB.receipts.find(x=>String(x.id)===String(id));
   if(!r) return;
+  const isAr=lang==='ar';
   document.getElementById('cancel-rec-modal')?.remove();
   const ov=document.createElement('div');
   ov.id='cancel-rec-modal';
@@ -5161,26 +5161,34 @@ async function delRec(id){
   ov.innerHTML=`
     <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;font-family:'Tajawal',sans-serif;overflow:hidden">
       <div style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;padding:14px 18px">
-        <div style="font-weight:900;font-size:1rem">🚫 إلغاء إيصال</div>
+        <div style="font-weight:900;font-size:1rem">${isAr?'🚫 إلغاء إيصال':'🚫 Cancel Receipt'}</div>
         <div style="font-size:.8rem;opacity:.85;margin-top:2px">#${r.receiptNum} — ${r.childName} — ${r.total} AED</div>
       </div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
         <div>
-          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">👤 اسمك <span style="color:#dc2626">*</span></label>
-          <input id="cancel-by-name" type="text" placeholder="اكتبي اسمك هنا..."
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">
+            👤 ${isAr?'اسمك':'Your Name'} <span style="color:#dc2626">*</span>
+          </label>
+          <input id="cancel-by-name" type="text" placeholder="${isAr?'اكتبي اسمك هنا...':'Write your name here...'}"
             style="width:100%;padding:9px 12px;border:2px solid #fca5a5;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem;box-sizing:border-box">
         </div>
         <div>
-          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 سبب الإلغاء <span style="color:#dc2626">*</span></label>
-          <textarea id="cancel-reason-txt" rows="3" placeholder="اكتبي سبب الإلغاء..."
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">
+            📝 ${isAr?'سبب الإلغاء':'Reason for Cancellation'} <span style="color:#dc2626">*</span>
+          </label>
+          <textarea id="cancel-reason-txt" rows="3" placeholder="${isAr?'اكتبي سبب الإلغاء...':'Write the reason for cancellation...'}"
             style="width:100%;padding:9px 12px;border:2px solid #fca5a5;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.9rem;box-sizing:border-box;resize:vertical"></textarea>
         </div>
         <div id="cancel-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:.82rem;font-weight:700"></div>
         <div style="display:flex;gap:8px">
           <button onclick="confirmCancelRec('${id}')"
-            style="flex:1;padding:11px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer">🚫 تأكيد الإلغاء</button>
+            style="flex:1;padding:11px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer">
+            🚫 ${isAr?'تأكيد الإلغاء':'Confirm Cancel'}
+          </button>
           <button onclick="document.getElementById('cancel-rec-modal').remove()"
-            style="flex:1;padding:11px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;cursor:pointer">← رجوع</button>
+            style="flex:1;padding:11px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.9rem;cursor:pointer">
+            ${isAr?'← رجوع':'← Back'}
+          </button>
         </div>
       </div>
     </div>`;
@@ -5195,8 +5203,8 @@ async function confirmCancelRec(id){
   const cancelledBy=(document.getElementById('cancel-by-name')?.value||'').trim();
   const reason=(document.getElementById('cancel-reason-txt')?.value||'').trim();
   const errEl=document.getElementById('cancel-error');
-  if(!cancelledBy){errEl.style.display='block';errEl.textContent='⚠️ الاسم مطلوب';document.getElementById('cancel-by-name')?.focus();return;}
-  if(!reason){errEl.style.display='block';errEl.textContent='⚠️ سبب الإلغاء مطلوب';document.getElementById('cancel-reason-txt')?.focus();return;}
+  if(!cancelledBy){errEl.style.display='block';errEl.textContent=lang==='ar'?'⚠️ الاسم مطلوب':'⚠️ Your name is required';document.getElementById('cancel-by-name')?.focus();return;}
+  if(!reason){errEl.style.display='block';errEl.textContent=lang==='ar'?'⚠️ سبب الإلغاء مطلوب':'⚠️ Cancellation reason is required';document.getElementById('cancel-reason-txt')?.focus();return;}
   const cancelNote=`[ملغي ${today()} بواسطة ${cancelledBy}: ${reason}]`;
   const updateObj={is_cancelled:true,cancel_reason:reason,cancel_date:today(),cancelled_by:cancelledBy,notes:((r.notes||'')+'\n'+cancelNote).trim()};
   const {error}=await sb.from('receipts').update(updateObj).eq('id',id);
@@ -16088,67 +16096,85 @@ function printAllMonthlyReceipts(){
   const fm=el('rfmon')?.value||monthOf(new Date());
   let list=DB.receipts.filter(r=>!r.isCancelled&&(yearView?(r.date||'').startsWith(yearView):monthOf(r.date)===fm));
   list.sort((a,b)=>(a.childName||'').localeCompare(b.childName||'','ar'));
-  if(!list.length){showToast('لا يوجد إيصالات');return;}
-  const branch=CB();const bx=getBranchExtra?.(curBid)||{};const logo=bx.logo||null;const col=branch?.c||'#1e3a8a';
-  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-  const fmtMon=m=>{const[y,mo]=m.split('-');return months[parseInt(mo)-1]+' '+y;};
+  if(!list.length){showToast(lang==='ar'?'لا يوجد إيصالات':'No receipts found');return;}
+
+  const branch=CB()||{ar:'',en:'',c:'#1e3a8a'};
+  const bx=getBranchExtra(curBid)||{};
+  const logo=bx.logo||null;
+  const col=branch.c||'#1e3a8a';
+  const months_ar=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const fmtMon=m=>{const[y,mo]=m.split('-');return months_ar[parseInt(mo)-1]+' '+y;};
   const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('ar-AE',{day:'2-digit',month:'long',year:'numeric'}):'—';
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:0,maximumFractionDigits:2});
   const payLbl=p=>p==='cash'?'💵 نقداً':p==='bank'?'🏦 تحويل':p==='card'?'💳 بطاقة':'';
-  const cards=list.map(r=>{
-    const colEsc=col.replace(/#/g,'%23');
-    return('<div style="border:1.5px solid '+col+'44;border-radius:10px;overflow:hidden;break-inside:avoid;margin-bottom:8px">'+
-      '<div style="background:'+col+';color:#fff;padding:5px 10px;display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="font-size:8pt;font-weight:700">'+(branch?.en||branch?.ar||'')+'</span>'+
-        '<span style="font-size:7.5pt;opacity:.85">'+r.receiptNum+'</span>'+
-      '</div>'+
-      '<div style="padding:7px 10px;display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center">'+
-        '<div>'+
-          '<div style="font-size:10pt;font-weight:900;color:#1e3a8a">'+(r.childName||'—')+'</div>'+
-          '<div style="font-size:7.5pt;color:#6b7280;margin-top:1px">'+(r.className||'')+' | '+fmtD(r.date)+' | '+payLbl(r.payMethod)+'</div>'+
-          (r.fromDate?'<div style="font-size:7pt;color:#6b7280">الفترة: '+fmtD(r.fromDate)+' — '+fmtD(r.toDate)+'</div>':'')+
-          ((r.fee||0)>0?'<div style="font-size:7pt;color:#374151">رسوم: '+fmt(r.fee)+' AED'+((r.bus||0)>0?' | مواصلات: '+fmt(r.bus)+' AED':'')+'</div>':'')+
-        '</div>'+
-        '<div style="text-align:right">'+
-          '<div style="font-size:15pt;font-weight:900;color:'+col+'">'+fmt(r.total)+'</div>'+
-          '<div style="font-size:7.5pt;color:#6b7280">AED</div>'+
-        '</div>'+
-      '</div>'+
-      '<div style="border-top:1px dashed '+col+'44;padding:4px 10px;display:flex;justify-content:space-between;font-size:7pt;color:#9ca3af">'+
-        '<span>توقيع ولي الأمر: _______________</span><span>✓</span>'+
-      '</div>'+
-    '</div>');
+
+  const cardHtml=list.map(r=>{
+    const lines=[];
+    lines.push('<div style="border:1.5px solid #ddd;border-radius:10px;overflow:hidden;break-inside:avoid;margin-bottom:8px">');
+    lines.push('<div style="background:'+col+';color:#fff;padding:5px 10px;display:flex;justify-content:space-between;align-items:center">');
+    lines.push('<span style="font-size:8pt;font-weight:700">'+(lang==='ar'?branch.ar:branch.en)+'</span>');
+    lines.push('<span style="font-size:7.5pt;opacity:.85">'+r.receiptNum+'</span>');
+    lines.push('</div>');
+    lines.push('<div style="padding:7px 10px;display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center">');
+    lines.push('<div>');
+    lines.push('<div style="font-size:10pt;font-weight:900;color:'+col+'">'+(r.childName||'—')+'</div>');
+    lines.push('<div style="font-size:7.5pt;color:#6b7280;margin-top:1px">'+(r.className||'')+' | '+fmtD(r.date)+' | '+payLbl(r.payMethod)+'</div>');
+    if(r.fromDate) lines.push('<div style="font-size:7pt;color:#6b7280">'+fmtD(r.fromDate)+' — '+fmtD(r.toDate)+'</div>');
+    if((r.fee||0)>0) lines.push('<div style="font-size:7pt;color:#374151">رسوم: '+fmt(r.fee)+' AED'+((r.bus||0)>0?' | مواصلات: '+fmt(r.bus)+' AED':'')+'</div>');
+    lines.push('</div>');
+    lines.push('<div style="text-align:right">');
+    lines.push('<div style="font-size:15pt;font-weight:900;color:'+col+'">'+fmt(r.total)+'</div>');
+    lines.push('<div style="font-size:7.5pt;color:#6b7280">AED</div>');
+    lines.push('</div></div>');
+    lines.push('<div style="border-top:1px dashed #ddd;padding:4px 10px;display:flex;justify-content:space-between;font-size:7pt;color:#9ca3af">');
+    lines.push('<span>توقيع ولي الأمر / Parent Signature: _______________</span><span>✓</span>');
+    lines.push('</div></div>');
+    return lines.join('');
   }).join('');
+
   const total=list.reduce((s,r)=>s+(r.total||0),0);
-  const label=yearView||fmtMon(fm);
+  const label=yearView?yearView+' (All Year)':fmtMon(fm);
   const printDate=new Date().toLocaleDateString('ar-AE',{day:'2-digit',month:'long',year:'numeric'});
-  const html=['<!DOCTYPE html><html><head><meta charset="UTF-8">',
+
+  const html=[
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">',
     '<style>',
-    '@page{size:A4;margin:10mm}*{margin:0;padding:0;box-sizing:border-box}',
+    '@page{size:A4;margin:10mm}',
+    '*{margin:0;padding:0;box-sizing:border-box}',
     'body{font-family:Tajawal,Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact;direction:rtl}',
     '.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
     '@media print{.np{display:none!important}}',
     '</style></head><body>',
     '<div class="np" style="background:#1f2937;padding:8px;text-align:center;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px;direction:ltr">',
-    '<button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ طباعة '+list.length+' إيصال</button>',
-    '<button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer">✕</button>',
-    '</div><div style="height:36px" class="np"></div>',
+    '<button onclick="window.print()" style="background:#059669;color:#fff;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ Print '+list.length+' Receipts</button>',
+    '<button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer">✕ Close</button>',
+    '</div>',
+    '<div style="height:36px" class="np"></div>',
     '<div style="background:'+col+';color:#fff;padding:8px 14px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">',
-    '<div><div style="font-size:9pt;opacity:.8">مجموعة رعاية الطفل للحضانات</div><div style="font-size:13pt;font-weight:900">'+(branch?.ar||branch?.en||'')+'</div></div>',
-    '<div style="text-align:left"><div style="font-size:10pt;font-weight:800">كشف إيصالات — '+label+'</div>',
-    '<div style="font-size:8pt;opacity:.85">'+list.length+' إيصال | إجمالي: '+fmt(total)+' AED</div>',
-    '<div style="font-size:7.5pt;opacity:.8">طُبع: '+printDate+'</div></div>',
+    '<div>',
+    '<div style="font-size:9pt;opacity:.8">Child Care Nurseries Group — مجموعة رعاية الطفل</div>',
+    '<div style="font-size:13pt;font-weight:900">'+(lang==='ar'?branch.ar:branch.en)+'</div>',
+    '</div>',
+    '<div style="text-align:left">',
+    '<div style="font-size:10pt;font-weight:800">Receipts Summary — كشف الإيصالات</div>',
+    '<div style="font-size:8pt;opacity:.85">'+label+' | '+list.length+' receipts | Total: '+fmt(total)+' AED</div>',
+    '<div style="font-size:7.5pt;opacity:.8">Printed: '+printDate+'</div>',
+    '</div>',
     (logo?'<img src="'+logo+'" style="height:40px;border-radius:8px;background:#fff;padding:3px">':''),
     '</div>',
-    '<div class="grid">'+cards+'</div>',
+    '<div class="grid">'+cardHtml+'</div>',
     '<div style="margin-top:10px;padding:8px 14px;background:#f0fdf4;border:2px solid '+col+';border-radius:10px;display:flex;justify-content:space-between;align-items:center">',
-    '<span style="font-size:10pt;font-weight:800;color:'+col+'">الإجمالي الكلي</span>',
+    '<span style="font-size:10pt;font-weight:800;color:'+col+'">Grand Total — الإجمالي الكلي</span>',
     '<span style="font-size:14pt;font-weight:900;color:'+col+'">'+fmt(total)+' AED</span>',
-    '</div></body></html>'
+    '</div>',
+    '</body></html>'
   ].join('');
-  w.document.write(html);w.document.close();setTimeout(()=>w.print(),700);
-}
 
+  const w=window.open('','_blank','width=900,height=1100');
+  if(!w){showToast('Allow popups to print');return;}
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),700);
 
 function openMonthlyReceiptCheck(){
   const mon=el('rec-month')?.value || new Date().toISOString().slice(0,7);
@@ -27150,6 +27176,8 @@ function renderTodaySummary(){
 
   html += '</div>';
   card.innerHTML = html;
+}
+
 }
 
 boot();
