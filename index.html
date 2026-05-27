@@ -705,7 +705,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
               <input type="month" id="vat-rep-to" style="font-family:'Tajawal',sans-serif;width:100%;padding:7px;border:1.5px solid #bae6fd;border-radius:8px;box-sizing:border-box">
             </div>
           </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+            <select id="vat-rep-year" style="padding:5px 8px;border:1.5px solid #bae6fd;border-radius:7px;font-family:'Tajawal',sans-serif;font-weight:700;color:#0369a1">
+              <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+            </select>
             <button onclick="setVATQuarter('Q1')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 يناير–مارس</button>
             <button onclick="setVATQuarter('Q2')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 أبريل–يونيو</button>
             <button onclick="setVATQuarter('Q3')" style="padding:4px 10px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 يوليو–سبتمبر</button>
@@ -4380,7 +4383,8 @@ function toggleVATperiod(type){
   el('vat-period-quarter').style.display=type==='quarter'?'':'none';
 }
 function setVATQuarter(q){
-  const yr=new Date().getFullYear();
+  const yrSel=document.getElementById('vat-rep-year');
+  const yr=yrSel?parseInt(yrSel.value)||new Date().getFullYear():new Date().getFullYear();
   const qMap={Q1:[yr+'-01',yr+'-03'],Q2:[yr+'-04',yr+'-06'],Q3:[yr+'-07',yr+'-09'],Q4:[yr+'-10',yr+'-12']};
   const[f,t]=qMap[q]||[yr+'-01',yr+'-03'];
   if(el('vat-rep-from'))el('vat-rep-from').value=f;
@@ -16396,7 +16400,10 @@ function openVAT5Report(){
                 <input type="month" id="exp-vat-to" value="${curYM}" style="width:100%;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
               </div>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+              <select id="exp-vat-year" style="padding:5px 8px;border:1.5px solid #ddd6fe;border-radius:7px;font-family:'Tajawal',sans-serif;font-weight:700;color:#5b21b6">
+                ${[2025,2026,2027].map(y=>`<option value="${y}" ${y===new Date().getFullYear()?'selected':''}>${y}</option>`).join('')}
+              </select>
               <button onclick="setExpVATQuarter('Q1')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q1 يناير–مارس</button>
               <button onclick="setExpVATQuarter('Q2')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q2 أبريل–يونيو</button>
               <button onclick="setExpVATQuarter('Q3')" style="padding:4px 10px;background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-size:.76rem;font-weight:700">Q3 يوليو–سبتمبر</button>
@@ -16430,7 +16437,8 @@ function toggleExpVATperiod(type){
 }
 
 function setExpVATQuarter(q){
-  const yr=new Date().getFullYear();
+  const yrSel=document.getElementById('exp-vat-year');
+  const yr=yrSel?parseInt(yrSel.value)||new Date().getFullYear():new Date().getFullYear();
   const qMap={Q1:[yr+'-01',yr+'-03'],Q2:[yr+'-04',yr+'-06'],Q3:[yr+'-07',yr+'-09'],Q4:[yr+'-10',yr+'-12']};
   const[f,t]=qMap[q]||[];
   if(f&&document.getElementById('exp-vat-from')) document.getElementById('exp-vat-from').value=f;
@@ -16508,7 +16516,7 @@ async function printExpVAT5Report(){
       '<td style="padding:6px 8px;font-size:.72rem;border-right:1px solid #e5e7eb;text-align:right;font-weight:700">'+fmt(r.amount||0)+'</td>'+
       '<td style="padding:6px 8px;font-size:.72rem;border-right:1px solid #e5e7eb;text-align:right;color:#d97706;font-weight:700">'+fmt(r.vat_amount||0)+'</td>'+
       '<td style="padding:6px 8px;font-size:.72rem;border-right:1px solid #e5e7eb">'+(branch?.en||branch?.ar||'')+'</td>'+
-      '<td style="padding:6px 8px;font-size:.72rem;border-right:1px solid #e5e7eb">'+((r.supplier_tax_no||r.trn||''))+'</td>'+
+      '<td style="padding:6px 8px;font-size:.72rem;border-right:1px solid #e5e7eb">'+((r.tax_number||''))+'</td>'+
       '<td style="padding:6px 8px;font-size:.72rem;">'+((r.reason||r.note||''))+'</td>'+
     '</tr>';
   }).join('');
