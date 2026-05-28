@@ -1061,6 +1061,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <button class="btn bsm" style="background:#6366f1;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openScan('invoice')">🤖 AI Scan Invoice</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-exp-file2').click()">📥 Import Excel</button>
       <button class="btn bg bsm" onclick="downloadExpensesTemplate()">📋 Template</button>
+      <button class="btn bsm" style="background:#0891b2;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openExpSummaryReport()">📊 Summary Report</button>
       <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openVAT5Report()">🧾 VAT 5% Report</button>
     </div>
     <input type="file" id="xl-exp-file2" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExpensesExcel(this.files[0])">
@@ -16360,6 +16361,248 @@ function openMonthlyReceiptCheck(){
 // ═══════════════════════════════════════════════
 // VAT 5% MONTHLY REPORT
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+// EXPENSE SUMMARY REPORT — grouped by sub_type
+// ═══════════════════════════════════════════════
+function openExpSummaryReport(){
+  document.getElementById('exp-summary-modal')?.remove();
+  const now=new Date();
+  const curYM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const ov=document.createElement('div');
+  ov.id='exp-summary-modal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;font-family:'Tajawal',sans-serif;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-weight:900;font-size:1rem">📊 Expense Summary Report</div>
+          <div style="font-size:.78rem;opacity:.85">تقرير ملخص المصاريف حسب التصنيف</div></div>
+        <button onclick="document.getElementById('exp-summary-modal').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <!-- Category -->
+        <div>
+          <label style="font-size:.82rem;font-weight:700;color:#374151;display:block;margin-bottom:6px">📂 Category — الفئة</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="exp-sum-cats">
+            ${[
+              {k:'bus',     l:'🚌 Bus Expenses',      c:'#0891b2'},
+              {k:'tel',     l:'📱 Communications',    c:'#7c3aed'},
+              {k:'bank',    l:'🏦 Bank Charges',       c:'#0369a1'},
+              {k:'purch',   l:'🛒 Purchases',          c:'#059669'},
+              {k:'maint',   l:'🔧 Maintenance',        c:'#d97706'},
+              {k:'util',    l:'💡 Utilities',          c:'#dc2626'},
+              {k:'salary',  l:'👷 Staff Salaries',     c:'#6366f1'},
+              {k:'contract',l:'📄 Annual Contracts',   c:'#475569'},
+              {k:'govt',    l:'🏛️ Government Fees',    c:'#0f766e'},
+              {k:'ads',     l:'📢 Advertising',        c:'#ea580c'},
+              {k:'rent',    l:'🏠 Rent Fees',          c:'#7e22ce'},
+              {k:'license', l:'📋 License Fees',       c:'#0c4a6e'},
+              {k:'printing',l:'✍️ Typing Work',        c:'#166534'},
+              {k:'other',   l:'📝 Other',              c:'#374151'},
+              {k:'',        l:'📊 ALL Categories',     c:'#1f2937'},
+            ].map(cat=>`<button onclick="selectExpSumCat(this,'${cat.k}')"
+              data-cat="${cat.k}"
+              style="padding:4px 10px;background:${cat.c}22;color:${cat.c};border:2px solid ${cat.c}44;border-radius:7px;cursor:pointer;font-size:.76rem;font-weight:700;font-family:'Tajawal',sans-serif">
+              ${cat.l}
+            </button>`).join('')}
+          </div>
+          <input type="hidden" id="exp-sum-cat" value="">
+        </div>
+        <!-- Period -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:.78rem;color:#6b7280">From — من</label>
+            <input type="month" id="exp-sum-from" value="${now.getFullYear()+'-01'}"
+              style="width:100%;padding:7px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:.78rem;color:#6b7280">To — إلى</label>
+            <input type="month" id="exp-sum-to" value="${curYM}"
+              style="width:100%;padding:7px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:.78rem;color:#6b7280">Branch — الفرع</label>
+            <select id="exp-sum-branch" style="width:100%;padding:7px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;box-sizing:border-box">
+              <option value="">— Current Branch —</option>
+              ${BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('')}
+              <option value="all">🏢 All Branches</option>
+            </select>
+          </div>
+        </div>
+        <!-- Quick year buttons -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${[2024,2025,2026].map(y=>`<button onclick="document.getElementById('exp-sum-from').value='${y}-01';document.getElementById('exp-sum-to').value='${y}-12'"
+            style="padding:4px 12px;background:#f0f9ff;color:#0369a1;border:1.5px solid #bae6fd;border-radius:7px;cursor:pointer;font-size:.78rem;font-weight:700">${y} كل السنة</button>`).join('')}
+        </div>
+        <button onclick="generateExpSummaryReport()"
+          style="padding:12px;background:#0891b2;color:#fff;border:none;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.95rem;font-weight:800;cursor:pointer">
+          📊 Generate Report — اطبع التقرير
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+}
+
+function selectExpSumCat(btn,cat){
+  document.querySelectorAll('#exp-sum-cats button').forEach(b=>b.style.fontWeight='700');
+  btn.style.boxShadow='0 0 0 3px currentColor';
+  btn.style.fontWeight='900';
+  document.getElementById('exp-sum-cat').value=cat;
+}
+
+async function generateExpSummaryReport(){
+  const cat=document.getElementById('exp-sum-cat')?.value??null;
+  const dateFrom=document.getElementById('exp-sum-from')?.value;
+  const dateTo=document.getElementById('exp-sum-to')?.value;
+  const branchSel=document.getElementById('exp-sum-branch')?.value||'';
+  const isAll=branchSel==='all';
+
+  if(!dateFrom||!dateTo){showToast('Please select date range');return;}
+
+  const [yf,mf]=dateFrom.split('-');
+  const [yt,mt]=dateTo.split('-');
+  const repFrom=dateFrom+'-01';
+  const lastDay=new Date(parseInt(yt),parseInt(mt),0).getDate();
+  const repTo=dateTo+'-'+String(lastDay).padStart(2,'0');
+
+  // Load expenses
+  let expenses=[];
+  if(isAll){
+    const all=await Promise.all(BRANCHES.map(b=>sb.from('expenses').select('*').eq('branch_id',b.id).gte('date',repFrom).lte('date',repTo)));
+    all.forEach(({data})=>{if(data)expenses.push(...data);});
+  } else {
+    const bid=branchSel||curBid;
+    const{data}=await sb.from('expenses').select('*').eq('branch_id',bid).gte('date',repFrom).lte('date',repTo);
+    expenses=data||[];
+  }
+
+  // Filter by category
+  if(cat) expenses=expenses.filter(e=>e.category===cat);
+
+  // Group by sub_type (bus number / phone number / charge type)
+  const groups={};
+  expenses.forEach(e=>{
+    const key=e.sub_type||e.supplier_name||'(No sub-type)';
+    if(!groups[key]) groups[key]={items:[],total:0,count:0};
+    groups[key].items.push(e);
+    groups[key].total+=Number(e.total_amount||e.amount||0);
+    groups[key].count++;
+  });
+
+  // Also group by month for trend
+  const byMonth={};
+  expenses.forEach(e=>{
+    const mon=(e.date||'').slice(0,7);
+    if(!byMonth[mon]) byMonth[mon]={total:0,count:0};
+    byMonth[mon].total+=Number(e.total_amount||e.amount||0);
+    byMonth[mon].count++;
+  });
+
+  const EXP_LABELS={'bus':'🚌 Bus Expenses','tel':'📱 Communications','bank':'🏦 Bank Charges',
+    'purch':'🛒 Purchases','maint':'🔧 Maintenance','util':'💡 Utilities','salary':'👷 Staff Salaries',
+    'contract':'📄 Annual Contracts','govt':'🏛️ Government Fees','ads':'📢 Advertising',
+    'rent':'🏠 Rent Fees','license':'📋 License Fees','printing':'✍️ Typing Work','other':'📝 Other'};
+
+  const catLabel=cat?EXP_LABELS[cat]||cat:'All Categories';
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  const grandTotal=expenses.reduce((s,e)=>s+Number(e.total_amount||e.amount||0),0);
+  const branch=isAll?{ar:'كل الفروع',en:'All Branches'}:(BRANCHES.find(b=>b.id===(branchSel||curBid))||CB());
+
+  // Build groups table
+  const sortedGroups=Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
+  const groupRows=sortedGroups.map(([key,g],i)=>{
+    const pct=(g.total/grandTotal*100).toFixed(1);
+    const bg=i%2===0?'#f0f9ff':'#fff';
+    return '<tr style="background:'+bg+'">'+
+      '<td style="padding:8px 10px;font-weight:700;color:#0891b2">'+key+'</td>'+
+      '<td style="padding:8px 10px;text-align:center;color:#6b7280">'+g.count+'</td>'+
+      '<td style="padding:8px 10px;text-align:right;font-weight:900;color:#1e3a8a">'+fmt(g.total)+' AED</td>'+
+      '<td style="padding:8px 10px;text-align:center">'+
+        '<div style="background:#e0f2fe;border-radius:99px;height:8px;width:100px;display:inline-block;vertical-align:middle">'+
+          '<div style="background:#0891b2;border-radius:99px;height:8px;width:'+Math.min(100,parseFloat(pct))+'%"></div>'+
+        '</div> <span style="font-size:.75rem;color:#0891b2;font-weight:700">'+pct+'%</span>'+
+      '</td>'+
+      '<td style="padding:8px 10px;text-align:center;color:#6b7280;font-size:.75rem">'+fmtD(g.items[0]?.date)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  // Monthly trend
+  const monthRows=Object.keys(byMonth).sort().map((mon,i)=>{
+    const m=byMonth[mon];
+    const bg=i%2===0?'#f0fdf4':'#fff';
+    const [y,mo]=mon.split('-');
+    const mNames=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '<tr style="background:'+bg+'">'+
+      '<td style="padding:7px 10px;font-weight:700">'+mNames[parseInt(mo)]+' '+y+'</td>'+
+      '<td style="padding:7px 10px;text-align:center;color:#6b7280">'+m.count+' invoices</td>'+
+      '<td style="padding:7px 10px;text-align:right;font-weight:900;color:#059669">'+fmt(m.total)+' AED</td>'+
+    '</tr>';
+  }).join('');
+
+  const html=[
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    '<style>@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap");',
+    '@page{size:A4;margin:10mm}*{margin:0;padding:0;box-sizing:border-box}',
+    'body{font-family:Tajawal,Arial,sans-serif;color:#1f2937;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+    'table{border-collapse:collapse;width:100%}th{padding:8px 10px;font-size:.78rem;font-weight:700;text-align:left;border-bottom:2px solid #0891b2;color:#0891b2}',
+    '@media print{.np{display:none!important}}</style></head><body>',
+    '<div class="np" style="background:#0891b2;padding:8px;position:fixed;top:0;width:100%;z-index:99;display:flex;justify-content:center;gap:10px">',
+    '<button onclick="window.print()" style="background:#fff;color:#0891b2;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-weight:700">🖨️ Print / Save as PDF</button>',
+    '<button onclick="window.close()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:7px 14px;border-radius:7px;cursor:pointer">✕</button>',
+    '</div><div style="height:40px" class="np"></div>',
+    // Header
+    '<div style="background:#0891b2;color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">',
+    '<div><div style="font-size:9pt;opacity:.8">مجموعة رعاية الطفل — Child Care Nurseries Group</div>',
+    '<div style="font-size:13pt;font-weight:900">'+(branch?.en||branch?.ar||'')+'</div></div>',
+    '<div style="text-align:right">',
+    '<div style="font-size:11pt;font-weight:800">📊 Expense Summary Report</div>',
+    '<div style="font-size:9pt;opacity:.85">'+catLabel+' | '+repFrom+' → '+repTo+'</div>',
+    '</div></div>',
+    // Summary cards
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">',
+    '<div style="border:2px solid #0891b2;border-radius:8px;padding:10px;text-align:center"><div style="font-size:8pt;color:#6b7280">Total Expenses</div><div style="font-size:14pt;font-weight:900;color:#0891b2">'+fmt(grandTotal)+' AED</div></div>',
+    '<div style="border:2px solid #059669;border-radius:8px;padding:10px;text-align:center"><div style="font-size:8pt;color:#6b7280">Total Invoices</div><div style="font-size:14pt;font-weight:900;color:#059669">'+expenses.length+'</div></div>',
+    '<div style="border:2px solid #d97706;border-radius:8px;padding:10px;text-align:center"><div style="font-size:8pt;color:#6b7280">Sub-Types / Groups</div><div style="font-size:14pt;font-weight:900;color:#d97706">'+sortedGroups.length+'</div></div>',
+    '</div>',
+    // Groups table
+    '<div style="margin-bottom:14px">',
+    '<div style="font-weight:900;color:#0891b2;font-size:.9rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #e0f2fe">',
+    cat==='bus'?'🚌 Totals by Bus Number':cat==='tel'?'📱 Totals by Phone Number':cat==='bank'?'🏦 Totals by Charge Type':'📊 Totals by Sub-Type / Supplier',
+    '</div>',
+    '<table><thead><tr>',
+    '<th>'+(cat==='bus'?'Bus No.':cat==='tel'?'Phone No.':cat==='bank'?'Charge Type':'Sub-Type / Supplier')+'</th>',
+    '<th style="text-align:center">Count</th>',
+    '<th style="text-align:right">Total (AED)</th>',
+    '<th style="text-align:center">% of Total</th>',
+    '<th style="text-align:center">Latest Date</th>',
+    '</tr></thead><tbody>',
+    groupRows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#9ca3af">No data found</td></tr>',
+    '</tbody><tfoot><tr style="background:#0891b2;color:#fff;font-weight:900">',
+    '<td style="padding:8px 10px">Total — الإجمالي</td>',
+    '<td style="padding:8px 10px;text-align:center">'+expenses.length+'</td>',
+    '<td style="padding:8px 10px;text-align:right">'+fmt(grandTotal)+' AED</td>',
+    '<td colspan="2"></td>',
+    '</tr></tfoot></table></div>',
+    // Monthly trend
+    Object.keys(byMonth).length>1?[
+      '<div><div style="font-weight:900;color:#059669;font-size:.9rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #dcfce7">📅 Monthly Breakdown</div>',
+      '<table><thead><tr><th>Month</th><th style="text-align:center">Invoices</th><th style="text-align:right">Total (AED)</th></tr></thead>',
+      '<tbody>'+monthRows+'</tbody>',
+      '<tfoot><tr style="background:#059669;color:#fff;font-weight:900"><td style="padding:8px 10px">Total</td><td style="padding:8px 10px;text-align:center">'+expenses.length+'</td><td style="padding:8px 10px;text-align:right">'+fmt(grandTotal)+' AED</td></tr></tfoot>',
+      '</table></div>'
+    ].join(''):'',
+    '</body></html>'
+  ].join('');
+
+  document.getElementById('exp-summary-modal')?.remove();
+  const w=window.open('','_blank','width=900,height=1000');
+  if(!w){showToast('Allow popups');return;}
+  w.document.write(html);w.document.close();
+  setTimeout(()=>w.print(),700);
+}
+
+
 function openVAT5Report(){
   // Build and show the modal
   document.getElementById('exp-vat5-modal')?.remove();
