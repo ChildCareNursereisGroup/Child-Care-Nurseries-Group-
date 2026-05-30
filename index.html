@@ -27608,6 +27608,71 @@ function renderTodaySummary(){
   card.innerHTML = html;
 }
 
+// ═══════════════════════════════════════════════
+// SYNC FROM ATTENDANCE — Read-only from staffAtt
+// ═══════════════════════════════════════════════
+async function ladSyncAttendance(staffId, yr){
+  const msg=document.getElementById('lad-save-msg');
+  if(msg) msg.innerHTML='<span style="color:#0891b2">⏳ Fetching attendance...</span>';
+
+  // READ ONLY — fetch from staff_attendance, no writes
+  const {data:attRows}=await sb.from('staff_attendance')
+    .select('date,status').eq('staff_id',Number(staffId))
+    .gte('date',yr+'-01-01').lte('date',yr+'-12-31');
+
+  if(!attRows||!attRows.length){
+    if(msg) msg.innerHTML='<span style="color:#d97706">⚠️ No attendance records found for '+yr+'</span>';
+    return;
+  }
+
+  // Group by month
+  const monthly={};
+  attRows.forEach(({date,status})=>{
+    const mon=date.slice(0,7);
+    if(!monthly[mon]) monthly[mon]={present:0,absent:0,annual:0,sick:0,unpaid:0};
+    const st=(status||'').trim();
+    if(st==='حضور')                                                  monthly[mon].present+=1;
+    else if(st==='نص يوم')                                          {monthly[mon].present+=0.5;monthly[mon].absent+=0.5;}
+    else if(st==='غياب')                                             monthly[mon].absent+=1;
+    else if(st==='إجازة سنوية'||st==='سنوية'||st==='annual')        monthly[mon].annual+=1;
+    else if(st==='إجازة مرضية'||st==='مرضية'||st==='sick')          monthly[mon].sick+=1;
+    else if(st==='بلا راتب'||st==='unpaid')                          monthly[mon].unpaid+=1;
+    // Weekends / off days ignored
+  });
+
+  // Fill only empty inputs per month
+  const setEmpty=(mon,id,val)=>{
+    const inp=document.getElementById('lad_'+mon+'_'+id);
+    if(inp&&inp.value===''&&val>0) inp.value=val;
+  };
+
+  let filled=0,skipped=0;
+  Object.entries(monthly).forEach(([mon,d])=>{
+    if(!document.getElementById('lad_'+mon+'_present')){skipped++;return;}
+    setEmpty(mon,'present',d.present);
+    setEmpty(mon,'absent', d.absent);
+    setEmpty(mon,'annual', d.annual);
+    setEmpty(mon,'sick',   d.sick);
+    setEmpty(mon,'unpaid', d.unpaid);
+    ladCalcNet(mon);
+    filled++;
+  });
+
+  if(msg) msg.innerHTML='<span style="color:#059669">✅ Synced '+filled+' month'+(filled!==1?'s':'')+' from attendance'+(skipped?' ('+skipped+' skipped)':'')+
+    '<br><span style="color:#6b7280;font-size:.72rem">⚠️ Only empty fields were filled. Review & save when ready.</span></span>';
+
+  // Confirmation banner
+  const prev=document.getElementById('lad-sync-banner');
+  if(prev) prev.remove();
+  const banner=document.createElement('div');
+  banner.id='lad-sync-banner';
+  banner.style.cssText='background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:.8rem;color:#166534;font-family:Tajawal,sans-serif;display:flex;justify-content:space-between;align-items:center';
+  banner.innerHTML='✅ Synced '+filled+' months — empty fields only. Click <b>💾 Save Year</b> to confirm.<button onclick=\'document.getElementById(\"lad-sync-banner\").remove()\' style=\'background:none;border:none;cursor:pointer;color:#6b7280;font-size:1rem\'>✕</button>';
+  const tableWrap=document.getElementById('lad-year-table-wrap');
+  if(tableWrap) tableWrap.parentElement.insertBefore(banner,tableWrap);
+}
+
+
 boot();
 </script>
 
@@ -27935,84 +28000,3 @@ boot();
 </div>
 </body>
 </html>
-// ═══════════════════════════════════════════════
-// SYNC FROM ATTENDANCE — Read-only from staffAtt
-// ═══════════════════════════════════════════════
-async function ladSyncAttendance(staffId, yr){
-  const msg=document.getElementById('lad-save-msg');
-  if(msg) msg.innerHTML='<span style="color:#0891b2">⏳ Fetching attendance...</span>';
-
-  // Fetch attendance for full year from Supabase (READ ONLY - no changes to attendance)
-  const {data:attRows} = await sb.from('staff_attendance')
-    .select('date,status')
-    .eq('staff_id', Number(staffId))
-    .gte('date', yr+'-01-01')
-    .lte('date', yr+'-12-31');
-
-  if(!attRows || !attRows.length){
-    if(msg) msg.innerHTML='<span style="color:#d97706">⚠️ No attendance records found for '+yr+'</span>';
-    return;
-  }
-
-  // Group by month
-  const monthly={};
-  attRows.forEach(({date, status})=>{
-    const mon=date.slice(0,7);
-    if(!monthly[mon]) monthly[mon]={present:0, absent:0, annual:0, sick:0, unpaid:0};
-    const st=(status||'').trim();
-    if(st==='حضور')                monthly[mon].present+=1;
-    else if(st==='نص يوم')         { monthly[mon].present+=0.5; monthly[mon].absent+=0.5; }
-    else if(st==='غياب')           monthly[mon].absent+=1;
-    else if(st==='إجازة سنوية' || st==='سنوية' || st==='annual')  monthly[mon].annual+=1;
-    else if(st==='إجازة مرضية' || st==='مرضية' || st==='sick')    monthly[mon].sick+=1;
-    else if(st==='بلا راتب'    || st==='unpaid')  monthly[mon].unpaid+=1;
-    // Weekend / off days are ignored (not counted as absent)
-  });
-
-  let filled=0, skipped=0;
-  Object.entries(monthly).forEach(([mon, data])=>{
-    // Only fill if the month inputs exist (i.e., that month row is visible)
-    const pInp=document.getElementById('lad_'+mon+'_present');
-    if(!pInp){ skipped++; return; }
-
-    // Check if already has data - warn but still fill (user can undo)
-    const alreadyHasData=pInp.value!==''||document.getElementById('lad_'+mon+'_absent')?.value!=='';
-
-    // Fill in: only set if input is empty OR user confirms override
-    const setIfEmpty=(id, val)=>{
-      const el=document.getElementById('lad_'+mon+'_'+id);
-      if(!el) return;
-      if(el.value==='' || alreadyHasData===false){
-        el.value=val>0?val:'';
-      } else if(alreadyHasData && el.value===''){
-        el.value=val>0?val:'';
-      }
-      // If already has data, show indicator but don't overwrite
-    };
-
-    if(data.present)  { const el=document.getElementById('lad_'+mon+'_present');  if(el&&el.value==='') el.value=data.present; }
-    if(data.absent)   { const el=document.getElementById('lad_'+mon+'_absent');   if(el&&el.value==='') el.value=data.absent; }
-    if(data.annual)   { const el=document.getElementById('lad_'+mon+'_annual');   if(el&&el.value==='') el.value=data.annual; }
-    if(data.sick)     { const el=document.getElementById('lad_'+mon+'_sick');     if(el&&el.value==='') el.value=data.sick; }
-    if(data.unpaid)   { const el=document.getElementById('lad_'+mon+'_unpaid');   if(el&&el.value==='') el.value=data.unpaid; }
-
-    // Recalculate net salary for this month
-    ladCalcNet(mon);
-    filled++;
-  });
-
-  if(msg) msg.innerHTML=`<span style="color:#059669">✅ Synced ${filled} month${filled!==1?'s':''} from attendance data
-    ${skipped?' ('+skipped+' skipped — change year to view)':''}
-    <br><span style="color:#6b7280;font-size:.72rem">⚠️ Only empty fields were filled. Review & save when ready.</span>
-  </span>`;
-
-  // Show confirmation banner
-  const banner=document.createElement('div');
-  banner.style.cssText='background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:.8rem;color:#166534;font-family:Tajawal,sans-serif;display:flex;justify-content:space-between;align-items:center';
-  banner.innerHTML='✅ Attendance synced — '+filled+' months filled. Empty fields only were updated. Review the values below and click <b>💾 Save Year</b> to confirm.'+
-    '<button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:1rem">✕</button>';
-  const tableWrap=document.getElementById('lad-year-table-wrap');
-  if(tableWrap) tableWrap.parentElement.insertBefore(banner, tableWrap);
-}
-
-
