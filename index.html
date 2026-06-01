@@ -25116,6 +25116,7 @@ async function ladLoadStaffEntry(){
   </div>`;
 
   // Build initial table for current year
+  _ladCurYear = curYear; // IMPORTANT: sync global year tracker with displayed year
   const tableHtml=ladBuildYearTable(staffId, curYear, recMap, gross, daily, monthNames, monthNamesAr);
 
   body.innerHTML=`
