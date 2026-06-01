@@ -5895,9 +5895,18 @@ function populateSHStaffSelect(){
   const sel = el('sh-tab-staff');
   if(!sel) return;
   const cur = sel.value;
+  // Deduplicate: keep highest ID per name (latest record)
+  const seenNames={};
+  const uniqueStaff=DB.staff
+    .filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=today())
+    .sort((a,b)=>b.id-a.id)
+    .filter(s=>{ if(seenNames[s.name]) return false; seenNames[s.name]=true; return true; })
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   sel.innerHTML = '<option value="">— اختاري موظف —</option>' +
-    DB.staff.filter(s=>!s.lastWorkingDay||s.lastWorkingDay>=today())
-    .map(s=>`<option value="${s.id}">${s.name} — ${s.position||''}</option>`).join('');
+    uniqueStaff.map(s=>{
+      const b=BRANCHES.find(x=>x.id===s.branchId);
+      return `<option value="${s.id}">${s.name} — ${b?tBN(b):s.branchId}</option>`;
+    }).join('');
   if(cur){ sel.value=cur; loadSHInline(); }
 }
 
@@ -24154,9 +24163,15 @@ function getActualWorkDaysCount(staffId){
   // Total actual working days from salary history + live attendance
   const history=getSalaryHistory(staffId);
   const histDays=history.reduce((s,r)=>s+(r.presentDays||0),0);
+
+  // Only count from DB.staffAtt for months NOT already in salary history
+  const histMonths=new Set(history.map(r=>r.month));
   let liveDays=0;
   Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+    const mon=date.slice(0,7);
+    if(histMonths.has(mon)) return; // already counted in salary history
     if(map[String(staffId)]==='حضور') liveDays++;
+    else if(map[String(staffId)]==='نص يوم') liveDays+=0.5;
   });
   return histDays+liveDays;
 }
@@ -24188,14 +24203,25 @@ function calcLeaveBalance(staffId, endDateStr){
   // UAE: 30 days annual leave per year, pro-rated
   const entitled=Math.floor(yearsWorked*30);
 
-  // Leave taken in system
+  // Leave taken in system (from leave requests)
   const takenInSystem=(DB.leaves||[])
     .filter(l=>String(l.staffId)===String(staffId)&&l.type==='annual'&&l.status!=='rejected')
     .reduce((acc,l)=>acc+(l.days||0),0);
 
+  // Leave days from Monthly Entry (staff_salary_history) — annual_leave_days field
+  const hist=getSalaryHistory(staffId);
+  const takenFromEntry=hist.reduce((acc,r)=>{
+    const annualDays=r.annualLeaveDays||r.annual_leave_days||0;
+    // Only count if NOT already recorded as a leave request (avoid double count)
+    return acc+annualDays;
+  },0);
+
   // Leave taken before system (manual entry on staff form)
   const takenBefore=Number(s.leavesTakenBefore||0);
-  const taken=takenInSystem+takenBefore;
+
+  // Total: whichever is higher between requests vs monthly entry (avoid double-count)
+  const taken=Math.max(takenInSystem, takenFromEntry) + takenBefore;
+  const takenFromMonthly=Math.max(0, takenFromEntry-takenInSystem); // extra days from monthly entry not in requests
   const remaining=Math.max(0,entitled-taken);
   const compensation=Math.round(remaining*dailyRate*100)/100;
 
@@ -25194,7 +25220,7 @@ function ladBuildYearTable(staffId, yr, recMap, gross, daily, monthNames, monthN
       <td style="padding:3px 2px;background:${rowBg}">${inp('deduct',v('deduct_other',''),9999)}</td>
       <td style="padding:3px 2px;background:${rowBg}">${inp('bonus',v('bonus',''),9999)}</td>
       <td style="padding:3px 2px;text-align:center;background:${rowBg}">
-        <select id="lad_${mon}_comppaid" style="padding:3px 4px;border:1.5px solid #e2e8f0;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.73rem;background:${rowBg};width:100%">
+        <select id="lad_${mon}_comppaid" onchange="ladOnCompPaidChange('${mon}',this.value)" style="padding:3px 4px;border:1.5px solid #e2e8f0;border-radius:6px;font-family:'Tajawal',sans-serif;font-size:.73rem;background:${rowBg};width:100%">
           <option value="0" ${!r.leave_comp_paid?'selected':''}>❌ No</option>
           <option value="1" ${r.leave_comp_paid?'selected':''}>✅ Yes</option>
         </select>
@@ -25227,16 +25253,46 @@ function ladBuildYearTable(staffId, yr, recMap, gross, daily, monthNames, monthN
   </div>`;
 }
 
+function ladOnCompPaidChange(mon, val){
+  // When switching to Yes — suggest the accrued comp amount in bonus if bonus is empty
+  if(val==='1'){
+    const bonusEl=el('lad_'+mon+'_bonus');
+    if(bonusEl && !bonusEl.value){
+      // Get the staff's accrued leave comp from the staff card data
+      const staffId=el('lad-entry-body')?.dataset.staffId;
+      const s=staffId?DB.staff.find(x=>String(x.id)===String(staffId)):null;
+      if(s){
+        const hist=getSalaryHistory(s.id);
+        const compDue=calcCompDue(s, hist); // existing function
+        if(compDue>0) bonusEl.value=Math.round(compDue);
+      }
+    }
+    // Highlight to confirm
+    const netEl=el('lad_'+mon+'_net');
+    if(netEl) netEl.style.borderColor='#059669';
+  }
+  ladCalcNet(mon);
+}
+
 function ladCalcNet(mon){
   const body=el('lad-entry-body');
   const daily=Number(body?.dataset.daily||0);
   const gross=Number(body?.dataset.gross||0);
   if(!gross||!daily) return;
-  const absent=Number(el(`lad_${mon}_absent`)?.value||0);
-  const unpaid=Number(el(`lad_${mon}_unpaid`)?.value||0);
-  const deduct=Number(el(`lad_${mon}_deduct`)?.value||0);
-  const bonus =Number(el(`lad_${mon}_bonus`)?.value||0);
-  const net   =Math.max(0,gross-(absent+unpaid)*daily-deduct+bonus);
+  const absent =Number(el(`lad_${mon}_absent`)?.value||0);
+  const unpaid =Number(el(`lad_${mon}_unpaid`)?.value||0);
+  const deduct =Number(el(`lad_${mon}_deduct`)?.value||0);
+  const bonus  =Number(el(`lad_${mon}_bonus`)?.value||0);
+  const compPaid=el(`lad_${mon}_comppaid`)?.value==='1';
+
+  let net;
+  if(compPaid){
+    // بدل إجازة مدفوع: راتب كامل + بونص (بدون خصم أيام الغياب لأنها إجازة سنوية مكتسبة)
+    net=Math.max(0, gross - deduct + bonus);
+  } else {
+    // حساب عادي: خصم الغياب وبدون راتب
+    net=Math.max(0, gross-(absent+unpaid)*daily-deduct+bonus);
+  }
   const ne=el(`lad_${mon}_net`);
   if(ne) ne.value=Math.round(net);
 }
@@ -25976,7 +26032,40 @@ function populateLADBranchFilter(){
     BRANCHES.map(b=>`<option value="${b.id}" ${String(b.id)===cur?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('');
 }
 
-function renderLeaveAttDashboard(){
+async function renderLeaveAttDashboard(){
+  // Pre-load ALL salary history for current branch staff (to get accurate work day counts)
+  const branchStaffIds = (DB.staff||[])
+    .filter(s=>(s.branchId===curBid||s.workBranch===curBid))
+    .map(s=>Number(s.id));
+
+  if(branchStaffIds.length){
+    const {data:shRows} = await sb.from('staff_salary_history')
+      .select('staff_id,month,present_days,amount,basic_salary,bonus,deduct_other,deduct_loan,annual_leave_days,sick_days,unpaid_leave_days,absent_days')
+      .in('staff_id', branchStaffIds);
+    if(shRows){
+      if(!DB.salaryHistory) DB.salaryHistory={};
+      // Build map grouped by staff_id
+      shRows.forEach(x=>{
+        const sid=String(x.staff_id);
+        if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+        // Only add if not already there
+        if(!DB.salaryHistory[sid].find(r=>r.month===x.month)){
+          DB.salaryHistory[sid].push({
+            month:x.month, amount:Number(x.amount||0),
+            basic:Number(x.basic_salary||0)||undefined,
+            presentDays:x.present_days??undefined,
+            absentDays:x.absent_days??undefined,
+            annualLeaveDays:x.annual_leave_days||0,
+            sickDays:x.sick_days||0,
+            unpaidLeaveDays:x.unpaid_leave_days||0,
+            bonus:Number(x.bonus||0)||undefined,
+            deductOther:Number(x.deduct_other||0)||undefined,
+            deductLoan:Number(x.deduct_loan||0)||undefined,
+          });
+        }
+      });
+    }
+  }
   const bf   = el('lad-branch-filter')?.value||'all';
   const srch = (el('lad-search')?.value||'').toLowerCase();
 
