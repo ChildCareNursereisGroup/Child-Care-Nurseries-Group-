@@ -25079,6 +25079,7 @@ async function ladLoadStaffEntry(){
     .order('month',{ascending:true});
   const recMap={};
   (rows||[]).forEach(r=>{recMap[r.month]=r;});
+  _ladRecMap=recMap; // persist globally for year switching
 
   // Build year tabs
   const years=[];
@@ -27636,6 +27637,7 @@ async function ladSyncAttendance(staffId, yr){
     else if(st==='غياب')                                             monthly[mon].absent+=1;
     else if(st==='إجازة سنوية'||st==='سنوية'||st==='annual')        monthly[mon].annual+=1;
     else if(st==='إجازة مرضية'||st==='مرضية'||st==='sick')          monthly[mon].sick+=1;
+    else if(st==='إجازة'||st==='اجازة')                             monthly[mon].annual+=1; // generic leave → annual
     else if(st==='بلا راتب'||st==='unpaid')                          monthly[mon].unpaid+=1;
     // Weekends / off days ignored
   });
