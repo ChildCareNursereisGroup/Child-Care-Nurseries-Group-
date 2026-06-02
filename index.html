@@ -2699,6 +2699,7 @@ async function setPW(bid,role,pw){
 async function loadFromSupa(bid) {
   bid=bid||curBid;
   _busAllBranchCache = null;
+  window._salaryHistoryLoaded = false; // refresh salary history on branch switch
   showLoad(lang==='ar'?'جاري التحميل...':'Loading...');
   try {
     // ── Load critical data first (parallel) ──────────────────────────
@@ -14365,6 +14366,39 @@ async function loadStaff(){
   }));
   // Load staff attendance lazily
   if(!window._staffAttLoaded) await loadStaffAttendance();
+
+  // Load salary history for all staff (needed for Leave Taken calculation)
+  if(!window._salaryHistoryLoaded){
+    const allIds=(DB.staff||[]).map(s=>Number(s.id)).filter(Boolean);
+    if(allIds.length){
+      const {data:shRows}=await sb.from('staff_salary_history')
+        .select('staff_id,month,present_days,absent_days,annual_leave_days,sick_days,unpaid_leave_days,amount,basic_salary,bonus,deduct_other,deduct_loan,leave_comp_paid')
+        .in('staff_id', allIds);
+      if(shRows){
+        DB.salaryHistory=DB.salaryHistory||{};
+        shRows.forEach(x=>{
+          const sid=String(x.staff_id);
+          if(!DB.salaryHistory[sid]) DB.salaryHistory[sid]=[];
+          if(!DB.salaryHistory[sid].find(r=>r.month===x.month)){
+            DB.salaryHistory[sid].push({
+              month:x.month,
+              amount:Number(x.amount||0),
+              presentDays:x.present_days??undefined,
+              absentDays:x.absent_days??undefined,
+              annualLeaveDays:Number(x.annual_leave_days||0),
+              sickDays:Number(x.sick_days||0),
+              unpaidLeaveDays:Number(x.unpaid_leave_days||0),
+              bonus:Number(x.bonus||0)||undefined,
+              deductOther:Number(x.deduct_other||0)||undefined,
+              deductLoan:Number(x.deduct_loan||0)||undefined,
+              leaveCompPaid:!!x.leave_comp_paid,
+            });
+          }
+        });
+        window._salaryHistoryLoaded=true;
+      }
+    }
+  }
 }
 
 let _staffAttLoading=false;
