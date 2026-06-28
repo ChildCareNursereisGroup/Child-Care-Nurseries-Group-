@@ -13415,6 +13415,7 @@ function printTripSchedule(){
   </style></head><body>
   <div class="np" style="background:#1f2937;padding:8px;text-align:center;margin-bottom:8px">
     <button onclick="window.print()" style="background:#d97706;color:#fff;border:none;padding:6px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;margin-right:8px">🖨️ Print / PDF</button>
+    <button id="trip-excel-btn" style="background:#16a34a;color:#fff;border:none;padding:6px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;margin-right:8px">📥 Excel</button>
     <button onclick="window.close()" style="background:#6b7280;color:#fff;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:13px">✕</button>
   </div>
   <h1>🗓️ Bus Trip Schedule — جدول رحلات الباصات</h1>
@@ -13422,7 +13423,45 @@ function printTripSchedule(){
   ${tripGroups.map(tableHTML).join('')}
   </body></html>`;
 
-  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+  const w=window.open('','_blank');w.document.write(html);w.document.close();
+  // Attach Excel export to button inside the new window
+  setTimeout(()=>{
+    const btn=w.document.getElementById('trip-excel-btn');
+    if(btn) btn.onclick=()=>{
+      // Build Excel from grouped data
+      if(typeof w.XLSX!=='undefined'||typeof XLSX!=='undefined'){
+        const XL=typeof XLSX!=='undefined'?XLSX:w.XLSX;
+        const wb=XL.utils.book_new();
+        tripGroups.forEach(g=>{
+          const kids=grouped[g.key];
+          if(!kids.length) return;
+          const rows=[['#','Child Name','Class','Nursery Timing','Direction','Pick/Drop','Area','Branch','Mother','Father']];
+          kids.forEach((c,i)=>{
+            rows.push([
+              i+1, c.name, c.className||'', c.kidsTime||'—',
+              c.busDirection==='two_way'?'↔ Two Way':c.busDirection==='one_way'?'One Way':'—',
+              c.busDirection==='two_way'?'Both':c.busPickDrop==='pick'?'▲ Pick':'▼ Drop',
+              c.busArea||'—', c.branchName||'—',
+              c.parentMom||'—', c.parentDad||'—'
+            ]);
+          });
+          const ws=XL.utils.aoa_to_sheet(rows);
+          ws['!cols']=[{wch:4},{wch:25},{wch:8},{wch:14},{wch:12},{wch:12},{wch:18},{wch:18},{wch:16},{wch:16}];
+          const sname=g.label.replace(/[🟢🔴⚪]/g,'').trim().replace(/[:\/?*\[\]—–]/g,'').substring(0,31);
+          XL.utils.book_append_sheet(wb,ws,sname);
+        });
+        // Summary sheet
+        const sumRows=[['Trip Group','Sub','Count']];
+        tripGroups.forEach(g=>{ if(grouped[g.key].length) sumRows.push([g.label,g.sub,grouped[g.key].length]); });
+        sumRows.push(['TOTAL','',allKids.length]);
+        const wsSummary=XL.utils.aoa_to_sheet(sumRows);
+        XL.utils.book_append_sheet(wb,wsSummary,'Summary');
+        XL.writeFile(wb,'Bus_Trip_Schedule_'+printDate.replace(/\//g,'-')+'.xlsx');
+      } else {
+        alert('Excel library not loaded. Please try from the main app window.');
+      }
+    };
+  },800);
 }
 
 function printBusChildrenReport(){
