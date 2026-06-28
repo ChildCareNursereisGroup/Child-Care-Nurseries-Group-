@@ -13145,8 +13145,8 @@ async function loadBusAllBranchData(forceReload){
   // Load all branches in parallel
   const results = await Promise.all(BRANCHES.map(async b=>{
     const [c, r] = await Promise.all([
-      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time,parent_mom,parent_dad').eq('branch_id',b.id),
-      sb.from('receipts').select('id,child_id,date,from_date,to_date,bus,branch_id').eq('branch_id',b.id),
+      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time,parent_mom,parent_dad').eq('branch_id',b.id).limit(5000),
+      sb.from('receipts').select('id,child_id,date,from_date,to_date,bus,branch_id').eq('branch_id',b.id).limit(5000),
     ]);
     return {
       branchId: b.id,
@@ -13195,11 +13195,16 @@ function renderBusChildrenReport(){
   // Parse kidsTime to get trip slots for a child
   const parseKidsTime=t=>{
     if(!t) return{startH:99,endH:99};
-    const m=t.replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
-    if(!m) return{startH:99,endH:99};
+    const clean=t.replace(/\s/g,'');
+    const m=clean.match(/(\d{1,2}):?(\d{2})[-\u2013to](\d{1,2}):?(\d{2})/);
+    if(!m){
+      const hrm=clean.match(/^(\d{1,2})/);
+      if(hrm){const h=parseInt(hrm[1]);return{startH:h<6?h+12:h,endH:99};}
+      return{startH:99,endH:99};
+    }
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
-  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
+    if(sh>=1&&sh<=5) sh+=12;
+    if(eh>=1&&eh<=5) eh+=12;
     return{startH:sh,endH:eh};
   };
   const getTripLabel=c=>{
@@ -13345,11 +13350,16 @@ function printTripSchedule(){
 
   const parseTime=t=>{
     if(!t) return{startH:99,endH:99};
-    const m=t.replace(/\s/g,'').match(/(\d{1,2}):?(\d{2})[-–](\d{1,2}):?(\d{2})/);
-    if(!m) return{startH:99,endH:99};
+    const clean=t.replace(/\s/g,'');
+    const m=clean.match(/(\d{1,2}):?(\d{2})[-\u2013to](\d{1,2}):?(\d{2})/);
+    if(!m){
+      const hrm=clean.match(/^(\d{1,2})/);
+      if(hrm){const h=parseInt(hrm[1]);return{startH:h<6?h+12:h,endH:99};}
+      return{startH:99,endH:99};
+    }
     let sh=parseInt(m[1]),eh=parseInt(m[3]);
-    if(sh>=1&&sh<=5) sh+=12;  // 1-5 can only be PM in nursery
-  if(eh>=1&&eh<=5) eh+=12;  // 1-5 can only be PM in nursery
+    if(sh>=1&&sh<=5) sh+=12;
+    if(eh>=1&&eh<=5) eh+=12;
     return{startH:sh,endH:eh};
   };
   const isPickup=c=>(c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick'));
@@ -13435,18 +13445,29 @@ function exportBusChildrenExcel(){
   // One sheet per branch (or single sheet if one branch)
   d.allExportData.forEach(({br,kids,monRecs})=>{
     if(!kids.length) return;
-    const rows=[['#','اسم الطفل','الفصل','وقت الحضانة','الاتجاه','Pick/Drop','المنطقة','رسوم الباص','مدفوع '+d.mon]];
+    const dirMap2={'two_way':'اتجاهين ↔️','one_way':'اتجاه واحد','':'غير محدد'};
+    const pdMap2={'pick':'🟢 Pick استقبال','drop':'🔴 Drop إيصال','':'—'};
+    const rows=[['#','اسم الطفل','الفصل','وقت الحضانة','الاتجاه','Pick/Drop','المنطقة','رقم الأم','رقم الأب','رسوم الباص (AED)','مدفوع '+d.mon+' (AED)','حالة الدفع']];
     kids.forEach((c,i)=>{
       const rec=monRecs.find(r=>String(r.childId)===String(c.id));
-      const dirMap2={'two_way':'اتجاهين','one_way':'اتجاه واحد','':'غير محدد'};
-      const pdMap2={'pick':'Pick استقبال','drop':'Drop إيصال','':'—'};
-      rows.push([i+1, c.name, c.className||'', c.kidsTime||'—', dirMap2[c.busDirection]||'غير محدد', c.busDirection==='one_way'?(pdMap2[c.busPickDrop]||'—'):'—', c.busArea||'—', c.busFee||0, rec?(rec.bus||0):0]);
+      const paid=rec?(rec.bus||0):0;
+      rows.push([
+        i+1, c.name, c.className||'', c.kidsTime||'—',
+        dirMap2[c.busDirection]||'غير محدد',
+        c.busDirection==='one_way'?(pdMap2[c.busPickDrop]||'—'):(c.busDirection==='two_way'?'اتجاهين':'—'),
+        c.busArea||'—',
+        c.parentMom||'—', c.parentDad||'—',
+        c.busFee||0, paid,
+        paid>0?'✅ مدفوع':'❌ غير مدفوع'
+      ]);
     });
     // Totals row
     const totFee=kids.reduce((s,c)=>s+(c.busFee||0),0);
     const totPaid=monRecs.filter(r=>kids.find(c=>String(c.id)===String(r.childId))).reduce((s,r)=>s+(r.bus||0),0);
-    rows.push(['','','','','','الإجمالي',totFee,totPaid]);
+    rows.push(['','','','','','','','','الإجمالي',totFee,totPaid,'']);
     const ws=XLSX.utils.aoa_to_sheet(rows);
+    // Column widths
+    ws['!cols']=[{wch:4},{wch:22},{wch:12},{wch:14},{wch:14},{wch:16},{wch:16},{wch:16},{wch:16},{wch:14},{wch:14},{wch:14}];
     const sheetName=(br.en||br.ar).replace(/[:\\/?*\[\]]/g,'').substring(0,31);
     XLSX.utils.book_append_sheet(wb,ws,sheetName);
   });
