@@ -13138,16 +13138,30 @@ async function openBusChildrenReport(){
   renderBusChildrenReport();
 }
 
+async function fetchAllPages(query){
+  // Fetches ALL records bypassing Supabase 1000-row default limit
+  let all=[], from=0, pageSize=1000;
+  while(true){
+    const {data,error}=await query.range(from, from+pageSize-1);
+    if(error||!data||!data.length) break;
+    all=[...all,...data];
+    if(data.length<pageSize) break;
+    from+=pageSize;
+  }
+  return all;
+}
+
 async function loadBusAllBranchData(forceReload){
   if(_busAllBranchCache && !forceReload) return;
   if(el('bus-ch-rpt-loading')) el('bus-ch-rpt-loading').style.display='block';
   if(el('bus-ch-rpt-body')) el('bus-ch-rpt-body').innerHTML='';
-  // Load all branches in parallel
+  // Load all branches sequentially with full pagination
   const results = await Promise.all(BRANCHES.map(async b=>{
-    const [c, r] = await Promise.all([
-      sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time,parent_mom,parent_dad').eq('branch_id',b.id).limit(5000),
-      sb.from('receipts').select('id,child_id,date,from_date,to_date,bus,branch_id').eq('branch_id',b.id).limit(5000),
+    const [cData, rData] = await Promise.all([
+      fetchAllPages(sb.from('children').select('id,name,class_name,bus,bus_fee,bus_direction,bus_pick_drop,bus_area,leave_date,branch_id,kids_time,parent_mom,parent_dad').eq('branch_id',b.id)),
+      fetchAllPages(sb.from('receipts').select('id,child_id,date,from_date,to_date,bus,branch_id').eq('branch_id',b.id)),
     ]);
+    const c={data:cData}, r={data:rData};
     return {
       branchId: b.id,
       children:(c.data||[]).map(x=>({
@@ -13260,8 +13274,7 @@ function renderBusChildrenReport(){
       </thead>
       <tbody>
         ${children.map((c,i)=>{
-          const rec = monReceipts.find(r=>String(r.childId)===String(c.id));
-          const paid = rec ? (rec.bus||0) : 0;
+          const paid = monReceipts.filter(r=>String(r.childId)===String(c.id)).reduce((s,r)=>s+(r.bus||0),0);
           const payBadge = paid>0
             ? `<span style="background:#d1fae5;color:#065f46;padding:2px 9px;border-radius:8px;font-weight:800;font-size:.75rem">✅ ${fmtNum(paid)}</span>`
             : `<span style="background:#fee2e2;color:#991b1b;padding:2px 9px;border-radius:8px;font-weight:800;font-size:.75rem">❌ غير مدفوع</span>`;
@@ -13488,8 +13501,7 @@ function exportBusChildrenExcel(){
     const pdMap2={'pick':'🟢 Pick استقبال','drop':'🔴 Drop إيصال','':'—'};
     const rows=[['#','اسم الطفل','الفصل','وقت الحضانة','الاتجاه','Pick/Drop','المنطقة','رقم الأم','رقم الأب','رسوم الباص (AED)','مدفوع '+d.mon+' (AED)','حالة الدفع']];
     kids.forEach((c,i)=>{
-      const rec=monRecs.find(r=>String(r.childId)===String(c.id));
-      const paid=rec?(rec.bus||0):0;
+      const paid=monRecs.filter(r=>String(r.childId)===String(c.id)).reduce((s,r)=>s+(r.bus||0),0);
       rows.push([
         i+1, c.name, c.className||'', c.kidsTime||'—',
         dirMap2[c.busDirection]||'غير محدد',
