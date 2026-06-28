@@ -13378,19 +13378,32 @@ function printTripSchedule(){
   const isPickup=c=>(c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='pick'));
   const isDrop=c=>(c.busDirection==='two_way'||(c.busDirection==='one_way'&&c.busPickDrop==='drop'));
 
-  const tripGroups=[
-    {key:'pick_6_9',  label:'🟢 PICK — Early Morning',       sub:'6:00 AM – 9:00 AM',  match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&startH>=6&&startH<=9;}},
-    {key:'pick_10_11',label:'🟢 PICK — Mid Morning',         sub:'10:00 AM – 11:00 AM',match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&(startH===10||startH===11);}},
-    {key:'pick_1pm',  label:'🟢 PICK — Afternoon',           sub:'1:00 PM',            match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&(startH===13||startH===1);}},
-    {key:'drop_11_12',label:'🔴 DROP — Late Morning',        sub:'11:00 AM – 12:00 PM',match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&(endH===11||endH===12);}},
-    {key:'drop_1pm',  label:'🔴 DROP — Afternoon',           sub:'1:00 PM',            match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH===13;}},
-    {key:'drop_3pm',  label:'🔴 DROP — Mid Afternoon',       sub:'3:00 PM',            match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH===15;}},
-    {key:'drop_4_5',  label:'🔴 DROP — Late Afternoon',      sub:'4:00 PM – 5:00 PM',  match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH>=16;}},
-    {key:'other',     label:'⚪ Unscheduled',                 sub:'No timing set',       match:c=>true},
+  // PICK groups — based on start time
+  const pickGroups=[
+    {key:'pick_6_9',  label:'🟢 PICK — Early Morning',  sub:'6:00 AM – 9:00 AM',   match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&startH>=6&&startH<=9;}},
+    {key:'pick_10_11',label:'🟢 PICK — Mid Morning',    sub:'10:00 AM – 11:00 AM', match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&(startH===10||startH===11);}},
+    {key:'pick_11',   label:'🟢 PICK — Late Morning',   sub:'11:00 AM',            match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&startH===11;}},
+    {key:'pick_1pm',  label:'🟢 PICK — Afternoon',      sub:'1:00 PM',             match:c=>{const{startH}=parseTime(c.kidsTime);return isPickup(c)&&(startH===13);}},
   ];
+  // DROP groups — based on end time
+  const dropGroups=[
+    {key:'drop_11_12',label:'🔴 DROP — Late Morning',   sub:'11:00 AM – 12:00 PM', match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&(endH===11||endH===12);}},
+    {key:'drop_1pm',  label:'🔴 DROP — Afternoon',      sub:'1:00 PM',             match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH===13;}},
+    {key:'drop_3pm',  label:'🔴 DROP — Mid Afternoon',  sub:'3:00 PM',             match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH===15;}},
+    {key:'drop_4_5',  label:'🔴 DROP — Late Afternoon', sub:'4:00 PM – 5:00 PM',   match:c=>{const{endH}=parseTime(c.kidsTime);return isDrop(c)&&endH>=16;}},
+  ];
+  const tripGroups=[...pickGroups,...dropGroups,{key:'other',label:'⚪ Unscheduled',sub:'No timing set',match:c=>true}];
 
   const grouped={};tripGroups.forEach(g=>{grouped[g.key]=[];});
-  allKids.forEach(c=>{for(const g of tripGroups){if(g.match(c)){grouped[g.key].push(c);break;}}});
+  allKids.forEach(c=>{
+    let matched=false;
+    // Add to ALL matching PICK groups
+    pickGroups.forEach(g=>{ if(g.match(c)){grouped[g.key].push(c);matched=true;} });
+    // Add to ALL matching DROP groups
+    dropGroups.forEach(g=>{ if(g.match(c)){grouped[g.key].push(c);matched=true;} });
+    // If no match at all → unscheduled
+    if(!matched) grouped['other'].push(c);
+  });
 
   const printDate=new Date().toLocaleDateString('en-GB');
   const branchTitle=branchFilter==='all'?'All Branches':BRANCHES.find(b=>b.id===branchFilter)?.ar||'';
