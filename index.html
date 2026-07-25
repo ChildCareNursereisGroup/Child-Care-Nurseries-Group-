@@ -3686,9 +3686,44 @@ function initAddForm(){
   const next=(Math.max(0,...DB.children.map(c=>parseInt(c.regNum)||0))+1);
   if(!el('fr').value)el('fr').value=String(next).padStart(4,'0');
 }
+// ── Fuzzy name similarity (Levenshtein ratio) ──────────────────────
+function strSimilarity(a,b){
+  a=(a||'').toLowerCase().replace(/\s+/g,' ').trim();
+  b=(b||'').toLowerCase().replace(/\s+/g,' ').trim();
+  if(a===b) return 1;
+  const la=a.length,lb=b.length;
+  if(!la||!lb) return 0;
+  const dp=Array.from({length:la+1},(_,i)=>Array.from({length:lb+1},(_,j)=>i?j?0:i:j));
+  for(let i=1;i<=la;i++) for(let j=1;j<=lb;j++)
+    dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return 1-dp[la][lb]/Math.max(la,lb);
+}
+
 async function saveChild(){
   const name=v('fn'),cls=v('fc'),join=el('fjoin').value,mom=v('fmom');
   if(!name||!cls||!join||!mom){showAlert('addalert',t('fillRequired'),true);return;}
+
+  // ── Fuzzy Duplicate Check ──────────────────────────────────────
+  {
+    const allKidsList = DB.children || [];
+    const inputPhone = (mom||'').replace(/\D/g,'');
+    const potentialDups = allKidsList.filter(k=>{
+      if(k.leaveDate) return false; // skip left children
+      const nameSim = strSimilarity(name, k.name||'');
+      const kPhone = (k.parentMom||'').replace(/\D/g,'');
+      const phoneMatch = inputPhone && kPhone && (inputPhone===kPhone || inputPhone.endsWith(kPhone) || kPhone.endsWith(inputPhone));
+      const dobMatch = el('fdob').value && k.dob && el('fdob').value===k.dob;
+      // Duplicate if: name very similar (>80%) OR (name similar >65% AND phone matches) OR (name similar >65% AND dob matches)
+      return nameSim>0.80 || (nameSim>0.65 && phoneMatch) || (nameSim>0.65 && dobMatch);
+    });
+    if(potentialDups.length>0){
+      const dupList = potentialDups.map(k=>`• ${k.name} — ${BRANCHES.find(b=>b.id===k.branchId)?.ar||''} — 📱${k.parentMom||'—'}`).join('\n');
+      const proceed = confirm(`⚠️ تحذير: يوجد أطفال مشابهون في السيستم!\n\n${dupList}\n\nهل تريدين المتابعة وإضافة هذا الطفل على أنه طفل جديد؟\n(اضغطي Cancel إذا كان مكرراً)`);
+      if(!proceed) return;
+    }
+  }
+  // ──────────────────────────────────────────────────────────────
+
   setSyncing(true);
   const row={
     branch_id:curBid,
