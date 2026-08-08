@@ -23096,31 +23096,63 @@ async function exportAllToExcel(type){
     if(fromM) list = list.filter(e=>(e.date||'').substring(0,7) >= fromM);
     if(toM)   list = list.filter(e=>(e.date||'').substring(0,7) <= toM);
     if(type==='expenses' && (fromM||toM)) expRangeSuffix = `_${fromM||'start'}_to_${toM||'end'}`;
-    const rows = list.map(e=>{
-      const branch = BRANCHES.find(b=>b.id===e.branchId);
-      const row = {
-        'Date': e.date||'',
-        'Category': e.type||e.category||'',
-        'Sub Type': e.subType||'',
-        'Invoice No.': e.invoiceNumber||'',
-        'Supplier / Employee': e.supplierName||'',
-        'Tax Number': e.taxNumber||'',
-        'Amount (before VAT)': e.amount||0,
-        'VAT Type': e.vatType||'',
-        'VAT Amount': e.vatAmount||0,
-        'Total Amount': e.totalAmount||e.amount||0,
-        'Paid By': e.paidBy||'',
-        'Branch': branch?tBN(branch):(e.branchId||''),
-        'Notes / Reason': e.note||'',
-      };
-      const _dupExtraKeys=new Set(['supplier','taxNo','reason','invoiceNo','subType']);
-      Object.entries(e.extra||{}).forEach(([k,v])=>{
-        if(k.startsWith('__')||_dupExtraKeys.has(k)) return;
-        row[k]=v;
-      });
-      return row;
+
+    // Same layout as the Import Template — one sheet per category, same columns/order
+    const toDMY = d => { if(!d) return ''; const [y,m,dd]=String(d).split('-'); return (y&&m&&dd)?`${dd}/${m}/${y}`:d; };
+    const AMT_NOTE='Amount BEFORE VAT (AED)', TOTAL_NOTE='Total AFTER VAT (AED)';
+    const expNote='⚠️ Amount = BEFORE VAT  |  Total = auto-calculate (Amount + VAT)  |  Example: Invoice 121 AED → Amount=115.5, VAT=5.5, Total=121';
+    const commonHeaders=['Invoice Date\n(DD/MM/YYYY)','Invoice No.','Supplier / Entity Name','Supplier TRN','Reason for Payment','VAT Type\n(exempt/5/15)',AMT_NOTE,'VAT Amount (AED)',TOTAL_NOTE,'Paid By\n(owner/accountant/petty)','Branch ID\n(b1-b5)'];
+    const commonRow = e => [toDMY(e.date), e.invoiceNumber||'', e.supplierName||'', e.taxNumber||'', e.note||'', e.vatType||'', e.amount||0, e.vatAmount||0, e.totalAmount||e.amount||0, e.paidBy||'', e.branchId||''];
+
+    const SHEET_DEFS=[
+      {k:'bus', sheet:'Bus', title:'🚌 Bus Expenses — مصاريف الباص', firstColLabel:'Bus No. / Type',
+       getFirst:e=>(e.extra&&(e.extra['__bus_no__']||e.extra['Bus No.']||e.extra['رقم الباص']))||e.subType||''},
+      {k:'purch', sheet:'Purchases', title:'🛒 Purchases — المشتريات', firstColLabel:'Item Name',
+       getFirst:e=>(e.extra&&e.extra['Item Name'])||e.subType||''},
+      {k:'salary', sheet:'Staff Salaries', title:'👷 Staff Salaries — رواتب العاملين', salary:true},
+      {k:'contract', sheet:'Annual Contracts', title:'📄 Annual Contracts — عقود سنوية', firstColLabel:'Contract Name',
+       getFirst:e=>(e.extra&&e.extra['Contract Name'])||e.subType||''},
+      {k:'maint', sheet:'Maintenance', title:'🔧 Maintenance — الصيانة', firstColLabel:'Item / Description',
+       getFirst:e=>(e.extra&&e.extra['Item Name'])||e.subType||''},
+      {k:'util', sheet:'Utilities', title:'💡 Utilities — الكهرباء والماء', firstColLabel:'Provider / Type',
+       getFirst:e=>e.subType||''},
+      {k:'tel', sheet:'Communications', title:'📱 Communications — الاتصالات', firstColLabel:'Service / Subscription No.',
+       getFirst:e=>(e.extra&&e.extra['Service / Subscription No.'])||e.subType||''},
+      {k:'rent', sheet:'Rent', title:'🏠 Rent Fees — رسوم الإيجار', firstColLabel:'Property / Location',
+       getFirst:e=>(e.extra&&e.extra['Property / Description'])||e.subType||''},
+      {k:'govt', sheet:'Government Fees', title:'🏛️ Government Fees — مصاريف حكومية', firstColLabel:'Fee Type / Description',
+       getFirst:e=>(e.extra&&e.extra['Item Name'])||e.subType||''},
+      {k:'ads', sheet:'Advertising', title:'📢 Advertising — الإعلانات', firstColLabel:'Channel / Platform',
+       getFirst:e=>(e.extra&&(e.extra['القناة / الوسيلة']||e.extra['Channel / Platform']))||e.subType||''},
+      {k:'bank', sheet:'Bank Charges', title:'🏦 Bank Charges — رسوم البنك', firstColLabel:'Charge Type',
+       getFirst:e=>e.subType||''},
+      {k:'printing', sheet:'Typing Work', title:'✍️ Typing Work — أعمال التايبينج', firstColLabel:'Description',
+       getFirst:e=>(e.extra&&e.extra['Description'])||e.subType||''},
+      {k:'license', sheet:'License Fees', title:'📋 License Fees — رسوم الترخيص', firstColLabel:'License Type / Description',
+       getFirst:e=>(e.extra&&e.extra['License Type'])||e.subType||''},
+      {k:'other', sheet:'Other', title:'📝 Other — أخرى', firstColLabel:'Item / Description',
+       getFirst:e=>(e.extra&&e.extra['Item Name'])||e.subType||''},
+    ];
+
+    SHEET_DEFS.forEach(def=>{
+      const catRows=list.filter(e=>e.category===def.k);
+      let headers, dataRows;
+      if(def.salary){
+        headers=['Employee Name','Job Title', ...commonHeaders];
+        dataRows=catRows.map(e=>[
+          (e.extra&&e.extra['Employee Name'])||e.supplierName||e.subType||'',
+          (e.extra&&e.extra['Job Title'])||'',
+          ...commonRow(e)
+        ]);
+      } else {
+        headers=[def.firstColLabel, ...commonHeaders];
+        dataRows=catRows.map(e=>[def.getFirst(e), ...commonRow(e)]);
+      }
+      const data=[[def.title],[expNote],headers,...dataRows];
+      const ws=XLSX.utils.aoa_to_sheet(data);
+      ws['!cols']=headers.map((_,i)=>({wch: def.salary?(i===0?26:i===1?18:14):(i===0?22:14)}));
+      XLSX.utils.book_append_sheet(wb2, ws, def.sheet);
     });
-    XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Expenses');
   }
 
   const fname = bName.replace(/\s/g,'_')+'_export_'+(type==='expenses'?'expenses'+expRangeSuffix+'_':'')+today()+'.xlsx';
