@@ -1345,6 +1345,21 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="font-weight:900;color:#0369a1;font-size:.95rem;margin-bottom:6px">Export All Data</div>
       <div style="font-size:.8rem;color:#555;margin-bottom:12px">Export current branch data as Excel file</div>
+      <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:10px;margin-bottom:12px">
+        <div style="font-weight:800;color:#92400e;font-size:.82rem;margin-bottom:8px">📅 فلترة تصدير المصاريف بالشهور (اختياري) — Filter Expenses Export by Month (optional)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="font-size:.72rem;color:#92400e;display:block;margin-bottom:2px">من شهر — From</label>
+            <input type="month" id="expExportFrom" style="padding:6px 8px;border-radius:8px;border:1.5px solid #fde68a;font-family:'Tajawal',sans-serif">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:#92400e;display:block;margin-bottom:2px">إلى شهر — To</label>
+            <input type="month" id="expExportTo" style="padding:6px 8px;border-radius:8px;border:1.5px solid #fde68a;font-family:'Tajawal',sans-serif">
+          </div>
+          <button onclick="el('expExportFrom').value='';el('expExportTo').value=''" style="padding:6px 12px;background:#fff;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;font-size:.75rem;font-weight:700;color:#92400e;font-family:'Tajawal',sans-serif">مسح — Clear</button>
+        </div>
+        <div style="font-size:.7rem;color:#92400e;margin-top:6px">لو سبتيهم فاضيين، هيتصدّر كل المصاريف من غير فلترة بالتاريخ.</div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button onclick="exportAllToExcel('children')" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export Children</button>
         <button onclick="exportAllToExcel('receipts')" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">Export Receipts</button>
@@ -23073,18 +23088,42 @@ async function exportAllToExcel(type){
     }));
     XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Receipts');
   }
+  let expRangeSuffix='';
   if(type==='expenses'||type==='all'){
-    const rows = DB.expenses.map(e=>({
-      'Date': e.date||'',
-      'Category': e.category||'',
-      'Amount': e.amount||0,
-      'Description': e.description||'',
-      'Paid By': e.paidBy||'',
-    }));
+    const fromM = el('expExportFrom')?.value||'';
+    const toM   = el('expExportTo')?.value||'';
+    let list = [...DB.expenses];
+    if(fromM) list = list.filter(e=>(e.date||'').substring(0,7) >= fromM);
+    if(toM)   list = list.filter(e=>(e.date||'').substring(0,7) <= toM);
+    if(type==='expenses' && (fromM||toM)) expRangeSuffix = `_${fromM||'start'}_to_${toM||'end'}`;
+    const rows = list.map(e=>{
+      const branch = BRANCHES.find(b=>b.id===e.branchId);
+      const row = {
+        'Date': e.date||'',
+        'Category': e.type||e.category||'',
+        'Sub Type': e.subType||'',
+        'Invoice No.': e.invoiceNumber||'',
+        'Supplier / Employee': e.supplierName||'',
+        'Tax Number': e.taxNumber||'',
+        'Amount (before VAT)': e.amount||0,
+        'VAT Type': e.vatType||'',
+        'VAT Amount': e.vatAmount||0,
+        'Total Amount': e.totalAmount||e.amount||0,
+        'Paid By': e.paidBy||'',
+        'Branch': branch?tBN(branch):(e.branchId||''),
+        'Notes / Reason': e.note||'',
+      };
+      const _dupExtraKeys=new Set(['supplier','taxNo','reason','invoiceNo','subType']);
+      Object.entries(e.extra||{}).forEach(([k,v])=>{
+        if(k.startsWith('__')||_dupExtraKeys.has(k)) return;
+        row[k]=v;
+      });
+      return row;
+    });
     XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(rows), 'Expenses');
   }
 
-  const fname = bName.replace(/\s/g,'_')+'_export_'+today()+'.xlsx';
+  const fname = bName.replace(/\s/g,'_')+'_export_'+(type==='expenses'?'expenses'+expRangeSuffix+'_':'')+today()+'.xlsx';
   XLSX.writeFile(wb2, fname);
 }
 
@@ -26468,7 +26507,7 @@ async function runDBHealthCheck(){
   // ── 2. Duplicate attendance check ──
   log(`<div style="font-weight:800;color:#1e3a8a;margin:12px 0 8px;font-size:.9rem">🔍 Duplicate Kids Attendance Check</div>`);
   try{
-    const {data:attAll}=await sb.from('attendance').select('id,branch_id,child_id,date,status');
+    const attAll=await fetchAll(()=>sb.from('attendance').select('id,branch_id,child_id,date,status'));
     if(attAll){
       const keyMap={};
       attAll.forEach(r=>{
