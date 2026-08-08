@@ -3522,7 +3522,7 @@ function renderPV(){
   let ok=0,miss=0,part=0,totalExp=0,totalPaid=0;
   active.forEach(c=>{
     const paid=DB.receipts.filter(r=>!r.isCancelled&&String(r.childId)===String(c.id)&&recCoversMonth(r,month)).reduce((s,r)=>s+r.total,0);
-    const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
+    const exp=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0)+(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
     const diff=exp-paid;
     totalExp+=exp; totalPaid+=paid;
     if(paid===0) miss++;
@@ -21929,7 +21929,9 @@ function renderRecentByMonth(){
        <span style="color:#059669">✅ نشط: <b>${recent.filter(c=>!c.leaveDate).length}</b></span>
        <span style="color:#dc2626">🚌 باص: <b>${recent.filter(c=>c.bus==='Yes'||c.bus==='نعم').length}</b></span>
      </div>`
-    + recent.map((c,i)=>`
+    + recent.map((c,i)=>{
+      const total=(c.fee||0)+((c.bus==='Yes'||c.bus==='نعم')?(c.busFee||0):0)+(c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+      return `
     <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openChild('${c.id}')">
       <div style="font-size:.72rem;color:var(--muted);min-width:22px;text-align:center;font-weight:700">${i+1}</div>
       <div class="av" style="background:${chCol(c.id)};width:32px;height:32px;font-size:.8rem;flex-shrink:0">${(c.name||'؟')[0]}</div>
@@ -21938,10 +21940,10 @@ function renderRecentByMonth(){
         <div style="font-size:.7rem;color:var(--muted)">${c.className||'—'} · ${fmtDate(c.joinDate)}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:.75rem;font-weight:700;color:${c.fee?'#1e3a8a':'#9ca3af'}">${c.fee?fmtNum(c.fee)+' AED':''}</div>
+        <div style="font-size:.75rem;font-weight:700;color:${total?'#1e3a8a':'#9ca3af'}">${total?fmtNum(total)+' AED':''}</div>
         <span class="bdg ${c.leaveDate?'derr':'dok'}" style="font-size:.62rem">${c.leaveDate?'غادر':'🆕 جديد'}</span>
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
 }
 
 function printMonthlyRegReport(){
