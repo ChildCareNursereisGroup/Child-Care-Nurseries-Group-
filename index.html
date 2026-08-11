@@ -14722,7 +14722,7 @@ function renderStaff(){
           ${curRole==='admin'?`<button class="btn bsm" onclick="openLoanModal('${s.id}')" style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">💳 Loans</button>`:''}
           ${curRole==='admin'&&isExited?`<button class="btn bsm" onclick="calcEOGForStaff('${s.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:.74rem;font-weight:700">📋 EOS</button>`:''}
           <button class="btn bd bsm" onclick="deleteStaff('${s.id}')">🗑</button>
-          ${(s.grossSalary||s.basicSalary)>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">Gross: ${fmtNum(s.grossSalary||s.basicSalary)} AED</span>`:''}
+          ${curRole==='admin'&&(s.grossSalary||s.basicSalary)>0?`<span style="background:#d1fae5;color:#065f46;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">Gross: ${fmtNum(s.grossSalary||s.basicSalary)} AED</span>`:''}
           ${s.transferCode?`<span style="background:#ede9fe;color:#5b21b6;border-radius:7px;padding:2px 8px;font-size:.72rem;font-weight:800">${s.transferCode}</span>`:''}
         </div>
       </div>
@@ -17316,7 +17316,7 @@ function openStaffForm(id){
       <div class="fg"><label>Emergency Contact (Name + Relation)</label><input id="sf_emname" value="${s?.emergencyContact||''}" placeholder="e.g. Ahmed - Brother"></div>
       <div class="fg"><label>Emergency Phone Number 🚨</label><input id="sf_emphone" type="tel" value="${s?.emergencyPhone||''}" placeholder="+971 50 000 0000"></div>
     </div>
-    <div style="background:#f0fdf4;border-radius:9px;padding:10px;margin-bottom:9px">
+    ${curRole==='admin'?`<div style="background:#f0fdf4;border-radius:9px;padding:10px;margin-bottom:9px">
       <div style="font-weight:800;color:#065f46;margin-bottom:8px;font-size:.82rem">💰 Salary & Payroll — الراتب</div>
       <div class="g3">
         <div class="fg">
@@ -17334,7 +17334,7 @@ function openStaffForm(id){
       <div style="margin-top:8px">
         <button type="button" onclick="openSalaryHistory('${s?.id||''}')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.78rem;font-weight:700">📋 Salary History — سجل الرواتب السابقة</button>
       </div>
-    </div>
+    </div>`:''}
     <div style="background:#f0f4ff;border-radius:9px;padding:10px;margin-bottom:9px">
       <div style="font-weight:800;color:#1e3a8a;margin-bottom:8px;font-size:.82rem">📅 Contract Dates — تواريخ العقد</div>
       <div class="g3">
@@ -17467,6 +17467,9 @@ function getSelectedWorkDays(){
 async function saveStaff(id){
   const name = document.getElementById('sf_name')?.value?.trim();
   if(!name){ showAlert('staff-save-alert','⚠️ Name is required',true); return; }
+  // Salary fields are hidden from non-admin roles — never overwrite them from a form
+  // that doesn't show them, or a manager save would silently wipe the staff's pay to 0.
+  const existingStaff = id ? DB.staff.find(x=>String(x.id)===String(id)) : null;
   const row = {
     branch_id: document.getElementById('sf_branch')?.value||curBid,
     work_branch: document.getElementById('sf_work_branch')?.value||null,
@@ -17495,9 +17498,9 @@ async function saveStaff(id){
     shift_end: document.getElementById('sf_shift_end')?.value?.trim()||null,
     uses_bus: document.getElementById('sf_uses_bus')?.value==='true',
     bus_pickup_time: document.getElementById('sf_bus_pickup_time')?.value?.trim()||null,
-    basic_salary: Number(document.getElementById('sf_basic')?.value||0),
-    gross_salary: Number(document.getElementById('sf_gross')?.value||0),
-    transfer_code: document.getElementById('sf_tcode')?.value||'',
+    basic_salary: curRole==='admin' ? Number(document.getElementById('sf_basic')?.value||0) : Number(existingStaff?.basicSalary||0),
+    gross_salary: curRole==='admin' ? Number(document.getElementById('sf_gross')?.value||0) : Number(existingStaff?.grossSalary||0),
+    transfer_code: curRole==='admin' ? (document.getElementById('sf_tcode')?.value||'') : (existingStaff?.transferCode||''),
     last_working_day: document.getElementById('sf_lastday')?.value||null,
     leaves_taken_before: Number(document.getElementById('sf_leaves_before')?.value||0),
     days_worked_before: Number(document.getElementById('sf_days_before')?.value||0),
