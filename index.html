@@ -442,6 +442,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div style="font-size:.72rem;opacity:.8;margin-top:3px" id="reg-total-breakdown"></div>
   </div>
 
+  <div class="fg" style="margin-bottom:10px">
+    <label>📝 شرح مصروفات الطفل الحالية — Current Fee Explanation</label>
+    <textarea id="ffeenotes" rows="2" placeholder="مثال: 600 شهري، أو 200 أسبوعي، أو 50 يومي..."></textarea>
+  </div>
   <div class="fg" style="margin-bottom:10px"><label data-t="notesLabel">Notes</label><textarea id="fnotes" rows="2" placeholder="Any additional notes..."></textarea></div>
   <div style="display:flex;gap:7px">
     <button class="btn bp" data-t="save" onclick="saveChild()">💾 Save</button>
@@ -482,8 +486,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <div id="rnum-warn" style="display:none;color:#dc2626;font-size:.72rem;margin-top:3px;font-weight:700"></div>
     </div>
     <div class="fg"><label data-t="payDate">Payment Date *</label><input type="date" id="rdate"></div>
-    <div class="fg"><label data-t="feesFrom">Fees From Date</label><input type="date" id="rfrom"></div>
-    <div class="fg"><label data-t="feesTo">Fees To Date</label><input type="date" id="rto"></div>
+    <div class="fg"><label data-t="feesFrom">Fees From Date *</label><input type="date" id="rfrom"></div>
+    <div class="fg"><label data-t="feesTo">Fees To Date *</label><input type="date" id="rto"></div>
   </div>
 
   <hr class="sep">
@@ -2732,7 +2736,7 @@ async function loadFromSupa(bid) {
       parentMom:x.parent_mom||'', parentDad:x.parent_dad||'', email:x.email||'',
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
-      notes:x.notes||'', branchId:x.branch_id,
+      notes:x.notes||'', feeNotes:x.fee_notes||'', branchId:x.branch_id,
       homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
@@ -2943,7 +2947,7 @@ const T = {
     addReceipt:'🧾 إضافة إيصال دفعة', receiptInfo:'📋 بيانات الإيصال',
     childName:'اسم الطفل *', classNameLabel:'اسم الفصل',
     receiptNo:'رقم الإيصال *', payDate:'تاريخ الدفع *',
-    feesFrom:'الرسوم من تاريخ', feesTo:'الرسوم إلى تاريخ',
+    feesFrom:'الرسوم من تاريخ *', feesTo:'الرسوم إلى تاريخ *',
     amountDetails:'💰 تفاصيل المبالغ', monthlyFee:'الرسوم الشهرية (د.إ)',
     regFee:'مصاريف التسجيل (د.إ)', transFee:'رسوم المواصلات (د.إ)',
     uniforms:'ملابس (د.إ)', stationary:'أدوات دراسية (د.إ)',
@@ -3036,7 +3040,7 @@ const T = {
     addReceipt:'🧾 Add Payment Receipt', receiptInfo:'📋 Receipt Details',
     childName:"Kid's Name *", classNameLabel:'Class Name',
     receiptNo:'Receipt No. *', payDate:'Payment Date *',
-    feesFrom:'Fees From Date', feesTo:'Fees To Date',
+    feesFrom:'Fees From Date *', feesTo:'Fees To Date *',
     amountDetails:'💰 Amount Details', monthlyFee:'Monthly Fees (AED)',
     regFee:'Registration Fees (AED)', transFee:'Transportation Fees (AED)',
     uniforms:'Uniforms (AED)', stationary:'Stationary (AED)',
@@ -3555,7 +3559,7 @@ async function switchBranch(bid){
   await loadFromSupa(bid).catch(()=>{});
   await Promise.all([
     loadStaff(), loadBuses(), loadLicenses(),
-    loadBranchSettings(), loadPWFromSupa()
+    loadBranchSettings(), loadPasswordsFromSupa()
   ]).catch(()=>{});
   renderDashboard();
   renderChildren();
@@ -3773,7 +3777,8 @@ async function saveChild(){
     bus_city: el('fbus').value==='Yes' ? (el('fbus-city')?.value||'') : '',
     bus_building: el('fbus').value==='Yes' ? (el('fbus-building')?.value?.trim()||'') : '',
     bus_landmark: el('fbus').value==='Yes' ? (el('fbus-landmark')?.value?.trim()||'') : '',
-    notes:v('fnotes')
+    notes:v('fnotes'),
+    fee_notes:v('ffeenotes')
   };
   const {data,error}=await sb.from('children').insert(row).select().single();
   setSyncing(false);
@@ -4252,6 +4257,7 @@ function calcTotal(){
 async function saveReceipt(){
   const childId=el('rch').value;const rDate=el('rdate').value;let rNum=v('rnum');
   if(!childId||!rDate||!rNum){showAlert('recalert',t('fillRequired'),true);return;}
+  if(!el('rfrom').value||!el('rto').value){showAlert('recalert',lang==='ar'?'❌ من فضلك حددي فترة الرسوم (من تاريخ - إلى تاريخ)':'❌ Please set the fees period (From Date - To Date)',true);return;}
 
   // ── Auto-fix: ensure receipt number prefix matches pay method ──
   const pm=el('rpaymethod')?.value||'cash';
@@ -5326,7 +5332,7 @@ function renderKidsWeek(){
   const weekStart=new Date(selDate); weekStart.setDate(selDate.getDate()-diffToSun);
   const weekDays=Array.from({length:7},(_,i)=>{
     const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
-    return d.toISOString().split('T')[0];
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   });
   const fmtD=d=>`${d.split('-')[2]}/${d.split('-')[1]}`;
   const badge=el('att-day-badge');
@@ -10081,7 +10087,7 @@ function printAtt(){
   // Full month dates
   const dates=[];
   let d=new Date(yr,mo,1);
-  while(d.getMonth()===mo){dates.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
+  while(d.getMonth()===mo){dates.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));d.setDate(d.getDate()+1);}
 
   // Active kids filtered by class
   const kids=DB.children.filter(c=>!c.leaveDate&&(!selClass||(c.className||'—')===selClass));
@@ -10903,6 +10909,7 @@ function showDTab(tab,btn){
         </div>
         <div class="fg"><label>Leave Date</label><input type="date" value="${c.leaveDate||''}" onchange="updateField('leaveDate',this.value||null)"></div>
       </div>
+      <div class="fg" style="margin-bottom:9px"><label>📝 شرح مصروفات الطفل الحالية — Current Fee Explanation</label><textarea rows="2" placeholder="مثال: 600 شهري، أو 200 أسبوعي، أو 50 يومي..." onchange="updateField('feeNotes',this.value)">${c.feeNotes||''}</textarea></div>
       <div class="fg" style="margin-bottom:9px"><label>Notes</label><textarea rows="2" onchange="updateField('notes',this.value)">${c.notes||''}</textarea></div>
       ${c.leaveDate ? `
       <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:14px;padding:14px 16px;margin-bottom:10px">
@@ -12563,7 +12570,7 @@ async function updateField(field,value){
     parentMom:'parent_mom', parentDad:'parent_dad', email:'email', dutyDays:'duty_days', friFee:'fri_fee', satFee:'sat_fee', sunFee:'sun_fee',
     fee:'fee', busFee:'bus_fee', bus:'bus',
     busDirection:'bus_direction', busPickDrop:'bus_pick_drop', busArea:'bus_area',
-    notes:'notes'
+    notes:'notes', feeNotes:'fee_notes'
   };
   c[field]=value;
   const dbField=map[field]||field;
@@ -20409,7 +20416,7 @@ function openAttReport(){
     classes.map(c=>`<option value="${c}">${c}</option>`).join('');
   // Default dates: first day of current month to today
   const now=new Date();
-  const first=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+  const first=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
   if(!el('att-rep-from').value) el('att-rep-from').value=first;
   if(!el('att-rep-to').value) el('att-rep-to').value=today();
   el('att-report-modal').classList.add('on');
