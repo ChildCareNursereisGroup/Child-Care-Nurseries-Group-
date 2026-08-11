@@ -2710,8 +2710,10 @@ function getPW(bid,role){
 async function setPW(bid,role,pw){
   _pwCache[`${bid}_${role}`]=pw;
   try{
-    await sb.from('app_settings').upsert({key:`pw_${bid}_${role}`,value:pw},{onConflict:'key'});
-  }catch(e){ console.error('Failed to save password:', e); }
+    const {error}=await sb.from('app_settings').upsert({key:`pw_${bid}_${role}`,value:pw},{onConflict:'key'});
+    if(error){ console.error('Failed to save password:', error); return false; }
+    return true;
+  }catch(e){ console.error('Failed to save password:', e); return false; }
 }
 
 // ═══════════════════════════════════════════════
@@ -10668,10 +10670,16 @@ async function changePW(){
   const bid=el('abr').value;const role=el('arole').value;const pw=v('apw');
   if(!pw||pw.length<4){showAlert('admalert',lang==='ar'?'⚠️ الباسورد 4 أحرف على الأقل':'⚠️ Password must be at least 4 characters',true);return;}
   showAlert('admalert','⏳ Saving...',false);
+  let allOk;
   if(bid==='all'){
-    await Promise.all(BRANCHES.map(b=>setPW(b.id,role,pw)));
+    const results=await Promise.all(BRANCHES.map(b=>setPW(b.id,role,pw)));
+    allOk=results.every(Boolean);
   } else {
-    await setPW(bid,role,pw);
+    allOk=await setPW(bid,role,pw);
+  }
+  if(!allOk){
+    showAlert('admalert',lang==='ar'?'❌ فشل الحفظ في قاعدة البيانات — راجعي صلاحيات جدول app_settings في Supabase':'❌ Failed to save to database — check app_settings table permissions in Supabase',true);
+    return;
   }
   el('apw').value='';
   showAlert('admalert',lang==='ar'?'✅ تم تغيير الباسورد على كل الأجهزة!':'✅ Password changed on all devices!',false);
@@ -10681,7 +10689,12 @@ async function saveMgrPW(bid){
   const inp=el(`mgr_pw_${bid}`);
   const pw=(inp.value||'').trim();
   if(!pw||pw.length<4){inp.style.borderColor='#dc2626';setTimeout(()=>inp.style.borderColor='#818cf8',1500);return;}
-  await setPW(bid,'manager',pw);
+  const saved=await setPW(bid,'manager',pw);
+  if(!saved){
+    inp.style.borderColor='#dc2626';
+    alert(lang==='ar'?'❌ فشل الحفظ في قاعدة البيانات — راجعي صلاحيات جدول app_settings في Supabase':'❌ Failed to save to database — check app_settings table permissions in Supabase');
+    return;
+  }
   inp.style.borderColor='#059669';
   const ok=el(`mgr_ok_${bid}`);ok.style.display='inline';
   setTimeout(()=>{inp.style.borderColor='#818cf8';ok.style.display='none';},2000);
