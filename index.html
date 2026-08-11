@@ -124,6 +124,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
 .mover{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:10px}
 .mover.on{display:flex}
 .modal{background:#fff;border-radius:17px;width:100%;max-width:640px;max-height:91vh;overflow-y:auto;padding:17px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mbox{background:#fff;border-radius:17px;width:100%;max-height:91vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mbox>.mh{padding:14px 14px 0}
 .mh{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
 .mt{font-size:.95rem;font-weight:800}
 .xb{background:#f3f4f6;border:none;width:27px;height:27px;border-radius:50%;cursor:pointer;font-size:.88rem}
@@ -10943,7 +10945,7 @@ function showDTab(tab,btn){
   }
   if(tab==='recs'){
     const recs=DB.receipts.filter(r=>String(r.childId)===String(curChild));
-    const tot=recs.reduce((s,r)=>s+r.total,0);
+    const tot=recs.filter(r=>!r.isCancelled).reduce((s,r)=>s+r.total,0);
     const isAdm=curRole==='admin';
     const isAdmOrMgr=curRole==='admin'||curRole==='manager';
 
@@ -10951,12 +10953,12 @@ function showDTab(tab,btn){
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
     </div>`:''}
-    ${recs.map(r=>`<div class="rc" style="margin-bottom:8px${isAdm?';cursor:pointer':''}"${isAdm?` onclick="openEditRec('${r.id}')"`:''}>
+    ${recs.map(r=>`<div class="rc" style="margin-bottom:8px${isAdm?';cursor:pointer':''}${r.isCancelled?';opacity:.6;background:#fef2f2':''}"${isAdm?` onclick="openEditRec('${r.id}')"`:''}>
       <div class="rh">
-        <div>#${r.receiptNum}</div>
-        <div>${fmtDate(r.date)}</div>
+        <div style="${r.isCancelled?'text-decoration:line-through;color:var(--muted)':''}">#${r.receiptNum} ${r.isCancelled?`<span style="background:#fee2e2;color:#dc2626;font-size:.62rem;padding:1px 6px;border-radius:5px;font-weight:700;text-decoration:none;display:inline-block">🚫 ${lang==='ar'?'ملغي':'Cancelled'}</span>`:''}</div>
+        <div style="${r.isCancelled?'text-decoration:line-through;color:var(--muted)':''}">${fmtDate(r.date)}</div>
         <div style="font-size:.75rem;color:var(--muted)">${fmtDate(r.fromDate)} → ${fmtDate(r.toDate)}</div>
-        ${isAdm?`<div style="font-weight:800;color:var(--ok)">${fmtNum(r.total)} د.إ</div>`:''}
+        ${isAdm?`<div style="font-weight:800;color:${r.isCancelled?'var(--muted)':'var(--ok)'};${r.isCancelled?'text-decoration:line-through':''}">${fmtNum(r.total)} د.إ</div>`:''}
       </div>
     </div>`).join('')||`<div class="empty"><div class="ei">🧾</div><p>${lang==='ar'?'لا توجد إيصالات':'No receipts found'}</p></div>`}`;
 
@@ -10977,7 +10979,7 @@ function showDTab(tab,btn){
     const allBranchRecs=[...recs];
     // Load from DB cached data of other branches if available
     const totalFee=c.fee+Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0);
-    const totalPaid=allBranchRecs.reduce((s,r)=>s+r.total,0);
+    const totalPaid=allBranchRecs.filter(r=>!r.isCancelled).reduce((s,r)=>s+r.total,0);
     cont.innerHTML=`<div class="sboxes">
       <div class="sbox sb"><div class="sv">${fmtNum(totalFee)} د.إ</div><div class="sk">${lang==='ar'?'الرسوم الشهرية':'Monthly Fees'}</div></div>
       <div class="sbox sg"><div class="sv">${fmtNum(totalPaid)} د.إ</div><div class="sk">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div></div>
@@ -10988,15 +10990,16 @@ function showDTab(tab,btn){
     ${allBranchRecs.sort((a,b)=>b.date>a.date?1:-1).map(r=>{
       const br=BRANCHES.find(x=>x.id===r.branchId);
       const isCurrentBranch=r.branchId===curBid;
-      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem;gap:6px">
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem;gap:6px${r.isCancelled?';opacity:.6;background:#fef2f2':''}">
         <div>
-          <div style="font-weight:700">${fmtDate(r.date)} <span style="font-size:.68rem;color:#9ca3af">#${r.receiptNum}</span></div>
+          <div style="font-weight:700${r.isCancelled?';text-decoration:line-through;color:var(--muted)':''}">${fmtDate(r.date)} <span style="font-size:.68rem;color:#9ca3af">#${r.receiptNum}</span></div>
           <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
             <span style="background:${br?.l||'#f3f4f6'};color:${br?.c||'#374151'};font-size:.63rem;padding:1px 6px;border-radius:8px;font-weight:700">${br?.icon||''} ${br?.ar||r.branchId}</span>
             ${!isCurrentBranch?`<span style="background:#fef3c7;color:#92400e;font-size:.6rem;padding:1px 5px;border-radius:6px">${lang==='ar'?'فرع سابق':'prev. branch'}</span>`:''}
+            ${r.isCancelled?`<span style="background:#fee2e2;color:#dc2626;font-size:.6rem;padding:1px 5px;border-radius:6px;font-weight:700">🚫 ${lang==='ar'?'ملغي':'Cancelled'}</span>`:''}
           </div>
         </div>
-        <b style="color:var(--ok);white-space:nowrap">${fmtNum(r.total)} د.إ</b>
+        <b style="color:${r.isCancelled?'var(--muted)':'var(--ok)'};white-space:nowrap;${r.isCancelled?'text-decoration:line-through':''}">${fmtNum(r.total)} د.إ</b>
       </div>`;
     }).join('')||`<div class="empty"><div class="ei">💳</div><p>${lang==='ar'?'لا توجد مدفوعات':'No payments found'}</p></div>`}`;
   }
