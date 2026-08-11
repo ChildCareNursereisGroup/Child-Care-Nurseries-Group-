@@ -2661,7 +2661,7 @@ async function testWhatsAppAPI(bid, safeId){
   }
   if(btn){btn.textContent='🧪 اختبار الاتصال — Test Connection';btn.disabled=false;}
 }
-const today=()=>new Date().toISOString().split('T')[0];
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const monthOf=d=>{if(!d)return'';const dt=new Date(d);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
 const fmtDate=d=>{
   if(!d)return'-';
@@ -8533,7 +8533,7 @@ async function renderStaffAttWeek(){
   const weekStart = new Date(selDate); weekStart.setDate(selDate.getDate() - diffToSun);
   const weekDays = Array.from({length:7},(_,i)=>{
     const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
-    return d.toISOString().split('T')[0];
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   });
 
   // Get staff - deduplicated
@@ -10944,7 +10944,7 @@ function showDTab(tab,btn){
       <div style="font-size:.76rem;color:var(--muted)">${lang==='ar'?'إجمالي المدفوع':'Total Paid'}</div>
       <div style="font-size:1.3rem;font-weight:800;color:var(--bc)">${fmtNum(tot)} د.إ</div>
     </div>`:''}
-    ${recs.map(r=>`<div class="rc" style="margin-bottom:8px">
+    ${recs.map(r=>`<div class="rc" style="margin-bottom:8px${isAdm?';cursor:pointer':''}"${isAdm?` onclick="openEditRec('${r.id}')"`:''}>
       <div class="rh">
         <div>#${r.receiptNum}</div>
         <div>${fmtDate(r.date)}</div>
@@ -17102,26 +17102,18 @@ function openStaffLeaveDashboard(staffId){
     const sickDays      = sickLeaves.reduce((sum,l)=>sum+(l.days||0),0);
     const unpaidDays    = unpaidLeaves.reduce((sum,l)=>sum+(l.days||0),0);
 
-    // ── UAE Law: leave entitlement ──
-    // <6 months: 0 | 6m–1y: 1.5 days/month | >1yr: 2.5 days/month
-    const monthsWorked = totalMonths;
-    let entitledPerMonth = 0;
-    let lawNote = '';
-    if(monthsWorked < 6){
-      entitledPerMonth=0; lawNote='أقل من 6 شهور — لا يستحق إجازة بعد';
-    } else if(monthsWorked < 12){
-      entitledPerMonth=1.5; lawNote='من 6 شهور إلى سنة — 1.5 يوم/شهر (18 يوم/سنة)';
-    } else {
-      entitledPerMonth=2.5; lawNote='أكثر من سنة — 2.5 يوم/شهر (30 يوم/سنة)';
-    }
-    const totalEntitled = Math.floor(monthsWorked * entitledPerMonth);
-    const taken         = annualDays + (Number(s.leavesTakenBefore||0));
-    const remaining     = Math.max(0, totalEntitled - taken);
-    const leaveComp     = Math.round(remaining * dailyRate * 100)/100;
+    // ── Leave entitlement: 30 days per 365 ACTUAL work days (owner's policy) ──
+    // Same single source of truth used by Payroll/EOS — see calcLeaveBalance/getServiceYears.
+    const serviceYears  = getServiceYears(s.id);
+    const totalEntitled = bal.entitled;
+    const taken         = bal.taken;
+    const remaining     = bal.remaining;
+    const leaveComp     = bal.compensation;
+    const lawNote       = `30 يوم إجازة كل 365 يوم عمل فعلي (الغياب بيأخر السنة) — ${serviceYears.toFixed(2)} سنة عمل فعلية لحد النهاردة`;
     const alarm         = remaining >= 15; // UAE law: can't accumulate more than 30 days
 
     // ── Gratuity calculation ──
-    const gratuityYears = totalAttDays > 0 ? totalAttDays/365 : totalCalDays/365;
+    const gratuityYears = getServiceYears(s.id); // calendar-based (UAE labour law), not attendance count
     let gratuity = 0, gratuityBreakdown = '';
     if(gratuityYears >= 1){
       const y1to5   = Math.min(gratuityYears, 5);
@@ -23680,15 +23672,59 @@ function renderPayroll(){
     </table>`;
 }
 
-function countAbsences(staffId, mon){
-  let count=0;
+// Single source of truth for "how many days did this staff member work/miss this month".
+// Same bridging rule used by the Historical/Labour-Complaint report: a scheduled off-day
+// (weekend) that sits between the staff member's attendance records inherits absence from
+// its nearest real work-day neighbor — e.g. present Thursday, off Fri+Sat, absent Sunday
+// → Friday and Saturday count as absent too, not just Sunday.
+function getStaffMonthAttendance(staffId, mon){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  const attMap={};
   Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
     if(date.startsWith(mon)){
       const st=map[staffId]||map[String(staffId)];
-      if(st&&st!=='حضور'&&st!=='present') count++;
+      if(st) attMap[date]=st;
     }
   });
-  return count;
+  const getNearestWorkStatus=(d,direction)=>{
+    for(let i=1;i<=14;i++){
+      const nd=d+(direction*i);
+      if(nd<1||nd>daysInMonth) return null;
+      const nDate=`${mon}-${String(nd).padStart(2,'0')}`;
+      const nDow=new Date(nDate+'T00:00:00').getDay();
+      if(workDays.includes(nDow)) return attMap[nDate]||'unset';
+    }
+    return null;
+  };
+  let present=0,absent=0,half=0,off=0,leave=0;
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+    const dow=new Date(dateStr+'T00:00:00').getDay();
+    if(!workDays.includes(dow)){
+      const prevSt=getNearestWorkStatus(d,-1);
+      const nextSt=getNearestWorkStatus(d,1);
+      const prevAbsent=prevSt==='غياب', nextAbsent=nextSt==='غياب';
+      const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
+      const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
+      if(prevAbsent||nextAbsent) absent++; // off day adjacent to any absence = absence
+      else if(prevPresent&&nextPresent) present++; // off day sandwiched between 2 present = paid
+      else off++; // genuinely isolated weekly off — not counted either way
+      continue;
+    }
+    const st=attMap[dateStr]||'';
+    if(st==='حضور'||st==='تعويض') present++;
+    else if(st==='غياب') absent++;
+    else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
+    else if(st==='إجازة') leave++;
+  }
+  return {present,absent,half,leave,off,daysInMonth};
+}
+
+function countAbsences(staffId, mon){
+  return getStaffMonthAttendance(staffId, mon).absent;
 }
 
 function countSickLeave(staffId, mon){
@@ -24403,29 +24439,75 @@ function getActualWorkDaysCount(staffId){
   return histDays+liveDays;
 }
 
+// Owner's policy: 1 year of service = 365 ACTUAL work days — unauthorized absence pauses
+// the clock (it doesn't count toward the 365). Scheduled weekly off-days still count as
+// service UNLESS they're adjacent to a real absence (same bridging rule as payroll —
+// see getStaffMonthAttendance) — a normal paid weekend does not delay someone's year.
+// Approved leave (إجازة) and comp-off (تعويض) are not absence, so they don't delay it either.
+function getAbsenceDaysInRange(staffId, fromDateStr, toDateStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
+  const from=new Date(fromDateStr+'T00:00:00');
+  const to=new Date(toDateStr+'T00:00:00');
+  if(to<from) return 0;
+  const totalDays=Math.round((to-from)/86400000)+1;
+  const dateAt=i=>{const d=new Date(from); d.setDate(from.getDate()+i); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  const attMap={};
+  Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
+    if(date>=fromDateStr&&date<=toDateStr){
+      const st=map[staffId]||map[String(staffId)];
+      if(st) attMap[date]=st;
+    }
+  });
+  const getNearestWorkStatus=(idx,direction)=>{
+    for(let i=1;i<=14;i++){
+      const nIdx=idx+(direction*i);
+      if(nIdx<0||nIdx>=totalDays) return null;
+      const nDate=dateAt(nIdx);
+      const nDow=new Date(nDate+'T00:00:00').getDay();
+      if(workDays.includes(nDow)) return attMap[nDate]||'unset';
+    }
+    return null;
+  };
+  let absent=0;
+  for(let i=0;i<totalDays;i++){
+    const dateStr=dateAt(i);
+    const dow=new Date(dateStr+'T00:00:00').getDay();
+    if(!workDays.includes(dow)){
+      const prevSt=getNearestWorkStatus(i,-1);
+      const nextSt=getNearestWorkStatus(i,1);
+      if(prevSt==='غياب'||nextSt==='غياب') absent++;
+      continue;
+    }
+    const st=attMap[dateStr]||'';
+    if(st==='غياب') absent+=1;
+    else if(st==='نص يوم') absent+=0.5;
+  }
+  return absent;
+}
+
+function getServiceYears(staffId, endDateStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s||!s.contractStart) return 0;
+  const endStr=endDateStr||today();
+  const start=new Date(s.contractStart);
+  const end=new Date(endStr);
+  const calendarDays=Math.floor((end-start)/(1000*60*60*24));
+  const absenceDays=getAbsenceDaysInRange(staffId, s.contractStart, endStr);
+  const daysBeforeSystem=Number(s.daysWorkedBefore||0);
+  return Math.max(0,(calendarDays-absenceDays+daysBeforeSystem)/365);
+}
+
 function calcLeaveBalance(staffId, endDateStr){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0,actualDays:0};
 
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
-  const actualDays=getActualWorkDaysCount(staffId);
+  const actualDays=getActualWorkDaysCount(staffId); // informational only — see getServiceYears
 
-  let yearsWorked=0;
-  let calcMethod='';
-
-  if(actualDays>0){
-    // Use actual work days recorded in system (most accurate)
-    yearsWorked=actualDays/365;
-    calcMethod='أيام فعلية';
-  } else {
-    // Fall back to calendar months
-    const start=new Date(s.contractStart);
-    const refDate=endDateStr?new Date(endDateStr):new Date();
-    const totalMonths=(refDate.getFullYear()-start.getFullYear())*12+(refDate.getMonth()-start.getMonth());
-    yearsWorked=totalMonths/12;
-    calcMethod='تواريخ عقد';
-  }
+  const yearsWorked=getServiceYears(staffId, endDateStr);
+  const calcMethod='تواريخ عقد';
 
   // UAE: 30 days annual leave per year, pro-rated
   const entitled=Math.floor(yearsWorked*30);
@@ -24672,12 +24754,11 @@ function calcEOG(){
   const diffMs=end-start;
   if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
 
-  // Use actual work days if available, add days worked before system
-  const actualDays = getActualWorkDaysCount(s.id);
-  const daysBeforeSystem = Number(s.daysWorkedBefore||0);
-  const totalDays = (actualDays>0 ? actualDays : Math.floor(diffMs/(1000*60*60*24))) + daysBeforeSystem;
-  const years = totalDays/365;
-  const usingActual=actualDays>0;
+  // Gratuity is based on calendar length of service (UAE labour law), not attendance records
+  const actualDays = getActualWorkDaysCount(s.id); // informational only
+  const years = getServiceYears(s.id, endDate);
+  const totalDays = Math.round(years*365);
+  const usingActual=false;
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
 
@@ -26359,7 +26440,7 @@ async function renderLeaveAttDashboard(){
     // Gratuity estimate
     const basic   = Number(s.basicSalary||0);
     const gross   = Number(s.grossSalary||s.basicSalary||0);
-    const gratuityYears = totalD>0?totalD/365:totalMo/12;
+    const gratuityYears = getServiceYears(s.id); // calendar-based (UAE labour law), not attendance count
     let gratuity=0;
     if(gratuityYears>=1){
       const y1=Math.min(gratuityYears,5), y2=Math.max(0,gratuityYears-5);
