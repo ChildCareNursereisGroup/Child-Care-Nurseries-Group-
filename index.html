@@ -3551,15 +3551,17 @@ function renderMonthlyPerformance(){
       if(isSuspendedNow || isSuspendedHistoric) return false;
       return true;
     });
-    let full=0, partial=0, none=0, totalPaid=0;
+    let full=0, partial=0, none=0;
     active.forEach(c=>{
       const paid = DB.receipts.filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
       const exp = c.fee + Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0) + (c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
-      totalPaid += paid;
       if(paid<=0) none++;
       else if(paid>=exp) full++;
       else partial++;
     });
+    // Total collected = ALL money received for this month, including receipts not linked
+    // to a specific child (guests/visitors, or unresolved names) — the money still counts.
+    const totalPaid = DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
     const newRegs = DB.children.filter(c=>c.joinDate && monthOf(c.joinDate)===mon).length;
     const stopped = DB.children.filter(c=>c.leaveDate && monthOf(c.leaveDate)===mon).length;
     return {mon, full, partial, none, totalPaid, newRegs, stopped, totalKids: active.length};
