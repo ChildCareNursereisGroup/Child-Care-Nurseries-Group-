@@ -232,6 +232,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
 
   <!-- YEARLY FINANCIAL SUMMARY — ADMIN ONLY -->
   <div id="yearly-summary" style="display:none;margin-bottom:12px"></div>
+  <div id="monthly-perf-summary" style="display:none;margin-bottom:12px"></div>
 
   <!-- TODAY'S QUICK SUMMARY -->
   <div class="card" id="today-summary-card" style="border-top:3px solid #1e3a8a;padding-bottom:4px">
@@ -2558,7 +2559,7 @@ function setAttView(v){
   renderStaffAtt();
 }
 // In-memory cache
-let DB = {children:[],receipts:[],attendance:{},expenses:[]};
+let DB = {children:[],receipts:[],attendance:{},expenses:[],childPauses:[]};
 let weekendFilterOn = false; // global state for weekend filter
 
 // ═══════════════════════════════════════════════
@@ -2726,10 +2727,15 @@ async function loadFromSupa(bid) {
   showLoad(lang==='ar'?'جاري التحميل...':'Loading...');
   try {
     // ── Load critical data first (parallel) ──────────────────────────
-    const [childrenRaw, expensesRaw] = await Promise.all([
+    const [childrenRaw, expensesRaw, pausesRaw] = await Promise.all([
       fetchAll(()=>sb.from('children').select('*').eq('branch_id',bid).order('created_at',{ascending:true})),
       fetchAll(()=>sb.from('expenses').select('*').eq('branch_id',bid).order('date',{ascending:false})),
+      fetchAll(()=>sb.from('child_pauses').select('*').eq('branch_id',bid).order('suspend_date',{ascending:false})),
     ]);
+    DB.childPauses = (pausesRaw||[]).map(x=>({
+      id:x.id, childId:x.child_id, branchId:x.branch_id,
+      suspendDate:x.suspend_date||null, resumeDate:x.resume_date||null, reason:x.reason||''
+    }));
 
     DB.children = (childrenRaw||[]).map(x=>({
       id:x.id, name:x.name||'', className:x.class_name||'', regNum:x.reg_num||'',
@@ -3494,6 +3500,7 @@ function renderDashboard(){
       yearlyEl.style.display='none';
     }
   }
+  renderMonthlyPerformance();
   if(curRole==='admin'){
     el('bovcard').style.display='block';
     el('bovgrid').innerHTML=BRANCHES.map(b=>`
@@ -3520,6 +3527,73 @@ function renderDashboard(){
   const _rMonEl = el('recent-mon');
   if(_rMonEl && !_rMonEl.value) _rMonEl.value = monthOf(new Date());
   renderRecentByMonth();
+}
+
+// ── Monthly fee-collection performance (Admin only) — current branch ──
+function renderMonthlyPerformance(){
+  const container = el('monthly-perf-summary');
+  if(!container) return;
+  if(curRole!=='admin'){ container.innerHTML=''; container.style.display='none'; return; }
+
+  const months = [...new Set((DB.receipts||[]).filter(r=>!r.isCancelled).map(r=>monthOf(r.date)).filter(Boolean))]
+    .sort().reverse().slice(0,24);
+  if(!months.length){ container.innerHTML=''; container.style.display='none'; return; }
+
+  const rows = months.map(mon=>{
+    const active = DB.children.filter(c=>{
+      if(!c.fee || c.fee<=0) return false;
+      if(c.joinDate && c.joinDate > mon+'-31') return false;
+      if(c.leaveDate && c.leaveDate < mon+'-01') return false;
+      // Suspended (temporary pause/resume) — checks the CURRENT pause fields plus the
+      // full archived history (child_pauses), so old resolved pauses still count.
+      const isSuspendedNow = c.suspendDate && c.suspendDate<=mon+'-28' && (!c.resumeDate || c.resumeDate>mon+'-01');
+      const isSuspendedHistoric = (DB.childPauses||[]).some(p=>String(p.childId)===String(c.id) && p.suspendDate<=mon+'-28' && (!p.resumeDate || p.resumeDate>mon+'-01'));
+      if(isSuspendedNow || isSuspendedHistoric) return false;
+      return true;
+    });
+    let full=0, partial=0, none=0, totalPaid=0;
+    active.forEach(c=>{
+      const paid = DB.receipts.filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
+      const exp = c.fee + Number((c.bus==='Yes'||c.bus==='نعم')?c.busFee||0:0) + (c.friFee||0)+(c.satFee||0)+(c.sunFee||0);
+      totalPaid += paid;
+      if(paid<=0) none++;
+      else if(paid>=exp) full++;
+      else partial++;
+    });
+    const newRegs = DB.children.filter(c=>c.joinDate && monthOf(c.joinDate)===mon).length;
+    const stopped = DB.children.filter(c=>c.leaveDate && monthOf(c.leaveDate)===mon).length;
+    return {mon, full, partial, none, totalPaid, newRegs, stopped, totalKids: active.length};
+  });
+
+  const monLabel = m => { const [y,mo]=m.split('-').map(Number); return new Date(y,mo-1,1).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'}); };
+
+  container.innerHTML = `
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;overflow-x:auto">
+      <div style="font-weight:900;color:#1e3a8a;font-size:.9rem;margin-bottom:10px">📈 ${lang==='ar'?'تقرير الأداء الشهري — تحصيل الرسوم':'Monthly Performance — Fee Collection'}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:680px">
+        <thead><tr style="background:#f8fafc">
+          <th style="padding:7px 9px;text-align:right;border-bottom:2px solid #e5e7eb">${lang==='ar'?'الشهر':'Month'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#059669">✅ ${lang==='ar'?'دفع كامل':'Paid Full'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#d97706">⚠️ ${lang==='ar'?'دفع جزء':'Partial'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#dc2626">❌ ${lang==='ar'?'لم يدفع':'Not Paid'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#0369a1">🆕 ${lang==='ar'?'تسجيل جديد':'New Regs'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#7c3aed">🚪 ${lang==='ar'?'توقف':'Stopped'}</th>
+          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb">${lang==='ar'?'إجمالي التحصيل (د.إ)':'Total Collected (AED)'}</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map((r,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+            <td style="padding:6px 9px;border-bottom:1px solid #e5e7eb;font-weight:700">${monLabel(r.mon)}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#059669;font-weight:800">${r.full}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#d97706;font-weight:800">${r.partial||'—'}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.none>0?'#dc2626':'#9ca3af'};font-weight:800">${r.none||'—'}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0369a1;font-weight:800">${r.newRegs||'—'}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.stopped>0?'#7c3aed':'#9ca3af'};font-weight:800">${r.stopped||'—'}</td>
+            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:#1e3a8a">${fmtNum(Math.round(r.totalPaid))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  container.style.display='block';
 }
 function renderPV(){
   if(curRole!=='admin'){el('pvcard').style.display='none';return;}
@@ -10752,6 +10826,7 @@ function showDTab(tab,btn){
   const c=DB.children.find(x=>String(x.id)===String(curChild));if(!c)return;
   const cont=el('dtcont');
   if(tab==='info'){
+    const pauseHistory = (DB.childPauses||[]).filter(p=>String(p.childId)===String(c.id));
     cont.innerHTML=`
       <div class="g3" style="margin-bottom:9px">
         <div class="fg"><label>Kids Name</label><input value="${c.name}" onchange="updateField('name',this.value)"></div>
@@ -10884,6 +10959,14 @@ function showDTab(tab,btn){
           ${c.resumeDate?` → ✅ Resumed: <b>${fmtDate(c.resumeDate)}</b>`:'→ <b style="color:#d97706">Still suspended</b>'}
           ${c.suspendReason?' | Reason: <b>'+c.suspendReason+'</b>':''}
         </div>`:''}
+        ${c.suspendDate?`<button onclick="archiveChildPause()" style="margin-top:8px;background:#4338ca;color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.76rem;font-weight:700;font-family:'Tajawal',sans-serif">📥 حفظ في السجل — Save to History</button>`:''}
+        <div style="margin-top:10px">
+          <div style="font-weight:800;color:#374151;font-size:.78rem;margin-bottom:6px">📜 سجل التوقفات السابقة — Pause History (${pauseHistory.length})</div>
+          ${pauseHistory.length?pauseHistory.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:.75rem">
+            <span>⏸️ ${fmtDate(p.suspendDate)} ${p.resumeDate?'→ ✅ '+fmtDate(p.resumeDate):'<b style="color:#d97706">(لسه مفتوح)</b>'}${p.reason?' | '+p.reason:''}</span>
+            <button onclick="deleteChildPause('${p.id}')" style="background:#fee2e2;color:#991b1b;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.7rem">🗑</button>
+          </div>`).join(''):`<div style="color:#9ca3af;font-size:.75rem">لا يوجد سجل توقفات سابقة</div>`}
+        </div>
       </div>
 
       <div class="g3" style="margin-bottom:9px">
@@ -12591,6 +12674,30 @@ async function updateField(field,value){
   c[field]=value;
   const dbField=map[field]||field;
   await sb.from('children').update({[dbField]:value}).eq('id',curChild);
+}
+
+// Archive the child's current suspend/resume fields into permanent history (child_pauses),
+// then clear them so a new pause can be recorded later without losing this one.
+async function archiveChildPause(){
+  const c=DB.children.find(x=>String(x.id)===String(curChild));
+  if(!c||!c.suspendDate){ alert(lang==='ar'?'لا يوجد توقف حالي لحفظه':'No current pause to archive'); return; }
+  const {data,error}=await sb.from('child_pauses').insert({
+    child_id:curChild, branch_id:curBid,
+    suspend_date:c.suspendDate, resume_date:c.resumeDate||null, reason:c.suspendReason||null
+  }).select().single();
+  if(error){ alert('❌ '+error.message); return; }
+  DB.childPauses=DB.childPauses||[];
+  DB.childPauses.unshift({id:data.id, childId:data.child_id, branchId:data.branch_id, suspendDate:data.suspend_date, resumeDate:data.resume_date, reason:data.reason});
+  await updateField('suspendDate',null);
+  await updateField('resumeDate',null);
+  await updateField('suspendReason','');
+  showDTab('info',document.querySelector('.dtab.on'));
+}
+async function deleteChildPause(id){
+  if(!confirm(lang==='ar'?'حذف سجل التوقف ده؟':'Delete this pause record?')) return;
+  await sb.from('child_pauses').delete().eq('id',id);
+  DB.childPauses=(DB.childPauses||[]).filter(p=>String(p.id)!==String(id));
+  showDTab('info',document.querySelector('.dtab.on'));
 }
 // ══ BUS TRIP SHEET — FULL SYSTEM ═════════════════
 let _tripTab = 'pick';
