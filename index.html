@@ -315,8 +315,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="Other">Other</option>
       </select>
     </div>
-    <div class="fg"><label data-t="dob">Date of Birth</label><input type="date" id="fdob"></div>
-    <div class="fg"><label data-t="kidsTime">Kids Time (hours)</label><input type="text" id="fktime" placeholder="e.g. 08:00-03:00 or 6hrs"></div>
+    <div class="fg"><label data-t="dob">Date of Birth</label><input type="date" id="fdob" onchange="updateClassSuggestion()"></div>
+    <div class="fg"><label data-t="kidsTime">Kids Time (hours)</label><input type="text" id="fktime" placeholder="e.g. 08:00-03:00 or 6hrs" onchange="updateClassSuggestion()"></div>
     <div class="fg" style="grid-column:1/-1">
       <label>📅 Attendance Days — أيام الحضور</label>
       <!-- Regular Days -->
@@ -1477,12 +1477,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="card" style="border:2px solid #0891b2">
   <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
-    <b>قواعد التوزيع — حد أقصى 15 طفل لكل فصل:</b><br>
-    🍼 <b>A</b> → أقل من 1.5 سنة — أي وقت<br>
-    🌟 <b>C / D / E</b> حسب العمر: بداية 6ص - 7ص - 8ص - 9ص وتنتهي 1م أو بعدها<br>
-    🕑 <b>CF / F / H</b> حسب العمر: بداية 10ص - 11ص وتنتهي 3م<br>
-    ☀️ <b>CS / S / G</b> حسب العمر: بداية 6ص - 7ص - 8ص وتنتهي 11ص بالظبط<br>
-    🌙 <b>M / N</b> حسب العمر: بداية 1م أو بعدها<br>
+    <b>قواعد التوزيع الجديدة (2026) — حسب قانون سن الدخول للمدرسة الجديد:</b><br>
+    🍼 <b>A ثم B</b> → أقل من سنة و3 شهور — حد أقصى 4 أطفال لكل فصل — أي وقت<br>
+    🌟 <b>C / CS / CF / CN</b> → من سنة و3 شهور لسنتين — حد أقصى 6 أطفال لكل فصل (C يوم كامل، CS صباحي قصير، CF نص يوم، CN بعد الظهر)<br>
+    🌟 <b>D / DS / DF / DN</b> → من سنتين لتلات سنين — حد أقصى 8 أطفال لكل فصل (نفس تقسيم المواعيد)<br>
+    🌟 <b>E / S / F / N</b> → من تلات سنين لأربع سنين — حد أقصى 10 أطفال لكل فصل (نفس تقسيم المواعيد)<br>
+    لو أي فصل امتلأ، الطفل الجديد ياخد رقم بعد اسم الفصل (زي B2, C2...)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -3912,6 +3912,7 @@ async function saveChild(){
   renderChildren();renderDashboard();
 }
 function clearAdd(){
+  _regClassAutoFilled='';
   ['fn','fc','fr','fidnum','fnat','fdob','fktime','fmom','fdad','femail','ffee','fbfee','fnotes'].forEach(i=>el(i).value='');
   el('fgender').value='Female';el('frel').value='Muslim';el('fbus').value='No';
   if(el('fbus-dir'))el('fbus-dir').value='';
@@ -13936,8 +13937,25 @@ function _ageMonths(dob){
   return Math.floor((Date.now()-new Date(dob))/(1000*60*60*24*30.44));
 }
 
+// Class-size caps by age bracket (2026 UAE school-age law update — school now takes
+// children turning 4 by December 2026, so nursery age bands were re-capped smaller).
+function _classCapForAge(mo){
+  if(mo<15) return 4;   // infants: under 1y3m
+  if(mo<24) return 6;   // 1y3m – 2y
+  if(mo<36) return 8;   // 2y – 3y
+  return 10;            // 3y – 4y
+}
+// Base class-name for a given age bracket + schedule group. Infants share one name
+// regardless of schedule; older tiers get one name per schedule (fullday/morning/midday/afternoon).
+function _baseClassName(mo, tg){
+  if(mo<15) return 'A';
+  if(tg==='other') return '';
+  if(mo<24) return tg==='fullday'?'C' : tg==='morning'?'CS' : tg==='midday'?'CF' : 'CN';
+  if(mo<36) return tg==='fullday'?'D' : tg==='morning'?'DS' : tg==='midday'?'DF' : 'DN';
+  return tg==='fullday'?'E' : tg==='morning'?'S' : tg==='midday'?'F' : 'N';
+}
+
 function _buildClassAssignments(){
-  const MAX=15; // max kids per class
   const active=DB.children.filter(c=>!c.leaveDate);
 
   // Sort by age: youngest first
@@ -13949,57 +13967,81 @@ function _buildClassAssignments(){
 
   const assignments=[];
 
-  // Counters per class
+  // Counters per class. Fills the base name(s) first (e.g. infants: A then B); once every
+  // base name is full, keeps extending the last one with a rising number (B2, B3, ...).
   const cnt={};
-  const nextSlot=(cls,overflow)=>{
-    if(!cnt[cls]) cnt[cls]=0;
-    if(cnt[cls]<MAX){ cnt[cls]++; return cls; }
-    // overflow class
-    if(!cnt[overflow]) cnt[overflow]=0;
-    cnt[overflow]++;
-    return overflow;
+  const nextSlot=(baseNames,cap)=>{
+    for(const name of baseNames){
+      if(!cnt[name]) cnt[name]=0;
+      if(cnt[name]<cap){ cnt[name]++; return name; }
+    }
+    let n=2;
+    while(true){
+      const name=baseNames[baseNames.length-1]+n;
+      if(!cnt[name]) cnt[name]=0;
+      if(cnt[name]<cap){ cnt[name]++; return name; }
+      n++;
+    }
   };
 
   byAge(active).forEach(c=>{
     const mo=_ageMonths(c.dob);
     const tg=_getTimeGroup(c.kidsTime);
-    let cls='';
+    const cap=_classCapForAge(mo);
+    const base=_baseClassName(mo,tg);
 
-    // Rule 1: Under 1.5 years (18 months) → Class A regardless of timing
-    if(mo<18){
-      cls=nextSlot('A','A2');
-    }
-    // Rule 2: Full day (08:xx-01:xx to 08:xx-05:xx)
-    else if(tg==='fullday'){
-      if(mo<24)       cls=nextSlot('C','C2');
-      else if(mo<36)  cls=nextSlot('D','D2');
-      else            cls=nextSlot('E','E2');
-    }
-    // Rule 3: Morning 08:00-11:00
-    else if(tg==='morning'){
-      if(mo<24)       cls=nextSlot('CS','CS2');
-      else            cls=nextSlot('S','G');   // 2-5 yrs: S then G
-    }
-    // Rule 4: Midday 11:00-03:00
-    else if(tg==='midday'){
-      if(mo<24)       cls=nextSlot('CF','CF2');
-      else            cls=nextSlot('F','H');   // 2-5 yrs: F then H
-    }
-    // Rule 5: Afternoon 01:00-05:00
-    else if(tg==='afternoon'){
-      if(mo<24)       cls=nextSlot('M','M2');
-      else            cls=nextSlot('N','N2');
-    }
-    else{
+    if(!base){
       // Unknown timing — no change
       assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className,noChange:true});
       return;
     }
 
+    const baseNames = mo<15 ? ['A','B'] : [base];
+    const cls=nextSlot(baseNames,cap);
     assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:cls});
   });
 
   return assignments;
+}
+
+// Suggest a class name for ONE new child (registration form), based on current occupancy
+// of the branch's active children — same age/schedule/cap rules as the bulk assignment tool.
+function _suggestClassName(dob, kidsTime){
+  if(!dob) return '';
+  const mo=_ageMonths(dob);
+  const tg=_getTimeGroup(kidsTime);
+  const cap=_classCapForAge(mo);
+  const base=_baseClassName(mo,tg);
+  if(!base) return '';
+  const baseNames = mo<15 ? ['A','B'] : [base];
+
+  const cnt={};
+  DB.children.filter(c=>!c.leaveDate).forEach(c=>{
+    const cn=(c.className||'').trim();
+    if(cn) cnt[cn]=(cnt[cn]||0)+1;
+  });
+  for(const name of baseNames){
+    if((cnt[name]||0)<cap) return name;
+  }
+  let n=2;
+  while(true){
+    const name=baseNames[baseNames.length-1]+n;
+    if((cnt[name]||0)<cap) return name;
+    n++;
+  }
+}
+
+// Auto-fills the registration form's Class Name field as the manager enters DOB/Kids Time —
+// but never overwrites a name she typed herself (only updates while the field still holds
+// our own last suggestion, or is empty).
+let _regClassAutoFilled='';
+function updateClassSuggestion(){
+  const clsInput=el('fc');
+  if(!clsInput) return;
+  const cur=clsInput.value.trim();
+  if(cur!==''&&cur!==_regClassAutoFilled) return; // manager typed her own class name — leave it
+  const suggestion=_suggestClassName(el('fdob')?.value,el('fktime')?.value);
+  if(suggestion){ clsInput.value=suggestion; _regClassAutoFilled=suggestion; }
 }
 
 function previewAutoClasses(){
@@ -14015,7 +14057,7 @@ function previewAutoClasses(){
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
 
-  const classColors={A:'#7c3aed',C:'#0891b2',CS:'#06b6d4',CF:'#0369a1',D:'#059669',E:'#d97706',S:'#1d4ed8',G:'#4f46e5',F:'#dc2626',H:'#b91c1c',M:'#9333ea',N:'#0e7490'};
+  const classColors={A:'#7c3aed',B:'#8b5cf6',C:'#0891b2',CS:'#06b6d4',CF:'#0369a1',CN:'#0ea5e9',D:'#059669',DS:'#10b981',DF:'#047857',DN:'#065f46',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490'};
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
@@ -16280,50 +16322,14 @@ async function saveRoutePlan(){
 // ═══════════════════════════════════════════════
 // AUTO ASSIGN CLASSES
 // ═══════════════════════════════════════════════
-function calcAgeMonths(dob){
-  if(!dob) return 999;
-  const d=new Date(dob+'T00:00:00');
-  if(isNaN(d)) return 999;
-  const now=new Date();
-  return (now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());
-}
-
-function suggestClass(child){
-  const ageM=calcAgeMonths(child.dob);
-  const kt=_parseKT(child.kidsTime||'');
-  const sh=kt.sh, eh=kt.eh;
-  if(ageM<18) return 'A';
-  const isMorningLong  = sh>=6&&sh<=9&&eh>=13;
-  const isMidday       = sh>=10&&sh<=11&&eh>=15;
-  const isMorningShort = sh>=6&&sh<=8&&eh===11;
-  const isAfternoon    = sh>=13;
-  if(ageM<30){
-    if(isMorningLong)  return 'C';
-    if(isMidday)       return 'CF';
-    if(isMorningShort) return 'CS';
-    return 'C';
-  }
-  if(ageM<36){
-    if(isMorningLong)  return 'D';
-    if(isMidday)       return 'F';
-    if(isMorningShort) return 'S';
-    if(isAfternoon)    return 'M';
-    return 'D';
-  }
-  if(isMorningLong)  return 'E';
-  if(isMidday)       return 'H';
-  if(isMorningShort) return 'G';
-  if(isAfternoon)    return 'N';
-  return 'E';
-}
-
 function openAutoAssignClasses(){
-  const children=(DB.children||[]).filter(c=>!c.leaveDate);
-  if(!children.length){showToast('No active children');return;}
-  const suggestions=children.map(c=>({
-    ...c, ageM:calcAgeMonths(c.dob),
-    suggested:suggestClass(c),
-    changed:suggestClass(c)!==c.className
+  const asgn=_buildClassAssignments();
+  if(!asgn.length){showToast('No active children');return;}
+  const suggestions=asgn.map(a=>({
+    id:a.id, name:a.name, dob:a.dob, kidsTime:a.kidsTime, className:a.oldClass,
+    ageM:_ageMonths(a.dob),
+    suggested:a.newClass,
+    changed:!a.noChange && a.newClass!==a.oldClass
   })).sort((a,b)=>a.suggested.localeCompare(b.suggested)||(a.ageM-b.ageM));
   const classCounts={};
   suggestions.forEach(c=>{classCounts[c.suggested]=(classCounts[c.suggested]||0)+1;});
