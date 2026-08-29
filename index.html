@@ -13128,13 +13128,29 @@ async function confirmAutoAssign(){
   for(const [childId, busIdx] of Object.entries(finalAssign)){
     const bus=buses[busIdx];
     if(!bus) continue;
+    // Must also set pick_bus_id/drop_bus_id, not just the generic bus_id — getBusAssign()
+    // reads pick/drop first and only falls back to bus_id when they're empty, so a child
+    // who already had a pick/drop bus assigned (e.g. from the Monthly Roster) would keep
+    // using that old bus even after confirming a different one here.
     const {error}=await sb.from('bus_assignments').upsert({
       child_id:Number(childId),
       bus_id:bus.id,
-      bus_number:bus.busNumber
+      bus_number:bus.busNumber,
+      pick_bus_id:bus.id,
+      pick_bus_number:bus.busNumber,
+      drop_bus_id:bus.id,
+      drop_bus_number:bus.busNumber
     },{onConflict:'child_id'});
     if(error) err++;
-    else { ok++; DB.busAssignments=DB.busAssignments||{}; DB.busAssignments[String(childId)]={busId:String(bus.id),busNumber:bus.busNumber}; }
+    else {
+      ok++;
+      DB.busAssignments=DB.busAssignments||{};
+      DB.busAssignments[String(childId)]={
+        busId:String(bus.id), busNumber:bus.busNumber,
+        pick:{busId:String(bus.id),busNumber:bus.busNumber},
+        drop:{busId:String(bus.id),busNumber:bus.busNumber}
+      };
+    }
   }
 
   if(status) status.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px;color:#065f46;font-weight:700">✅ تم حفظ ${ok} طفل${err?` | ⚠️ ${err} خطأ`:''}!</div>`;
