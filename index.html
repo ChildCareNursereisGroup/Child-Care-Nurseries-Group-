@@ -2174,6 +2174,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div id="pg-class-msg-inner"></div>
 </div><!-- end pg-class-msg -->
 
+<div class="page" id="pg-group-fin">
+<div id="pg-group-fin-inner"></div>
+</div><!-- end pg-group-fin -->
+
 <div class="page" id="pg-visitors">
 <div class="card np" id="inquiry-form-card">
   <div class="ch">
@@ -2462,7 +2466,7 @@ const BRANCHES = [
   {id:'b5', ar:'أبطال البراعم',   en:'Abtal Al Baraeim',  icon:'🦸', c:'#dc2626', l:'#fee2e2'},
 ];
 const ROLES_PAGES = {
-  admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','class-msg','admin'],
+  admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','class-msg','group-fin','admin'],
   manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff','buses','class-msg'],
   visitor_reg:['visitors'],
   receipts:   ['dashboard','children','add','receipts','birthdays','reminders'],
@@ -2867,6 +2871,113 @@ async function loadAllBranches() {
     };
   }));
   return result;
+}
+
+// ═══════════════════════════════════════════════
+// GROUP FINANCIAL OVERVIEW — admin only, all 5 branches side by side
+// ═══════════════════════════════════════════════
+let _groupFinCache=null; // {branchId:{children,receipts,expenses}} — fetched once, reused until refreshed
+
+async function initGroupFinPage(){
+  const inner=el('pg-group-fin-inner');
+  if(!inner) return;
+  if(curRole!=='admin'){ inner.innerHTML=`<div class="empty"><div class="ei">🔒</div><p>Admin only</p></div>`; return; }
+  if(_groupFinCache){ renderGroupFinPage(); return; }
+  inner.innerHTML=`<div class="card np" style="text-align:center;padding:40px">⏳ ${lang==='ar'?'جاري تحميل بيانات كل الفروع...':'Loading all branches...'}</div>`;
+  _groupFinCache=await loadAllBranches();
+  renderGroupFinPage();
+}
+
+async function refreshGroupFin(){
+  const inner=el('pg-group-fin-inner');
+  if(inner) inner.innerHTML=`<div class="card np" style="text-align:center;padding:40px">⏳ ${lang==='ar'?'جاري التحديث...':'Refreshing...'}</div>`;
+  _groupFinCache=await loadAllBranches();
+  renderGroupFinPage();
+}
+
+function renderGroupFinPage(){
+  const ar=lang==='ar';
+  const inner=el('pg-group-fin-inner');
+  if(!inner||!_groupFinCache) return;
+  const data=_groupFinCache;
+
+  const monthSet=new Set();
+  BRANCHES.forEach(b=>{
+    const bd=data[b.id]||{receipts:[],expenses:[]};
+    bd.receipts.forEach(r=>{ const m=monthOf(r.date); if(m) monthSet.add(m); });
+    bd.expenses.forEach(e=>{ const m=monthOf(e.date); if(m) monthSet.add(m); });
+  });
+  const months=[...monthSet].sort().reverse(); // newest first
+
+  if(!months.length){
+    inner.innerHTML=`<div class="empty"><div class="ei">📊</div><p>${ar?'لا توجد بيانات بعد':'No data yet'}</p></div>`;
+    return;
+  }
+
+  const monLabel=m=>{ const [y,mo]=m.split('-').map(Number); return new Date(y,mo-1,1).toLocaleDateString(ar?'ar-AE':'en-AE',{month:'long',year:'numeric'}); };
+
+  const metricsFor=(bid,mon)=>{
+    const bd=data[bid]||{receipts:[],expenses:[]};
+    const income=bd.receipts.filter(r=>!r.is_cancelled && monthOf(r.date)===mon).reduce((s,r)=>s+(r.total||0),0);
+    const expenses=bd.expenses.filter(e=>monthOf(e.date)===mon).reduce((s,e)=>s+(e.totalAmount||e.total_amount||e.amount||0),0);
+    return {income, expenses, profit: income-expenses};
+  };
+
+  const branchHeaders=BRANCHES.map(b=>`<th colspan="3" style="padding:7px;text-align:center;border-bottom:1px solid #e5e7eb;background:${b.c}18;font-weight:900;color:${b.c};border-right:2px solid #e5e7eb">${b.icon} ${tBN(b)}</th>`).join('');
+  const subHeaders=BRANCHES.map(()=>`
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#dc2626;font-size:.68rem">💸 ${ar?'مصاريف':'Expenses'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#059669;font-size:.68rem">💰 ${ar?'دخل':'Income'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:.68rem;border-right:2px solid #e5e7eb">📈 ${ar?'مكسب':'Profit'}</th>
+  `).join('');
+
+  const bodyRows=months.map((mon,i)=>{
+    let rowInc=0, rowExp=0;
+    const branchCells=BRANCHES.map(b=>{
+      const m=metricsFor(b.id,mon);
+      rowInc+=m.income; rowExp+=m.expenses;
+      return `
+        <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#dc2626;font-weight:700">${m.expenses?fmtNum(Math.round(m.expenses)):'—'}</td>
+        <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#059669;font-weight:700">${m.income?fmtNum(Math.round(m.income)):'—'}</td>
+        <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:${m.profit>=0?'#1d4ed8':'#dc2626'};border-right:2px solid #e5e7eb">${fmtNum(Math.round(m.profit))}</td>`;
+    }).join('');
+    const rowProfit=rowInc-rowExp;
+    return `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+      <td style="padding:6px 9px;border-bottom:1px solid #e5e7eb;font-weight:700;position:sticky;left:0;background:inherit">${monLabel(mon)}</td>
+      ${branchCells}
+      <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#dc2626;font-weight:800;background:#fef2f2">${fmtNum(Math.round(rowExp))}</td>
+      <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#059669;font-weight:800;background:#f0fdf4">${fmtNum(Math.round(rowInc))}</td>
+      <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:900;color:${rowProfit>=0?'#1d4ed8':'#dc2626'};background:#eff6ff">${fmtNum(Math.round(rowProfit))}</td>
+    </tr>`;
+  }).join('');
+
+  inner.innerHTML=`
+  <div class="card np">
+    <div class="ch" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div class="ct">🏢 Child Care Nurseries Group — ${ar?'مقارنة الفروع الشهرية':'Monthly Branch Comparison'}</div>
+      <button onclick="refreshGroupFin()" style="padding:6px 14px;background:#1e3a8a;color:#fff;border:none;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer">🔄 ${ar?'تحديث':'Refresh'}</button>
+    </div>
+    <div style="background:#eff6ff;border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:.78rem;color:#1e40af">
+      ${ar?'مقارنة شهرية بين كل الفروع الخمسة: إجمالي المصاريف، إجمالي الدخل، وصافي المكسب — بالإضافة لإجمالي المجموعة كلها.':'Monthly comparison across all 5 branches: total expenses, total income, and net profit — plus the whole-group total.'}
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:${200+BRANCHES.length*260+3*140}px">
+        <thead>
+          <tr style="background:#f8fafc">
+            <th rowspan="2" style="padding:7px 9px;text-align:right;border-bottom:1px solid #e5e7eb;vertical-align:bottom;position:sticky;left:0;background:#f8fafc;z-index:1">${ar?'الشهر':'Month'}</th>
+            ${branchHeaders}
+            <th colspan="3" style="padding:7px;text-align:center;border-bottom:1px solid #e5e7eb;background:#1e3a8a;color:#fff;font-weight:900">🏢 ${ar?'إجمالي المجموعة':'Group Total'}</th>
+          </tr>
+          <tr style="background:#f8fafc">
+            ${subHeaders}
+            <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#dc2626;font-size:.68rem;background:#fef2f2">💸 ${ar?'مصاريف':'Expenses'}</th>
+            <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#059669;font-size:.68rem;background:#f0fdf4">💰 ${ar?'دخل':'Income'}</th>
+            <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:.68rem;background:#eff6ff">📈 ${ar?'مكسب':'Profit'}</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 // ── Realtime subscriptions ──────────────────────
@@ -3367,6 +3478,7 @@ function renderNav(){
     birthdays:()=>lang==='ar'?'🎂 أعياد الميلاد':'🎂 Birthdays',
     reminders:()=>lang==='ar'?'💸 تذكير الرسوم':'💸 Fee Reminders',
     'class-msg':()=>lang==='ar'?'💬 رسائل الفصول':'💬 Class Messages',
+    'group-fin':()=>'🏢 Child Care Nurseries Group',
   };
   el('nav').innerHTML=pages.map((p,i)=>`<button class="ntab${i===0?' on':''}" onclick="showPage('${p}',this)">${labels[p]()}</button>`).join('');
 }
@@ -3403,6 +3515,7 @@ async function showPage(page,btn){
     const p=el('bday-month-picker2'); if(p&&!p.value){p.value=today().slice(0,7);} renderBirthdayPanel();
   }
   if(page==='class-msg') initClassMsgPage();
+  if(page==='group-fin') initGroupFinPage();
   if(page==='reminders'){
     const inp=el('fee-rem-month');
     if(inp&&!inp.value){const d=new Date();d.setMonth(d.getMonth()+1);inp.value=d.toISOString().slice(0,7);}
@@ -3535,11 +3648,12 @@ function renderMonthlyPerformance(){
   if(!container) return;
   if(curRole!=='admin'){ container.innerHTML=''; container.style.display='none'; return; }
 
-  const months = [...new Set((DB.receipts||[]).filter(r=>!r.isCancelled).map(r=>monthOf(r.date)).filter(Boolean))]
-    .sort().reverse().slice(0,24);
-  if(!months.length){ container.innerHTML=''; container.style.display='none'; return; }
+  const allMonths = [...new Set((DB.receipts||[]).filter(r=>!r.isCancelled).map(r=>monthOf(r.date)).filter(Boolean))].sort();
+  if(!allMonths.length){ container.innerHTML=''; container.style.display='none'; return; }
 
-  const rows = months.map(mon=>{
+  const years = [...new Set(allMonths.map(m=>m.split('-')[0]))].sort();
+
+  const metricsFor = mon => {
     const active = DB.children.filter(c=>{
       if(!c.fee || c.fee<=0) return false;
       if(c.joinDate && c.joinDate > mon+'-31') return false;
@@ -3564,35 +3678,52 @@ function renderMonthlyPerformance(){
     const totalPaid = DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
     const newRegs = DB.children.filter(c=>c.joinDate && monthOf(c.joinDate)===mon).length;
     const stopped = DB.children.filter(c=>c.leaveDate && monthOf(c.leaveDate)===mon).length;
-    return {mon, full, partial, none, totalPaid, newRegs, stopped, totalKids: active.length};
-  });
+    return {full, partial, none, totalPaid, newRegs, stopped};
+  };
 
-  const monLabel = m => { const [y,mo]=m.split('-').map(Number); return new Date(y,mo-1,1).toLocaleDateString(lang==='ar'?'ar-AE':'en-AE',{month:'long',year:'numeric'}); };
+  const monthNamesAr=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const monthNamesEn=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthNames = lang==='ar'?monthNamesAr:monthNamesEn;
+
+  const dataByYearMon = {};
+  allMonths.forEach(mon=>{ dataByYearMon[mon]=metricsFor(mon); });
+
+  const cell = (val, color) => `<td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:${val?color:'#cbd5e1'}">${val||'—'}</td>`;
+
+  const bodyRows = Array.from({length:12},(_,i)=>i+1).map(monNum=>{
+    const mm = String(monNum).padStart(2,'0');
+    if(!years.some(y=>dataByYearMon[`${y}-${mm}`])) return ''; // no year has data for this month at all
+    const yearCells = years.map(y=>{
+      const d = dataByYearMon[`${y}-${mm}`];
+      if(!d) return `<td colspan="6" style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#cbd5e1;border-right:2px solid #e5e7eb">—</td>`;
+      return `${cell(d.full,'#059669')}${cell(d.partial,'#d97706')}${cell(d.none,'#dc2626')}${cell(d.newRegs,'#0369a1')}${cell(d.stopped,'#7c3aed')}<td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:#1e3a8a;border-right:2px solid #e5e7eb">${fmtNum(Math.round(d.totalPaid))}</td>`;
+    }).join('');
+    return `<tr><td style="padding:6px 9px;border-bottom:1px solid #e5e7eb;font-weight:700;background:#f8fafc">${monthNames[monNum-1]}</td>${yearCells}</tr>`;
+  }).join('');
+
+  const subHeaders = years.map(()=>`
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#059669;font-size:.7rem">✅ ${lang==='ar'?'كامل':'Full'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#d97706;font-size:.7rem">⚠️ ${lang==='ar'?'جزء':'Part'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#dc2626;font-size:.7rem">❌ ${lang==='ar'?'لم يدفع':'Unpaid'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#0369a1;font-size:.7rem">🆕 ${lang==='ar'?'جديد':'New'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#7c3aed;font-size:.7rem">🚪 ${lang==='ar'?'توقف':'Stop'}</th>
+    <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:.7rem;border-right:2px solid #e5e7eb">💰 ${lang==='ar'?'إجمالي':'Total'}</th>
+  `).join('');
+
+  const yearHeaders = years.map(y=>`<th colspan="6" style="padding:6px;text-align:center;border-bottom:1px solid #e5e7eb;background:#eef2ff;font-weight:900;color:#1e3a8a;border-right:2px solid #e5e7eb">${y}</th>`).join('');
 
   container.innerHTML = `
     <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;overflow-x:auto">
       <div style="font-weight:900;color:#1e3a8a;font-size:.9rem;margin-bottom:10px">📈 ${lang==='ar'?'تقرير الأداء الشهري — تحصيل الرسوم':'Monthly Performance — Fee Collection'}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:680px">
-        <thead><tr style="background:#f8fafc">
-          <th style="padding:7px 9px;text-align:right;border-bottom:2px solid #e5e7eb">${lang==='ar'?'الشهر':'Month'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#059669">✅ ${lang==='ar'?'دفع كامل':'Paid Full'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#d97706">⚠️ ${lang==='ar'?'دفع جزء':'Partial'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#dc2626">❌ ${lang==='ar'?'لم يدفع':'Not Paid'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#0369a1">🆕 ${lang==='ar'?'تسجيل جديد':'New Regs'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb;color:#7c3aed">🚪 ${lang==='ar'?'توقف':'Stopped'}</th>
-          <th style="padding:7px;text-align:center;border-bottom:2px solid #e5e7eb">${lang==='ar'?'إجمالي التحصيل (د.إ)':'Total Collected (AED)'}</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map((r,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
-            <td style="padding:6px 9px;border-bottom:1px solid #e5e7eb;font-weight:700">${monLabel(r.mon)}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#059669;font-weight:800">${r.full}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#d97706;font-weight:800">${r.partial||'—'}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.none>0?'#dc2626':'#9ca3af'};font-weight:800">${r.none||'—'}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0369a1;font-weight:800">${r.newRegs||'—'}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.stopped>0?'#7c3aed':'#9ca3af'};font-weight:800">${r.stopped||'—'}</td>
-            <td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:#1e3a8a">${fmtNum(Math.round(r.totalPaid))}</td>
-          </tr>`).join('')}
-        </tbody>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:${260+years.length*300}px">
+        <thead>
+          <tr style="background:#f8fafc">
+            <th rowspan="2" style="padding:7px 9px;text-align:right;border-bottom:1px solid #e5e7eb;vertical-align:bottom">${lang==='ar'?'الشهر':'Month'}</th>
+            ${yearHeaders}
+          </tr>
+          <tr style="background:#f8fafc">${subHeaders}</tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
       </table>
     </div>`;
   container.style.display='block';
@@ -10787,7 +10918,7 @@ async function genReport(){
     let totalInc=0,totalExp=0,totalChildren=0,totalActive=0;
     const rows=BRANCHES.map(br=>{
       const bd=allData[br.id]||{children:[],receipts:[],expenses:[]};
-      const inc=bd.receipts.filter(r=>!r.isCancelled&&(monthOf(r.date)===month||monthOf(r.fromDate||'')===month)).reduce((s,r)=>s+(r.total||0),0);
+      const inc=bd.receipts.filter(r=>!r.is_cancelled&&(monthOf(r.date)===month||monthOf(r.from_date||'')===month)).reduce((s,r)=>s+(r.total||0),0);
       const exp=bd.expenses.filter(e=>monthOf(e.date)===month).reduce((s,e)=>s+(e.total_amount||e.totalAmount||e.amount||0),0);
       const active=bd.children.filter(c=>!c.leaveDate&&!c.leave_date).length;
       totalInc+=inc;totalExp+=exp;totalChildren+=bd.children.length;totalActive+=active;
