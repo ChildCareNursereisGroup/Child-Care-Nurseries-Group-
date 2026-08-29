@@ -7258,28 +7258,23 @@ async function printHistoricalAttReport(){
     const yr=Number(mon.split('-')[0]),mo=Number(mon.split('-')[1])-1;
     const daysInMonth=new Date(yr,mo+1,0).getDate();
     let present=0,absent=0,half=0,off=0,leave=0;
-
-    // Helper: get nearest working day status (before or after)
-    const getNearestWorkStatus=(d,direction)=>{
-      for(let i=1;i<=7;i++){
-        const nd=d+(direction*i);
-        if(nd<1||nd>daysInMonth) return null;
-        const nDate=`${mon}-${String(nd).padStart(2,'0')}`;
-        const nDow=new Date(nDate+'T00:00:00').getDay();
-        if(workDays.includes(nDow)){
-          return attMap[nDate]||'unset';
-        }
-      }
-      return null;
-    };
+    const minD=`${mon}-01`, maxD=`${mon}-${String(daysInMonth).padStart(2,'0')}`;
 
     for(let d=1;d<=daysInMonth;d++){
       const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
       const dow=new Date(dateStr+'T00:00:00').getDay();
+      const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
+      if(st){
+        if(st==='حضور'||st==='تعويض') present++;
+        else if(st==='غياب') absent++;
+        else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
+        else if(st==='إجازة') leave++;
+        continue;
+      }
       if(!workDays.includes(dow)){
         // Smart off-day logic
-        const prevSt=getNearestWorkStatus(d,-1);
-        const nextSt=getNearestWorkStatus(d,1);
+        const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
+        const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
         const prevAbsent=prevSt==='غياب';
         const nextAbsent=nextSt==='غياب';
         const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
@@ -7291,13 +7286,8 @@ async function printHistoricalAttReport(){
         } else {
           off++; // truly isolated off day
         }
-        continue;
       }
-      const st=attMap[dateStr]||'';
-      if(st==='حضور'||st==='تعويض') present++;
-      else if(st==='غياب') absent++;
-      else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
-      else if(st==='إجازة') leave++;
+      // else: scheduled work day with nothing recorded — stays unrecorded
     }
     const gross=Number(s.grossSalary||s.basicSalary||0);
     const daily=gross>0?gross/daysInMonth:0;
@@ -7371,23 +7361,10 @@ async function printHistoricalAttReport(){
   // ── MONTHLY DETAIL PAGES ──
   // Helper: resolve off-day status based on neighbors
   const resolveOffDay=(d,mon,daysInMonth)=>{
-    const getNear=(dir)=>{
-      for(let i=1;i<=14;i++){
-        const nd=d+(dir*i);
-        if(nd<1||nd>daysInMonth) return null;
-        const nDate=`${mon}-${String(nd).padStart(2,'0')}`;
-        const nDow=new Date(nDate+'T00:00:00').getDay();
-        if(workDays.includes(nDow)){
-          // Found a real work day — return its status
-          const st=attMap[nDate]||'';
-          if(st && st!=='إجازة') return st;
-          return 'unset';
-        }
-        // Non-work day: skip entirely
-      }
-      return null;
-    };
-    const prev=getNear(-1), next=getNear(1);
+    const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
+    const minD=`${mon}-01`, maxD=`${mon}-${String(daysInMonth).padStart(2,'0')}`;
+    const prev=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
+    const next=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
     const anyAbsent=prev==='غياب'||next==='غياب';
     const bothPresent=(prev==='حضور'||prev==='تعويض')&&(next==='حضور'||next==='تعويض');
     if(anyAbsent) return 'absent';
@@ -7406,7 +7383,12 @@ async function printHistoricalAttReport(){
       const isOff=!workDays.includes(dow);
       const st=attMap[dateStr]||'';
       let stLabel='',stColor='#374151',stBg='transparent';
-      if(isOff){
+      if(st==='حضور'){stLabel=isAr?'✅ حضور':'✅ Present';stColor='#059669';stBg='#f0fdf4';}
+      else if(st==='غياب'){stLabel=isAr?'❌ غياب':'❌ Absent';stColor='#dc2626';stBg='#fff5f5';}
+      else if(st==='نص يوم'){stLabel=isAr?'⚡ نص يوم':'⚡ Half Day';stColor='#d97706';stBg='#fef9ec';}
+      else if(st==='إجازة'){stLabel=isAr?'🏖️ إجازة':'🏖️ Leave';stColor='#0369a1';stBg='#eff6ff';}
+      else if(st==='تعويض'){stLabel=isAr?'🔄 تعويض':'🔄 Comp Off';stColor='#7c3aed';stBg='#f5f3ff';}
+      else if(isOff){
         const resolved=resolveOffDay(d,mon,daysInMonth);
         if(resolved==='absent'){
           stLabel=isAr?'❌ غياب (راحة)':'❌ Absent (Off Day)';stColor='#dc2626';stBg='#fff5f5';
@@ -7416,11 +7398,6 @@ async function printHistoricalAttReport(){
           stLabel=isAr?'— إجازة أسبوعية':'— Weekly Off';stColor='#9ca3af';stBg='#f9fafb';
         }
       }
-      else if(st==='حضور'){stLabel=isAr?'✅ حضور':'✅ Present';stColor='#059669';stBg='#f0fdf4';}
-      else if(st==='غياب'){stLabel=isAr?'❌ غياب':'❌ Absent';stColor='#dc2626';stBg='#fff5f5';}
-      else if(st==='نص يوم'){stLabel=isAr?'⚡ نص يوم':'⚡ Half Day';stColor='#d97706';stBg='#fef9ec';}
-      else if(st==='إجازة'){stLabel=isAr?'🏖️ إجازة':'🏖️ Leave';stColor='#0369a1';stBg='#eff6ff';}
-      else if(st==='تعويض'){stLabel=isAr?'🔄 تعويض':'🔄 Comp Off';stColor='#7c3aed';stBg='#f5f3ff';}
       else{stLabel=isAr?'— غير مسجل':'— Not recorded';stColor='#9ca3af';}
       rows.push(`<tr style="background:${stBg}">
         <td style="padding:5px 10px;border:1px solid #e5e7eb;font-weight:700;color:#374151">${d}</td>
@@ -7893,25 +7870,10 @@ async function printStaffAttReport(exportType='print'){
     // No saved record → check if scheduled off
     if(!isWorkDay){
       const sMap = attMap[String(staffId)]||{};
-      const getNearSt=(dir)=>{
-        for(let i=1;i<=14;i++){
-          const ni=dayIdx+(dir*i);
-          if(ni<0||ni>=days.length) return null;
-          const nDow=new Date(days[ni]+'T00:00:00').getDay();
-          const rec=sMap[days[ni]]||'';
-          const neighborIsWorkDay=workDays.includes(nDow);
-          // ONLY use the status of a scheduled WORK DAY — skip non-work days entirely
-          if(neighborIsWorkDay){
-            if(rec && rec!=='إجازة') return rec; // work day with real record
-            return 'unset'; // work day with no (or leave) record
-          }
-          // Non-work day: skip regardless of any saved record
-        }
-        return null;
-      };
+      const prevSt=_nearestAttStatus(sMap,workDays,days[dayIdx],-1,days[0],days[days.length-1]);
+      const nextSt=_nearestAttStatus(sMap,workDays,days[dayIdx],1,days[0],days[days.length-1]);
       const isPresent=st=>(st==='حضور'||st==='present'||st==='تعويض'||st==='comp');
       const isAbsent=st=>(st==='غياب'||st==='absent');
-      const prevSt=getNearSt(-1), nextSt=getNearSt(1);
       const anyAbsent=isAbsent(prevSt)||isAbsent(nextSt);
       const bothPresent=isPresent(prevSt)&&isPresent(nextSt);
       if(anyAbsent) return {status:'غياب', smart:true, isWorkDay:false};
@@ -9608,6 +9570,63 @@ function sendPaymentConfirmWA(){ alert('Use the Generate Letter button instead.'
 // ═══════════════════════════════════════════════
 // CLASS MESSAGING SYSTEM 💬
 // ═══════════════════════════════════════════════
+let _cmsgImageFile=null, _cmsgImageDataUrl=null, _cmsgImageUrl=null;
+
+function onCmsgImagePicked(input){
+  const f=input.files && input.files[0];
+  if(!f) return;
+  _cmsgImageFile=f; _cmsgImageUrl=null;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    _cmsgImageDataUrl=e.target.result;
+    const prev=el('cmsg-image-preview');
+    const wrap=el('cmsg-image-wrap');
+    if(prev) prev.src=_cmsgImageDataUrl;
+    if(wrap) wrap.style.display='';
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearCmsgImage(){
+  _cmsgImageFile=null; _cmsgImageUrl=null; _cmsgImageDataUrl=null;
+  const inp=el('cmsg-image'); if(inp) inp.value='';
+  const wrap=el('cmsg-image-wrap'); if(wrap) wrap.style.display='none';
+}
+
+// Uploads the attached flyer once and reuses the same public URL for every parent.
+async function _uploadCmsgImage(){
+  if(_cmsgImageUrl) return _cmsgImageUrl;
+  if(!_cmsgImageFile) return null;
+  const ext=(_cmsgImageFile.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`${curBid}_${Date.now()}.${ext}`;
+  const {error}=await sb.storage.from('flyers').upload(path,_cmsgImageFile,{upsert:true});
+  if(error){ console.error('Flyer upload error:',error); return null; }
+  const {data}=sb.storage.from('flyers').getPublicUrl(path);
+  _cmsgImageUrl=data.publicUrl;
+  return _cmsgImageUrl;
+}
+
+// Sends an image via the Meta WhatsApp Business API. wa.me/web.whatsapp.com links
+// cannot carry images at all, so this only works once the branch's Phone ID + Token are set.
+async function sendWAImage(phoneNum, imageUrl, caption){
+  const bx=getBranchExtra(curBid);
+  if(!(bx.waPhoneId && bx.waToken)) return {ok:false, reason:'no_api'};
+  try{
+    const res=await fetch(`https://graph.facebook.com/v20.0/${bx.waPhoneId}/messages`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+bx.waToken,'Content-Type':'application/json'},
+      body:JSON.stringify({messaging_product:'whatsapp',to:phoneNum,type:'image',image:{link:imageUrl,caption:caption||''}})
+    });
+    const data=await res.json();
+    if(res.ok && data.messages) return {ok:true};
+    console.warn('Meta WA image API error:',data);
+    return {ok:false, reason:'api_error'};
+  }catch(err){
+    console.warn('Meta WA image API failed:',err);
+    return {ok:false, reason:'network'};
+  }
+}
+
 function initClassMsgPage(){
   const ar = lang==='ar';
   const inner = el('pg-class-msg-inner');
@@ -9683,6 +9702,17 @@ function initClassMsgPage(){
         <input type="checkbox" id="cmsg-personalize" checked style="accent-color:#0369a1">
         ${ar?'تشخيص الرسالة — إضافة اسم الطفل تلقائياً':'Personalize — Add child\'s name automatically'} 👤
       </label>
+      <div id="cmsg-image-wrap" style="margin-top:10px;${_cmsgImageDataUrl?'':'display:none'}">
+        <img id="cmsg-image-preview" src="${_cmsgImageDataUrl||''}" style="max-width:180px;max-height:180px;border-radius:9px;border:1.5px solid #bae6fd;display:block;margin-bottom:6px">
+        <button onclick="clearCmsgImage()" style="padding:4px 10px;background:#fee2e2;color:#dc2626;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif">🗑️ ${ar?'إزالة الصورة':'Remove image'}</button>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label style="display:inline-block;padding:6px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;font-size:.78rem;font-weight:700;color:#1e40af;cursor:pointer;font-family:'Tajawal',sans-serif">
+          📷 ${ar?'إرفاق صورة (فلاير الأسبوع)':'Attach Image (Weekly Flyer)'}
+          <input type="file" id="cmsg-image" accept="image/*" style="display:none" onchange="onCmsgImagePicked(this)">
+        </label>
+        <span style="font-size:.68rem;color:#9ca3af">${ar?'إرسال الصورة يحتاج تفعيل Meta WhatsApp API لهذا الفرع أولاً':'Sending images requires Meta WhatsApp API set up for this branch first'}</span>
+      </div>
     </div>
 
     <!-- Bulk bar -->
@@ -9806,11 +9836,27 @@ function buildCmsgText(childName){
   return msg;
 }
 
-function sendCmsgToOne(childId){
+async function sendCmsgToOne(childId){
   const c = DB.children.find(x=>String(x.id)===String(childId));
   if(!c) return;
   const phone = c.parentMom||c.parentDad;
   if(!phone){ alert(lang==='ar'?'لا يوجد رقم واتساب!':'No WhatsApp number!'); return; }
+
+  if(_cmsgImageFile){
+    const url = await _uploadCmsgImage();
+    if(!url){ alert(lang==='ar'?'تعذّر رفع الصورة، حاولي تاني':'Could not upload the image, try again'); return; }
+    const caption = buildCmsgText(c.name)||'';
+    const r = await sendWAImage(phone, url, caption);
+    if(!r.ok){
+      alert(r.reason==='no_api'
+        ? (lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول عشان ترسلي صور — من صفحة الإدارة ← إعدادات الفروع':'You need to set up Meta WhatsApp API for this branch first (Admin → Branch Settings) to send images')
+        : (lang==='ar'?'فشل إرسال الصورة، حاولي تاني':'Failed to send the image, try again'));
+      return;
+    }
+    logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`);
+    return;
+  }
+
   const msg = buildCmsgText(c.name);
   if(!msg) return;
   openWA(phone, msg);
@@ -9821,13 +9867,38 @@ async function sendClassMsgBulk(){
   const children = getClassMsgChildren();
   const withPhone = children.filter(c=>c.parentMom||c.parentDad);
   if(!withPhone.length){ alert(lang==='ar'?'لا يوجد أطفال بأرقام واتساب!':'No children with phone numbers!'); return; }
-  const msg = buildCmsgText(null);
-  if(!msg) return;
-
-  const cls = el('cmsg-class')?.value||'all';
   const personalize = el('cmsg-personalize')?.checked;
   const status = el('cmsg-bulk-status');
-  if(status) status.textContent = `⏳ ${lang==='ar'?'جاري الإرسال...':'Sending...'}`;
+
+  if(_cmsgImageFile){
+    if(!(el('cmsg-text')?.value||'').trim() && !personalize){ /* caption optional for images */ }
+    if(status) status.textContent = `⏳ ${lang==='ar'?'جاري رفع الصورة...':'Uploading image...'}`;
+    const url = await _uploadCmsgImage();
+    if(!url){ if(status) status.textContent = `❌ ${lang==='ar'?'تعذّر رفع الصورة':'Could not upload the image'}`; return; }
+
+    let sent=0, noApi=0, failed=0, i=0;
+    for(const c of withPhone){
+      i++;
+      if(status) status.textContent = `⏳ ${lang==='ar'?'جاري الإرسال':'Sending'} (${i}/${withPhone.length})`;
+      const phone = c.parentMom||c.parentDad;
+      const caption = personalize ? (buildCmsgText(c.name)||'') : (el('cmsg-text')?.value||'').trim();
+      const r = await sendWAImage(phone, url, caption);
+      if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
+      else if(r.reason==='no_api') noApi++;
+      else failed++;
+    }
+    if(status){
+      status.textContent = noApi>0 && sent===0
+        ? `⚠️ ${lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول من صفحة الإدارة ← إعدادات الفروع':'Set up Meta WhatsApp API for this branch first (Admin → Branch Settings)'}`
+        : `✅ ${lang==='ar'?'تم إرسال الصورة لـ':'Sent image to'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`;
+    }
+    return;
+  }
+
+  const msg = buildCmsgText(null);
+  if(!msg) return;
+  const status2 = status;
+  if(status2) status2.textContent = `⏳ ${lang==='ar'?'جاري الإرسال...':'Sending...'}`;
 
   let sent=0;
   for(const c of withPhone){
@@ -9842,7 +9913,7 @@ async function sendClassMsgBulk(){
     if(withPhone.length>1) await new Promise(r=>setTimeout(r,600));
   }
 
-  if(status) status.textContent = `✅ ${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`;
+  if(status2) status2.textContent = `✅ ${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`;
 }
 
 async function sendClassMsgSelected(){
@@ -9850,6 +9921,27 @@ async function sendClassMsgSelected(){
   if(!selected.length){ alert(lang==='ar'?'لم تختاري أحداً!':'No one selected!'); return; }
   const personalize = el('cmsg-personalize')?.checked;
   const rawMsg = (el('cmsg-text')?.value||'').trim();
+
+  if(_cmsgImageFile){
+    const url = await _uploadCmsgImage();
+    if(!url){ alert(lang==='ar'?'تعذّر رفع الصورة، حاولي تاني':'Could not upload the image, try again'); return; }
+    let sent=0, noApi=0, failed=0;
+    for(const id of selected){
+      const c = DB.children.find(x=>String(x.id)===String(id));
+      if(!c) continue;
+      const phone = c.parentMom||c.parentDad;
+      if(!phone) continue;
+      const caption = personalize ? (buildCmsgText(c.name)||'') : rawMsg;
+      const r = await sendWAImage(phone, url, caption);
+      if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
+      else if(r.reason==='no_api') noApi++;
+      else failed++;
+    }
+    setTimeout(()=>alert(noApi>0 && sent===0
+      ? (lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول من صفحة الإدارة ← إعدادات الفروع':'Set up Meta WhatsApp API for this branch first (Admin → Branch Settings)')
+      : `✅ ${sent} ${lang==='ar'?'صورة أُرسلت':'images sent'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`),300);
+    return;
+  }
   if(!rawMsg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Write the message first!'); return; }
 
   let sent=0;
@@ -23818,11 +23910,34 @@ function renderPayroll(){
 // (weekend) that sits between the staff member's attendance records inherits absence from
 // its nearest real work-day neighbor — e.g. present Thursday, off Fri+Sat, absent Sunday
 // → Friday and Saturday count as absent too, not just Sunday.
+// Shared neighbor-search for the off-day bridging rule. Walks day-by-day in one
+// direction from fromDateStr looking for the nearest day that actually tells us
+// something: a real saved record always wins immediately (even on a day that
+// isn't in the schedule — e.g. an employee who in practice works a day her
+// profile doesn't list as a work day), an approved leave ('إجازة') acts as a
+// neutral wall (stop here, but don't let it count as present or absent), and a
+// scheduled work day with nothing recorded also stops the search as neutral.
+// Only days with no record AND outside the schedule get skipped over.
+function _nearestAttStatus(dayMap, workDays, fromDateStr, direction, minDateStr, maxDateStr){
+  let cur=new Date(fromDateStr+'T00:00:00');
+  for(let i=1;i<=14;i++){
+    cur.setDate(cur.getDate()+direction);
+    const y=cur.getFullYear(), m=String(cur.getMonth()+1).padStart(2,'0'), dd=String(cur.getDate()).padStart(2,'0');
+    const nDate=`${y}-${m}-${dd}`;
+    if(nDate<minDateStr||nDate>maxDateStr) return null;
+    const rec=dayMap[nDate];
+    if(rec) return rec==='إجازة' ? 'unset' : rec;
+    if(workDays.includes(cur.getDay())) return 'unset';
+  }
+  return null;
+}
+
 function getStaffMonthAttendance(staffId, mon){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
   const [yr,mo]=mon.split('-').map(Number);
   const daysInMonth=new Date(yr,mo,0).getDate();
+  const minD=`${mon}-01`, maxD=`${mon}-${String(daysInMonth).padStart(2,'0')}`;
   const attMap={};
   Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{
     if(date.startsWith(mon)){
@@ -23830,36 +23945,29 @@ function getStaffMonthAttendance(staffId, mon){
       if(st) attMap[date]=st;
     }
   });
-  const getNearestWorkStatus=(d,direction)=>{
-    for(let i=1;i<=14;i++){
-      const nd=d+(direction*i);
-      if(nd<1||nd>daysInMonth) return null;
-      const nDate=`${mon}-${String(nd).padStart(2,'0')}`;
-      const nDow=new Date(nDate+'T00:00:00').getDay();
-      if(workDays.includes(nDow)) return attMap[nDate]||'unset';
-    }
-    return null;
-  };
   let present=0,absent=0,half=0,off=0,leave=0;
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
     const dow=new Date(dateStr+'T00:00:00').getDay();
+    const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
+    if(st){
+      if(st==='حضور'||st==='تعويض') present++;
+      else if(st==='غياب') absent++;
+      else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
+      else if(st==='إجازة') leave++;
+      continue;
+    }
     if(!workDays.includes(dow)){
-      const prevSt=getNearestWorkStatus(d,-1);
-      const nextSt=getNearestWorkStatus(d,1);
+      const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
+      const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
       const prevAbsent=prevSt==='غياب', nextAbsent=nextSt==='غياب';
       const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
       const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
       if(prevAbsent||nextAbsent) absent++; // off day adjacent to any absence = absence
       else if(prevPresent&&nextPresent) present++; // off day sandwiched between 2 present = paid
       else off++; // genuinely isolated weekly off — not counted either way
-      continue;
     }
-    const st=attMap[dateStr]||'';
-    if(st==='حضور'||st==='تعويض') present++;
-    else if(st==='غياب') absent++;
-    else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
-    else if(st==='إجازة') leave++;
+    // else: scheduled work day with nothing recorded — stays unrecorded
   }
   return {present,absent,half,leave,off,daysInMonth};
 }
@@ -24600,29 +24708,21 @@ function getAbsenceDaysInRange(staffId, fromDateStr, toDateStr){
       if(st) attMap[date]=st;
     }
   });
-  const getNearestWorkStatus=(idx,direction)=>{
-    for(let i=1;i<=14;i++){
-      const nIdx=idx+(direction*i);
-      if(nIdx<0||nIdx>=totalDays) return null;
-      const nDate=dateAt(nIdx);
-      const nDow=new Date(nDate+'T00:00:00').getDay();
-      if(workDays.includes(nDow)) return attMap[nDate]||'unset';
-    }
-    return null;
-  };
   let absent=0;
   for(let i=0;i<totalDays;i++){
     const dateStr=dateAt(i);
     const dow=new Date(dateStr+'T00:00:00').getDay();
-    if(!workDays.includes(dow)){
-      const prevSt=getNearestWorkStatus(i,-1);
-      const nextSt=getNearestWorkStatus(i,1);
-      if(prevSt==='غياب'||nextSt==='غياب') absent++;
+    const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
+    if(st){
+      if(st==='غياب') absent+=1;
+      else if(st==='نص يوم') absent+=0.5;
       continue;
     }
-    const st=attMap[dateStr]||'';
-    if(st==='غياب') absent+=1;
-    else if(st==='نص يوم') absent+=0.5;
+    if(!workDays.includes(dow)){
+      const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,fromDateStr,toDateStr);
+      const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,fromDateStr,toDateStr);
+      if(prevSt==='غياب'||nextSt==='غياب') absent++;
+    }
   }
   return absent;
 }
