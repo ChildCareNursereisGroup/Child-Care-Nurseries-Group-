@@ -3677,6 +3677,24 @@ function renderMonthlyPerformance(){
   const years = [...new Set(allMonths.map(m=>m.split('-')[0]))].sort();
 
   const metricsFor = mon => {
+    // Total collected = ALL money received for this month, including receipts not linked
+    // to a specific child (guests/visitors, or unresolved names) — the money still counts.
+    const totalPaid = DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
+    const newRegs = DB.children.filter(c=>c.joinDate && monthOf(c.joinDate)===mon).length;
+    const stopped = DB.children.filter(c=>c.leaveDate && monthOf(c.leaveDate)===mon).length;
+
+    // 2025 receipts were entered under unreliable/generic child names, so they can't be
+    // reliably grouped by child. Per the owner's call: classify each 2025 receipt on its
+    // own instead — Full if it's 600 AED or more, Partial if less. "Unpaid" isn't
+    // computable this way (no trustworthy roster match), so it stays at 0 ("—").
+    if(mon.startsWith('2025-')){
+      let full=0, partial=0;
+      DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).forEach(r=>{
+        if(r.total>=600) full++; else partial++;
+      });
+      return {full, partial, none:0, totalPaid, newRegs, stopped};
+    }
+
     const active = DB.children.filter(c=>{
       if(!c.fee || c.fee<=0) return false;
       if(c.joinDate && c.joinDate > mon+'-31') return false;
@@ -3696,11 +3714,6 @@ function renderMonthlyPerformance(){
       else if(paid>=exp) full++;
       else partial++;
     });
-    // Total collected = ALL money received for this month, including receipts not linked
-    // to a specific child (guests/visitors, or unresolved names) — the money still counts.
-    const totalPaid = DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).reduce((s,r)=>s+r.total,0);
-    const newRegs = DB.children.filter(c=>c.joinDate && monthOf(c.joinDate)===mon).length;
-    const stopped = DB.children.filter(c=>c.leaveDate && monthOf(c.leaveDate)===mon).length;
     return {full, partial, none, totalPaid, newRegs, stopped};
   };
 
