@@ -1481,8 +1481,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
     🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى 4 أطفال لكل فصل، أي وقت حضور<br>
     ⏰ <b>باقي الأعمار (سنة و3 شهور فأكتر):</b> ميعاد الحضور خط أحمر — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
     🌟 <b>E</b> = يوم كامل &nbsp;|&nbsp; <b>S</b> = صباحي &nbsp;|&nbsp; <b>F</b> = نص يوم &nbsp;|&nbsp; <b>N</b> = بعد الظهر<br>
-    داخل نفس الميعاد، الأعمار القريبة من بعض بتتضم في نفس الفصل بحيث كل فصل يبقى بين <b>10 و15 طفل</b> — مفيش طفل لوحده في فصل<br>
-    لو فصل الميعاد ده احتاج أكتر من فصل، ياخد رقم بعد اسم الفصل (زي E2, S2...)<br>
+    داخل نفس الميعاد، الأعمار القريبة من بعض بتتضم في نفس الفصل — مفيش طفل لوحده في فصل، وحد أقصى <b>15 طفل</b> لكل فصل<br>
+    لو عدد أطفال الميعاد ده عدّى الـ15، بيتقسموا بالتساوي على أكتر من فصل (الأعمار المتقاربة مع بعض) وياخدوا رقم بعد اسم الفصل (زي E2, S2...)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -14217,16 +14217,15 @@ function _ageMonths(dob){
 // Class rules (per owner, 2026): infants are always kept apart, any headcount, capped
 // at 4/class — schedule time is a hard boundary for everyone else and is NEVER mixed,
 // but nearby ages ARE merged together within the same schedule so no class ends up
-// with just one or two kids. Target 10-15 children per merged class.
-const INFANT_MAX_MO=15, MIN_CLASS_SIZE=10, MAX_CLASS_SIZE=15;
+// with just one or two kids. Cap: 15 children per class — once a same-schedule group
+// goes over 15, open a new class for it (evenly split, so nearby ages stay together
+// and neither class ends up needlessly small).
+const INFANT_MAX_MO=15, MAX_CLASS_SIZE=15;
 const SCHEDULE_LETTER={fullday:'E', morning:'S', midday:'F', afternoon:'N', other:'X'};
 
-// How many classes a same-schedule, age-sorted group of `n` children should split into —
-// only splits further while doing so keeps every resulting class at or above the minimum.
+// How many classes a same-schedule, age-sorted group of `n` children should split into.
 function _splitIntoClasses(n){
-  let numClasses=1;
-  while((n/(numClasses+1))>=MIN_CLASS_SIZE && (n/numClasses)>MAX_CLASS_SIZE) numClasses++;
-  return numClasses;
+  return Math.max(1, Math.ceil(n/MAX_CLASS_SIZE));
 }
 
 function _buildClassAssignments(){
