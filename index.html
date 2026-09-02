@@ -2465,6 +2465,18 @@ const BRANCHES = [
   {id:'b4', ar:'السعادة للأطفال', en:'Al Saada For Kids',  icon:'🌿', c:'#059669', l:'#d1fae5'},
   {id:'b5', ar:'أبطال البراعم',   en:'Abtal Al Baraeim',  icon:'🦸', c:'#dc2626', l:'#fee2e2'},
 ];
+
+// Social links per branch, for the new-registration WhatsApp welcome message.
+const BRANCH_SOCIAL = {
+  b1: {fb:'https://www.facebook.com/SharjahNursery',      ig:'https://www.instagram.com/al_farha_nursery',        channel:'https://whatsapp.com/channel/0029Vb6DPwo9cDDSMg4GC00A'},
+  b2: {fb:'https://www.facebook.com/BestNurseryUAE',      ig:'https://www.instagram.com/al_saada_nursery',        channel:'https://whatsapp.com/channel/0029VbB4i6SJ93wVeWb8bh30'},
+  b3: {fb:'http://facebook.com/BestNurseryinSharjah/',    ig:'https://www.instagram.com/dolphin_nursery',         channel:'https://whatsapp.com/channel/0029VbBFDADIiRovv1qBYm0S'},
+  b4: {fb:'https://www.facebook.com/AjmanbestNursery',    ig:'https://www.instagram.com/alsaadaforkidsacademic',  channel:'https://whatsapp.com/channel/0029Vb69eCG5kg79FocEt60x'},
+  b5: {fb:'https://www.facebook.com/profile.php?id=61578275925707', ig:'https://www.instagram.com/abtal_al_baraiem', channel:'https://whatsapp.com/channel/0029VbBCx6kAojYuN7Ow8M3B'},
+};
+const GROUP_WA_CHANNEL = 'https://whatsapp.com/channel/0029Vaa6ncZAYlUR5xH3YV2v';
+const COMPLAINTS_EMAIL = 'fsdchildcare@gmail.com';
+
 const ROLES_PAGES = {
   admin:      ['dashboard','children','add','receipts','attendance','birthdays','reminders','expenses','reports','staff','licenses','buses','visitors','class-msg','group-fin','admin'],
   manager:    ['dashboard','children','add','receipts','attendance','birthdays','reminders','staff','buses','class-msg'],
@@ -22223,6 +22235,111 @@ function _quickSendWA(id){
 }
 
 // ─── Monthly Registration Report ────────────────
+// ═══════════════════════════════════════════════
+// NEW REGISTRATION — WhatsApp welcome message
+// ═══════════════════════════════════════════════
+function buildWelcomeMsg(c, lang){
+  const b = BRANCHES.find(x=>x.id===c.branchId) || CB();
+  const soc = BRANCH_SOCIAL[b.id] || {};
+  const isBus = c.bus==='Yes'||c.bus==='نعم';
+  const total = (c.fee||0) + (isBus?(c.busFee||0):0) + (c.friFee||0) + (c.satFee||0) + (c.sunFee||0);
+
+  const dayNamesAr={Mon:'الاثنين',Tue:'الثلاثاء',Wed:'الأربعاء',Thu:'الخميس',Fri:'الجمعة',Sat:'السبت',Sun:'الأحد'};
+  const dutyList=(c.dutyDays||'').split(',').map(d=>d.trim()).filter(Boolean);
+
+  if(lang==='ar'){
+    const days=dutyList.map(d=>dayNamesAr[d]||d).join('، ')||'—';
+    let feesLines=`💰 الرسوم الشهرية: ${fmtNum(c.fee||0)} د.إ`;
+    if(isBus && c.busFee) feesLines+=`\n🚌 رسوم المواصلات: ${fmtNum(c.busFee)} د.إ`;
+    if(c.friFee) feesLines+=`\n🟡 رسوم الجمعة: ${fmtNum(c.friFee)} د.إ`;
+    if(c.satFee) feesLines+=`\n🟣 رسوم السبت: ${fmtNum(c.satFee)} د.إ`;
+    if(c.sunFee) feesLines+=`\n🔵 رسوم الأحد: ${fmtNum(c.sunFee)} د.إ`;
+    return `🌸 أهلاً بيكي في *مجموعة رعاية الطفل للحضانات*! 🌸
+
+يسعدنا انضمام *${c.name}* لينا في *${b.ar}* 💕
+
+📅 أيام الحضور: ${days}
+⏰ المواعيد: ${c.kidsTime||'—'}
+
+${feesLines}
+💵 الإجمالي الشهري: ${fmtNum(total)} د.إ
+
+⚠️ يرجى العلم: الرسوم غير مسترجعة، ولازم يتم السداد قبل يوم 27 من كل شهر.
+
+📲 تابعونا على:
+📘 فيسبوك: ${soc.fb||'—'}
+📸 إنستجرام: ${soc.ig||'—'}
+💬 قناة ${b.ar} على واتساب: ${soc.channel||'—'}
+💬 قناة مجموعة رعاية الطفل على واتساب: ${GROUP_WA_CHANNEL}
+
+📩 لأي شكوى أو اقتراح، تواصلوا معنا على: ${COMPLAINTS_EMAIL}
+
+شكراً لثقتكم بينا 🌸
+— مجموعة رعاية الطفل للحضانات`;
+  }
+
+  const dayNamesEn={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
+  const daysEn=dutyList.map(d=>dayNamesEn[d]||d).join(', ')||'—';
+  let feesLinesEn=`💰 Monthly Fee: AED ${fmtNum(c.fee||0)}`;
+  if(isBus && c.busFee) feesLinesEn+=`\n🚌 Transportation Fee: AED ${fmtNum(c.busFee)}`;
+  if(c.friFee) feesLinesEn+=`\n🟡 Friday Fee: AED ${fmtNum(c.friFee)}`;
+  if(c.satFee) feesLinesEn+=`\n🟣 Saturday Fee: AED ${fmtNum(c.satFee)}`;
+  if(c.sunFee) feesLinesEn+=`\n🔵 Sunday Fee: AED ${fmtNum(c.sunFee)}`;
+  return `🌸 Welcome to *Child Care Nurseries Group*! 🌸
+
+We're delighted to welcome *${c.name}* to *${b.en||b.ar}* 💕
+
+📅 Attendance Days: ${daysEn}
+⏰ Timing: ${c.kidsTime||'—'}
+
+${feesLinesEn}
+💵 Total Monthly: AED ${fmtNum(total)}
+
+⚠️ Please note: fees are non-refundable, and payment is due before the 27th of every month.
+
+📲 Follow us:
+📘 Facebook: ${soc.fb||'—'}
+📸 Instagram: ${soc.ig||'—'}
+💬 ${b.en||b.ar} WhatsApp Channel: ${soc.channel||'—'}
+💬 Child Care Nurseries Group WhatsApp Channel: ${GROUP_WA_CHANNEL}
+
+📩 For any complaint or suggestion, please contact us at: ${COMPLAINTS_EMAIL}
+
+Thank you for trusting us 🌸
+— Child Care Nurseries Group`;
+}
+
+function sendWelcomeWA(childId, lang){
+  document.querySelectorAll('.welcome-wa-menu').forEach(m=>m.remove());
+  const c = DB.children.find(x=>String(x.id)===String(childId));
+  if(!c) return;
+  const phone = c.parentMom||c.parentDad;
+  if(!phone){ alert(lang==='ar'?'لا يوجد رقم واتساب!':'No WhatsApp number!'); return; }
+  const msg = buildWelcomeMsg(c, lang);
+  openWA(phone, msg);
+  logActivity('whatsapp', `🌸 Welcome Msg → ${c.name}`);
+}
+
+function openWelcomeWAMenu(childId, btnEl, ev){
+  if(ev) ev.stopPropagation();
+  document.querySelectorAll('.welcome-wa-menu').forEach(m=>m.remove());
+  const menu=document.createElement('div');
+  menu.className='welcome-wa-menu';
+  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.2);padding:5px;display:flex;flex-direction:column;gap:3px;min-width:140px';
+  const rect=btnEl.getBoundingClientRect();
+  menu.style.top=(rect.bottom+4)+'px';
+  menu.style.left=Math.min(rect.left,window.innerWidth-150)+'px';
+  [{lang:'ar',label:'🇦🇪 عربي'},{lang:'en',label:'🇬🇧 English'}].forEach(o=>{
+    const btn=document.createElement('button');
+    btn.textContent=o.label;
+    btn.style.cssText="background:#25d366;color:#fff;border:none;border-radius:7px;padding:7px 12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:700;text-align:center";
+    btn.onclick=(e)=>{ e.stopPropagation(); menu.remove(); sendWelcomeWA(childId, o.lang); };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',function h(){menu.remove();document.removeEventListener('click',h);}),100);
+}
+
 function renderRecentByMonth(){
   const mon = el('recent-mon')?.value || monthOf(new Date());
   const recent = [...DB.children]
@@ -22262,6 +22379,7 @@ function renderRecentByMonth(){
         <div style="font-size:.75rem;font-weight:700;color:${total?'#1e3a8a':'#9ca3af'}">${total?fmtNum(total)+' AED':''}</div>
         <span class="bdg ${c.leaveDate?'derr':'dok'}" style="font-size:.62rem">${c.leaveDate?'غادر':'🆕 جديد'}</span>
       </div>
+      ${(c.parentMom||c.parentDad)?`<button onclick="openWelcomeWAMenu('${c.id}',this,event)" title="إرسال رسالة ترحيب — Send welcome message" style="background:#25d366;color:#fff;border:none;border-radius:8px;width:28px;height:28px;flex-shrink:0;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center">💬</button>`:''}
     </div>`;}).join('');
 }
 
