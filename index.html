@@ -7431,30 +7431,29 @@ async function printHistoricalAttReport(){
       const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
       const dow=new Date(dateStr+'T00:00:00').getDay();
       const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
-      if(st){
+      if(st && st!=='إجازة'){
         if(st==='حضور'||st==='تعويض') present++;
         else if(st==='غياب') absent++;
         else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
-        else if(st==='إجازة') leave++;
         continue;
       }
-      if(!workDays.includes(dow)){
-        // Smart off-day logic
-        const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
-        const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
-        const prevAbsent=prevSt==='غياب';
-        const nextAbsent=nextSt==='غياب';
-        const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
-        const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
-        if(prevAbsent||nextAbsent){
-          absent++; // off day adjacent to any absent = absent
-        } else if(prevPresent&&nextPresent){
-          present++; // off day between 2 present = present
-        } else {
-          off++; // truly isolated off day
-        }
+      // Either nothing recorded, or an approved leave day — both get bridged the same way.
+      if(!st && workDays.includes(dow)) continue; // scheduled work day, nothing recorded — stays unrecorded
+      const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
+      const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
+      const prevAbsent=prevSt==='غياب';
+      const nextAbsent=nextSt==='غياب';
+      const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
+      const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
+      if(prevAbsent||nextAbsent){
+        absent++; // adjacent to any absent = absent
+      } else if(prevPresent&&nextPresent){
+        present++; // sandwiched between 2 present = present
+      } else if(st==='إجازة'){
+        leave++; // genuinely ambiguous leave day
+      } else {
+        off++; // truly isolated off day
       }
-      // else: scheduled work day with nothing recorded — stays unrecorded
     }
     const gross=Number(s.grossSalary||s.basicSalary||0);
     const daily=gross>0?gross/daysInMonth:0;
@@ -7553,14 +7552,17 @@ async function printHistoricalAttReport(){
       if(st==='حضور'){stLabel=isAr?'✅ حضور':'✅ Present';stColor='#059669';stBg='#f0fdf4';}
       else if(st==='غياب'){stLabel=isAr?'❌ غياب':'❌ Absent';stColor='#dc2626';stBg='#fff5f5';}
       else if(st==='نص يوم'){stLabel=isAr?'⚡ نص يوم':'⚡ Half Day';stColor='#d97706';stBg='#fef9ec';}
-      else if(st==='إجازة'){stLabel=isAr?'🏖️ إجازة':'🏖️ Leave';stColor='#0369a1';stBg='#eff6ff';}
       else if(st==='تعويض'){stLabel=isAr?'🔄 تعويض':'🔄 Comp Off';stColor='#7c3aed';stBg='#f5f3ff';}
-      else if(isOff){
+      else if(st==='إجازة'||isOff){
+        // Leave and ordinary days off both get bridged the same way: present if flanked
+        // by real presence, absent if flanked by a real absence, otherwise stay neutral.
         const resolved=resolveOffDay(d,mon,daysInMonth);
         if(resolved==='absent'){
           stLabel=isAr?'❌ غياب (راحة)':'❌ Absent (Off Day)';stColor='#dc2626';stBg='#fff5f5';
         } else if(resolved==='present'){
           stLabel=isAr?'✅ حضور (راحة)':'✅ Present (Off Day)';stColor='#059669';stBg='#f0fdf4';
+        } else if(st==='إجازة'){
+          stLabel=isAr?'🏖️ إجازة':'🏖️ Leave';stColor='#0369a1';stBg='#eff6ff';
         } else {
           stLabel=isAr?'— إجازة أسبوعية':'— Weekly Off';stColor='#9ca3af';stBg='#f9fafb';
         }
@@ -8028,28 +8030,24 @@ async function printStaffAttReport(exportType='print'){
     const dow = new Date(days[dayIdx]+'T00:00:00').getDay();
     const isWorkDay = workDays.includes(dow);
 
-    // Check saved record FIRST — manager override always wins
+    // Check saved record FIRST — manager override always wins. Leave is the one
+    // exception: it gets bridged like an ordinary off day (below) instead of always
+    // showing as a fixed neutral "off" — present if flanked by real presence, absent
+    // if flanked by a real absence, otherwise it stays a leave day.
     const raw=(attMap[String(staffId)]||{})[days[dayIdx]]||'';
-    if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false};
     if(raw==='تعويض') return {status:'comp', smart:false, isWorkDay};
-    if(raw) return {status:raw, smart:false, isWorkDay:true}; // saved = treat as work day
+    if(raw && raw!=='إجازة') return {status:raw, smart:false, isWorkDay:true}; // saved = treat as work day
 
-    // No saved record → check if scheduled off
-    if(!isWorkDay){
-      const sMap = attMap[String(staffId)]||{};
-      const prevSt=_nearestAttStatus(sMap,workDays,days[dayIdx],-1,days[0],days[days.length-1]);
-      const nextSt=_nearestAttStatus(sMap,workDays,days[dayIdx],1,days[0],days[days.length-1]);
-      const isPresent=st=>(st==='حضور'||st==='present'||st==='تعويض'||st==='comp');
-      const isAbsent=st=>(st==='غياب'||st==='absent');
-      const anyAbsent=isAbsent(prevSt)||isAbsent(nextSt);
-      const bothPresent=isPresent(prevSt)&&isPresent(nextSt);
-      if(anyAbsent) return {status:'غياب', smart:true, isWorkDay:false};
-      if(bothPresent) return {status:'حضور', smart:true, isWorkDay:false};
-      return {status:'off', smart:false, isWorkDay:false};
-    }
-
-    // Work day, not recorded
-    return {status:'', smart:false, isWorkDay};
+    const sMap = attMap[String(staffId)]||{};
+    const prevSt=_nearestAttStatus(sMap,workDays,days[dayIdx],-1,days[0],days[days.length-1]);
+    const nextSt=_nearestAttStatus(sMap,workDays,days[dayIdx],1,days[0],days[days.length-1]);
+    const isPresent=st=>(st==='حضور'||st==='present'||st==='تعويض'||st==='comp');
+    const isAbsent=st=>(st==='غياب'||st==='absent');
+    if(isAbsent(prevSt)||isAbsent(nextSt)) return {status:'غياب', smart:true, isWorkDay:false};
+    if(isPresent(prevSt)&&isPresent(nextSt)) return {status:'حضور', smart:true, isWorkDay:false};
+    if(raw==='إجازة') return {status:'off', smart:false, isWorkDay:false}; // ambiguous leave day
+    if(!isWorkDay) return {status:'off', smart:false, isWorkDay:false}; // isolated normal day off
+    return {status:'', smart:false, isWorkDay}; // scheduled work day, nothing recorded
   };
 
   if(exportType==='excel'){
@@ -21198,7 +21196,10 @@ function openRecReportModal(){
   // Default: first and last day of current month
   const now=new Date();
   const firstDay=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-  const lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  // Built from local y/m/d, not toISOString() — that converts to UTC and would show
+  // the wrong (previous) day for UAE's UTC+4 timezone.
+  const _lastDayD=new Date(now.getFullYear(),now.getMonth()+1,0);
+  const lastDay=`${_lastDayD.getFullYear()}-${String(_lastDayD.getMonth()+1).padStart(2,'0')}-${String(_lastDayD.getDate()).padStart(2,'0')}`;
   if(!el('rec-rep-from').value) el('rec-rep-from').value=firstDay;
   if(!el('rec-rep-to').value)   el('rec-rep-to').value=lastDay;
   el('rec-report-modal').classList.add('on');
@@ -21395,7 +21396,10 @@ function printRecReport(exportType='print'){
 function openExpReportModal(){
   const now=new Date();
   const firstDay=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-  const lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  // Built from local y/m/d, not toISOString() — that converts to UTC and would show
+  // the wrong (previous) day for UAE's UTC+4 timezone.
+  const _lastDayD=new Date(now.getFullYear(),now.getMonth()+1,0);
+  const lastDay=`${_lastDayD.getFullYear()}-${String(_lastDayD.getMonth()+1).padStart(2,'0')}-${String(_lastDayD.getDate()).padStart(2,'0')}`;
   if(!el('exp-rep-from').value) el('exp-rep-from').value=firstDay;
   if(!el('exp-rep-to').value)   el('exp-rep-to').value=lastDay;
   // Populate categories
@@ -24002,12 +24006,12 @@ function renderPayroll(){
 // → Friday and Saturday count as absent too, not just Sunday.
 // Shared neighbor-search for the off-day bridging rule. Walks day-by-day in one
 // direction from fromDateStr looking for the nearest day that actually tells us
-// something: a real saved record always wins immediately (even on a day that
-// isn't in the schedule — e.g. an employee who in practice works a day her
-// profile doesn't list as a work day), an approved leave ('إجازة') acts as a
-// neutral wall (stop here, but don't let it count as present or absent), and a
-// scheduled work day with nothing recorded also stops the search as neutral.
-// Only days with no record AND outside the schedule get skipped over.
+// something: a real حضور/غياب/نص يوم/تعويض record always wins immediately (even
+// on a day that isn't in the schedule — e.g. an employee who in practice works a
+// day her profile doesn't list as a work day), a scheduled work day with nothing
+// recorded stops the search as neutral, and an approved leave ('إجازة') is
+// transparent — it never stops the search itself, so the days around it (and the
+// leave day itself) end up resolved by whatever real signal is further out.
 function _nearestAttStatus(dayMap, workDays, fromDateStr, direction, minDateStr, maxDateStr){
   let cur=new Date(fromDateStr+'T00:00:00');
   for(let i=1;i<=14;i++){
@@ -24016,7 +24020,8 @@ function _nearestAttStatus(dayMap, workDays, fromDateStr, direction, minDateStr,
     const nDate=`${y}-${m}-${dd}`;
     if(nDate<minDateStr||nDate>maxDateStr) return null;
     const rec=dayMap[nDate];
-    if(rec) return rec==='إجازة' ? 'unset' : rec;
+    if(rec==='إجازة') continue; // transparent — keep looking past it for a real signal
+    if(rec) return rec;
     if(workDays.includes(cur.getDay())) return 'unset';
   }
   return null;
@@ -24040,24 +24045,25 @@ function getStaffMonthAttendance(staffId, mon){
     const dateStr=`${mon}-${String(d).padStart(2,'0')}`;
     const dow=new Date(dateStr+'T00:00:00').getDay();
     const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
-    if(st){
+    if(st && st!=='إجازة'){
       if(st==='حضور'||st==='تعويض') present++;
       else if(st==='غياب') absent++;
       else if(st==='نص يوم'){present+=0.5;absent+=0.5;half++;}
-      else if(st==='إجازة') leave++;
       continue;
     }
-    if(!workDays.includes(dow)){
-      const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
-      const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
-      const prevAbsent=prevSt==='غياب', nextAbsent=nextSt==='غياب';
-      const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
-      const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
-      if(prevAbsent||nextAbsent) absent++; // off day adjacent to any absence = absence
-      else if(prevPresent&&nextPresent) present++; // off day sandwiched between 2 present = paid
-      else off++; // genuinely isolated weekly off — not counted either way
-    }
-    // else: scheduled work day with nothing recorded — stays unrecorded
+    // Either nothing recorded, or an approved leave day — both get bridged the same way:
+    // present if flanked by real presence, absent if flanked by a real absence, otherwise
+    // stays neutral (leave keeps its own bucket when it can't be resolved either way).
+    if(!st && workDays.includes(dow)) continue; // scheduled work day, nothing recorded — stays unrecorded
+    const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,minD,maxD);
+    const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,minD,maxD);
+    const prevAbsent=prevSt==='غياب', nextAbsent=nextSt==='غياب';
+    const prevPresent=prevSt==='حضور'||prevSt==='تعويض';
+    const nextPresent=nextSt==='حضور'||nextSt==='تعويض';
+    if(prevAbsent||nextAbsent) absent++; // adjacent to any absence = absence
+    else if(prevPresent&&nextPresent) present++; // sandwiched between 2 present = paid
+    else if(st==='إجازة') leave++; // genuinely ambiguous leave day
+    else off++; // genuinely isolated weekly off — not counted either way
   }
   return {present,absent,half,leave,off,daysInMonth};
 }
@@ -24803,12 +24809,14 @@ function getAbsenceDaysInRange(staffId, fromDateStr, toDateStr){
     const dateStr=dateAt(i);
     const dow=new Date(dateStr+'T00:00:00').getDay();
     const st=attMap[dateStr]; // a real saved record always wins, even on an off-schedule day
-    if(st){
+    if(st && st!=='إجازة'){
       if(st==='غياب') absent+=1;
       else if(st==='نص يوم') absent+=0.5;
       continue;
     }
-    if(!workDays.includes(dow)){
+    // Either nothing recorded, or an approved leave day — a leave day only counts against
+    // service time if it's flanked by a real absence, same bridging rule as everywhere else.
+    if(st || !workDays.includes(dow)){
       const prevSt=_nearestAttStatus(attMap,workDays,dateStr,-1,fromDateStr,toDateStr);
       const nextSt=_nearestAttStatus(attMap,workDays,dateStr,1,fromDateStr,toDateStr);
       if(prevSt==='غياب'||nextSt==='غياب') absent++;
