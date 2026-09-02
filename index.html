@@ -3840,14 +3840,18 @@ function filterCh(q){srchQ=q;renderChildren();}
 // registered & paid registration on Aug 27 but attendance starts Sep 1 → counts as
 // an August registration. Falls back to joinDate if no registration-fee receipt exists.
 function _regDateFor(c){
-  const regReceipts=(DB.receipts||[]).filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && r.reg>0 && r.date);
-  if(!regReceipts.length) return c.joinDate;
-  const earliest=regReceipts.reduce((min,r)=>(!min||r.date<min)?r.date:min, null);
-  // Guard against a cancelled/reissued original registration receipt: if a later "makeup"
-  // receipt for just the missing registration fee gets created months after the child
-  // actually joined, that receipt's date isn't a real registration date — it's a billing
-  // correction. Only trust the receipt date when it's within ~45 days of joinDate either
-  // way (covers "registered a few days before the month starts"); otherwise use joinDate.
+  // The registration/receipt date is simply the child's FIRST receipt ever — whether or
+  // not that particular receipt happens to carry a "Registration" fee line item (many
+  // don't; e.g. an advance payment for next month with reg=0 is still the real
+  // registration moment).
+  const receipts=(DB.receipts||[]).filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && r.date);
+  if(!receipts.length) return c.joinDate;
+  const earliest=receipts.reduce((min,r)=>(!min||r.date<min)?r.date:min, null);
+  // Guard against a cancelled/reissued original receipt: if the child's real first
+  // receipt got voided and nothing else was recorded until months later, that later
+  // receipt's date isn't a real registration date — it's a billing correction. Only
+  // trust the receipt date when it's within ~45 days of joinDate either way (covers
+  // "registered a few days before the month starts"); otherwise use joinDate.
   if(c.joinDate){
     const gapDays=Math.abs((new Date(earliest)-new Date(c.joinDate))/86400000);
     if(gapDays>45) return c.joinDate;
