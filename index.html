@@ -3842,7 +3842,17 @@ function filterCh(q){srchQ=q;renderChildren();}
 function _regDateFor(c){
   const regReceipts=(DB.receipts||[]).filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && r.reg>0 && r.date);
   if(!regReceipts.length) return c.joinDate;
-  return regReceipts.reduce((min,r)=>(!min||r.date<min)?r.date:min, null);
+  const earliest=regReceipts.reduce((min,r)=>(!min||r.date<min)?r.date:min, null);
+  // Guard against a cancelled/reissued original registration receipt: if a later "makeup"
+  // receipt for just the missing registration fee gets created months after the child
+  // actually joined, that receipt's date isn't a real registration date — it's a billing
+  // correction. Only trust the receipt date when it's within ~45 days of joinDate either
+  // way (covers "registered a few days before the month starts"); otherwise use joinDate.
+  if(c.joinDate){
+    const gapDays=Math.abs((new Date(earliest)-new Date(c.joinDate))/86400000);
+    if(gapDays>45) return c.joinDate;
+  }
+  return earliest;
 }
 
 // Has this child ever paid a uniforms fee, and ever paid a registration or stationery
