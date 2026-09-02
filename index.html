@@ -3834,6 +3834,35 @@ function renderFPills(){
 }
 function setCF(f){chFilter=f;renderChildren();}
 function filterCh(q){srchQ=q;renderChildren();}
+
+// The date a child's registration is counted under — the date the registration-fee
+// receipt was actually issued, NOT the child's attendance start (joinDate). E.g.
+// registered & paid registration on Aug 27 but attendance starts Sep 1 → counts as
+// an August registration. Falls back to joinDate if no registration-fee receipt exists.
+function _regDateFor(c){
+  const regReceipts=(DB.receipts||[]).filter(r=>!r.isCancelled && String(r.childId)===String(c.id) && r.reg>0 && r.date);
+  if(!regReceipts.length) return c.joinDate;
+  return regReceipts.reduce((min,r)=>(!min||r.date<min)?r.date:min, null);
+}
+
+// Has this child ever paid a uniforms fee, and ever paid a registration or stationery
+// fee, in any of their receipts (one-off charges, not the recurring monthly fee)?
+function _feeFlags(c){
+  const recs=(DB.receipts||[]).filter(r=>!r.isCancelled && String(r.childId)===String(c.id));
+  return {
+    noClothes: !recs.some(r=>r.clothes>0),
+    noRegTools: !recs.some(r=>(r.reg>0)||(r.tools>0)),
+  };
+}
+function feeFlagBadges(c){
+  const f=_feeFlags(c);
+  if(!f.noClothes && !f.noRegTools) return '';
+  return `<span style="display:inline-flex;gap:3px;vertical-align:middle">`
+    + (f.noClothes?'<span title="لسه مادفعش رسوم ملابس — Uniforms fee not paid" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626"></span>':'')
+    + (f.noRegTools?'<span title="لسه مادفعش رسوم تسجيل/أدوات دراسية — Registration/Stationery fee not paid" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2563eb"></span>':'')
+    + `</span>`;
+}
+
 function renderChildren(){
   renderFPills();
   let list=[...DB.children];
@@ -3856,7 +3885,7 @@ function renderChildren(){
         <div style="display:flex;align-items:center;gap:8px">
           <div class="av" style="background:${c.leaveDate?'#9ca3af':chCol(c.id)};width:36px;height:36px;font-size:.9rem">${(c.name||'؟')[0]}</div>
           <div>
-            <div style="font-weight:800">${c.name} ${c.bus==='نعم'?'<span class="bdg dbus">🚌</span>':''}</div>
+            <div style="font-weight:800">${c.name} ${feeFlagBadges(c)} ${c.bus==='نعم'?'<span class="bdg dbus">🚌</span>':''}</div>
             <div style="font-size:.72rem;color:var(--muted)">${c.className||''} | #${c.regNum||'-'}</div>
           </div>
         </div>
@@ -22343,8 +22372,8 @@ function openWelcomeWAMenu(childId, btnEl, ev){
 function renderRecentByMonth(){
   const mon = el('recent-mon')?.value || monthOf(new Date());
   const recent = [...DB.children]
-    .filter(c => monthOf(c.joinDate) === mon)
-    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+    .filter(c => monthOf(_regDateFor(c)) === mon)
+    .sort((a,b) => new Date(_regDateFor(a)) - new Date(_regDateFor(b)));
 
   const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const isAdmin = curRole==='admin';
@@ -22372,8 +22401,8 @@ function renderRecentByMonth(){
       <div style="font-size:.72rem;color:var(--muted);min-width:22px;text-align:center;font-weight:700">${i+1}</div>
       <div class="av" style="background:${chCol(c.id)};width:32px;height:32px;font-size:.8rem;flex-shrink:0">${(c.name||'؟')[0]}</div>
       <div style="flex:1">
-        <div style="font-weight:700;font-size:.85rem">${c.name} ${(c.bus==='Yes'||c.bus==='نعم')?'<span style="background:#dbeafe;color:#1e3a8a;font-size:.62rem;padding:1px 5px;border-radius:5px">🚌</span>':''}</div>
-        <div style="font-size:.7rem;color:var(--muted)">${c.className||'—'} · ${fmtDate(c.joinDate)}</div>
+        <div style="font-weight:700;font-size:.85rem">${c.name} ${feeFlagBadges(c)} ${(c.bus==='Yes'||c.bus==='نعم')?'<span style="background:#dbeafe;color:#1e3a8a;font-size:.62rem;padding:1px 5px;border-radius:5px">🚌</span>':''}</div>
+        <div style="font-size:.7rem;color:var(--muted)">${c.className||'—'} · ${fmtDate(_regDateFor(c))}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:.75rem;font-weight:700;color:${total?'#1e3a8a':'#9ca3af'}">${total?fmtNum(total)+' AED':''}</div>
@@ -22386,8 +22415,8 @@ function renderRecentByMonth(){
 function printMonthlyRegReport(){
   const mon = el('recent-mon')?.value || monthOf(new Date());
   const recent = [...DB.children]
-    .filter(c => monthOf(c.joinDate) === mon)
-    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+    .filter(c => monthOf(_regDateFor(c)) === mon)
+    .sort((a,b) => new Date(_regDateFor(a)) - new Date(_regDateFor(b)));
   const b = CB();
   const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const fmtD2 = s=>{ if(!s)return'—'; const p=String(s).split('T')[0].split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
@@ -22427,7 +22456,7 @@ function printMonthlyRegReport(){
   </div>
   <table><thead><tr>
     <th>#</th><th>Child Name — اسم الطفل</th><th>Class</th>
-    <th>Join Date</th><th>Fee (AED)</th><th>Bus</th><th>Status</th>
+    <th>Registration Date</th><th>Fee (AED)</th><th>Bus</th><th>Status</th>
   </tr></thead><tbody>`;
 
   recent.forEach((c,i)=>{
@@ -22435,7 +22464,7 @@ function printMonthlyRegReport(){
       <td style="color:#9ca3af">${i+1}</td>
       <td><b>${c.name}</b><br><span style="font-size:.68rem;color:#6b7280">${c.nationality||''}</span></td>
       <td><span style="background:#eff6ff;padding:2px 7px;border-radius:6px">${c.className||'—'}</span></td>
-      <td>${fmtD2(c.joinDate)}</td>
+      <td>${fmtD2(_regDateFor(c))}</td>
       <td style="font-weight:700;color:#1e3a8a">${c.fee?fmtNum(c.fee)+' AED':'—'}</td>
       <td>${(c.bus==='Yes'||c.bus==='نعم')?'🚌':'—'}</td>
       <td><span style="background:${c.leaveDate?'#fee2e2':'#d1fae5'};color:${c.leaveDate?'#991b1b':'#065f46'};padding:2px 8px;border-radius:8px;font-size:.72rem">${c.leaveDate?'Left — غادر':'Active — نشط'}</span></td>
@@ -22451,8 +22480,8 @@ function printMonthlyRegReport(){
 function sendRegReportWA(){
   const mon = el('recent-mon')?.value || monthOf(new Date());
   const recent = [...DB.children]
-    .filter(c => monthOf(c.joinDate) === mon)
-    .sort((a,b) => new Date(a.joinDate) - new Date(b.joinDate));
+    .filter(c => monthOf(_regDateFor(c)) === mon)
+    .sort((a,b) => new Date(_regDateFor(a)) - new Date(_regDateFor(b)));
   const b = CB();
   const monLabel = new Date(mon+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const NL = '\n';
