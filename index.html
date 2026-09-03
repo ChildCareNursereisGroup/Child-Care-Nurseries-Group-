@@ -14218,9 +14218,10 @@ function _getTimeGroup(kidsTime){
   if(/fullday|fulltime|full/.test(t)) return 'fullday';
 
   // ── Parse start and end hours ──
-  // Tolerate common typos in the Kids Time field: "-" or "_" used instead of ":" between
-  // hour/minute (e.g. "08:00-03-00"), or "_" used instead of "-" between start/end (e.g. "08:00_01:00").
-  const timeMatch = t.match(/(\d{1,2})[:_-]?(\d{2})[-–_]+(\d{1,2})[:_-]?(\d{2})/);
+  // Tolerate common typos in the Kids Time field: "-", "_" or ";" used instead of ":"
+  // between hour/minute (e.g. "08:00-03-00", "11;00-03;00"), or "_" used instead of "-"
+  // between start/end (e.g. "08:00_01:00"). Spaces are already stripped before this runs.
+  const timeMatch = t.match(/(\d{1,2})[:;_-]?(\d{2})[-–_]+(\d{1,2})[:;_-]?(\d{2})/);
   if(timeMatch){
     let startH=parseInt(timeMatch[1]);
     let endH=parseInt(timeMatch[3]);
@@ -14254,11 +14255,12 @@ function _getTimeGroup(kidsTime){
     if(startH===1 && endH>=17) return 'afternoon';
   }
 
-  // Fallback regex
-  if(/08:?00[-–](0?1|0?2|0?3|0?4|0?5):?00/.test(t)) return 'fullday';
-  if(/08:?00[-–](13|14|15|16|17):?00/.test(t)) return 'fullday';
-  if(/11:?00[-–](0?3|15):?00/.test(t)) return 'midday';
-  if(/(0?1|13):?00[-–](0?5|17):?00/.test(t)) return 'afternoon';
+  // Fallback regex — same typo tolerance as the primary parse above (";", "_" or "-"
+  // instead of ":", and "_" instead of "-" between start/end).
+  if(/08[:;_-]?00[-–_]+(0?1|0?2|0?3|0?4|0?5)[:;_-]?00/.test(t)) return 'fullday';
+  if(/08[:;_-]?00[-–_]+(13|14|15|16|17)[:;_-]?00/.test(t)) return 'fullday';
+  if(/11[:;_-]?00[-–_]+(0?3|15)[:;_-]?00/.test(t)) return 'midday';
+  if(/(0?1|13)[:;_-]?00[-–_]+(0?5|17)[:;_-]?00/.test(t)) return 'afternoon';
   return 'other';
 }
 
