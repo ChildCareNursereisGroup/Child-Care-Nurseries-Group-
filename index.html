@@ -1509,6 +1509,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
       style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:9px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
       🔍 البحث عن المكررين
     </button>
+    <button onclick="showMergeLog()"
+      style="background:#fff;color:#5b21b6;border:2px solid #7c3aed;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif">
+      📜 سجل عمليات الدمج السابقة
+    </button>
   </div>
   <div id="merge-dup-output"></div>
 </div>
@@ -3880,7 +3884,10 @@ function feeFlagBadges(c){
 function renderChildren(){
   renderFPills();
   let list=[...DB.children];
-  if(srchQ)list=list.filter(c=>c.name.includes(srchQ)||(c.className||'').includes(srchQ));
+  if(srchQ){
+    const q=srchQ.trim().toLowerCase();
+    list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.className||'').toLowerCase().includes(q));
+  }
   if(chFilter==='active')list=list.filter(c=>!c.leaveDate);
   if(chFilter==='inactive')list=list.filter(c=>!!c.leaveDate);
   if(chFilter==='bus')list=list.filter(c=>(c.bus==='نعم'||c.bus==='Yes')&&!c.leaveDate);
@@ -14585,6 +14592,16 @@ async function mergeChildren(primaryId, dupeIdsStr, gi){
       await sb.from('children').update(updates).eq('id',primaryId);
     }
 
+    // Log a full snapshot of the duplicate BEFORE deleting it — merges are permanent
+    // and previously left no trace at all, so a wrongly-picked duplicate could vanish
+    // with no way to even see what it used to be. This keeps that recoverable.
+    await sb.from('child_merge_log').insert({
+      primary_child_id:Number(primaryId), primary_child_name:primaryKid?.name||'',
+      branch_id:dupeKid.branch_id||primaryKid?.branch_id||null,
+      deleted_child:dupeKid,
+      receipts_moved:rCount||0, attendance_moved:(dupeAtts||[]).length,
+    }).then(({error})=>{ if(error) errors.push('merge log: '+error.message); });
+
     // Delete the duplicate child
     const {error:dErr}=await sb.from('children').delete().eq('id',dupeId);
     if(dErr) errors.push('delete child: '+dErr.message);
@@ -14605,6 +14622,59 @@ async function mergeChildren(primaryId, dupeIdsStr, gi){
 
   // Re-run search to update list
   setTimeout(findDuplicateChildren,1500);
+}
+
+// Shows every past merge — which record was kept, which was deleted (with its full
+// data, in case it needs to be recovered), and how much of its history moved over.
+async function showMergeLog(){
+  const {data,error}=await sb.from('child_merge_log').select('*').order('merged_at',{ascending:false}).limit(100);
+  document.getElementById('merge-log-ov')?.remove();
+  const ov=document.createElement('div');
+  ov.id='merge-log-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:16px';
+  if(error){
+    ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:500px;margin:40px auto;padding:16px;font-family:'Tajawal',sans-serif">
+      <div style="color:#dc2626;font-weight:800;margin-bottom:8px">⚠️ لسه مفيش جدول سجل الدمج في قاعدة البيانات</div>
+      <div style="font-size:.8rem;color:#6b7280">شغّلي الكود ده مرة واحدة في Supabase SQL Editor:</div>
+      <pre style="background:#f3f4f6;border-radius:8px;padding:10px;font-size:.7rem;overflow-x:auto;direction:ltr;text-align:left">create table if not exists child_merge_log (
+  id bigint generated always as identity primary key,
+  merged_at timestamptz default now(),
+  primary_child_id bigint,
+  primary_child_name text,
+  branch_id text,
+  deleted_child jsonb,
+  receipts_moved int,
+  attendance_moved int
+);
+alter table child_merge_log enable row level security;
+create policy "anon full access" on child_merge_log for all to anon using (true) with check (true);</pre>
+      <button onclick="document.getElementById('merge-log-ov').remove()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;margin-top:8px">إغلاق</button>
+    </div>`;
+    document.body.appendChild(ov);
+    return;
+  }
+  const rows=data||[];
+  const branchLabel=id=>BRANCHES.find(b=>b.id===id)?.ar||id||'—';
+  ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:800px;margin:0 auto;font-family:'Tajawal',sans-serif">
+    <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:14px 18px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:900;font-size:.95rem">📜 سجل عمليات الدمج — ${rows.length} عملية</div>
+      <button onclick="document.getElementById('merge-log-ov').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:1rem">✕</button>
+    </div>
+    <div style="padding:14px">
+      ${!rows.length?`<div style="text-align:center;color:#9ca3af;padding:20px">لسه مفيش أي عملية دمج متسجلة</div>`:
+      rows.map(r=>{
+        const dk=r.deleted_child||{};
+        return `<div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px;font-size:.8rem">
+          <div style="color:#9ca3af;font-size:.7rem;margin-bottom:4px">${new Date(r.merged_at).toLocaleString('ar-AE')} — ${branchLabel(r.branch_id)}</div>
+          <div style="color:#dc2626;font-weight:700">🗑 اتمسح: ${dk.name||'—'} (#${dk.reg_num||'—'}, ميلاد: ${dk.dob||'—'})</div>
+          <div style="color:#059669;font-weight:700">✅ اندمج في: ${r.primary_child_name||'—'} (ID: ${r.primary_child_id})</div>
+          <div style="color:#6b7280;font-size:.72rem;margin-top:3px">💳 ${r.receipts_moved||0} إيصال نُقل | 📅 ${r.attendance_moved||0} يوم حضور نُقل</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); });
 }
 
 async function transferChild(){
