@@ -6,6 +6,7 @@
 <title>مجموعة رعاية الطفل للحضانات</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@9.5.3/dist/index.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -19375,39 +19376,42 @@ function downloadChildExp2026Template(){
   XLSX.writeFile(wb,'children_expenses_2026_template.xlsx');
 }
 
-function downloadExpensesTemplate(){
+async function downloadExpensesTemplate(){
   const XLSX=window.XLSX; if(!XLSX) return;
 
+  // Trimmed to what UAE FTA actually needs on a valid expense record, plus the minimum
+  // this system needs to file it — Branch ID is dropped (the sheet/branch already implies
+  // it) and "Item" + "Reason for Payment" are merged into one Description field.
   const cols = [
     'Category',
-    'Item / Description',
     'Invoice Date\n(DD/MM/YYYY)',
     'Invoice No.',
     'Supplier / Entity Name',
     'Supplier TRN',
-    'Reason for Payment',
+    'Description',
     'VAT Type\n(exempt/5/15)',
     'Amount BEFORE VAT (AED)',
     'VAT Amount (AED)',
     'Total AFTER VAT (AED)',
     'Paid By\n(owner/accountant/petty)',
-    'Branch ID\n(b1-b5)'
   ];
   const note = '⚠️ One sheet per branch. Amount = BEFORE VAT | Total = auto-calculate. More than one invoice for a category this month? Copy that row and add another below it.';
+  const catList = EXP_TEMPLATE_CATS.map(c=>c.label).join(',');
 
   const wb = XLSX.utils.book_new();
+  const HEADER_ROW=3, FIRST_DATA_ROW=4; // 1-indexed spreadsheet rows: 1=title, 2=note, 3=headers, 4+=data
 
-  // One sheet per branch — every fixed category already listed as a starter row,
-  // Branch ID pre-filled, so a manager only fills in the date/invoice/amount each month.
+  // One sheet per branch — every fixed category already listed as a starter row, so a
+  // manager only fills in the date/invoice/amount each month.
   BRANCHES.forEach(b=>{
     const data = [
       [`${b.icon} ${b.en} — Monthly Expenses`],
       [note],
       cols,
-      ...EXP_TEMPLATE_CATS.map(c=>[c.label, c.item, '', '', c.supplier, '', '', c.vat, '', '', '', '', b.id]),
+      ...EXP_TEMPLATE_CATS.map(c=>[c.label, '', '', c.supplier, '', c.item, c.vat, '', '', '', '']),
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = cols.map((_,i)=>({wch: i===0?16 : i===1?30 : i===6?26 : i===4?22 : 14}));
+    ws['!cols'] = cols.map((_,i)=>({wch: i===0?16 : i===5?28 : i===3?22 : 14}));
     XLSX.utils.book_append_sheet(wb, ws, b.en);
   });
 
@@ -19428,19 +19432,51 @@ function downloadExpensesTemplate(){
     ['   Or: Invoice shows both figures → just use the "before VAT" number directly'],
     [''],
     ['GENERAL RULES:'],
-    ['1. Each sheet = one branch. Every category already has a starter row with "Category" and "Branch ID" filled in — do not change those two columns.'],
-    ['2. Row 1=title, Row 2=note, Row 3=headers — DO NOT delete them'],
-    ['3. Fill in the Date, Invoice No., Supplier, and Amount for each starter row every month'],
-    ['4. More than one invoice for a category this month (e.g. two Purchases invoices)? Copy that row and paste a new one right below it with the same Category'],
-    ['5. No expense at all for a category this month? Leave that row\'s Date/Amount empty — it will simply be skipped on import'],
-    ['6. Date format: DD/MM/YYYY (e.g. 01/04/2026)'],
-    ['7. VAT Type: "exempt" for 0%, "5" for 5%, "15" for 15%'],
-    ['8. Paid By: "owner", "accountant", or "petty"'],
+    ['1. Each sheet = one branch. The header row stays frozen as you scroll down.'],
+    ['2. The "Category" column has a dropdown — click any cell in it to pick from the list instead of typing.'],
+    ['3. Row 1=title, Row 2=note, Row 3=headers — DO NOT delete them'],
+    ['4. Fill in the Date, Invoice No., Supplier, and Amount for each starter row every month'],
+    ['5. More than one invoice for a category this month (e.g. two Purchases invoices)? Copy that row and paste a new one right below it — pick the same Category from the dropdown'],
+    ['6. No expense at all for a category this month? Leave that row\'s Date/Amount empty — it will simply be skipped on import'],
+    ['7. Date format: DD/MM/YYYY (e.g. 01/04/2026)'],
+    ['8. VAT Type: "exempt" for 0%, "5" for 5%, "15" for 15%'],
+    ['9. Paid By: "owner", "accountant", or "petty"'],
   ];
   const wsHow = XLSX.utils.aoa_to_sheet(howData);
   wsHow['!cols'] = [{wch:100}];
   XLSX.utils.book_append_sheet(wb,wsHow,'📖 HOW TO USE');
 
+  // ── Post-process the raw XLSX to add what SheetJS's free build can't write itself:
+  // a real Excel dropdown on the Category column, and a frozen header so it stays
+  // visible while scrolling down a long sheet. ──
+  const arrBuf = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  if(window.JSZip){
+    try{
+      const zip = await JSZip.loadAsync(arrBuf);
+      for(let i=1;i<=BRANCHES.length;i++){
+        const path=`xl/worksheets/sheet${i}.xml`;
+        const file=zip.file(path);
+        if(!file) continue;
+        let xml=await file.async('string');
+        xml=xml.replace('<sheetView workbookViewId="0"/>',
+          `<sheetView workbookViewId="0"><pane ySplit="${HEADER_ROW}" topLeftCell="A${FIRST_DATA_ROW}" activePane="bottomLeft" state="frozen"/></sheetView>`);
+        const dv=`<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="A${FIRST_DATA_ROW}:A300"><formula1>"${catList}"</formula1></dataValidation></dataValidations>`;
+        xml=xml.replace('</sheetData>','</sheetData>'+dv);
+        zip.file(path,xml);
+      }
+      const outBlob=await zip.generateAsync({type:'blob'});
+      const url=URL.createObjectURL(outBlob);
+      const a=document.createElement('a');
+      a.href=url; a.download='Expenses_Template.xlsx';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      return;
+    }catch(e){
+      console.error('Template post-processing failed, falling back to plain export:',e);
+    }
+  }
+  // Fallback (JSZip missing or post-processing failed): still usable, just without
+  // the dropdown/frozen header.
   XLSX.writeFile(wb, 'Expenses_Template.xlsx');
 }
 
@@ -19745,7 +19781,7 @@ async function importExpensesExcel(file){
         const taxNo=String(getCol(row,'TRN','Tax No','Supplier TRN','Supplier Tax')||'').trim();
         const reason=String(getCol(row,'Reason','Description','description','reason','Notes')||'').trim();
         const invoiceNo=String(getCol(row,'Invoice No','Invoice No.','invoice')||'').trim();
-        const subType=String(getCol(row,'Sub Type','Bus No','Expense Type','Item','Employee','Job Title','License','Contract','Property','Type','Service / Subscription No.','Service','Channel')||'').trim();
+        const subType=String(getCol(row,'Sub Type','Bus No','Expense Type','Item','Description','Employee','Job Title','License','Contract','Property','Type','Service / Subscription No.','Service','Channel')||'').trim();
         const extra=String(getCol(row,'Extra Expenses','extra')||'0');
 
         // Build type/label
