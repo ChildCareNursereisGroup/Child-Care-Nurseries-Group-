@@ -24722,19 +24722,29 @@ async function savePastAtt(){
 
   let saved=0, errors=0;
   for(const [staffId, d] of Object.entries(_pastAttData)){
+    const s = DB.staff.find(x=>String(x.id)===staffId);
+    if(!s) continue;
     const abs     = Number(d.abs||0);
     const penalty = Number(d.penalty||0);
     const loan    = Number(d.loan||0);
     const bonus   = Number(d.bonus||0);
-    const totalDedDays = abs + penalty;
 
-    const s = DB.staff.find(x=>String(x.id)===staffId);
-    if(!s) continue;
+    // Large absence (15+ days) — confirm whether it's paid annual leave (comes out of
+    // the leave balance, not the salary) or unpaid absence (comes out of the salary).
+    let annualDays=0;
+    if(abs>=15){
+      const bal=calcLeaveBalance(staffId);
+      const useAnnual=confirm(`${s.name} غاب/غابت ${abs} يوم في ${mon}.\n\nرصيد إجازتها الحالي: ${bal.remaining} يوم.\n\nهل الغياب ده "إجازة سنوية مدفوعة" (يتخصم من رصيد الإجازة ومش من الراتب)؟\n\nOK = إجازة سنوية مدفوعة\nCancel = غياب بدون راتب (يتخصم من الراتب)`);
+      if(useAnnual) annualDays=abs;
+    }
+    const payAbsDays = abs - annualDays; // only unpaid absence hits the salary
+    const totalDedDays = payAbsDays + penalty;
+
     const gross = Number(s.grossSalary||s.basicSalary||0);
     if(!gross) continue;
     const dr = gross/daysInMonth;
     const net = Math.max(0, Math.round((dr*(daysInMonth-totalDedDays) - loan + bonus)*100)/100);
-    const presentDays = daysInMonth - abs;
+    const presentDays = daysInMonth - payAbsDays;
 
     // 1. Save attendance
     await sb.from('staff_attendance').delete()
@@ -24742,10 +24752,11 @@ async function savePastAtt(){
       .gte('date',`${mon}-01`).lte('date',lastDay);
 
     const attRows=[];
-    let absLeft=abs;
+    let absLeft=payAbsDays, leaveLeft=annualDays;
     for(let day=daysInMonth;day>=1;day--){
       const date=`${mon}-${String(day).padStart(2,'0')}`;
       if(absLeft>0){ attRows.push({branch_id:s.branchId||curBid,staff_id:Number(staffId),date,status:'غياب'}); absLeft--; }
+      else if(leaveLeft>0){ attRows.push({branch_id:s.branchId||curBid,staff_id:Number(staffId),date,status:'إجازة'}); leaveLeft--; }
       else           attRows.push({branch_id:s.branchId||curBid,staff_id:Number(staffId),date,status:'حضور'});
     }
     let attOk=true;
@@ -24757,7 +24768,8 @@ async function savePastAtt(){
     attRows.forEach(r=>{ if(!DB.staffAtt[r.date]) DB.staffAtt[r.date]={}; DB.staffAtt[r.date][staffId]=r.status; });
 
     // 2. Save salary history
-    const salEntry={month:mon,amount:net,basic:gross,presentDays,absentDays:abs,
+    const salEntry={month:mon,amount:net,basic:gross,presentDays,absentDays:payAbsDays,
+      annualLeaveDays:annualDays,
       deductDays:penalty,deductLoan:loan,bonus,addedAt:new Date().toISOString()};
     const hist=getSalaryHistory(staffId);
     const idx=hist.findIndex(r=>r.month===mon);
@@ -25117,8 +25129,9 @@ function calcLeaveBalance(staffId, endDateStr){
   const yearsWorked=getServiceYears(staffId, endDateStr);
   const calcMethod='تواريخ عقد';
 
-  // UAE: 30 days annual leave per year, pro-rated
-  const entitled=Math.floor(yearsWorked*30);
+  // Owner's policy: 30 days annual leave granted as one lump sum ONLY after a
+  // full completed 365-day service year — no gradual/pro-rated accrual during the year.
+  const entitled=Math.floor(yearsWorked)*30;
 
   // Leave taken in system (from leave requests)
   const takenInSystem=(DB.leaves||[])
@@ -25690,6 +25703,7 @@ async function upsertSalaryHistoryEntry(staffId, entry){
     basic_salary: entry.basic||0,
     present_days: entry.presentDays??null,
     absent_days: entry.absentDays??null,
+    annual_leave_days: entry.annualLeaveDays??null,
     sick_days: entry.sickDays??null,
     deduct_days: entry.deductDays??null,
     deduct_loan: entry.deductLoan||0,
@@ -27923,24 +27937,39 @@ async function addSalaryHistoryEntry(staffId){
   const basic=Number(el('sh_basic')?.value||0);
   const gross=Number(el('sh_gross')?.value||0)||basic;
   const n=v=>{ const el2=document.getElementById(v); return el2&&el2.value!==''?Number(el2.value):undefined; };
-  const s=v=>{ const el2=document.getElementById(v); return el2&&el2.value.trim()?el2.value.trim():undefined; };
+  const sv=v=>{ const el2=document.getElementById(v); return el2&&el2.value.trim()?el2.value.trim():undefined; };
   const presentDays=n('sh_present');
-  const absentDays=n('sh_absent');
+  let absentDays=n('sh_absent');
   const sickDays=n('sh_sick');
   const deductDays=n('sh_deduct_days');
   const deductLoan=n('sh_deduct_loan');
   const deductOther=n('sh_deduct_other');
   const bonus=n('sh_bonus');
-  const bonusReason=s('sh_bonus_reason');
+  const bonusReason=sv('sh_bonus_reason');
   if(!month){alert('اختاري الشهر أولاً'); return;}
   if(!gross){alert('أدخلي الراتب الإجمالي (Gross Salary)'); return;}
+
+  // Large absence (15+ days) — confirm whether it's paid annual leave (comes out of
+  // the leave balance) or unpaid absence (comes out of the salary), per owner's policy.
+  let annualLeaveDays=0;
+  if((absentDays||0)>=15){
+    const staffObj=DB.staff.find(x=>String(x.id)===String(staffId));
+    const bal=calcLeaveBalance(staffId);
+    const useAnnual=confirm(`${staffObj?.name||''} غاب/غابت ${absentDays} يوم في ${month}.\n\nرصيد إجازتها الحالي: ${bal.remaining} يوم.\n\nهل الغياب ده "إجازة سنوية مدفوعة" (يتخصم من رصيد الإجازة ومش من الراتب)؟\n\nOK = إجازة سنوية مدفوعة\nCancel = غياب بدون راتب (يتخصم من الراتب)`);
+    if(useAnnual){
+      annualLeaveDays=absentDays;
+      absentDays=0;
+      if(el('sh_absent')) el('sh_absent').value=0;
+    }
+  }
+
   // Auto-calculate net if not filled
   calcSHNet(staffId);
   const amount=Number(el('sh_amount')?.value||0);
   const history=getSalaryHistory(staffId);
   const idx=history.findIndex(r=>r.month===month);
   const entry={month, amount, basic:basic||undefined, gross,
-    presentDays, absentDays, sickDays,
+    presentDays, absentDays, sickDays, annualLeaveDays,
     deductDays, deductLoan, deductOther,
     bonus, bonusReason,
     addedAt:new Date().toISOString()};
