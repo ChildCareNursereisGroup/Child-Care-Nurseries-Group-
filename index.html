@@ -2791,6 +2791,7 @@ async function loadFromSupa(bid) {
       fee:Number(x.fee||0), busFee:Number(x.bus_fee||0),
       bus:x.bus||'No', busDirection:x.bus_direction||'', busPickDrop:x.bus_pick_drop||'', busArea:x.bus_area||'',
       notes:x.notes||'', feeNotes:x.fee_notes||'', branchId:x.branch_id,
+      transferredFrom:x.transferred_from_branch_id||null,
       homeArea:x.home_area||'', busCity:x.bus_city||'', busBuilding:x.bus_building||'', busLandmark:x.bus_landmark||'', shiftStart:x.shift_start||'', shiftEnd:x.shift_end||'', usesBus:!!x.uses_bus, busPickupTime:x.bus_pickup_time||''
     }));
 
@@ -3912,6 +3913,7 @@ function renderChildren(){
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          ${c.transferredFrom?`<span style="background:#ede9fe;color:#5b21b6;border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:800">🔄 من ${BRANCHES.find(b=>b.id===c.transferredFrom)?.ar||c.transferredFrom}</span>`:''}
           ${c.leaveDate?`<span style="background:#fee2e2;color:#dc2626;border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:800">🚪 ${fmtDate(c.leaveDate)}</span>`:''}
           <span class="bdg ${c.leaveDate?'derr':'dok'}">${c.leaveDate?t('left'):t('present')}</span>
           ${(()=>{
@@ -14681,30 +14683,46 @@ create policy "anon full access" on child_merge_log for all to anon using (true)
 async function transferChild(){
   const targetBid=el('tbsel')?.value;if(!targetBid)return;
   const target=BRANCHES.find(b=>b.id===targetBid);
+  const originBid=curBid;
   const c=DB.children.find(x=>String(x.id)===String(curChild));
   if(!c)return;
-  if(!confirm(`نقل ${c.name} إلى ${target?.ar}؟\n\n✅ سيتم نقل: الطفل + سجل الحضور\n❌ لن تُنقل: الإيصالات (تبقى في الفرع القديم)`))return;
+  if(!confirm(`نقل ${c.name} إلى ${target?.ar}؟\n\n✅ سيتم نقل: الطفل + سجل الحضور + السجلات الطبية + التقييمات + فترات الإيقاف\n❌ لن تُنقل: الإيصالات (تبقى في الفرع القديم)`))return;
   showLoad('جاري النقل...');
 
-  const transferNote=`[نُقل من ${BRANCHES.find(b=>b.id===curBid)?.ar||curBid} بتاريخ ${today()}]`;
+  const transferNote=`[نُقل من ${BRANCHES.find(b=>b.id===originBid)?.ar||originBid} بتاريخ ${today()}]`;
   const newNotes=((c.notes||'')+'\n'+transferNote).trim();
 
-  // Move child + update notes with transfer history
+  // Move child + update notes with transfer history + tag origin branch for the badge
   await sb.from('children')
-    .update({branch_id:targetBid, notes:newNotes})
+    .update({branch_id:targetBid, notes:newNotes, transferred_from_branch_id:originBid})
     .eq('id',curChild);
 
   // Move attendance records to new branch
   await sb.from('attendance')
     .update({branch_id:targetBid})
     .eq('child_id',curChild)
-    .eq('branch_id',curBid);
+    .eq('branch_id',originBid);
 
-  // ❌ Do NOT move receipts — they stay in the original branch
+  // Move medical records, progress records, and pause history — this is the child's
+  // own data, not financial history, so it should follow the child to the new branch.
+  await sb.from('medical_records')
+    .update({branch_id:targetBid})
+    .eq('child_id',curChild)
+    .eq('branch_id',originBid);
+  await sb.from('progress_records')
+    .update({branch_id:targetBid})
+    .eq('child_id',curChild)
+    .eq('branch_id',originBid);
+  await sb.from('child_pauses')
+    .update({branch_id:targetBid})
+    .eq('child_id',curChild)
+    .eq('branch_id',originBid);
+
+  // ❌ Do NOT move receipts/expenses — money already paid stays in the original branch
 
   hideLoad();closeModal();
   await loadFromSupa(curBid);renderChildren();renderDashboard();
-  alert(`✅ تم نقل ${c.name} إلى ${target?.ar}\n\nالإيصالات القديمة بقيت في ${BRANCHES.find(b=>b.id===curBid)?.ar||curBid} ✅`);
+  alert(`✅ تم نقل ${c.name} إلى ${target?.ar}\n\nالإيصالات القديمة بقيت في ${BRANCHES.find(b=>b.id===originBid)?.ar||originBid} ✅`);
 }
 
 
