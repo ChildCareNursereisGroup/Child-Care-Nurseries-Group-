@@ -14692,10 +14692,23 @@ async function transferChild(){
   const transferNote=`[نُقل من ${BRANCHES.find(b=>b.id===originBid)?.ar||originBid} بتاريخ ${today()}]`;
   const newNotes=((c.notes||'')+'\n'+transferNote).trim();
 
-  // Move child + update notes with transfer history + tag origin branch for the badge
-  await sb.from('children')
-    .update({branch_id:targetBid, notes:newNotes, transferred_from_branch_id:originBid})
+  // Essential move: child record to the new branch + note the transfer history.
+  const {error:moveErr}=await sb.from('children')
+    .update({branch_id:targetBid, notes:newNotes})
     .eq('id',curChild);
+  if(moveErr){
+    hideLoad();
+    alert('❌ فشل النقل:\n'+moveErr.message);
+    return;
+  }
+
+  // Best-effort: tag the origin branch for the list badge. Needs a one-time column:
+  //   alter table children add column if not exists transferred_from_branch_id text;
+  // If the column is missing this fails harmlessly — the child still moved above.
+  const {error:tagErr}=await sb.from('children')
+    .update({transferred_from_branch_id:originBid})
+    .eq('id',curChild);
+  if(tagErr) console.warn('transfer badge not tagged (column missing?):',tagErr.message);
 
   // Move attendance records to new branch
   await sb.from('attendance')
