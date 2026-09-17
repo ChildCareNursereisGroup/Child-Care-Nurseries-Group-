@@ -16512,7 +16512,7 @@ async function printTwoWeekBusRoster(){
       </tr>`;
     }).join('');
 
-    return`<div id="tp-${pIdx}" class="trip-page" style="page-break-after:always">
+    return`<div id="tp-${pIdx}" class="trip-page" data-driver="${(grp.driverName||'').replace(/"/g,'&quot;')}" style="page-break-after:always">
       <div style="background:${col};color:#fff;padding:5mm 6mm;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:7pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — 2-Week Bus Attendance Roster</div>
@@ -16523,7 +16523,7 @@ async function printTwoWeekBusRoster(){
           <div style="font-size:7.5pt;opacity:.8">Driver / السواق</div>
           <div style="font-size:12pt;font-weight:900">${grp.driverName}</div>
           <div style="font-size:8pt;opacity:.85">Bus ${grp.busNum}${grp.assistant?' | '+grp.assistant:''}</div>
-          <button class="np" onclick="printOnlyDriverTrip('tp-${pIdx}')" style="margin-top:2mm;background:#fff;color:${col};border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:7.5pt;font-weight:700;width:100%">🖨️ Print this driver only</button>
+          <button class="np" onclick="printOnlyDriverTrip('tp-${pIdx}')" style="margin-top:2mm;background:#fff;color:${col};border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:7.5pt;font-weight:700;width:100%">🖨️ Print all trips for this driver</button>
         </div>
       </div>
       <div style="background:${col}18;padding:2mm 6mm;font-size:8pt;font-weight:700;color:${col};border-bottom:2px solid ${col}33">
@@ -16577,7 +16577,9 @@ async function printTwoWeekBusRoster(){
   ${pages.join('')}
   <script>
     function printOnlyDriverTrip(id){
-      document.querySelectorAll('.trip-page').forEach(function(el){ el.style.display = (el.id===id) ? '' : 'none'; });
+      var target=document.getElementById(id);
+      var driver=target?target.dataset.driver:null;
+      document.querySelectorAll('.trip-page').forEach(function(el){ el.style.display = (el.dataset.driver===driver) ? '' : 'none'; });
       window.print();
       setTimeout(function(){ document.querySelectorAll('.trip-page').forEach(function(el){ el.style.display=''; }); }, 300);
     }
