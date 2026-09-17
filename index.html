@@ -13317,42 +13317,37 @@ async function openDriverTripSheet(){
       </tr>`).join('');
 
     return `<div style="page-break-after:always">
-      <div style="background:${col};color:#fff;padding:6mm 8mm 5mm;display:flex;justify-content:space-between;align-items:center">
+      <div style="background:${col};color:#fff;padding:3mm 8mm 2.5mm;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-size:7.5pt;opacity:.75;margin-bottom:1.5mm">Child Care Nurseries Group — Driver Trip Sheet</div>
-          <div style="font-size:14pt;font-weight:900;margin-bottom:1.5mm">${label}</div>
-          <div style="font-size:9pt;opacity:.9">🕐 ${g.trip.time} &nbsp;|&nbsp; ${sub}</div>
+          <div style="font-size:7pt;opacity:.75;margin-bottom:.8mm">Child Care Nurseries Group — Driver Trip Sheet</div>
+          <div style="font-size:12pt;font-weight:900;margin-bottom:.8mm">${label}</div>
+          <div style="font-size:8.5pt;opacity:.9">🕐 ${g.trip.time} &nbsp;|&nbsp; ${sub}</div>
         </div>
-        <div style="background:rgba(0,0,0,.18);padding:4mm 8mm;border-radius:10px;text-align:right">
-          <div style="font-size:7.5pt;opacity:.8">Driver / السواق</div>
-          <div style="font-size:15pt;font-weight:900">${g.dName}</div>
-          <div style="font-size:8.5pt;opacity:.9">Bus: ${bus?.busNumber||'—'}${bus?.assistantName?' &nbsp;|&nbsp; Asst: '+bus.assistantName:''}</div>
+        <div style="background:rgba(0,0,0,.18);padding:2mm 7mm;border-radius:8px;text-align:right">
+          <div style="font-size:7pt;opacity:.8">Driver / السواق</div>
+          <div style="font-size:13pt;font-weight:900">${g.dName}</div>
+          <div style="font-size:8pt;opacity:.9">Bus: ${bus?.busNumber||'—'}${bus?.assistantName?' &nbsp;|&nbsp; Asst: '+bus.assistantName:''}</div>
         </div>
       </div>
-      <div style="background:${col}20;border-bottom:2px solid ${col}44;padding:2.5mm 8mm;font-size:8.5pt;font-weight:700;color:#374151;display:flex;gap:20mm">
+      <div style="background:${col}20;border-bottom:2px solid ${col}44;padding:1.5mm 8mm;font-size:8pt;font-weight:700;color:#374151;display:flex;gap:20mm">
         <span>📅 ${fmtDate()}</span>
         <span>👶 ${g.kids.length} children</span>
         <span>${g.trip.type==='pick'?'▲ Pick-up':'▼ Drop-off'}</span>
       </div>
-      <div style="padding:4mm 5mm">
+      <div style="padding:2mm 5mm">
         <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
           <thead><tr style="background:${col};color:#fff">
-            <th style="padding:6px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:44px">Stop#</th>
-            <th style="padding:6px 10px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Parent Contact</th>
-            <th style="padding:6px 7px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:34px">✓</th>
+            <th style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:44px">Stop#</th>
+            <th style="padding:5px 10px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Parent Contact</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:34px">✓</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-      </div>
-      <div style="padding:3mm 5mm;display:flex;gap:10mm;margin-top:2mm">
-        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">${g.dName}</div><div style="color:#6b7280">Driver Signature</div></div>
-        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">${bus?.assistantName||'___________'}</div><div style="color:#6b7280">Assistant Signature</div></div>
-        <div style="flex:1;border-top:1.5px solid #374151;padding-top:2mm;font-size:8.5pt"><div style="font-weight:700">___________</div><div style="color:#6b7280">Manager Signature</div></div>
       </div>
       <div style="padding:1mm 5mm;font-size:7pt;color:#9ca3af;text-align:center">Child Care Nurseries Group | ${label} | Bus ${bus?.busNumber||'—'} | ${new Date().toLocaleDateString('en-GB')}</div>
     </div>`;
@@ -16495,7 +16490,7 @@ async function printTwoWeekBusRoster(){
 
   const mkCell=()=>`<td style="padding:2px;text-align:center;border:1px solid #e5e7eb"><div style="width:20px;height:18px;border:1.5px solid #cbd5e1;border-radius:3px;margin:auto"></div></td>`;
 
-  const pages=groups.map(grp=>{
+  const pages=groups.map((grp,pIdx)=>{
     const trip=grp.trip;
     const col=trip.type==='pick'?'#0d9488':trip.type==='mixed'?'#d97706':'#1d4ed8';
     const label=trip.en||trip.labelEN||'';
@@ -16517,7 +16512,7 @@ async function printTwoWeekBusRoster(){
       </tr>`;
     }).join('');
 
-    return`<div style="page-break-after:always">
+    return`<div id="tp-${pIdx}" class="trip-page" style="page-break-after:always">
       <div style="background:${col};color:#fff;padding:5mm 6mm;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:7pt;opacity:.8;margin-bottom:1mm">Child Care Nurseries Group — 2-Week Bus Attendance Roster</div>
@@ -16528,6 +16523,7 @@ async function printTwoWeekBusRoster(){
           <div style="font-size:7.5pt;opacity:.8">Driver / السواق</div>
           <div style="font-size:12pt;font-weight:900">${grp.driverName}</div>
           <div style="font-size:8pt;opacity:.85">Bus ${grp.busNum}${grp.assistant?' | '+grp.assistant:''}</div>
+          <button class="np" onclick="printOnlyDriverTrip('tp-${pIdx}')" style="margin-top:2mm;background:#fff;color:${col};border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:7.5pt;font-weight:700;width:100%">🖨️ Print this driver only</button>
         </div>
       </div>
       <div style="background:${col}18;padding:2mm 6mm;font-size:8pt;font-weight:700;color:${col};border-bottom:2px solid ${col}33">
@@ -16579,6 +16575,13 @@ async function printTwoWeekBusRoster(){
   </div>
   <div style="height:38px" class="np"></div>
   ${pages.join('')}
+  <script>
+    function printOnlyDriverTrip(id){
+      document.querySelectorAll('.trip-page').forEach(function(el){ el.style.display = (el.id===id) ? '' : 'none'; });
+      window.print();
+      setTimeout(function(){ document.querySelectorAll('.trip-page').forEach(function(el){ el.style.display=''; }); }, 300);
+    }
+  <\/script>
   </body></html>`;
 
   const w=window.open('','_blank','width=1100,height=900');
