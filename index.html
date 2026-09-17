@@ -15990,7 +15990,8 @@ function renderMonthlyBusRoster(){
                 <td style="padding:4px 8px;text-align:center;color:#0369a1;font-weight:700">${s.shiftStart||'?'}–${s.shiftEnd||'?'}</td>
                 <td style="padding:4px 8px">${s.homeArea||'—'}</td>
                 <td style="padding:4px 8px">
-                  <select data-sid="${s.id}" data-trip-type="${tType}" class="staff-assign-sel"
+                  <select data-sid="${s.id}" data-trip-type="${tType}" class="staff-assign-sel-trip"
+                    onchange="document.querySelectorAll(\`.staff-assign-sel[data-sid='${s.id}'][data-trip-type='${tType}']\`).forEach(o=>o.value=this.value)"
                     style="padding:3px 6px;border:1.5px solid #93c5fd;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:.74rem;background:#fff;min-width:130px">
                     <option value="">— Select driver —</option>
                     ${busOpts.replace(`value="${assignedId}"`,`value="${assignedId}" selected`)}
