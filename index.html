@@ -15780,9 +15780,9 @@ function renderMonthlyBusRoster(){
 
   const busOpts=allBuses.map(b=>`<option value="${b.id}">${b.driverName||'سواق '+b.busNumber} (${b.busNumber})</option>`).join('');
 
-  // Get bus-using staff from fresh load or DB
-  const rawStaff = window._rosterStaff || (DB.staff||[]).filter(s=>s.usesBus);
-  // Show all staff regardless of branch filter (buses are shared across branches)
+  // Get bus-using staff from fresh load or DB, filtered by the selected branch
+  const rawStaffAll = window._rosterStaff || (DB.staff||[]).filter(s=>s.usesBus);
+  const rawStaff = branchSel==='all' ? rawStaffAll : rawStaffAll.filter(s=>s.branchId===branchSel);
   const busStaff = rawStaff.map(s=>{
     const br=BRANCHES.find(b=>b.id===s.branchId)||{};
     return{...s,
