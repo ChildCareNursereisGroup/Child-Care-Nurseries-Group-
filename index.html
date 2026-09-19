@@ -3710,8 +3710,14 @@ function renderMonthlyPerformance(){
       DB.receipts.filter(r=>!r.isCancelled && recCoversMonth(r,mon)).forEach(r=>{
         if(r.total>=600) full++; else partial++;
       });
-      return {full, partial, none:0, totalPaid, newRegs, stopped};
+      return {full, partial, none:0, excluded:0, totalPaid, newRegs, stopped};
     }
+
+    const enrolledCount = DB.children.filter(c=>{
+      if(c.joinDate && c.joinDate > mon+'-31') return false;
+      if(c.leaveDate && c.leaveDate < mon+'-01') return false;
+      return true;
+    }).length;
 
     const active = DB.children.filter(c=>{
       if(!c.fee || c.fee<=0) return false;
@@ -3732,7 +3738,7 @@ function renderMonthlyPerformance(){
       else if(paid>=exp) full++;
       else partial++;
     });
-    return {full, partial, none, totalPaid, newRegs, stopped};
+    return {full, partial, none, excluded:Math.max(0,enrolledCount-active.length), totalPaid, newRegs, stopped};
   };
 
   const monthNamesAr=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -3749,8 +3755,8 @@ function renderMonthlyPerformance(){
     if(!years.some(y=>dataByYearMon[`${y}-${mm}`])) return ''; // no year has data for this month at all
     const yearCells = years.map(y=>{
       const d = dataByYearMon[`${y}-${mm}`];
-      if(!d) return `<td colspan="6" style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#cbd5e1;border-right:2px solid #e5e7eb">—</td>`;
-      return `${cell(d.full,'#059669')}${cell(d.partial,'#d97706')}${cell(d.none,'#dc2626')}${cell(d.newRegs,'#0369a1')}${cell(d.stopped,'#7c3aed')}<td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:#1e3a8a;border-right:2px solid #e5e7eb">${fmtNum(Math.round(d.totalPaid))}</td>`;
+      if(!d) return `<td colspan="7" style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;color:#cbd5e1;border-right:2px solid #e5e7eb">—</td>`;
+      return `${cell(d.full,'#059669')}${cell(d.partial,'#d97706')}${cell(d.none,'#dc2626')}${cell(d.excluded,'#64748b')}${cell(d.newRegs,'#0369a1')}${cell(d.stopped,'#7c3aed')}<td style="padding:6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:800;color:#1e3a8a;border-right:2px solid #e5e7eb">${fmtNum(Math.round(d.totalPaid))}</td>`;
     }).join('');
     return `<tr><td style="padding:6px 9px;border-bottom:1px solid #e5e7eb;font-weight:700;background:#f8fafc">${monthNames[monNum-1]}</td>${yearCells}</tr>`;
   }).join('');
@@ -3759,17 +3765,18 @@ function renderMonthlyPerformance(){
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#059669;font-size:.7rem">✅ ${lang==='ar'?'كامل':'Full'}</th>
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#d97706;font-size:.7rem">⚠️ ${lang==='ar'?'جزء':'Part'}</th>
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#dc2626;font-size:.7rem">❌ ${lang==='ar'?'لم يدفع':'Unpaid'}</th>
+    <th title="${lang==='ar'?'رسوم صفر أو موقّف مؤقتًا':'Zero fee or paused'}" style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:.7rem">⏸️ ${lang==='ar'?'مستبعد':'Excl.'}</th>
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#0369a1;font-size:.7rem">🆕 ${lang==='ar'?'جديد':'New'}</th>
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;color:#7c3aed;font-size:.7rem">🚪 ${lang==='ar'?'توقف':'Stop'}</th>
     <th style="padding:5px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:.7rem;border-right:2px solid #e5e7eb">💰 ${lang==='ar'?'إجمالي':'Total'}</th>
   `).join('');
 
-  const yearHeaders = years.map(y=>`<th colspan="6" style="padding:6px;text-align:center;border-bottom:1px solid #e5e7eb;background:#eef2ff;font-weight:900;color:#1e3a8a;border-right:2px solid #e5e7eb">${y}</th>`).join('');
+  const yearHeaders = years.map(y=>`<th colspan="7" style="padding:6px;text-align:center;border-bottom:1px solid #e5e7eb;background:#eef2ff;font-weight:900;color:#1e3a8a;border-right:2px solid #e5e7eb">${y}</th>`).join('');
 
   container.innerHTML = `
     <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px;overflow-x:auto">
       <div style="font-weight:900;color:#1e3a8a;font-size:.9rem;margin-bottom:10px">📈 ${lang==='ar'?'تقرير الأداء الشهري — تحصيل الرسوم':'Monthly Performance — Fee Collection'}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:${260+years.length*300}px">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:${260+years.length*345}px">
         <thead>
           <tr style="background:#f8fafc">
             <th rowspan="2" style="padding:7px 9px;text-align:right;border-bottom:1px solid #e5e7eb;vertical-align:bottom">${lang==='ar'?'الشهر':'Month'}</th>
