@@ -1090,12 +1090,21 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <div class="ct">💸 Expenses Log — سجل المصاريف</div>
       <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         <input type="month" id="efmon" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderExps()">
+        <span style="display:flex;align-items:center;gap:4px;font-size:.78rem;font-weight:700;color:var(--muted)">
+          من <input type="date" id="efrom" style="padding:4px 6px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderExps()">
+          إلى <input type="date" id="efto" style="padding:4px 6px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif" onchange="renderExps()">
+          <button class="btn bg bsm" title="مسح الفترة" onclick="el('efrom').value='';el('efto').value='';renderExps()">✕</button>
+        </span>
         <span style="font-weight:800;color:var(--err)">إجمالي: <span id="exptot">0</span> د.إ</span>
         <button class="btn bsm" style="background:#dc2626;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openExpReportModal()">📊 Expense Report</button>
         <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:5px 11px;border-radius:9px;cursor:pointer;font-size:.78rem;font-weight:700" onclick="openBusReport()">🚌 Bus Report</button>
       </div>
     </div>
     <div id="epills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
+    <div id="efbus-wrap" style="display:none;margin-bottom:8px;align-items:center;gap:8px;background:#fef9c3;border:1.5px solid #fde68a;border-radius:9px;padding:7px 12px">
+      <span style="font-weight:800;color:#854d0e;font-size:.82rem">🚌 رقم الباص:</span>
+      <select id="efbus" onchange="renderExps()" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Tajawal',sans-serif;min-width:130px"></select>
+    </div>
     <div id="explist"></div>
   </div>
 </div>
@@ -10707,8 +10716,23 @@ function renderExps(){
     const prevMon=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
     list=list.filter(e=>{const m=monthOf(e.date);return m===curMon||m===prevMon;});
   }
-  if(fm)list=list.filter(e=>monthOf(e.date)===fm);
+  const ff=el('efrom')?.value||'', ft=el('efto')?.value||'';
+  if(ff||ft) list=list.filter(e=>(!ff||(e.date||'')>=ff)&&(!ft||(e.date||'')<=ft)); // date range overrides the month picker
+  else if(fm)list=list.filter(e=>monthOf(e.date)===fm);
   if(expFilt!=='all')list=list.filter(e=>e.category===expFilt);
+  // Bus category: filter by bus number (options come from the invoices in the current date scope)
+  const busWrap=el('efbus-wrap');
+  if(busWrap){
+    if(expFilt==='bus'){
+      const busNo=e=>((e.extra&&e.extra['__bus_no__'])||'').toString().trim().toUpperCase();
+      const nums=[...new Set(list.map(busNo).filter(Boolean))].sort();
+      const sel=el('efbus'); const prev=sel.value;
+      sel.innerHTML=`<option value="">— كل الباصات —</option>`+nums.map(b=>`<option value="${b}">${b}</option>`).join('');
+      if(nums.includes(prev)) sel.value=prev;
+      busWrap.style.display='flex';
+      if(sel.value) list=list.filter(e=>busNo(e)===sel.value);
+    } else busWrap.style.display='none';
+  }
   const tot=list.reduce((s,e)=>s+(e.totalAmount||e.amount),0);
   const vatTot=list.reduce((s,e)=>s+(e.vatAmount||0),0);
   el('exptot').textContent=fmtNum(tot);
@@ -10861,6 +10885,12 @@ function renderQuickExp(){
         <input type="date" id="qe_date" value="${today()}" style="${inp}"></div>
       <div class="fg"><label>💰 ${ar?'المبلغ الإجمالي (د.إ)':'Total Amount (AED)'}</label>
         <input type="number" step="0.01" min="0" id="qe_total" oninput="qeCalc()" style="${inp}"></div>
+      ${expCat==='bus'?`
+      <div class="fg"><label>🚌 ${ar?'رقم الباص':'Bus No.'}</label>
+        <input type="text" id="qe_busno" list="qe_busl" style="${inp}">
+        <datalist id="qe_busl">${(DB.allBuses||[]).map(b=>`<option value="${b.busNumber}"></option>`).join('')}</datalist></div>
+      <div class="fg"><label>🔧 ${ar?'نوع المصروف':'Expense Type'}</label>
+        <select id="qe_bustype" style="${inp}">${(ar?['وقود','صيانة','تأمين','مخالفات','غسيل','أخرى']:['Fuel','Maintenance','Insurance','Fines','Wash','Other']).map(o=>`<option>${o}</option>`).join('')}</select></div>`:''}
     </div>
     <div style="margin-top:12px;background:#f8fafc;border:2px solid #e5e7eb;border-radius:12px;padding:12px 14px">
       <div style="font-weight:800;margin-bottom:8px">🧾 ${ar?'هل الفاتورة بضريبة؟':'Is there VAT?'}</div>
@@ -10907,6 +10937,14 @@ async function saveQuickExp(){
   if(!supplier){showAlert('expalert',ar?'❌ اكتبي اسم الشركة':'❌ Enter the company name',true);return;}
   if(!date){showAlert('expalert',ar?'❌ اختاري تاريخ الفاتورة':'❌ Pick the invoice date',true);return;}
   if(!(total>0)){showAlert('expalert',ar?'❌ اكتبي المبلغ الإجمالي':'❌ Enter the total amount',true);return;}
+  const extra={}; let subType='';
+  if(expCat==='bus'){
+    const busNo=v('qe_busno').trim().toUpperCase();
+    if(!busNo){showAlert('expalert',ar?'❌ اكتبي رقم الباص':'❌ Enter the bus number',true);return;}
+    extra['__bus_no__']=busNo;
+    subType=el('qe_bustype')?.value||'';
+    extra['__bus_type__']=subType;
+  }
   let amount=total, vatAmt=0, taxNum='';
   if(vatYes){
     taxNum=v('qe_trn'); const before=n('qe_before');
@@ -10919,13 +10957,14 @@ async function saveQuickExp(){
       : `⚠️ VAT (${fmtNum(vatAmt)}) is not 5% of the pre-VAT amount (expected ${fmtNum(expected)}). Save anyway?`)) return;
   }
   const dup=DB.expenses.find(e=>e.category===expCat && (e.date||'')===date &&
-    Math.abs((e.totalAmount||e.amount||0)-total)<0.01 && (e.supplierName||'')===supplier);
+    Math.abs((e.totalAmount||e.amount||0)-total)<0.01 && (e.supplierName||'')===supplier &&
+    ((e.extra&&e.extra['__bus_no__'])||'')===(extra['__bus_no__']||''));
   if(dup){showAlert('expalert',ar?`⚠️ المصروف ده مسجل قبل كده (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} د.إ)`:`⚠️ Duplicate expense (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} AED)`,true);return;}
   const row={
     branch_id:branchId, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
     amount, vat_type:vatYes?'5% ضريبة':'معفى (0%)', vat_amount:vatAmt, total_amount:total,
-    date, note:'', sub_type:'', supplier_name:supplier, tax_number:taxNum,
-    invoice_number:null, paid_by:'accountant', extra:{}
+    date, note:'', sub_type:subType, supplier_name:supplier, tax_number:taxNum,
+    invoice_number:null, paid_by:'accountant', extra
   };
   setSyncing(true);
   const {error}=await sb.from('expenses').insert(row);
