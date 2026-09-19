@@ -4667,6 +4667,25 @@ async function saveReceipt(){
   const vatType=(clothes||tools)?'5':'exempt';
   const total=Math.round((fee+bus+clothes+reg+tools+wkFee+hourFee+overFee+vatAmt)*100)/100;
   const payMethod=el('rpaymethod')?.value||'cash';
+
+  // Warn when the tuition paid is less than the child's monthly fee in the system, and
+  // require the reason (it feeds the "Partial" list on the dashboard).
+  let partialReason='';
+  if(c && fee>0 && c.fee>0 && fee < c.fee-0.005){
+    const arW=lang==='ar';
+    const ans=prompt(arW
+      ? `⚠️ تنبيه: الدفع غير مطابق للنظام\n\n${c.name}\nالرسوم الشهرية في النظام: ${fmtNum(c.fee)} د.إ\nالمبلغ المدفوع في الإيصال: ${fmtNum(fee)} د.إ\nالفترة: ${el('rfrom').value} → ${el('rto').value}\n\nاكتبي سبب الدفع الجزئي (مثلاً: الطفل حضر جزء من الأيام):`
+      : `⚠️ Payment does not match the system\n\n${c.name}\nMonthly fee in system: ${fmtNum(c.fee)} AED\nAmount paid on this receipt: ${fmtNum(fee)} AED\nPeriod: ${el('rfrom').value} → ${el('rto').value}\n\nEnter the reason for the partial payment (e.g. child attended only part of the days):`,
+      '');
+    if(ans===null) return;
+    if(!ans.trim()){
+      showAlert('recalert',arW?'❌ لازم تكتبي سبب الدفع الجزئي قبل الحفظ':'❌ A reason for the partial payment is required',true);
+      return;
+    }
+    partialReason=(arW?'سبب الدفع الجزئي: ':'Partial payment reason: ')+ans.trim();
+  }
+  const notesOut=[v('rnotes'),partialReason].filter(Boolean).join(' | ');
+
   setSyncing(true);
   const row={
     branch_id:curBid,
@@ -4680,7 +4699,7 @@ async function saveReceipt(){
     overtime_date:el('rover_date')?.value||null, overtime_dur:el('rover_dur')?.value||'',
     overtime_fee:n('rover_fee')||0,
     vat_type:vatType,vat_amount:vatAmt,pay_method:payMethod,
-    total,notes:v('rnotes')
+    total,notes:notesOut
   };
   // ── Duplicate check — receipt number unique within branch ──
   const {data:dupCheck} = await sb.from('receipts').select('id')
@@ -28669,6 +28688,28 @@ function renderTodaySummary(){
   const unpaidClasses = Object.keys(unpaidByClass).sort();
   const totalUnpaid   = unpaidClasses.reduce((s,k)=>s+unpaidByClass[k].length, 0);
 
+  // ── 3b. Partial-period payments: paid only up to a mid-month date (e.g. 1st → 17th).
+  // The child shows here from the day BEFORE that end date until a receipt covers beyond it.
+  const _ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const _today = new Date(todayStr+'T12:00:00');
+  const _tomorrowStr = _ymd(new Date(_today.getFullYear(), _today.getMonth(), _today.getDate()+1));
+  const _oldestStr   = _ymd(new Date(_today.getFullYear(), _today.getMonth(), _today.getDate()-40));
+  const dueSoon = [];
+  active.filter(c => c.fee > 0).forEach(c => {
+    if(c.suspendDate && c.suspendDate<=todayStr && (!c.resumeDate || c.resumeDate>todayStr)) return;
+    const recs = DB.receipts.filter(r => !r.isCancelled && String(r.childId)===String(c.id));
+    if(recs.filter(r => recCoversMonth(r, mon)).reduce((s,r)=>s+r.total, 0) === 0) return; // already in "Not Paid"
+    const tuition = recs.filter(r => r.toDate && ((r.fee||0)>0 || (r.friFee||0)+(r.satFee||0)+(r.sunFee||0)>0));
+    if(!tuition.length) return;
+    const covEnd = tuition.reduce((m,r) => r.toDate>m ? r.toDate : m, '');
+    const [cy,cm,cd] = covEnd.split('-').map(Number);
+    if(cd === new Date(cy, cm, 0).getDate()) return; // ends on a month-end → normal monthly cycle
+    if(covEnd > _tomorrowStr || covEnd < _oldestStr) return;
+    const daysLeft = Math.round((new Date(covEnd+'T12:00:00') - _today) / 86400000);
+    dueSoon.push({name:c.name, cls:(c.className||'No Class').trim(), covEnd, daysLeft});
+  });
+  dueSoon.sort((a,b) => a.covEnd.localeCompare(b.covEnd) || a.name.localeCompare(b.name));
+
   // ── Date label ─────────────────────────────────
   const dateLabel = new Date(todayStr+'T12:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const dateEl = el('today-summary-date');
@@ -28736,6 +28777,27 @@ function renderTodaySummary(){
     html += `<div style="background:#f0fdf4;border-radius:10px;padding:9px 13px;border:1px solid #bbf7d0;display:flex;align-items:center;gap:7px">
       <span style="font-size:1.1rem">✅</span>
       <span style="font-weight:700;font-size:.8rem;color:#065f46">All children paid for this month!</span>
+    </div>`;
+  }
+
+  // Section: Partial-period payments ending soon / overdue
+  if(dueSoon.length){
+    html += `<div style="background:#fffbeb;border-radius:10px;padding:11px 13px;border:1px solid #fcd34d">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+        <span style="font-weight:800;font-size:.82rem;color:#92400e">⏰ Must Pay Now — partial period ending</span>
+        <span style="font-weight:900;font-size:.95rem;color:#d97706">${dueSoon.length} kids</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${dueSoon.map(d=>{
+          const status = d.daysLeft>0 ? 'ends tomorrow' : d.daysLeft===0 ? 'ends today' : 'overdue '+Math.abs(d.daysLeft)+'d';
+          const col = d.daysLeft<0 ? '#dc2626' : '#d97706';
+          return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.76rem">
+            <span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 9px;font-weight:800;white-space:nowrap">${d.cls}</span>
+            <span style="font-weight:700;color:#374151">${d.name}</span>
+            <span style="color:${col};font-weight:700">paid until ${fmtDate(d.covEnd)} — ${status}</span>
+          </div>`;
+        }).join('')}
+      </div>
     </div>`;
   }
 
