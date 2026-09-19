@@ -1064,7 +1064,12 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <div id="ecats" style="display:flex;flex-wrap:wrap;gap:5px"></div>
   </div>
   <div class="card np">
-    <div class="ch"><div class="ct" id="eformttl">➕ مصروف</div></div>
+    <div class="ch"><div class="ct" id="eformttl">➕ مصروف</div>
+      <div style="display:flex;gap:5px">
+        <button id="expmode-quick" class="btn bsm bp" onclick="setExpMode('quick')">⚡ إدخال سريع</button>
+        <button id="expmode-full" class="btn bsm bg" onclick="setExpMode('full')">📋 تفصيلي</button>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
       <button class="btn bsm" style="background:#6366f1;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openScan('invoice')">🤖 AI Scan Invoice</button>
       <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-exp-file2').click()">📥 Import Excel</button>
@@ -1074,7 +1079,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     </div>
     <input type="file" id="xl-exp-file2" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExpensesExcel(this.files[0])">
     <div id="eformbody"></div>
-    <div style="display:flex;gap:7px;margin-top:9px">
+    <div id="eformbtns" style="display:flex;gap:7px;margin-top:9px">
       <button class="btn bd" onclick="saveExp()">💾 حفظ</button>
       <button class="btn bg bsm" onclick="renderEForm()">🔄</button>
     </div>
@@ -10651,9 +10656,15 @@ function renderECats(){
   renderEForm();
 }
 function pickExpCat(k){expCat=k;renderECats();}
+var expMode='quick';
+function setExpMode(m){ expMode=m; renderEForm(); }
 function renderEForm(){
   const cat=EXP_CATS.find(c=>c.k===expCat);if(!cat)return;
   el('eformttl').textContent='➕ '+(typeof cat.ar==='function'?cat.ar():cat.ar);
+  if(el('expmode-quick')) el('expmode-quick').className='btn bsm '+(expMode==='quick'?'bp':'bg');
+  if(el('expmode-full'))  el('expmode-full').className='btn bsm '+(expMode==='full'?'bp':'bg');
+  if(el('eformbtns')) el('eformbtns').style.display=expMode==='quick'?'none':'flex';
+  if(expMode==='quick'){ renderQuickExp(); return; }
   const mkField=f=>{
     const lbl=typeof f.ar==='function'?f.ar():f.ar;
     const opts=typeof f.opts==='function'?f.opts():(f.opts||[]);
@@ -10833,6 +10844,96 @@ async function saveExp(){
   showAlert('expalert',t('expSaved'),false);
   { const _ec=EXP_CATS.find(c=>c.k===expCat); logActivity('expense', (typeof _ec?.ar==='function'?_ec.ar():_ec?.ar||expCat)+' — '+fmtNum(amount)+' د.إ'); }
   renderEForm();await loadFromSupa(curBid);renderExps();
+}
+// ── Quick expense entry: company, date, total, VAT yes/no (+ TRN and pre-VAT amount) ──
+var _qeBeforeTouched=false;
+function renderQuickExp(){
+  const ar=lang==='ar';
+  _qeBeforeTouched=false;
+  const inp='width:100%;padding:11px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:1rem;font-family:\'Tajawal\',sans-serif;box-sizing:border-box';
+  el('eformbody').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">
+      <div class="fg"><label>🏢 ${ar?'الفرع':'Branch'}</label>
+        <select id="qe_branch" style="${inp}">${BRANCHES.map(b=>`<option value="${b.id}" ${b.id===curBid?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('')}</select></div>
+      <div class="fg"><label>🏭 ${ar?'اسم الشركة':'Company Name'}</label>
+        <input type="text" id="qe_supplier" style="${inp}"></div>
+      <div class="fg"><label>📅 ${ar?'تاريخ الفاتورة':'Invoice Date'}</label>
+        <input type="date" id="qe_date" value="${today()}" style="${inp}"></div>
+      <div class="fg"><label>💰 ${ar?'المبلغ الإجمالي (د.إ)':'Total Amount (AED)'}</label>
+        <input type="number" step="0.01" min="0" id="qe_total" oninput="qeCalc()" style="${inp}"></div>
+    </div>
+    <div style="margin-top:12px;background:#f8fafc;border:2px solid #e5e7eb;border-radius:12px;padding:12px 14px">
+      <div style="font-weight:800;margin-bottom:8px">🧾 ${ar?'هل الفاتورة بضريبة؟':'Is there VAT?'}</div>
+      <div style="display:flex;gap:10px">
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;font-weight:800;background:#fff"><input type="radio" name="qe_vat" value="no" checked onchange="qeToggleVat()"> ${ar?'لا — بدون ضريبة':'No'}</label>
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;font-weight:800;background:#fff"><input type="radio" name="qe_vat" value="yes" onchange="qeToggleVat()"> ${ar?'نعم — بضريبة 5%':'Yes — 5% VAT'}</label>
+      </div>
+      <div id="qe_vatbox" style="display:none;margin-top:12px;display:none;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">
+        <div class="fg"><label>🔢 ${ar?'الرقم الضريبي للشركة (TRN)':'Company Tax Number (TRN)'}</label>
+          <input type="text" id="qe_trn" inputmode="numeric" style="${inp}"></div>
+        <div class="fg"><label>💵 ${ar?'الإجمالي قبل الضريبة (د.إ)':'Total before VAT (AED)'}</label>
+          <input type="number" step="0.01" min="0" id="qe_before" oninput="_qeBeforeTouched=true;qeCalc()" style="${inp}"></div>
+        <div id="qe_vatinfo" style="grid-column:1/-1;font-size:.85rem;font-weight:700"></div>
+      </div>
+    </div>
+    <button class="btn bd" style="margin-top:14px;width:100%;padding:13px;font-size:1.05rem" onclick="saveQuickExp()">💾 ${ar?'حفظ المصروف':'Save Expense'}</button>`;
+}
+function qeToggleVat(){
+  const yes=document.querySelector('input[name="qe_vat"]:checked')?.value==='yes';
+  const box=el('qe_vatbox'); if(box) box.style.display=yes?'grid':'none';
+  qeCalc();
+}
+function qeCalc(){
+  const yes=document.querySelector('input[name="qe_vat"]:checked')?.value==='yes';
+  if(!yes) return;
+  const total=n('qe_total');
+  if(!_qeBeforeTouched && el('qe_before')) el('qe_before').value=total>0?(Math.round(total/1.05*100)/100):'';
+  const before=n('qe_before'), info=el('qe_vatinfo');
+  if(!info) return;
+  if(!(total>0)||!(before>0)){ info.innerHTML=''; return; }
+  const vat=Math.round((total-before)*100)/100;
+  const expected=Math.round(before*0.05*100)/100;
+  const ok=Math.abs(vat-expected)<=0.06;
+  info.innerHTML=ok
+    ? `<span style="color:#059669">✅ ${lang==='ar'?'الضريبة 5%':'VAT 5%'}: ${fmtNum(vat)} ${lang==='ar'?'د.إ':'AED'}</span>`
+    : `<span style="color:#d97706">⚠️ ${lang==='ar'?'الفرق بين الإجمالي وقبل الضريبة':'Difference'}: ${fmtNum(vat)} — ${lang==='ar'?'الضريبة 5% المتوقعة':'expected 5% VAT'}: ${fmtNum(expected)}</span>`;
+}
+async function saveQuickExp(){
+  const cat=EXP_CATS.find(c=>c.k===expCat); if(!cat) return;
+  const ar=lang==='ar';
+  const supplier=v('qe_supplier'), date=el('qe_date')?.value||'', total=n('qe_total');
+  const vatYes=document.querySelector('input[name="qe_vat"]:checked')?.value==='yes';
+  const branchId=el('qe_branch')?.value||curBid;
+  if(!supplier){showAlert('expalert',ar?'❌ اكتبي اسم الشركة':'❌ Enter the company name',true);return;}
+  if(!date){showAlert('expalert',ar?'❌ اختاري تاريخ الفاتورة':'❌ Pick the invoice date',true);return;}
+  if(!(total>0)){showAlert('expalert',ar?'❌ اكتبي المبلغ الإجمالي':'❌ Enter the total amount',true);return;}
+  let amount=total, vatAmt=0, taxNum='';
+  if(vatYes){
+    taxNum=v('qe_trn'); const before=n('qe_before');
+    if(!taxNum){showAlert('expalert',ar?'❌ اكتبي الرقم الضريبي للشركة':'❌ Enter the company tax number',true);return;}
+    if(!(before>0)||before>total){showAlert('expalert',ar?'❌ الإجمالي قبل الضريبة غير صحيح':'❌ Total before VAT is not valid',true);return;}
+    amount=before; vatAmt=Math.round((total-before)*100)/100;
+    const expected=Math.round(before*0.05*100)/100;
+    if(Math.abs(vatAmt-expected)>0.06 && !confirm(ar
+      ? `⚠️ الضريبة (${fmtNum(vatAmt)}) مش 5% من المبلغ قبل الضريبة (المتوقع ${fmtNum(expected)}). تحفظي برضه؟`
+      : `⚠️ VAT (${fmtNum(vatAmt)}) is not 5% of the pre-VAT amount (expected ${fmtNum(expected)}). Save anyway?`)) return;
+  }
+  const dup=DB.expenses.find(e=>e.category===expCat && (e.date||'')===date &&
+    Math.abs((e.totalAmount||e.amount||0)-total)<0.01 && (e.supplierName||'')===supplier);
+  if(dup){showAlert('expalert',ar?`⚠️ المصروف ده مسجل قبل كده (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} د.إ)`:`⚠️ Duplicate expense (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} AED)`,true);return;}
+  const row={
+    branch_id:branchId, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
+    amount, vat_type:vatYes?'5% ضريبة':'معفى (0%)', vat_amount:vatAmt, total_amount:total,
+    date, note:'', sub_type:'', supplier_name:supplier, tax_number:taxNum,
+    invoice_number:null, paid_by:'accountant', extra:{}
+  };
+  setSyncing(true);
+  const {error}=await sb.from('expenses').insert(row);
+  setSyncing(false);
+  if(error){showAlert('expalert','❌ خطأ: '+error.message,true);return;}
+  showAlert('expalert',t('expSaved'),false);
+  logActivity('expense', supplier+' — '+fmtNum(total)+' د.إ');
+  renderQuickExp(); await loadFromSupa(curBid); renderExps();
 }
 async function delExp(id){
   if(!confirm('حذف المصروف؟'))return;
