@@ -19956,9 +19956,18 @@ async function importExpensesExcel(file){
         hMap[i]=hn;
       });
 
+      // A generic name like "Type" or "Invoice" must not match the "VAT Type" column or the
+      // "Invoice Date" column — that put the VAT type into Sub Type and the date serial into Invoice No.
       const getCol=(row,...names)=>{
         for(const name of names){
-          const idx=headers.findIndex(h=>String(h).toLowerCase().includes(name.toLowerCase()));
+          const nl=name.toLowerCase();
+          const idx=headers.findIndex(h=>{
+            const hl=String(h).toLowerCase();
+            if(!hl.includes(nl)) return false;
+            if(hl.includes('vat') && !nl.includes('vat')) return false;
+            if(nl==='invoice' && hl.includes('date')) return false;
+            return true;
+          });
           if(idx>=0 && row[idx]!==undefined && row[idx]!=='') return row[idx];
         }
         return '';
