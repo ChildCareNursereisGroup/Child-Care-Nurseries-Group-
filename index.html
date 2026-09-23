@@ -10161,6 +10161,27 @@ function buildCmsgText(childName){
   return msg;
 }
 
+// Sends the picked flyer to ONE parent. Uses the real Meta API when the branch has it
+// configured (waPhoneId+waToken); otherwise falls back to the OS share sheet — the same
+// technique the single-receipt "Share as image" button uses (Web Share with a file) — so
+// she picks that parent's WhatsApp chat herself and the image goes across attached, no API
+// needed. This only ever shares to whichever chat she picks in that one tap.
+async function shareCmsgImageTo(phone, caption){
+  const bx=getBranchExtra(curBid);
+  if(bx.waPhoneId && bx.waToken){
+    const url = await _uploadCmsgImage();
+    if(url){
+      const r = await sendWAImage(phone, url, caption);
+      if(r.ok) return {ok:true};
+    }
+  }
+  if(_cmsgImageFile && navigator.share && navigator.canShare && navigator.canShare({files:[_cmsgImageFile]})){
+    try{ await navigator.share({title:lang==='ar'?'فلاير الأسبوع':'Weekly Flyer', text:caption||'', files:[_cmsgImageFile]}); return {ok:true}; }
+    catch(e){ if(e.name==='AbortError') return {ok:false, reason:'cancelled'}; }
+  }
+  return {ok:false, reason:'unsupported'};
+}
+
 async function sendCmsgToOne(childId){
   const c = DB.children.find(x=>String(x.id)===String(childId));
   if(!c) return;
@@ -10168,17 +10189,18 @@ async function sendCmsgToOne(childId){
   if(!phone){ alert(lang==='ar'?'لا يوجد رقم واتساب!':'No WhatsApp number!'); return; }
 
   if(_cmsgImageFile){
-    const url = await _uploadCmsgImage();
-    if(!url){ alert(lang==='ar'?'تعذّر رفع الصورة، حاولي تاني':'Could not upload the image, try again'); return; }
     const caption = buildCmsgText(c.name)||'';
-    const r = await sendWAImage(phone, url, caption);
-    if(!r.ok){
-      alert(r.reason==='no_api'
-        ? (lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول عشان ترسلي صور — من صفحة الإدارة ← إعدادات الفروع':'You need to set up Meta WhatsApp API for this branch first (Admin → Branch Settings) to send images')
-        : (lang==='ar'?'فشل إرسال الصورة، حاولي تاني':'Failed to send the image, try again'));
-      return;
+    const r = await shareCmsgImageTo(phone, caption);
+    if(r.ok){ logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); return; }
+    if(r.reason==='cancelled') return;
+    if(r.reason==='unsupported'){
+      alert(lang==='ar'
+        ? 'المتصفح ده ما بيدعمش مشاركة الصور مباشرة. هفتحلك شات واتساب — ابعتي الصورة يدوياً من المعرض.'
+        : "This browser can't share images directly. Opening WhatsApp — please attach the image manually from your gallery.");
+      openWA(phone, caption);
+    } else {
+      alert(lang==='ar'?'حصلت مشكلة في المشاركة، حاولي تاني':'Sharing failed, try again');
     }
-    logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`);
     return;
   }
 
@@ -10196,27 +10218,30 @@ async function sendClassMsgBulk(){
   const status = el('cmsg-bulk-status');
 
   if(_cmsgImageFile){
-    if(!(el('cmsg-text')?.value||'').trim() && !personalize){ /* caption optional for images */ }
-    if(status) status.textContent = `⏳ ${lang==='ar'?'جاري رفع الصورة...':'Uploading image...'}`;
-    const url = await _uploadCmsgImage();
-    if(!url){ if(status) status.textContent = `❌ ${lang==='ar'?'تعذّر رفع الصورة':'Could not upload the image'}`; return; }
-
-    let sent=0, noApi=0, failed=0, i=0;
-    for(const c of withPhone){
-      i++;
-      if(status) status.textContent = `⏳ ${lang==='ar'?'جاري الإرسال':'Sending'} (${i}/${withPhone.length})`;
-      const phone = c.parentMom||c.parentDad;
-      const caption = personalize ? (buildCmsgText(c.name)||'') : (el('cmsg-text')?.value||'').trim();
-      const r = await sendWAImage(phone, url, caption);
-      if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
-      else if(r.reason==='no_api') noApi++;
-      else failed++;
+    const bx=getBranchExtra(curBid);
+    if(bx.waPhoneId && bx.waToken){
+      // Real API configured — one click really does send to everyone.
+      if(status) status.textContent = `⏳ ${lang==='ar'?'جاري رفع الصورة...':'Uploading image...'}`;
+      const url = await _uploadCmsgImage();
+      if(!url){ if(status) status.textContent = `❌ ${lang==='ar'?'تعذّر رفع الصورة':'Could not upload the image'}`; return; }
+      let sent=0, failed=0, i=0;
+      for(const c of withPhone){
+        i++;
+        if(status) status.textContent = `⏳ ${lang==='ar'?'جاري الإرسال':'Sending'} (${i}/${withPhone.length})`;
+        const caption = personalize ? (buildCmsgText(c.name)||'') : (el('cmsg-text')?.value||'').trim();
+        const r = await sendWAImage(c.parentMom||c.parentDad, url, caption);
+        if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
+        else failed++;
+      }
+      if(status) status.textContent = `✅ ${lang==='ar'?'تم إرسال الصورة لـ':'Sent image to'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`;
+      return;
     }
-    if(status){
-      status.textContent = noApi>0 && sent===0
-        ? `⚠️ ${lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول من صفحة الإدارة ← إعدادات الفروع':'Set up Meta WhatsApp API for this branch first (Admin → Branch Settings)'}`
-        : `✅ ${lang==='ar'?'تم إرسال الصورة لـ':'Sent image to'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`;
-    }
+    // No API on this branch — a single click can't blast an image to everyone (WhatsApp's
+    // share sheet only ever lets her pick ONE chat at a time). Send her to the per-child
+    // "Send" buttons below instead, where each tap shares the same image to that one parent.
+    if(status) status.innerHTML = lang==='ar'
+      ? '📷 لإرسال صورة، دوسي زرار "إرسال" جنب كل طفل تحت — كل دوسة بتفتحلك شات واتساب بتاعه بالصورة جاهزة، اختاري بس وابعتي.'
+      : '📷 To send an image, use the "Send" button next to each child below — each tap opens that parent\'s WhatsApp chat with the image ready to send.';
     return;
   }
 
@@ -10248,23 +10273,28 @@ async function sendClassMsgSelected(){
   const rawMsg = (el('cmsg-text')?.value||'').trim();
 
   if(_cmsgImageFile){
-    const url = await _uploadCmsgImage();
-    if(!url){ alert(lang==='ar'?'تعذّر رفع الصورة، حاولي تاني':'Could not upload the image, try again'); return; }
-    let sent=0, noApi=0, failed=0;
-    for(const id of selected){
-      const c = DB.children.find(x=>String(x.id)===String(id));
-      if(!c) continue;
-      const phone = c.parentMom||c.parentDad;
-      if(!phone) continue;
-      const caption = personalize ? (buildCmsgText(c.name)||'') : rawMsg;
-      const r = await sendWAImage(phone, url, caption);
-      if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
-      else if(r.reason==='no_api') noApi++;
-      else failed++;
+    const bx=getBranchExtra(curBid);
+    if(bx.waPhoneId && bx.waToken){
+      const url = await _uploadCmsgImage();
+      if(!url){ alert(lang==='ar'?'تعذّر رفع الصورة، حاولي تاني':'Could not upload the image, try again'); return; }
+      let sent=0, failed=0;
+      for(const id of selected){
+        const c = DB.children.find(x=>String(x.id)===String(id));
+        if(!c) continue;
+        const phone = c.parentMom||c.parentDad;
+        if(!phone) continue;
+        const caption = personalize ? (buildCmsgText(c.name)||'') : rawMsg;
+        const r = await sendWAImage(phone, url, caption);
+        if(r.ok){ sent++; logActivity('whatsapp', `📷 Flyer → ${c.name} (${c.className||'—'})`); }
+        else failed++;
+      }
+      setTimeout(()=>alert(`✅ ${sent} ${lang==='ar'?'صورة أُرسلت':'images sent'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`),300);
+      return;
     }
-    setTimeout(()=>alert(noApi>0 && sent===0
-      ? (lang==='ar'?'محتاجة تفعّلي Meta WhatsApp API لهذا الفرع الأول من صفحة الإدارة ← إعدادات الفروع':'Set up Meta WhatsApp API for this branch first (Admin → Branch Settings)')
-      : `✅ ${sent} ${lang==='ar'?'صورة أُرسلت':'images sent'}${failed?` | ❌ ${failed} ${lang==='ar'?'فشلوا':'failed'}`:''}`),300);
+    // No API — same limit as bulk: point her at the per-child buttons, one tap each.
+    alert(lang==='ar'
+      ? '📷 لإرسال صورة، دوسي زرار "إرسال" جنب كل طفل محدد — كل دوسة بتفتح شات واتساب بتاعه بالصورة جاهزة.'
+      : '📷 To send an image, use the "Send" button next to each selected child — each tap opens that parent\'s WhatsApp chat with the image ready.');
     return;
   }
   if(!rawMsg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Write the message first!'); return; }
