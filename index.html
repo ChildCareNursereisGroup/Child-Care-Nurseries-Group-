@@ -2391,6 +2391,10 @@ main{padding:12px;max-width:960px;margin:0 auto}
 // Set your key here OR enter it via Settings page
 let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // ─────────────────────────────────────────────────
+// Bump this string on every future edit to index.html — checkForUpdate() compares it
+// against the live deployed file so an open tab can prompt for a refresh instead of
+// silently running stale code (open tabs on shared/manager devices never reload on their own).
+const APP_VERSION = '2026-09-25-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -15308,6 +15312,29 @@ async function boot(){
   hideLoad();
   el('login').style.display='flex';
   setLang(lang);
+  setTimeout(checkForUpdate, 20000);
+  setInterval(checkForUpdate, 5*60*1000);
+}
+
+// ── Update banner — catches tabs left open on a shared/manager device that would
+// otherwise keep running old cached code after a new version is deployed ──
+async function checkForUpdate(){
+  if(document.getElementById('update-banner')) return; // already showing
+  try{
+    const res = await fetch(location.pathname+'?v='+Date.now(), {cache:'no-store'});
+    const txt = await res.text();
+    const m = txt.match(/const APP_VERSION\s*=\s*'([^']+)'/);
+    if(m && m[1]!==APP_VERSION) showUpdateBanner();
+  }catch(e){ /* offline or blocked — ignore, try again next interval */ }
+}
+function showUpdateBanner(){
+  if(document.getElementById('update-banner')) return;
+  const b=document.createElement('div');
+  b.id='update-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e3a8a;color:#fff;padding:10px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-family:Tajawal,sans-serif;font-size:.85rem;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  b.innerHTML = `<span>🔄 ${lang==='ar'?'فيه تحديث جديد للنظام':'A new update is available'}</span>
+    <button onclick="location.reload()" style="background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:6px 16px;cursor:pointer;font-weight:900;font-family:Tajawal,sans-serif;font-size:.82rem">${lang==='ar'?'🔃 حدّثي دلوقتي':'🔃 Refresh now'}</button>`;
+  document.body.prepend(b);
 }
 // ═══════════════════════════════════════════════
 //  DB EXTENSIONS
