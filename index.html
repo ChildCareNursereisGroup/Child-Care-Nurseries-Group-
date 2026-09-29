@@ -2852,7 +2852,7 @@ async function loadFromSupa(bid) {
         date:x.date||null,note:x.note||'',subType:x.sub_type||'',
         supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',
         invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
-        branchId:x.branch_id||'',extra};
+        branchId:x.branch_id||'',createdAt:x.created_at||null,extra};
     });
     // Load ALL staff (unlimited)
     const allStaff = await fetchAll(()=>sb.from('staff').select('*'));
@@ -21904,7 +21904,7 @@ function openExpReportModal(){
   el('exp-report-modal').classList.add('on');
 }
 
-function printExpReport(exportType='print'){
+async function printExpReport(exportType='print'){
   const from   = el('exp-rep-from').value;
   const to     = el('exp-rep-to').value;
   const catF   = el('exp-rep-cat').value;
@@ -21925,18 +21925,33 @@ function printExpReport(exportType='print'){
   if(branchF === 'all') targetBids = BRANCHES.map(b=>b.id);
   else if(branchF !== 'current') targetBids = [branchF];
 
-  // Filter expenses
+  // Filter expenses — DB.expenses only ever holds the CURRENTLY selected branch's rows, so
+  // any other branch (a specific one, or "all") needs a fresh fetch, not a filter over it.
   let allExp = [];
-  if(branchF === 'all' && DB.allBranchData){
-    BRANCHES.forEach(br=>{ allExp = allExp.concat(DB.allBranchData[br.id]?.expenses||[]); });
-  } else {
+  if(branchF === 'current'){
     allExp = DB.expenses.filter(e=>targetBids.includes(e.branchId||e.branch_id||curBid));
+  } else {
+    showLoad(isAr?'جاري تحميل بيانات الفروع...':'Loading branch data...');
+    for(const bid of targetBids){
+      const {data}=await sb.from('expenses').select('*').eq('branch_id',bid);
+      (data||[]).forEach(x=>{
+        let extra={};try{extra=typeof x.extra==='string'?JSON.parse(x.extra||'{}'):(x.extra||{});}catch(err){}
+        allExp.push({id:x.id,category:x.category||'',type:x.type||'',
+          amount:Number(x.amount||0),vatType:x.vat_type||'معفى (0%)',vatAmount:Number(x.vat_amount||0),
+          totalAmount:Number(x.total_amount||x.amount||0),
+          date:x.date||null,note:x.note||'',subType:x.sub_type||'',
+          supplierName:x.supplier_name||'',taxNumber:x.tax_number||'',
+          invoiceNumber:x.invoice_number||'',paidBy:x.paid_by||'owner',
+          branchId:x.branch_id||'',createdAt:x.created_at||null,extra});
+      });
+    }
+    hideLoad();
   }
 
   let list = allExp.filter(e => {
     if(dateMode==='entry'){
       // Filter by entry/created date (created_at field)
-      const entryDate=(e.created_at||e.date||'').split('T')[0];
+      const entryDate=(e.createdAt||e.date||'').split('T')[0];
       return entryDate >= from && entryDate <= to;
     } else {
       // Filter by invoice date
@@ -23225,7 +23240,17 @@ function openEditExp(id){
   el('eedit-subtype').value=e.subType||'';
   el('eedit-date').value=e.date||today();
   el('eedit-amount').value=e.amount||0;
-  el('eedit-vat').value=e.vatType||'معفى (0%)';
+  // vat_type has been stored as many different literal strings over time (manual add in
+  // Arabic/English, Excel import, older app versions — "5", "Standard Rate 5%", "Exempt ",
+  // "rc"...). None of those match this dropdown's 3 fixed options, so setting .value directly
+  // left it blank — and saving a blank silently defaulted to Exempt, wiping real 5% VAT.
+  // Detect the rate from the raw string instead of relying on an exact match.
+  {
+    const rawVat=(e.vatType||'').toLowerCase();
+    el('eedit-vat').value = rawVat.includes('5') ? '5%'
+      : (rawVat.includes('zero')||rawVat.includes('صفر')) ? 'صفر (0%)'
+      : 'معفى (0%)';
+  }
   el('eedit-vatamt').value=e.vatAmount||0;
   el('eedit-total').value=e.totalAmount||e.amount||0;
   el('eedit-supplier').value=e.supplierName||'';
