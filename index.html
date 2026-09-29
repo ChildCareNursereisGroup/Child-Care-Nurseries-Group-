@@ -23216,9 +23216,13 @@ function exportBusReportExcel(){
 function openEditExp(id){
   const e=DB.expenses.find(x=>String(x.id)===String(id));
   if(!e){alert('لم يتم العثور على المصروف');return;}
-  const cat=EXP_CATS.find(c=>c.k===e.category)||{ar:e.type||e.category};
   el('eedit-id').value=id;
-  el('eedit-cat').value=(typeof cat.ar==='function'?cat.ar():cat.ar)+(e.subType?' — '+e.subType:'');
+  const catSel=el('eedit-cat');
+  if(catSel){
+    catSel.innerHTML=EXP_CATS.map(c=>`<option value="${c.k}">${c.ic} ${typeof c.ar==='function'?c.ar():c.ar}</option>`).join('');
+    catSel.value=e.category;
+  }
+  el('eedit-subtype').value=e.subType||'';
   el('eedit-date').value=e.date||today();
   el('eedit-amount').value=e.amount||0;
   el('eedit-vat').value=e.vatType||'معفى (0%)';
@@ -23251,6 +23255,8 @@ async function saveEditExp(){
   const pct=vatType.includes('5')?0.05:0;
   const vatAmt=pct?Math.round(amount*pct*100)/100:(Number(el('eedit-vatamt')?.value)||0);
   const total=Math.round((amount+vatAmt)*100)/100;
+  const newCat=el('eedit-cat')?.value;
+  const catObj=EXP_CATS.find(c=>c.k===newCat);
   const row={
     date:el('eedit-date')?.value||today(),
     amount, vat_type:vatType, vat_amount:vatAmt, total_amount:total,
@@ -23259,6 +23265,11 @@ async function saveEditExp(){
     invoice_number:el('eedit-invoice-num')?.value||null,
     note:el('eedit-reason')?.value||null,
   };
+  if(catObj){
+    row.category=catObj.k;
+    row.type=typeof catObj.ar==='function'?catObj.ar():catObj.ar;
+    row.sub_type=el('eedit-subtype')?.value||null;
+  }
   // Transfer to different branch if selected
   const transferBranch = el('eedit-branch')?.value;
   if(transferBranch) row.branch_id = transferBranch;
@@ -29265,9 +29276,13 @@ boot();
     <div style="padding:18px">
       <input type="hidden" id="eedit-id">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div style="grid-column:1/-1">
+        <div>
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📁 الفئة / Category</label>
-          <input id="eedit-cat" readonly style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;background:#f9fafb;box-sizing:border-box;font-weight:700">
+          <select id="eedit-cat" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box;font-weight:700"></select>
+        </div>
+        <div>
+          <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📝 تفاصيل الفئة / Sub-type</label>
+          <input id="eedit-subtype" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.85rem;box-sizing:border-box">
         </div>
         <div>
           <label style="font-size:.75rem;font-weight:700;color:#374151;display:block;margin-bottom:4px">📅 التاريخ / Date</label>
