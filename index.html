@@ -24495,6 +24495,60 @@ function populatePayrollBranch(){
   sel.innerHTML=`<option value="all">All Branches</option>`+BRANCHES.map(b=>`<option value="${b.id}">${b.icon} ${tBN(b)}</option>`).join('');
 }
 
+// Single source of truth for one staff member's payroll figures for one month — used by the
+// on-screen Payroll table, the monthly Print, and the Excel export, so all three always agree.
+function computeStaffPayrollRow(s, mon){
+  const basic=Number(s.basicSalary||0);
+  const gross=Number(s.grossSalary||0)||basic; // use gross for salary calc, fallback to basic
+  if(!gross&&!basic) return null;
+  const salaryBase=gross; // Calculation based on gross salary
+  const [yr,mo]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yr,mo,0).getDate();
+  // Count absences from attendance records this month
+  const att=getStaffMonthAttendance(s.id,mon);
+  const absCount=att.absent;
+  const sickDays=countSickLeave(s.id,mon);
+  // UAE Federal Decree-Law No.33/2021 sick leave:
+  // Days 1-15: full pay, Days 16-45: half pay, Days 46+: unpaid
+  let sickDeduction=0;
+  if(sickDays>15&&sickDays<=45) sickDeduction=(salaryBase/daysInMonth)*(sickDays-15)*0.5;
+  else if(sickDays>45) sickDeduction=(salaryBase/daysInMonth)*15+(salaryBase/daysInMonth)*(Math.min(sickDays,45)-15)*0.5;
+  // Regular absence deduction (days only, no AED entered manually)
+  const regularAbsDays=Math.max(0,absCount-sickDays);
+  const absDeduction=(salaryBase/daysInMonth)*regularAbsDays;
+  // Check if a confirmed salary record exists for this month in salary history
+  const savedHist=(DB.salaryHistory&&DB.salaryHistory[String(s.id)])||[];
+  const savedEntry=savedHist.find(r=>r.month===mon);
+
+  let monthBonus=0, monthDeductAED=0, loanDeduct=0, absDaysUsed=regularAbsDays, sickDaysUsed=sickDays, netSalary, presentDays;
+  if(savedEntry){
+    // Use confirmed saved values
+    monthBonus=savedEntry.bonus||0;
+    monthDeductAED=savedEntry.deductOther||0;
+    loanDeduct=savedEntry.deductLoan||0;
+    absDaysUsed=savedEntry.absentDays??regularAbsDays;
+    sickDaysUsed=savedEntry.sickDays??sickDays;
+    netSalary=savedEntry.amount||0;
+    presentDays=savedEntry.presentDays??Math.max(0,daysInMonth-absDaysUsed-sickDaysUsed);
+  } else {
+    // Calculate from daily attendance data
+    for(let d=1;d<=daysInMonth;d++){
+      const dd=mon+'-'+String(d).padStart(2,'0');
+      const dd2=getStaffDayData(s.id,dd);
+      monthBonus+=Number(dd2.bonus||0);
+      monthDeductAED+=Number(dd2.deduct||0);
+    }
+    loanDeduct=getLoanDeductionForMonth(s.id,mon);
+    netSalary=Math.max(0,salaryBase - absDeduction - sickDeduction - monthDeductAED - loanDeduct + monthBonus);
+    presentDays=att.present;
+  }
+  const totalDeduction=Math.round((absDeduction+sickDeduction+monthDeductAED+loanDeduct)*100)/100;
+  const confirmed=!!savedEntry;
+  return {s, basic, gross:salaryBase, absCount:absDaysUsed, regularAbsDays:absDaysUsed, sickDays:sickDaysUsed,
+    sickDeduction, absDeduction, monthBonus, monthDeductAED, loanDeduct, totalDeduction, netSalary,
+    presentDays, daysInMonth, confirmed};
+}
+
 function renderPayroll(){
   const monthEl=el('payroll-month');
   if(!monthEl) return;
@@ -24505,54 +24559,9 @@ function renderPayroll(){
   if(bf!=='all') staff=staff.filter(s=>s.branchId===bf);
   if(!staff.length){ el('payroll-list').innerHTML=`<div class="empty"><div class="ei">💰</div><p>No staff found</p></div>`; return; }
 
-  const [yr,mo]=mon.split('-').map(Number);
-  const daysInMonth=new Date(yr,mo,0).getDate();
-
   let totalPayroll=0;
-  const rows=staff.map(s=>{
-    const basic=Number(s.basicSalary||0);
-    const gross=Number(s.grossSalary||0)||basic; // use gross for salary calc, fallback to basic
-    if(!gross&&!basic) return null;
-    const salaryBase=gross; // Calculation based on gross salary
-    // Count absences from attendance records this month
-    const absCount=countAbsences(s.id,mon);
-    const sickDays=countSickLeave(s.id,mon);
-    // UAE Federal Decree-Law No.33/2021 sick leave:
-    // Days 1-15: full pay, Days 16-45: half pay, Days 46+: unpaid
-    let sickDeduction=0;
-    if(sickDays>15&&sickDays<=45) sickDeduction=(salaryBase/daysInMonth)*(sickDays-15)*0.5;
-    else if(sickDays>45) sickDeduction=(salaryBase/daysInMonth)*15+(salaryBase/daysInMonth)*(Math.min(sickDays,45)-15)*0.5;
-    // Regular absence deduction (days only, no AED entered manually)
-    const regularAbsDays=Math.max(0,absCount-sickDays);
-    const absDeduction=(salaryBase/daysInMonth)*regularAbsDays;
-    // Check if a confirmed salary record exists for this month in salary history
-    const savedHist=(DB.salaryHistory&&DB.salaryHistory[String(s.id)])||[];
-    const savedEntry=savedHist.find(r=>r.month===mon);
-
-    let monthBonus=0, monthDeductAED=0, loanDeduct=0, absDaysUsed=regularAbsDays, sickDaysUsed=sickDays, netSalary;
-    if(savedEntry){
-      // Use confirmed saved values
-      monthBonus=savedEntry.bonus||0;
-      monthDeductAED=savedEntry.deductOther||0;
-      loanDeduct=savedEntry.deductLoan||0;
-      absDaysUsed=savedEntry.absentDays??regularAbsDays;
-      sickDaysUsed=savedEntry.sickDays??sickDays;
-      netSalary=savedEntry.amount||0;
-    } else {
-      // Calculate from daily attendance data
-      for(let d=1;d<=daysInMonth;d++){
-        const dd=mon+'-'+String(d).padStart(2,'0');
-        const dd2=getStaffDayData(s.id,dd);
-        monthBonus+=Number(dd2.bonus||0);
-        monthDeductAED+=Number(dd2.deduct||0);
-      }
-      loanDeduct=getLoanDeductionForMonth(s.id,mon);
-      netSalary=Math.max(0,salaryBase - absDeduction - sickDeduction - monthDeductAED - loanDeduct + monthBonus);
-    }
-    totalPayroll+=netSalary;
-    const confirmed=!!savedEntry;
-    return {s, basic, gross:salaryBase, absCount:absDaysUsed, regularAbsDays:absDaysUsed, sickDays:sickDaysUsed, sickDeduction, absDeduction, monthBonus, monthDeductAED, loanDeduct, netSalary, daysInMonth, confirmed};
-  }).filter(Boolean);
+  const rows=staff.map(s=>computeStaffPayrollRow(s,mon)).filter(Boolean);
+  rows.forEach(r=>totalPayroll+=r.netSalary);
 
   // Summary boxes
   el('payroll-summary').innerHTML=`
@@ -25358,30 +25367,42 @@ async function savePayrollFromCalc(staffId, mon, presentDays, absentDays, netSal
   setTimeout(()=>{ event.target.textContent='💾 حفظ'; event.target.style.background='#059669'; },2000);
 }
 
+// Both the Excel export and the print below share this — one row per staff member with
+// exactly the fields the owner asked for: name, branch, days worked, absence days, bonus,
+// deduction (all deduction sources combined into one figure), and the salary actually due.
+// Uses computeStaffPayrollRow so these numbers always match what's on the Payroll screen —
+// the old export recomputed from basicSalary alone and ignored confirmed salary-history
+// entries, so it could show different numbers than the screen for the same month.
+function buildMonthlyPayrollReportRows(mon, bf){
+  let staff=[...DB.staff];
+  if(bf&&bf!=='all') staff=staff.filter(s=>s.branchId===bf);
+  return staff.map(s=>{
+    const r=computeStaffPayrollRow(s,mon);
+    if(!r) return null;
+    const branch=BRANCHES.find(b=>b.id===s.branchId);
+    return {
+      name:s.name, branchName: branch?(lang==='ar'?branch.ar:(branch.en||branch.ar)):(s.branchId||'—'),
+      daysWorked:r.presentDays, absenceDays:r.regularAbsDays+r.sickDays,
+      bonus:r.monthBonus, deduction:r.totalDeduction, net:r.netSalary,
+    };
+  }).filter(Boolean);
+}
+
 function exportPayrollExcel(){
   const mon=el('payroll-month')?.value||'';
   const bf=el('payroll-branch')?.value||'all';
-  let staff=[...DB.staff];
-  if(bf!=='all') staff=staff.filter(s=>s.branchId===bf);
-  const [yr,mo]=mon.split('-').map(Number);
-  const daysInMonth=new Date(yr,mo,0).getDate();
-  const rows=staff.filter(s=>s.basicSalary>0).map(s=>{
-    const basic=Number(s.basicSalary||0);
-    const absCount=countAbsences(s.id,mon);
-    const sickDays=countSickLeave(s.id,mon);
-    let sickDed=0;
-    if(sickDays>15&&sickDays<=45) sickDed=(basic/daysInMonth)*(sickDays-15)*0.5;
-    else if(sickDays>45) sickDed=(basic/daysInMonth)*30*0.5+(basic/daysInMonth)*(sickDays-45);
-    const absDeduct=(basic/daysInMonth)*Math.max(0,absCount-sickDays);
-    const net=Math.max(0,basic-absDeduct-sickDed-(s.deductions||0)+(s.bonus||0));
-    return [s.name,s.position||'',s.transferCode||'',basic,absCount,sickDays,
-      Math.round(absDeduct*100)/100,Math.round(sickDed*100)/100,s.bonus||0,s.deductions||0,Math.round(net*100)/100];
-  });
-  const ws=XLSX.utils.aoa_to_sheet([
-    ['Staff Name','Position','Transfer Code','Basic Salary','Absence Days','Sick Days',
-     'Absence Deduct','Sick Deduct','Bonus','Other Deductions','Net Salary'],
-    ...rows
-  ]);
+  const rows=buildMonthlyPayrollReportRows(mon,bf);
+  const r2=n=>Math.round((n+Number.EPSILON)*100)/100;
+  const totalNet=r2(rows.reduce((s,r)=>s+r.net,0));
+  const aoa=[
+    [lang==='ar'?'اسم الموظف':'Employee Name', lang==='ar'?'الفرع':'Branch',
+     lang==='ar'?'أيام العمل':'Days Worked', lang==='ar'?'أيام الغياب':'Absence Days',
+     lang==='ar'?'البونص':'Bonus', lang==='ar'?'الخصم':'Deduction', lang==='ar'?'الراتب المستحق':'Net Salary'],
+    ...rows.map(r=>[r.name,r.branchName,r.daysWorked,r.absenceDays,r2(r.bonus),r2(r.deduction),r2(r.net)]),
+    [], ['', '', '', '', '', lang==='ar'?'الإجمالي':'Total', totalNet],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:24},{wch:20},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,`Payroll ${mon}`);
   XLSX.writeFile(wb,`payroll_${mon}.xlsx`);
@@ -25389,14 +25410,60 @@ function exportPayrollExcel(){
 
 function printPayroll(){
   const mon=el('payroll-month')?.value||'';
-  const table=el('payroll-list')?.innerHTML||'';
+  const bf=el('payroll-branch')?.value||'all';
+  const rows=buildMonthlyPayrollReportRows(mon,bf);
+  const r2=n=>Math.round((n+Number.EPSILON)*100)/100;
+  const totalNet=r2(rows.reduce((s,r)=>s+r.net,0));
+  const monLabel=mon?new Date(mon+'-01').toLocaleDateString('ar-AE',{month:'long',year:'numeric'}):'';
+  const branchLabel=bf==='all'?'كل الفروع':(BRANCHES.find(b=>b.id===bf)?.ar||bf);
+  const printDate=new Date().toLocaleDateString('en-GB');
+  const rowsHtml=rows.map((r,i)=>`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:700">${r.name}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb">${r.branchName}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center">${r.daysWorked}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:${r.absenceDays>0?'#dc2626':'#059669'}">${r.absenceDays}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#059669">${r.bonus>0?'+'+fmtNum(r.bonus):'—'}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#dc2626">${r.deduction>0?'-'+fmtNum(r.deduction):'—'}</td>
+    <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:900;color:#1e3a8a">${fmtNum(r.net)}</td>
+  </tr>`).join('');
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>Payroll ${mon}</title>
-    <style>body{font-family:'Tajawal',sans-serif;direction:rtl;padding:20px}
-    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;font-size:.8rem}
-    th{background:#1e3a8a;color:#fff}@media print{button{display:none}}</style></head>
-    <body><h2>كشف الرواتب — ${mon}</h2>${table}<br>
-    <button onclick="window.print()">🖨️ Print</button></body></html>`);
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>كشف الرواتب — ${mon}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+      @page{size:A4 landscape;margin:12mm} *{box-sizing:border-box}
+      body{font-family:'Tajawal',Arial,sans-serif;color:#1f2937;margin:0}
+      table{width:100%;border-collapse:collapse;font-size:.82rem}
+      th{background:#1e3a8a;color:#fff;padding:8px 10px;border:1px solid #1e3a8a;text-align:right}
+      @media print{.np{display:none!important}}
+    </style></head>
+    <body>
+      <div class="np" style="background:#1f2937;padding:10px;text-align:center;position:sticky;top:0">
+        <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:800">🖨️ طباعة / Print</button>
+      </div>
+      <div style="padding:16px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1e3a8a;padding-bottom:10px;margin-bottom:14px">
+          <div>
+            <div style="font-size:1.15rem;font-weight:900;color:#1e3a8a">📋 كشف الرواتب الشهري — Monthly Payroll Report</div>
+            <div style="font-size:.85rem;color:#6b7280;margin-top:3px">🏢 ${branchLabel} &nbsp;|&nbsp; 📅 ${monLabel}</div>
+          </div>
+          <div style="text-align:left;font-size:.72rem;color:#9ca3af">مجموعة رعاية الطفل للحضانات<br>Child Care Nurseries Group<br>طُبع: ${printDate}</div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>اسم الموظف</th><th>الفرع</th><th style="text-align:center">أيام العمل</th>
+            <th style="text-align:center">أيام الغياب</th><th style="text-align:center">البونص</th>
+            <th style="text-align:center">الخصم</th><th style="text-align:center">الراتب المستحق</th>
+          </tr></thead>
+          <tbody>${rowsHtml||'<tr><td colspan="7" style="padding:16px;text-align:center;color:#9ca3af">لا يوجد موظفون</td></tr>'}</tbody>
+          <tfoot><tr style="background:#eff6ff;font-weight:900">
+            <td colspan="4" style="padding:9px 10px;border:1px solid #e5e7eb">عدد الموظفين: ${rows.length}</td>
+            <td colspan="2" style="padding:9px 10px;border:1px solid #e5e7eb;text-align:left">الإجمالي — Total</td>
+            <td style="padding:9px 10px;border:1px solid #e5e7eb;text-align:center;color:#1e3a8a">${fmtNum(totalNet)} AED</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </body></html>`);
+  win.document.close();
 }
 
 // ═══════════════════════════════════════════════
