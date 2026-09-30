@@ -3926,6 +3926,14 @@ function filterCh(q){srchQ=q;renderChildren();}
 // registered & paid registration on Aug 27 but attendance starts Sep 1 → counts as
 // an August registration. Falls back to joinDate if no registration-fee receipt exists.
 function _regDateFor(c){
+  // A transferred-in child isn't a new registration at all, and the receipt heuristic
+  // below can't tell the difference anyway: DB.receipts only holds the CURRENT branch's
+  // receipts, and a transfer deliberately leaves the child's real payment history behind
+  // at their old branch (see transferChild()) — so "first receipt at this branch" is
+  // really just "first payment since the transfer", which can land in any later month
+  // and wrongly show the child as a fresh registration then. joinDate is untouched by a
+  // transfer and still holds the true original date, so trust it directly here.
+  if(c.transferredFrom) return c.joinDate||null;
   // The registration/receipt date is simply the child's FIRST receipt ever — whether or
   // not that particular receipt happens to carry a "Registration" fee line item (many
   // don't; e.g. an advance payment for next month with reg=0 is still the real
