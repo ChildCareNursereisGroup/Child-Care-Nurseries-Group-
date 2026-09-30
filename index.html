@@ -10923,6 +10923,8 @@ function renderQuickExp(){
         <select id="qe_branch" style="${inp}">${BRANCHES.map(b=>`<option value="${b.id}" ${b.id===curBid?'selected':''}>${b.icon} ${tBN(b)}</option>`).join('')}</select></div>
       <div class="fg"><label>🏭 ${ar?'اسم الشركة':'Company Name'}</label>
         <input type="text" id="qe_supplier" style="${inp}"></div>
+      <div class="fg"><label>🧾 ${ar?'رقم الفاتورة':'Invoice No.'}</label>
+        <input type="text" id="qe_invoice" style="${inp}"></div>
       <div class="fg"><label>📅 ${ar?'تاريخ الفاتورة':'Invoice Date'}</label>
         <input type="date" id="qe_date" value="${today()}" style="${inp}"></div>
       <div class="fg"><label>💰 ${ar?'المبلغ الإجمالي (د.إ)':'Total Amount (AED)'}</label>
@@ -10974,6 +10976,7 @@ async function saveQuickExp(){
   const cat=EXP_CATS.find(c=>c.k===expCat); if(!cat) return;
   const ar=lang==='ar';
   const supplier=v('qe_supplier'), date=el('qe_date')?.value||'', total=n('qe_total');
+  const invoiceNum=v('qe_invoice');
   const vatYes=document.querySelector('input[name="qe_vat"]:checked')?.value==='yes';
   const branchId=el('qe_branch')?.value||curBid;
   if(!supplier){showAlert('expalert',ar?'❌ اكتبي اسم الشركة':'❌ Enter the company name',true);return;}
@@ -11006,7 +11009,7 @@ async function saveQuickExp(){
     branch_id:branchId, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
     amount, vat_type:vatYes?'5% ضريبة':'معفى (0%)', vat_amount:vatAmt, total_amount:total,
     date, note:'', sub_type:subType, supplier_name:supplier, tax_number:taxNum,
-    invoice_number:null, paid_by:'accountant', extra
+    invoice_number:invoiceNum||null, paid_by:'accountant', extra
   };
   setSyncing(true);
   const {error}=await sb.from('expenses').insert(row);
