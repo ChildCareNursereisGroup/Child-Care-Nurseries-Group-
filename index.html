@@ -2394,7 +2394,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-09-25-1';
+const APP_VERSION = '2026-10-01-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -10825,6 +10825,28 @@ function renderExps(){
     </div>`;
   }).join('');
 }
+// Shared duplicate-expense detector used by both the detailed form (saveExp) and quick entry (saveQuickExp).
+// DB.expenses is already scoped to the current branch by loadFromSupa(), so no branch check is needed here.
+// If an invoice number is given, that alone (+ same date + same total) flags a duplicate — regardless of
+// category/sub-type — since re-entering the same real invoice under a different category is still a duplicate.
+function findDuplicateExpense({invoiceNum, category, date, total, supplier, subType, busNo}){
+  const inv=(invoiceNum||'').trim().toLowerCase();
+  if(inv){
+    return DB.expenses.find(e=>
+      (e.invoiceNumber||'').trim().toLowerCase()===inv &&
+      (e.date||'')===date &&
+      Math.abs((e.totalAmount||e.amount||0)-total)<0.01
+    );
+  }
+  return DB.expenses.find(e=>
+    e.category===category &&
+    (e.date||'')===date &&
+    Math.abs((e.totalAmount||e.amount||0)-total)<0.01 &&
+    (e.supplierName||'')===(supplier||'') &&
+    (e.subType||'')===(subType||'') &&
+    (busNo===undefined || ((e.extra&&e.extra['__bus_no__'])||'')===(busNo||''))
+  );
+}
 async function saveExp(){
   const cat=EXP_CATS.find(c=>c.k===expCat);if(!cat)return;
   const amount=cat.getAmt();
@@ -10887,14 +10909,7 @@ async function saveExp(){
       return;
     }
   }
-  const dupExp = DB.expenses.find(e=>
-    e.branch_id === curBid &&
-    e.category === expCat &&
-    (e.date||'') === date &&
-    Math.abs((e.totalAmount||e.amount||0) - totalWithVat) < 0.01 &&
-    (e.supplierName||'') === (supplier||'') &&
-    (e.subType||'') === subType
-  );
+  const dupExp = findDuplicateExpense({invoiceNum, category:expCat, date, total:totalWithVat, supplier, subType});
   if(dupExp){
     const catLabel = typeof cat.ar==='function'?cat.ar():cat.ar;
     showAlert('expalert', lang==='ar'
@@ -11001,9 +11016,7 @@ async function saveQuickExp(){
       ? `⚠️ الضريبة (${fmtNum(vatAmt)}) مش 5% من المبلغ قبل الضريبة (المتوقع ${fmtNum(expected)}). تحفظي برضه؟`
       : `⚠️ VAT (${fmtNum(vatAmt)}) is not 5% of the pre-VAT amount (expected ${fmtNum(expected)}). Save anyway?`)) return;
   }
-  const dup=DB.expenses.find(e=>e.category===expCat && (e.date||'')===date &&
-    Math.abs((e.totalAmount||e.amount||0)-total)<0.01 && (e.supplierName||'')===supplier &&
-    ((e.extra&&e.extra['__bus_no__'])||'')===(extra['__bus_no__']||''));
+  const dup=findDuplicateExpense({invoiceNum, category:expCat, date, total, supplier, subType, busNo:extra['__bus_no__']});
   if(dup){showAlert('expalert',ar?`⚠️ المصروف ده مسجل قبل كده (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} د.إ)`:`⚠️ Duplicate expense (${supplier} — ${fmtDate(date)} — ${fmtNum(total)} AED)`,true);return;}
   const row={
     branch_id:branchId, category:expCat, type:typeof cat.ar==='function'?cat.ar():cat.ar,
