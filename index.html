@@ -1284,6 +1284,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
         <option value="children" data-t="rep_children">📋 Children List</option>
         <option value="financial" data-t="rep_financial">💰 Monthly Financial Report</option>
         <option value="group" data-t="rep_group">🏢 Group Report</option>
+        <option value="entry_coverage" data-t="rep_coverage">✅ Expense Entry Follow-up (متابعة إدخال المصاريف)</option>
       </select>
     </div>
     <div class="fg"><label data-t="month">Month — الشهر</label><input type="month" id="repmon"></div>
@@ -2394,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-01-1';
+const APP_VERSION = '2026-10-04-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -3170,6 +3171,7 @@ const T = {
     rep_children:'📋 قائمة الأطفال',
     rep_financial:'💰 التقرير المالي الشهري',
     rep_group:'🏢 تقرير المجموعة',
+    rep_coverage:'✅ متابعة إدخال المصاريف الشهرية',
     // Role options
     roleAdminOpt:'مديرة', roleAttOpt:'موظف حضور', roleExpOpt:'موظف مصاريف',
     dir:'rtl',
@@ -3261,6 +3263,7 @@ const T = {
     rep_children:'📋 Children List',
     rep_financial:'💰 Monthly Financial Report',
     rep_group:'🏢 Group Report',
+    rep_coverage:'✅ Expense Entry Follow-up',
     // Role options
     roleAdminOpt:'Admin', roleAttOpt:'Attendance Staff', roleExpOpt:'Expenses Staff',
     dir:'ltr',
@@ -11041,8 +11044,241 @@ async function delExp(id){
 // ═══════════════════════════════════════════════
 //  REPORTS
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+//  ENTRY FOLLOW-UP REPORT — which monthly bills / salaries are entered, per branch, per month
+// ═══════════════════════════════════════════════
+const COV_ITEMS=[
+  {k:'util',   ar:'فاتورة سيوى / كهرباء وماء', en:'SEWA / Utilities (Ajman: Etihad WE)', annual:false},
+  {k:'tel',    ar:'فاتورة اتصالات (Etisalat / e&)', en:'Telecom (Etisalat / e&)', annual:false},
+  {k:'net',    ar:'Internet (إنترنت)', en:'Internet', annual:false},
+  {k:'fuel',   ar:'بترول (وقود الباصات)', en:'Bus fuel', annual:false},
+  {k:'salary', ar:'رواتب كاش', en:'Cash salaries', annual:false},
+  {k:'bank',   ar:'رسوم البنك', en:'Bank charges', annual:false},
+  {k:'rent',   ar:'الإيجار (سنوي)', en:'Rent (annual)', annual:true},
+  {k:'license',ar:'رسوم الرخصة (سنوي)', en:'License fees (annual)', annual:true},
+];
+const COV_MON_AR=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const COV_MN={january:1,jan:1,february:2,feb:2,march:3,mar:3,april:4,apr:4,may:5,june:6,jun:6,july:7,jul:7,august:8,aug:8,september:9,sept:9,sep:9,october:10,oct:10,november:11,nov:11,december:12,dec:12};
+let _covLast=null;
+
+function covMonthsFromNote(note, entryMonth, year, needYear){
+  const s=String(note||'').replace(/\[[^\]]*\]/g,' ');
+  const out=new Set();
+  const re=/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\b[^A-Za-z0-9]{0,12}(?:\d{1,2}\s*[-–]\s*\d{1,2},?\s*)?(20\d\d)?/gi;
+  let m;
+  while((m=re.exec(s))){
+    const mo=COV_MN[m[1].toLowerCase()]; const yr=m[2]?+m[2]:null;
+    if(yr && yr!==year) continue;
+    if(!yr){ if(needYear) continue; if(mo>entryMonth+6) continue; }
+    out.add(mo);
+  }
+  return [...out];
+}
+
+function covClassify(e){
+  const sup=String(e.supplier_name||'').toLowerCase();
+  const t=(sup+' '+String(e.sub_type||'')+' '+String(e.note||'')).toLowerCase();
+  const cat=e.category;
+  if(/edenred|endered/.test(sup)) return 'bank';
+  if(/adcb|arab financial|wio|rakbank|merchant services/.test(sup) && cat!=='purch') return 'bank';
+  if(cat==='bank') return 'bank';
+  if(cat==='license' || (/licens|sedd/.test(sup) && cat!=='govt')) return 'license';
+  if(cat==='rent' || /real estate|commercial bank of dubai/.test(sup)) return 'rent';
+  if(cat==='salary') return 'salary';
+  if(/etisalat|emirates telecom|e&|\bdu\b/.test(sup) || cat==='tel') return /internet|إنترنت|انترنت/.test(t)?'net':'tel';
+  if(cat==='util' && /etisalat|internet/.test(t)) return /internet|إنترنت/.test(t)?'net':'tel';
+  if(/sewa|sharjah electricity|etihad|اتحاد|sewerage/.test(sup)) return 'util';
+  if(cat==='util') return 'util';
+  if((cat==='bus'||cat==='other') && /adnoc|enoc retail|emarat|eppco|petrol|fuel|وقود|بنزين|ulg/.test(t) && !/spare|pump|insurance|tasjeel/.test(t)) return 'fuel';
+  return null;
+}
+
+function covAnnualStatus(rows, cat, refDate, year){
+  const fmtD=d=>d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
+  const fmtA=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
+  const list=rows.filter(x=>x.item===cat).sort((a,b)=>a.date.localeCompare(b.date));
+  const MAIN=5000;
+  const cut=new Date(refDate.getTime()-365*864e5).toISOString().slice(0,10);
+  const main=list.filter(x=>x.total>=MAIN);
+  const inYear=list.filter(x=>x.date.slice(0,4)===String(year));
+  const label=cat==='rent'?'إيجار':'رخصة';
+  if(!main.length) return {level:'bad',text:'✗ لسه ما اتدخلش — مفيش ولا دفعة '+label+' متسجلة'+(inYear.length?' (فيه بس: '+inYear.map(x=>fmtD(x.date)+' '+fmtA(x.total)).join('، ')+')':''),short:'مفيش أي دفعة '+label+' متسجلة'};
+  const lacking=main.filter(x=>x.date<cut).filter(x=>{
+    const t=new Date(x.date); t.setFullYear(t.getFullYear()+1);
+    const lo=t.getTime()-60*864e5, hi=t.getTime()+60*864e5;
+    return !main.some(y=>{const d=new Date(y.date).getTime();return d>=lo&&d<=hi;});
+  });
+  const cur=main.filter(x=>x.date>=cut);
+  const curTxt=cur.map(x=>fmtD(x.date)+' — '+fmtA(x.total)+(x.note&&/Rent for|Payment for|Yearly/i.test(x.note)?' ('+x.note+')':'')).join('  |  ');
+  if(!lacking.length) return {level:'ok',text:'✓ اتدخل — '+curTxt,short:''};
+  const lackTxt=lacking.map(x=>'آخر مرة '+fmtD(x.date)+' بمبلغ '+fmtA(x.total)).join('، ');
+  return {level:cur.length?'warn':'bad',
+    text:(cur.length?'⚠ ناقص جزء — ':'✗ لسه ما اتدخلش — ')+'التجديد مش متسجل ('+lackTxt+')'+(curTxt?' | متسجل: '+curTxt:''),
+    short:'التجديد السنوي ما اتدخلش ('+lackTxt+')'};
+}
+
+async function covFetchBranch(bid, from, to){
+  const cols='id,branch_id,category,date,total_amount,supplier_name,sub_type,note,paid_by,invoice_number';
+  let all=[], start=0; const PAGE=1000;
+  for(;;){
+    const {data,error}=await sb.from('expenses').select(cols).eq('branch_id',bid).gte('date',from).lte('date',to).order('id',{ascending:true}).range(start,start+PAGE-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<PAGE) break;
+    start+=PAGE;
+  }
+  return all;
+}
+
+async function runEntryCoverage(){
+  const year=Number(el('repyear')?.value)||new Date().getFullYear();
+  const now=new Date(); const curYear=now.getFullYear(), curMon=now.getMonth()+1;
+  const lastMon = year<curYear ? 12 : (year>curYear ? 0 : curMon);
+  const refDate = year===curYear ? now : new Date(year+'-12-31');
+  showLoad('جاري تحميل المصاريف لكل الفروع...');
+  let data={};
+  try{
+    for(const b of BRANCHES){
+      data[b.id]=await covFetchBranch(b.id, (year-1)+'-01-01', year+'-12-31');
+    }
+  }catch(err){ hideLoad(); alert('تعذر تحميل البيانات: '+(err.message||err)); return; }
+  hideLoad();
+
+  const result={year,lastMon,branches:[]};
+  for(const b of BRANCHES){
+    const classified=[];
+    (data[b.id]||[]).forEach(e=>{
+      const item=covClassify(e); if(!item) return;
+      const em=+String(e.date).slice(5,7);
+      const ey=+String(e.date).slice(0,4);
+      let months;
+      if(['util','tel','net','rent'].includes(item)){
+        const nm=covMonthsFromNote(e.note,em,ey,item!=='rent');
+        months=nm.length?nm:[em];
+      } else if(item==='salary'){
+        const nm=covMonthsFromNote(e.note,em,ey,false);
+        months=nm.length?[nm[0]]:[em];
+      } else months=[em];
+      classified.push({item,date:e.date,total:Number(e.total_amount||0),note:e.note||'',paid_by:e.paid_by,months,ey});
+    });
+    const cells={}; COV_ITEMS.forEach(it=>{cells[it.k]={};});
+    classified.forEach(c=>{
+      if(c.ey!==year) return;
+      const targets=c.item==='net'?['net','tel']:[c.item];
+      targets.forEach(k=>{
+        if(!cells[k]) return;
+        c.months.forEach(m=>{
+          if(m<1||m>12) return;
+          const x=cells[k][m]||(cells[k][m]={n:0,cash:0,noncash:0});
+          x.n++;
+          if(c.item==='salary'){ if(c.paid_by==='petty'||/cash/i.test(c.note)) x.cash++; else x.noncash++; }
+        });
+      });
+    });
+    const annual={};
+    ['rent','license'].forEach(k=>{
+      const rows=classified.filter(c=>c.item===k);
+      annual[k]=covAnnualStatus(rows,k,refDate,year);
+    });
+    result.branches.push({b,cells,annual});
+  }
+  _covLast=result;
+  renderEntryCoverage(result);
+}
+
+function renderEntryCoverage(R){
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const missingRows=[]; const perBranchMissing={};
+  const cellHtml=(state)=>{
+    const base='text-align:center;padding:6px 3px;border:1px solid #e5e7eb;font-weight:800;min-width:46px';
+    if(state==='ok') return `<td style="${base};background:#c6efce;color:#006100">✓</td>`;
+    if(state==='part') return `<td style="${base};background:#ffeb9c;color:#7f6000" title="اتدخل بس مش متعلّم كاش/عهدة">◐</td>`;
+    if(state==='wait') return `<td style="${base};background:#f3f4f6;color:#9ca3af" title="الشهر لسه شغال">…</td>`;
+    if(state==='future') return `<td style="${base};background:#fafafa;color:#d1d5db">–</td>`;
+    return `<td style="${base};background:#ffc7ce;color:#9c0006">✗</td>`;
+  };
+  let blocks='';
+  R.branches.forEach(({b,cells,annual})=>{
+    perBranchMissing[b.id]=0;
+    let rows='';
+    COV_ITEMS.forEach(it=>{
+      if(it.annual){
+        const a=annual[it.k];
+        const bg=a.level==='ok'?'#c6efce':a.level==='warn'?'#ffeb9c':'#ffc7ce';
+        const col=a.level==='ok'?'#006100':a.level==='warn'?'#7f6000':'#9c0006';
+        rows+=`<tr><td style="padding:6px 8px;border:1px solid #e5e7eb;font-weight:800;white-space:nowrap">${esc(it.ar)}</td><td colspan="12" style="padding:6px 8px;border:1px solid #e5e7eb;background:${bg};color:${col};font-weight:700;font-size:.82rem">${esc(a.text)}</td></tr>`;
+        if(a.level!=='ok'){ missingRows.push({b,item:it.ar,months:a.short,monthly:false}); perBranchMissing[b.id]++; }
+        return;
+      }
+      const miss=[];
+      let tds='';
+      for(let m=1;m<=12;m++){
+        const c=cells[it.k][m];
+        let st;
+        if(m>R.lastMon) st='future';
+        else if(c){ st=(it.k==='salary'&&!c.cash)?'part':'ok'; }
+        else if(m===R.lastMon && R.year===new Date().getFullYear()) st='wait';
+        else { st='miss'; miss.push(COV_MON_AR[m-1]); }
+        tds+=cellHtml(st);
+      }
+      rows+=`<tr><td style="padding:6px 8px;border:1px solid #e5e7eb;font-weight:800;white-space:nowrap">${esc(it.ar)}</td>${tds}</tr>`;
+      if(miss.length){ missingRows.push({b,item:it.ar,months:miss.join('، '),monthly:true}); perBranchMissing[b.id]+=miss.length; }
+    });
+    blocks+=`<div class="card" style="margin-bottom:12px;overflow-x:auto">
+      <div class="ch"><div class="ct" style="color:${b.c}">${b.icon} ${esc(b.ar)} — ${esc(b.en)}</div></div>
+      <table style="border-collapse:collapse;width:100%;font-size:.84rem">
+        <tr style="background:#f3f4f6"><th style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right">البند</th>${COV_MON_AR.map(m=>`<th style="padding:6px 3px;border:1px solid #e5e7eb">${m}</th>`).join('')}</tr>
+        ${rows}
+      </table></div>`;
+  });
+  const chips=R.branches.map(({b})=>{
+    const n=perBranchMissing[b.id];
+    return `<span style="display:inline-block;margin:3px 4px;padding:5px 12px;border-radius:18px;font-weight:800;font-size:.82rem;background:${n?'#ffc7ce':'#c6efce'};color:${n?'#9c0006':'#006100'}">${b.icon} ${esc(b.ar)}: ${n?n+' ناقص':'✓ كامل'}</span>`;
+  }).join('');
+  const missTable=missingRows.length? `<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:.84rem">
+      <tr style="background:#f3f4f6"><th style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right">الفرع</th><th style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right">البند</th><th style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right">الناقص</th></tr>
+      ${missingRows.map(r=>`<tr><td style="padding:6px 8px;border:1px solid #e5e7eb;white-space:nowrap">${r.b.icon} ${esc(r.b.ar)}</td><td style="padding:6px 8px;border:1px solid #e5e7eb;font-weight:700">${esc(r.item)}</td><td style="padding:6px 8px;border:1px solid #e5e7eb;color:#9c0006">${esc(r.months)}</td></tr>`).join('')}
+    </table></div>` : '<div style="padding:14px;text-align:center;font-weight:800;color:#006100">✅ كل حاجة اتدخلت — مفيش أي نقص</div>';
+  el('repcont').innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <div class="ch"><div class="ct">✅ متابعة إدخال المصاريف — ${R.year}</div>
+        <div class="np" style="display:flex;gap:6px"><button class="btn bo bsm" onclick="exportEntryCoverage()">📥 Excel</button><button class="btn bo bsm" onclick="window.print()">🖨️</button></div></div>
+      <div style="font-size:.78rem;color:#6b7280;margin-bottom:8px">✓ اتدخل &nbsp; ✗ لسه ما اتدخلش &nbsp; ◐ راتب اتدخل بس مش متعلّم كاش/عهدة &nbsp; … الشهر الحالي لسه شغال &nbsp; | الإيجار والرخصة بيتعرضوا كحالة سنوية. التقرير بيتعرف على البند من اسم المورد والملاحظات.</div>
+      <div>${chips}</div>
+    </div>
+    <div class="card" style="margin-bottom:12px"><div class="ch"><div class="ct">📝 الناقص (المطلوب إدخاله)</div></div>${missTable}</div>
+    ${blocks}`;
+}
+
+function exportEntryCoverage(){
+  const R=_covLast; if(!R){alert('اعملي التقرير الأول');return;}
+  const XLSX=window.XLSX; if(!XLSX){alert('Excel library not loaded');return;}
+  const aoa=[['الفرع','البند',...COV_MON_AR,'ملاحظة']];
+  const miss=[['الفرع','البند','الناقص']];
+  R.branches.forEach(({b,cells,annual})=>{
+    COV_ITEMS.forEach(it=>{
+      if(it.annual){ const a=annual[it.k]; aoa.push([b.ar,it.ar,...COV_MON_AR.map(()=>''),a.text]); if(a.level!=='ok') miss.push([b.ar,it.ar,a.short]); return; }
+      const row=[b.ar,it.ar]; const ms=[];
+      for(let m=1;m<=12;m++){
+        const c=cells[it.k][m];
+        if(m>R.lastMon) row.push('');
+        else if(c) row.push(it.k==='salary'&&!c.cash?'◐':'✓');
+        else if(m===R.lastMon && R.year===new Date().getFullYear()) row.push('…');
+        else { row.push('✗'); ms.push(COV_MON_AR[m-1]); }
+      }
+      row.push(''); aoa.push(row);
+      if(ms.length) miss.push([b.ar,it.ar,ms.join('، ')]);
+    });
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Coverage');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(miss),'Missing');
+  XLSX.writeFile(wb,'Expense_Entry_Followup_'+R.year+'.xlsx');
+}
+
 async function genReport(){
   const type=el('reptype').value;
+  if(type==='entry_coverage'){ await runEntryCoverage(); return; }
   if(type==='enrollment'){ printEnrollmentReport(); return; }
   if(type==='bus_report'){  printBusReport(); return; }
   const month=el('repmon').value||monthOf(new Date());
