@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-04-1';
+const APP_VERSION = '2026-10-04-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -10800,6 +10800,7 @@ function renderExps(){
               ${e.supplierName?`<span style="background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:700">🏢 ${e.supplierName}</span>`:''}
               ${e.invoiceNumber?`<span style="background:#ede9fe;color:#6d28d9;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:700">🧾 ${e.invoiceNumber}</span>`:''}
               ${e.taxNumber?' | رقم ضريبي: '+e.taxNumber:''}
+              ${(e.extra&&e.extra.work_done)?'<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:10px;margin-right:4px;font-weight:800" title="'+(e.extra.nursery||'')+'">✅ تمت المراجعة</span>':''}
             </div>
             ${(e.extra&&e.extra['__bus_no__'])?`<div style="font-size:.72rem;margin-top:2px"><span style="background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:10px;font-weight:800">🚌 ${e.extra['__bus_no__']}${e.extra['__bus_type__']?' — '+e.extra['__bus_type__']:''}</span></div>`:''}
             ${(e.category==='salary'&&e.extra)?(()=>{
