@@ -1497,8 +1497,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
     🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى 4 أطفال لكل فصل، أي وقت حضور<br>
     ⏰ <b>باقي الأعمار (سنة و3 شهور فأكتر):</b> ميعاد الحضور خط أحمر — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
     🌟 <b>E</b> = يوم كامل &nbsp;|&nbsp; <b>S</b> = صباحي &nbsp;|&nbsp; <b>F</b> = نص يوم &nbsp;|&nbsp; <b>N</b> = بعد الظهر<br>
-    داخل نفس الميعاد، الأعمار القريبة من بعض بتتضم في نفس الفصل — مفيش طفل لوحده في فصل، وحد أقصى <b>15 طفل</b> لكل فصل<br>
-    لو عدد أطفال الميعاد ده عدّى الـ15، بيتقسموا بالتساوي على أكتر من فصل (الأعمار المتقاربة مع بعض) وياخدوا رقم بعد اسم الفصل (زي E2, S2...)<br>
+    داخل نفس الميعاد، الأعمار القريبة من بعض بتتضم في نفس الفصل — مفيش طفل لوحده في فصل، وحد أقصى <b>20 طفل</b> لكل فصل<br>
+    لو عدد أطفال الميعاد ده عدّى الـ20، بيتقسموا بالتساوي على أكتر من فصل (الأعمار المتقاربة مع بعض) وياخدوا رقم بعد اسم الفصل (زي E2, S2...)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-04-2';
+const APP_VERSION = '2026-10-07-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -14793,10 +14793,10 @@ function _ageMonths(dob){
 // Class rules (per owner, 2026): infants are always kept apart, any headcount, capped
 // at 4/class — schedule time is a hard boundary for everyone else and is NEVER mixed,
 // but nearby ages ARE merged together within the same schedule so no class ends up
-// with just one or two kids. Cap: 15 children per class — once a same-schedule group
-// goes over 15, open a new class for it (evenly split, so nearby ages stay together
+// with just one or two kids. Cap: 20 children per class — once a same-schedule group
+// goes over 20, open a new class for it (evenly split, so nearby ages stay together
 // and neither class ends up needlessly small).
-const INFANT_MAX_MO=15, MAX_CLASS_SIZE=15;
+const INFANT_MAX_MO=15, MAX_CLASS_SIZE=20;
 const SCHEDULE_LETTER={fullday:'E', morning:'S', midday:'F', afternoon:'N', other:'X'};
 
 // How many classes a same-schedule, age-sorted group of `n` children should split into.
@@ -14837,7 +14837,7 @@ function _buildClassAssignments(){
   });
 
   // 15 months+: group by schedule (hard boundary), then merge nearby ages within each
-  // schedule into as few classes as the 10-15 target allows.
+  // schedule into as few classes as the 20-child cap allows.
   const bySchedule={};
   active.filter(c=>_ageMonths(c.dob)>=INFANT_MAX_MO).forEach(c=>{
     const tg=_getTimeGroup(c.kidsTime)||'other';
