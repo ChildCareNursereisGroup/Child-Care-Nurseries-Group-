@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-07-1';
+const APP_VERSION = '2026-10-12-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -16543,6 +16543,8 @@ function renderMonthlyBusRoster(){
 }
 
 async function saveAllBusAssignments(){
+  // 1) Read EVERYTHING from the screen first — the roster is re-rendered after saving,
+  //    which would otherwise wipe the staff dropdowns before they are read.
   const sels=document.querySelectorAll('.bus-assign-sel');
   const byChild={};
   for(const sel of sels){
@@ -16555,7 +16557,25 @@ async function saveAllBusAssignments(){
     if(!byChild[cid]) byChild[cid]={};
     byChild[cid][tripType]={busId:String(bus.id),busNumber:bus.busNumber};
   }
-  if(!Object.keys(byChild).length){showToast('⚠️ No changes to save');return;}
+  const staffMap={}; // sid → {pickBusId, pickBusNum, dropBusId, dropBusNum, stopNum}
+  document.querySelectorAll('.staff-assign-sel').forEach(sel=>{
+    const sid=sel.dataset.sid;
+    const tType=sel.dataset.tripType||'pick';
+    const busId=sel.value;
+    if(!sid||!busId) return;
+    const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
+    if(!bus) return;
+    if(!staffMap[sid]) staffMap[sid]={};
+    if(tType==='pick'){ staffMap[sid].pickBusId=bus.id; staffMap[sid].pickBusNum=bus.busNumber; }
+    if(tType==='drop'){ staffMap[sid].dropBusId=bus.id; staffMap[sid].dropBusNum=bus.busNumber; }
+  });
+  document.querySelectorAll('.staff-stop-inp').forEach(inp=>{
+    const sid=inp.dataset.sid; const val=parseInt(inp.value);
+    if(sid&&!isNaN(val)&&staffMap[sid]) staffMap[sid].stopNum=val;
+  });
+  if(!Object.keys(byChild).length && !Object.keys(staffMap).length){showToast('⚠️ No changes to save — choose a driver first');return;}
+
+  // 2) Save children
   let ok=0,fail=0;
   for(const [cid,types] of Object.entries(byChild)){
     if(!DB.busAssignments) DB.busAssignments={};
@@ -16591,66 +16611,48 @@ async function saveAllBusAssignments(){
       }
     }catch(e){fail++;console.error('Bus save exception:',e);}
   }
-  // Force reload from Supabase to confirm
-  await loadAllBusAssignments();
-  const saved=Object.keys(DB.busAssignments).length;
-  console.log('Verified DB.busAssignments entries:',saved);
-  renderMonthlyBusRoster();
-  if(fail>0) showToast('⚠️ Saved '+ok+', failed '+fail+' — see console');
-  else showToast('✅ Saved '+ok+' assignments ('+saved+' total in DB)');
-  // Save staff assignments — collect all selects per staff first, then save once per staff
-  const staffSels=document.querySelectorAll('.staff-assign-sel');
-  const staffMap={}; // sid → {pickBusId, pickBusNum, dropBusId, dropBusNum, stopNum}
-  staffSels.forEach(sel=>{
-    const sid=sel.dataset.sid;
-    const tType=sel.dataset.tripType||'pick';
-    const busId=sel.value;
-    if(!sid) return;
-    if(!staffMap[sid]) staffMap[sid]={};
-    if(busId){
-      const bus=(DB.allBuses||[]).find(b=>String(b.id)===String(busId));
-      if(bus){
-        if(tType==='pick'){ staffMap[sid].pickBusId=bus.id; staffMap[sid].pickBusNum=bus.busNumber; }
-        if(tType==='drop'){ staffMap[sid].dropBusId=bus.id; staffMap[sid].dropBusNum=bus.busNumber; }
-      }
-    }
-  });
-  document.querySelectorAll('.staff-stop-inp').forEach(inp=>{
-    const sid=inp.dataset.sid; const val=parseInt(inp.value);
-    if(sid&&!isNaN(val)){ if(!staffMap[sid]) staffMap[sid]={}; staffMap[sid].stopNum=val; }
-  });
 
-  let staffSaved=0;
+  // 3) Save staff — one delete + insert per staff member
+  let staffSaved=0, staffFail=0;
   for(const [sid,sm] of Object.entries(staffMap)){
-    const hasBus=sm.pickBusId||sm.dropBusId;
-    if(!hasBus&&!sm.stopNum) continue;
+    if(!sm.pickBusId&&!sm.dropBusId) continue;
     if(!DB.staffBusAssignments) DB.staffBusAssignments={};
     if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
     if(sm.pickBusId) DB.staffBusAssignments[sid].pick={busId:String(sm.pickBusId),busNumber:sm.pickBusNum};
     if(sm.dropBusId) DB.staffBusAssignments[sid].drop={busId:String(sm.dropBusId),busNumber:sm.dropBusNum};
     if(sm.stopNum)   DB.staffBusAssignments[sid].stopNumber=sm.stopNum;
-    // One delete + insert per staff (avoid race condition from multiple selects)
-    await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
-    if(hasBus){
+    try{
+      await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
       const pickId=sm.pickBusId||sm.dropBusId;
       const dropId=sm.dropBusId||sm.pickBusId;
+      const pickNum=sm.pickBusNum||sm.dropBusNum||'';
+      const dropNum=sm.dropBusNum||sm.pickBusNum||'';
       const {error}=await sb.from('bus_assignments').insert({
         staff_id:Number(sid), entity_type:'staff',
-        bus_id:Number(pickId), bus_number:sm.pickBusNum||sm.dropBusNum||'',
-        pick_bus_id:Number(pickId), pick_bus_number:sm.pickBusNum||'',
-        drop_bus_id:Number(dropId), drop_bus_number:sm.dropBusNum||'',
+        bus_id:Number(pickId), bus_number:pickNum,
+        pick_bus_id:Number(pickId), pick_bus_number:pickNum,
+        drop_bus_id:Number(dropId), drop_bus_number:dropNum,
         stop_number:sm.stopNum||null,
       });
-      if(error) console.error('Staff assign error:',sid,error.message);
+      if(error){ console.error('Staff assign error:',sid,error.message); staffFail++; }
       else staffSaved++;
-    }
+    }catch(e){ staffFail++; console.error('Staff assign exception:',e); }
   }
-  if(staffSaved>0) showToast('✅ Staff: saved '+staffSaved+' assignments');
+
+  // 4) Reload from the database to confirm, then redraw the roster
+  await loadAllBusAssignments();
+  const saved=Object.keys(DB.busAssignments).length;
+  renderMonthlyBusRoster();
+  const parts=[];
+  if(ok||fail) parts.push('Children: '+ok+' saved'+(fail?', '+fail+' failed':''));
+  if(staffSaved||staffFail) parts.push('Staff: '+staffSaved+' saved'+(staffFail?', '+staffFail+' failed':''));
+  if(fail>0||staffFail>0) showToast('⚠️ '+parts.join(' | ')+' — see console');
+  else showToast('✅ '+parts.join(' | '));
 }
 
 async function saveStopNumbers(){
   const inputs=document.querySelectorAll('.stop-num-inp');
-  if(!inputs.length){showToast('No stop numbers to save');return;}
+  if(!inputs.length && !document.querySelectorAll('.staff-stop-inp').length){showToast('No stop numbers to save');return;}
   let saved=0, skipped=0;
   for(const inp of inputs){
     const cid=inp.dataset.cid;
@@ -16670,9 +16672,20 @@ async function saveStopNumbers(){
     }
     saved++;
   }
+  // Staff stop numbers (staff must already have a driver assigned and saved)
+  let staffStops=0;
+  for(const inp of document.querySelectorAll('.staff-stop-inp')){
+    const sid=inp.dataset.sid; const val=parseInt(inp.value);
+    if(!sid||isNaN(val)) continue;
+    if(!DB.staffBusAssignments) DB.staffBusAssignments={};
+    if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
+    DB.staffBusAssignments[sid].stopNumber=val;
+    const {error}=await sb.from('bus_assignments').update({stop_number:val}).eq('staff_id',Number(sid)).eq('entity_type','staff');
+    if(!error) staffStops++;
+  }
   // Re-render sorted by new stop numbers
   renderMonthlyBusRoster();
-  showToast(`✅ Stop numbers saved for ${saved} children — sorted!`);
+  showToast(`✅ Stop numbers saved for ${saved} children${staffStops?' + '+staffStops+' staff':''} — sorted!`);
 }
 
 function showToast(msg){
