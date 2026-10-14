@@ -2395,10 +2395,24 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-14-1';
+const APP_VERSION = '2026-10-14-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
-const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
+// ── Secure login (Supabase Auth) ──────────────────────────────────────────────
+// Each branch+role (e.g. b1_manager) has a real Supabase account behind the same password screen.
+// LEGACY_LOGIN_FALLBACK keeps the old password check working until the database is locked down;
+// it is switched off after the security fix is complete.
+const STAFF_EMAIL_DOMAIN = 'staff.nursery.local';
+const LEGACY_LOGIN_FALLBACK = true;
+async function secureLogin(bid, role, pw){
+  try{
+    const {error} = await sb.auth.signInWithPassword({email:`${bid}_${role}@${STAFF_EMAIL_DOMAIN}`, password:pw});
+    if(!error) return 'secure';
+  }catch(e){ console.warn('Secure login unavailable:', e&&e.message); }
+  if(LEGACY_LOGIN_FALLBACK && pw===getPW(bid,role)) return 'legacy';
+  return false;
+}
 
 // ── Universal unlimited fetch ─────────────────────────────────────
 async function fetchAll(getQuery, pageSize=1000){
@@ -2776,6 +2790,11 @@ async function setPW(bid,role,pw){
   try{
     const {error}=await sb.from('app_settings').upsert({key:`pw_${bid}_${role}`,value:pw},{onConflict:'key'});
     if(error){ console.error('Failed to save password:', error); return false; }
+    // Also update the real login (only exists after the security setup; ignore if not set up yet)
+    try{
+      const r = await sb.rpc('admin_set_password',{p_branch:bid,p_role:role,p_new:pw});
+      if(r.error && !/does not exist|Could not find|schema cache/i.test(r.error.message||'')){ console.error('Login password update failed:', r.error); return false; }
+    }catch(e){ console.warn('admin_set_password not available', e&&e.message); }
     return true;
   }catch(e){ console.error('Failed to save password:', e); return false; }
 }
@@ -3436,9 +3455,16 @@ function pickBranch(id){
 async function doLogin(){
   const pw=el('pwi').value;
   const isPublic=selRole==='public_reg'||selRole==='visitor_reg'||selRole==='inquiry';
-  if(!isPublic && pw!==getPW(selBid,selRole)){
-    const e=el('lerr');e.textContent=t('wrongPass');e.style.display='block';el('pwi').value='';return;
+  let secureSession=false;
+  if(isPublic){ try{ await sb.auth.signOut(); }catch(e){} }
+  else {
+    const loginMode = await secureLogin(selBid, selRole, pw);
+    if(!loginMode){
+      const e=el('lerr');e.textContent=t('wrongPass');e.style.display='block';el('pwi').value='';return;
+    }
+    secureSession = (loginMode==='secure');
   }
+  window._secureSession = secureSession;
   el('lerr').style.display='none';
   curBid=selBid;curRole=selRole;
   showLoad(t('connecting'));
@@ -3447,7 +3473,7 @@ async function doLogin(){
     if(error)throw error;
     sbOK=true;
     el('cdot').style.background='#0e9f6e';
-    el('ctxt').textContent='☁️ متصل بالسيرفر';
+    el('ctxt').textContent='☁️ متصل بالسيرفر'+(secureSession?' 🔒':'');
   }catch(e){
     sbOK=false;el('cdot').style.background='#e02424';
     el('ctxt').textContent=t('serverError');
@@ -3471,6 +3497,8 @@ el('pwi').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 // Load passwords from Supabase when page opens (before login)
 loadPasswordsFromSupa();
 function doLogout(){
+  try{ sb.auth.signOut(); }catch(e){}
+  window._secureSession=false;
   realtimeSubs.forEach(s=>sb.removeChannel(s));realtimeSubs=[];
   el('app').style.display='none';el('login').style.display='flex';el('pwi').value='';
 }
