@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-12-1';
+const APP_VERSION = '2026-10-14-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -4512,11 +4512,14 @@ function printTransportReceiptFromChild(){
 // ─── End Registration Receipts ───────────────────
 async function getNextSerialAsync(payMethod){
   const prefix={'cash':'C','bank':'B','card':'K'}[payMethod]||'C';
-  // Query ONLY current branch receipts with this prefix
-  const {data} = await sb.from('receipts')
+  // Query ONLY current branch receipts with this prefix.
+  // Must read ALL pages: Supabase returns max 1000 rows per request, and Abtal has more
+  // than 1000 cash receipts — a single query missed the newest one and re-suggested a taken number.
+  const data = await fetchAll(()=>sb.from('receipts')
     .select('receipt_num')
     .eq('branch_id', curBid)
-    .like('receipt_num', prefix+'-%');
+    .like('receipt_num', prefix+'-%')
+    .order('id',{ascending:true}));
   const allNums = (data||[]).map(r=>{
     const rn = String(r.receipt_num||'');
     const m = rn.match(/(\d+)$/);
