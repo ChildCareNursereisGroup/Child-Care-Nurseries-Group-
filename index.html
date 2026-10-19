@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-14-3';
+const APP_VERSION = '2026-10-19-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -2668,8 +2668,7 @@ function formatWANum(phone){
  * openWA(phoneNum, message)
  * Priority:
  * 1. Meta WhatsApp Business API → sends directly, works from anywhere in the world
- * 2. WhatsApp Web (web.whatsapp.com) → if nursery WA number set, opens in browser tab
- * 3. wa.me → personal phone fallback
+ * 2. wa.me click-to-chat → opens the WhatsApp app / WhatsApp Web (all branches)
  */
 async function openWA(phoneNum, message){
   const bx=getBranchExtra(curBid);
@@ -2704,14 +2703,12 @@ async function openWA(phoneNum, message){
     }
   }
 
-  // ── Option 2: WhatsApp Web ─────────────────────────────────────────
+  // ── Option 2: wa.me click-to-chat ──────────────────────────────────
+  // Used for every branch. It opens the WhatsApp app on the device, or WhatsApp Web if that is
+  // what is logged in, and keeps the chat + text. Opening web.whatsapp.com/send directly asked
+  // for a QR login every time and dropped the chat after login (seen on Al Saada For Kids,
+  // where the nursery WhatsApp number was saved).
   const encoded=encodeURIComponent(message||'');
-  if(bx.nurseryWA){
-    window.open(`https://web.whatsapp.com/send?phone=${phoneNum}&text=${encoded}`,'_blank');
-    return;
-  }
-
-  // ── Option 3: wa.me fallback ───────────────────────────────────────
   window.open(`https://wa.me/${phoneNum}?text=${encoded}`,'_blank');
 }
 
