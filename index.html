@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-27-1';
+const APP_VERSION='2026-10-27-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -23312,6 +23312,44 @@ async function loadVisitors(){
   DB.visitors = (data||[]).map(v=>({...v, name:(v.name||'').trim()}))
     .sort((a,b)=>(b.visit_date||b.id||'').localeCompare(a.visit_date||a.id||''));
   console.log('✅ Visitors loaded:',DB.visitors.length,'for branch_id=',curBid);
+}
+
+// Days since the visit (null when the visit date is missing/invalid)
+function visitorDaysSince(v){
+  if(!v||!v.visit_date) return null;
+  const d=new Date(v.visit_date);
+  if(isNaN(d)) return null;
+  return Math.max(0,Math.floor((new Date()-d)/86400000));
+}
+
+function followUpColor(v){
+  const n=visitorDaysSince(v);
+  if(n===null||n<=7) return '#e5e7eb';
+  return n<=21?'#fbbf24':'#f87171';
+}
+
+function daysSinceVisitBadge(v){
+  const n=visitorDaysSince(v);
+  if(n===null) return '';
+  const col=n<=7?['#dcfce7','#166534']:n<=21?['#fef3c7','#92400e']:['#fee2e2','#991b1b'];
+  return `<span style="background:${col[0]};color:${col[1]};font-size:.62rem;padding:2px 7px;border-radius:6px;font-weight:700">${n===0?'اليوم':'منذ '+n+' يوم'}</span>`;
+}
+
+// There is no follow-up date column on visitors; show it only if one is ever saved
+function lastFollowUpLine(v){
+  const d=v&&(v.last_follow_up||v.last_followup);
+  return d?`<div style="font-size:.7rem;color:#0f766e;margin-top:3px">💬 آخر متابعة: ${d}</div>`:'';
+}
+
+function openFollowUpWA(id){
+  const v=(DB.visitors||[]).find(x=>String(x.id)===String(id));
+  if(!v) return;
+  const phone=v.phone_mom||v.phone_dad;
+  if(!phone){ alert('لا يوجد رقم هاتف لهذا الزائر'); return; }
+  const b=CB();
+  const nm=(lang==='ar'?b.ar:b.en)||b.ar||b.en||'';
+  const msg=`مرحباً ${v.name||''}،\nنشكركم على زيارتكم ${nm}. نود متابعة استفساركم عن التسجيل، ويسعدنا الإجابة عن أي سؤال أو ترتيب زيارة جديدة.`;
+  openWA(phone,msg);
 }
 
 function renderVisitors(){
