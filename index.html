@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION = '2026-10-19-2';
+const APP_VERSION = '2026-10-27-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -10288,20 +10288,18 @@ async function sendClassMsgBulk(){
   const status2 = status;
   if(status2) status2.textContent = `⏳ ${lang==='ar'?'جاري الإرسال...':'Sending...'}`;
 
-  let sent=0;
-  for(const c of withPhone){
-    const phone = c.parentMom||c.parentDad;
-    const rawMsg = (el('cmsg-text')?.value||'').trim();
-    const prefix = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
-    const suffix = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
-    const finalMsg = personalize ? prefix + rawMsg + suffix : rawMsg;
-    openWA(phone, finalMsg);
-    logActivity('whatsapp', `💬 Bulk Msg → ${c.name} (${c.className||'—'})`);
-    sent++;
-    if(withPhone.length>1) await new Promise(r=>setTimeout(r,600));
-  }
-
-  if(status2) status2.textContent = `✅ ${lang==='ar'?'تم فتح واتساب لـ':'Opened WhatsApp for'} ${sent} ${lang==='ar'?'ولي أمر':'parents'}`;
+  // One click = one WhatsApp tab (popup blockers swallow the rest), so go through the queue.
+  const rawMsg = (el('cmsg-text')?.value||'').trim();
+  startWAQueue('💬 '+(lang==='ar'?'رسائل الفصول':'Class Messages'), withPhone.map(c=>({
+    label:c.name+' — '+(c.className||'—'),
+    run:()=>{
+      const prefix = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
+      const suffix = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
+      openWA(c.parentMom||c.parentDad, personalize ? prefix + rawMsg + suffix : rawMsg);
+      logActivity('whatsapp', `💬 Bulk Msg → ${c.name} (${c.className||'—'})`);
+    }
+  })));
+  if(status2) status2.textContent = `⏳ ${withPhone.length} ${lang==='ar'?'ولي أمر في الطابور — اضغطي التالي لكل واحد':'parents queued — tap Next for each'}`;
 }
 
 async function sendClassMsgSelected(){
@@ -10337,21 +10335,21 @@ async function sendClassMsgSelected(){
   }
   if(!rawMsg){ alert(lang==='ar'?'اكتبي الرسالة أولاً!':'Write the message first!'); return; }
 
-  let sent=0;
+  // One click = one WhatsApp tab (popup blockers swallow the rest), so go through the queue.
+  const items=[];
   for(const id of selected){
     const c = DB.children.find(x=>String(x.id)===String(id));
     if(!c) continue;
     const phone = c.parentMom||c.parentDad;
     if(!phone) continue;
-    const pfx = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
-    const sfx = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
-    const finalMsg = personalize ? pfx + rawMsg + sfx : rawMsg;
-    openWA(phone, finalMsg);
-    logActivity('whatsapp', `💬 Individual Msg → ${c.name} (${c.className||'—'})`);
-    sent++;
-    if(selected.length>1) await new Promise(r=>setTimeout(r,600));
+    items.push({label:c.name+' — '+(c.className||'—'), run:()=>{
+      const pfx = lang==='ar' ? `🌸 ولي أمر الطفل/ة ${c.name}،\n\n` : `🌸 Dear Parent of ${c.name},\n\n`;
+      const sfx = lang==='ar' ? `\n\n— مجموعة رعاية الطفل للحضانات 🏫` : `\n\n— Child Care Nurseries Group 🏫`;
+      openWA(phone, personalize ? pfx + rawMsg + sfx : rawMsg);
+      logActivity('whatsapp', `💬 Individual Msg → ${c.name} (${c.className||'—'})`);
+    }});
   }
-  setTimeout(()=>alert(`✅ ${sent} ${lang==='ar'?'رسالة أُرسلت':'messages sent'}`),300);
+  startWAQueue('💬 '+(lang==='ar'?'رسائل الفصول':'Class Messages'), items);
 }
 
 function insertCmsgTemplate(type){
@@ -24131,9 +24129,42 @@ function sendAllFeeReminders(){
   const unpaid=DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0&&(c.parentMom||c.parentDad));
   if(!unpaid.length){ alert('✅ All children have paid for this month!'); return; }
   if(!confirm(`إرسال تذكير لـ ${unpaid.length} طفل؟`)) return;
-  unpaid.forEach((c,i)=>{
-    setTimeout(()=>sendFeeReminderWA(c.id), i*800);
-  });
+  // The browser only lets a click open ONE new WhatsApp tab (the others were blocked as popups),
+  // so the reminders go out through a queue: the first one opens now, each next click opens the next.
+  startWAQueue('💸 Fee Reminders', unpaid.map(c=>({label:c.name+' — '+(c.className||'—'), run:()=>sendFeeReminderWA(c.id)})));
+}
+
+// ── WhatsApp send queue ──────────────────────────────────────────────
+// items: [{label, run}] — run() opens the WhatsApp chat for that item. One click = one chat,
+// so popup blockers never swallow a message. First item is opened by the click that started it.
+let _waQueue=[], _waQueueIdx=0, _waQueueTitle='';
+function startWAQueue(title, items){
+  _waQueue=items; _waQueueIdx=0; _waQueueTitle=title;
+  if(!_waQueue.length) return;
+  sendNextWAQueue();
+}
+function sendNextWAQueue(){
+  if(_waQueueIdx<_waQueue.length){
+    const it=_waQueue[_waQueueIdx]; _waQueueIdx++;
+    try{ it.run(); }catch(e){ console.warn('WA queue item failed', it.label, e); }
+  }
+  renderWAQueue();
+}
+function skipWAQueue(){ if(_waQueueIdx<_waQueue.length) _waQueueIdx++; renderWAQueue(); }
+function renderWAQueue(){
+  const total=_waQueue.length, done=_waQueueIdx, finished=done>=total;
+  const next=finished?null:_waQueue[done];
+  const pct=total?Math.round(done/total*100):100;
+  const html=`<div style="text-align:center;padding:4px 2px">
+    <div style="font-weight:900;font-size:1.05rem;color:${finished?'#059669':'#e11d48'};margin-bottom:6px">${finished?'✅ تم فتح واتساب لكل الأولياء — All done':'تم '+done+' من '+total+' — Sent '+done+' of '+total}</div>
+    <div style="background:#f3f4f6;border-radius:10px;height:12px;overflow:hidden;margin-bottom:12px"><div style="height:100%;width:${pct}%;background:#25d366"></div></div>
+    ${finished?'':`<div style="font-size:.82rem;color:#6b7280;margin-bottom:6px">التالي — Next:</div>
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:12px">${next.label}</div>
+    <div style="font-size:.74rem;color:#9ca3af;margin-bottom:10px">ابعتي الرسالة في واتساب وارجعي هنا واضغطي التالي — Send in WhatsApp, come back, tap Next</div>
+    <button onclick="sendNextWAQueue()" style="width:100%;background:#25d366;color:#fff;border:none;border-radius:12px;padding:13px;cursor:pointer;font-weight:900;font-size:1rem">💬 التالي — Next (${done+1}/${total})</button>
+    <button onclick="skipWAQueue()" style="margin-top:8px;background:none;border:none;color:#6b7280;cursor:pointer;font-size:.78rem;text-decoration:underline">تخطي — Skip</button>`}
+  </div>`;
+  showModal(_waQueueTitle, html);
 }
 
 function printFeeReminderList(){
