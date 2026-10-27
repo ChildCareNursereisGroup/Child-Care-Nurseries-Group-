@@ -2395,7 +2395,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-10-27-2';
+const APP_VERSION='2026-10-27-3';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -24679,6 +24679,30 @@ Child Care Nurseries Group`;
   renderBirthdayPanel();
 }
 
+// Contacts file (vCard) of the parents who have not paid the selected month, to import on the phone
+// and build a WhatsApp Business broadcast list. Same list as "Send All".
+function downloadUnpaidVCard(){
+  const selMon=el('fee-rem-month')?.value||monthOf(new Date());
+  const paidIds=new Set(DB.receipts.filter(r=>!r.isCancelled&&recCoversMonth(r,selMon)).map(r=>String(r.childId)));
+  const unpaid=DB.children.filter(c=>!c.leaveDate&&!paidIds.has(String(c.id))&&(c.fee||0)>0&&(c.parentMom||c.parentDad));
+  if(!unpaid.length){ alert('✅ كل الأطفال دفعوا لهذا الشهر'); return; }
+  const esc=t=>String(t||'').replace(/[\\;,]/g,m=>'\\'+m).replace(/\r?\n/g,' ');
+  const mon=new Date(selMon+'-01').toLocaleString('en',{month:'short',year:'numeric'});
+  const cards=unpaid.map(c=>{
+    const tels=[c.parentMom,c.parentDad].filter(Boolean).map(formatWANum)
+      .filter((n,i,a)=>n&&a.indexOf(n)===i)
+      .map(n=>'TEL;TYPE=CELL:+'+n);
+    return ['BEGIN:VCARD','VERSION:3.0','FN:'+esc('ولي أمر '+c.name+' (Unpaid '+mon+')'),'N:'+esc(c.name)+';ولي أمر;;;',...tels,'END:VCARD'].join('\r\n');
+  });
+  const blob=new Blob([cards.join('\r\n')+'\r\n'],{type:'text/vcard;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Unpaid_Parents_'+selMon+'.vcf';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  logActivity('whatsapp','📇 vCard unpaid parents '+selMon+' ('+unpaid.length+')');
+}
+
 function renderFeeReminderPanel(){
   // Default to NEXT month (since reminders are sent before month starts)
   const inp=el('fee-rem-month');
@@ -24719,6 +24743,9 @@ function renderFeeReminderPanel(){
       </button>
       <button onclick="printFeeReminderList()" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.78rem">
         🖨️ Print List
+      </button>
+      <button onclick="downloadUnpaidVCard()" style="background:#0f766e;color:#fff;border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-weight:800;font-family:'Tajawal',sans-serif;font-size:.78rem" title="ملف جهات اتصال لعمل قائمة بث في واتساب بيزنس">
+        📇 vCard
       </button>
     </div>
   </div>
