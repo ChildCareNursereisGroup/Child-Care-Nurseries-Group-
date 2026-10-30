@@ -282,6 +282,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     <button class="btn bsm" style="background:#059669;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="el('xl-ch-file').click()">📥 Import Children Excel</button>
     <button class="btn bg bsm" onclick="downloadChildTemplate()">📋 Template</button>
     <button class="btn bsm" style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="printClassCards()">🪪 Print Class Cards</button>
+    <button class="btn bsm" style="background:#0d9488;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openAttendanceRegisterDialog()">🗓️ كشف غياب الفصول</button>
     <button class="btn bsm" style="background:#d97706;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openAutoAssignClasses()">🎓 Auto Assign Classes</button>
   </div>
   <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:#0369a1;font-weight:700">
@@ -13276,6 +13277,102 @@ const LH_IMAGES={
 // ═══════════════════════════════════════════════
 //  PRINT CLASS CLOTHING TAGS
 // ═══════════════════════════════════════════════
+// ── Monthly class attendance register (printable) ───────────────────
+function openAttendanceRegisterDialog(){
+  const classes=[...new Set(DB.children.filter(c=>!c.leaveDate).map(c=>c.className||'—'))].sort((a,b)=>a.localeCompare(b,'en'));
+  const now=new Date();
+  const mon=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const inp='width:100%;padding:8px;border:1.5px solid #d1d5db;border-radius:8px;font-family:Tajawal,sans-serif;font-size:.85rem;box-sizing:border-box';
+  showModal('🗓️ كشف غياب الأطفال — Attendance Register', `
+    <div style="font-size:.8rem;color:#6b7280;margin-bottom:10px">يطلع كشف شهري لكل فصل، بأسماء الأطفال ومواعيدهم من السيستم، مرتبين أبجدياً. Names and timings come from the system, sorted A–Z.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">الشهر — Month</div><input type="month" id="ar-month" value="${mon}" style="${inp}"></div>
+      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">الفصل — Class</div>
+        <select id="ar-class" style="${inp}">
+          <option value="__all__">كل الفصول — All classes (${classes.length})</option>
+          ${classes.map(c=>`<option value="${String(c).replace(/"/g,'&quot;')}">${c}</option>`).join('')}
+        </select></div>
+      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">مُدرّسة الفصل — Class Teacher (اختياري)</div><input type="text" id="ar-teacher" placeholder="T. ..." style="${inp}"></div>
+      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">مساعدة الفصل — Class Assistant (اختياري)</div><input type="text" id="ar-assistant" placeholder="T. ..." style="${inp}"></div>
+    </div>
+    <div style="font-size:.7rem;color:#9ca3af;margin-bottom:10px">اسم المدرّسة والمساعدة بيتكتبوا على الكشف لو الفصل واحد. مع "كل الفصول" الخانتين بيفضلوا فاضيين تتكتب بخط اليد.</div>
+    <button onclick="printAttendanceRegister()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:900;font-size:.95rem">🖨️ طباعة — Print</button>`);
+}
+
+function printAttendanceRegister(){
+  const mon=el('ar-month')?.value;
+  const clsSel=el('ar-class')?.value||'__all__';
+  const teacher=(el('ar-teacher')?.value||'').trim();
+  const assistant=(el('ar-assistant')?.value||'').trim();
+  if(!mon){ alert('اختاري الشهر'); return; }
+  const [yy,mm]=mon.split('-').map(Number);
+  const daysInMonth=new Date(yy,mm,0).getDate();
+  const monStart=mon+'-01', monEnd=mon+'-'+String(daysInMonth).padStart(2,'0');
+  const monLabel=new Date(yy,mm-1,1).toLocaleDateString('en-GB',{month:'long'})+' '+yy;
+  // Children enrolled at any point in the month
+  const inMonth=DB.children.filter(c=>{
+    if(c.leaveDate && c.leaveDate<monStart) return false;
+    if(c.joinDate && c.joinDate>monEnd) return false;
+    return true;
+  });
+  const classes=[...new Set(inMonth.map(c=>c.className||'—'))].sort((a,b)=>a.localeCompare(b,'en'));
+  const wanted=clsSel==='__all__'?classes:classes.filter(c=>c===clsSel);
+  if(!wanted.length){ alert('مفيش أطفال في الفصل ده للشهر ده — No children found'); return; }
+  const ROWS=20;
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  // weekend columns (Fri, Sat, Sun) shaded like the paper form
+  const isWk=d=>{const w=new Date(yy,mm-1,d).getDay();return w===5||w===6||w===0;};
+  const dayHead=Array.from({length:31},(_,i)=>{const d=i+1;const off=d>daysInMonth;return `<th class="d${off?' off':''}${!off&&isWk(d)?' wk':''}">${d}</th>`;}).join('');
+  const pages=[];
+  for(const cls of wanted){
+    const kids=inMonth.filter(c=>(c.className||'—')===cls).sort((a,b)=>(a.name||'').trim().localeCompare((b.name||'').trim(),'en',{sensitivity:'base'}));
+    const chunks=[]; for(let i=0;i<kids.length;i+=ROWS) chunks.push(kids.slice(i,i+ROWS)); if(!chunks.length) chunks.push([]);
+    chunks.forEach((chunk,ci)=>{
+      const rows=Array.from({length:ROWS},(_,r)=>{
+        const c=chunk[r]; const no=ci*ROWS+r+1;
+        const cells=Array.from({length:31},(_,i)=>{const d=i+1;const off=d>daysInMonth;return `<td class="${off?'off':(isWk(d)?'wk':'')}"></td>`;}).join('');
+        const tm=c?(c.kidsTime&&!/^full day$/i.test(c.kidsTime.trim())?c.kidsTime:(c.kidsTime||'')):'';
+        return `<tr><td class="no">${c?no:no}</td><td class="nm">${c?esc(c.name):''}</td><td class="tm">${esc(tm)}</td>${cells}</tr>`;
+      }).join('');
+      pages.push(`<div class="pg">
+        <div class="hd"><div class="h1">Child Care Nurseries Group<br><span>British Montessori Preschool</span></div>
+          <div class="h2"><b>KIDS ATTENDANCE REGISTER</b><br><span>Monthly Class Attendance Tracker</span></div>
+          <div class="h3">CHILD CARE NURSERIES<br>GROUP</div></div>
+        <table class="meta"><tr><td class="l">Class Teacher</td><td class="v">${esc(clsSel==='__all__'?'':teacher)}</td><td class="l">Class Name</td><td class="v"><b>${esc(cls)}</b></td><td class="l">Class Assistant</td><td class="v">${esc(clsSel==='__all__'?'':assistant)}</td><td class="l">Month / Year</td><td class="v"><b>${monLabel}</b></td></tr></table>
+        <table class="g"><thead><tr><th class="no">NO.</th><th class="nm">NAME</th><th class="tm">KIDS<br>TIMING</th>${dayHead}</tr></thead><tbody>${rows}</tbody></table>
+        <div class="ft"><span>Class Teacher: ________________</span><span>Class Assistant: ________________</span><span>Manager Name: ________________</span><span>Date: ____________</span></div>
+        <div class="doc">Document No: CCNG-ED-F-001 &nbsp;|&nbsp; Rev 01 &nbsp;|&nbsp; Kids Attendance Register &nbsp;|&nbsp; Page ${ci+1} of ${chunks.length} &nbsp;|&nbsp; ${esc(cls)}</div>
+      </div>`);
+    });
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Kids Attendance Register — ${monLabel}</title><style>
+    @page{size:A4 landscape;margin:6mm} *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#111}
+    .pg{width:285mm;height:198mm;page-break-after:always;position:relative}
+    .pg:last-child{page-break-after:auto}
+    .hd{display:flex;border:1px solid #666;margin-bottom:3mm}
+    .hd>div{padding:2.5mm 4mm}.h1{flex:1.1;font-size:10pt;font-weight:700;color:#1e3a8a;border-right:1px solid #666}.h1 span{font-size:7pt;font-weight:400;font-style:italic;color:#555}
+    .h2{flex:1.6;text-align:center;font-size:13pt;border-right:1px solid #666}.h2 span{font-size:8pt;color:#444}
+    .h3{flex:.8;text-align:center;font-size:7pt;font-weight:700;color:#1e3a8a;display:flex;align-items:center;justify-content:center}
+    table{border-collapse:collapse;width:100%}
+    .meta td{padding:1.4mm 2mm;font-size:9pt}.meta .l{background:#8a8a8a;color:#fff;font-weight:700;font-size:7.5pt;width:15mm;text-transform:uppercase}.meta .v{border-bottom:1px solid #888;width:35mm;font-size:11pt}
+    .meta{margin-bottom:3mm;table-layout:fixed}
+    .g{table-layout:fixed;border:1.4px solid #222}
+    .g th{background:#6b6b6b;color:#fff;font-size:7pt;border:1px solid #222;padding:1mm 0;height:7mm}
+    .g td{border:1px solid #333;height:7.6mm;font-size:8.5pt}
+    .g .no{width:8mm;text-align:center}.g .nm{width:62mm;padding-left:1.5mm;font-weight:700;font-size:9pt;white-space:nowrap;overflow:hidden}.g .tm{width:19mm;text-align:center;font-size:8pt}
+    .g .d{width:auto}.g .wk{background:#f9a8d4}.g .off{background:#d1d5db}
+    .ft{display:flex;justify-content:space-between;margin-top:3mm;font-size:8.5pt}
+    .doc{text-align:center;font-size:7pt;color:#555;margin-top:2mm}
+    .bar{background:#1f2937;color:#fff;padding:6px;text-align:center;font-size:12px}@media print{.bar{display:none}}
+  </style></head><body><div class="bar">اضغطي Ctrl+P للطباعة — Print landscape A4</div>${pages.join('')}</body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ alert('المتصفح منع النافذة — اسمحي بالـ popups للموقع'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),600);
+  logActivity('print', `🗓️ Attendance register ${monLabel} — ${wanted.length} class(es)`);
+}
+
 function printClassCards(){
   const b=CB();
   const active=DB.children.filter(c=>!c.leaveDate);
