@@ -13292,18 +13292,15 @@ function openAttendanceRegisterDialog(){
           <option value="__all__">كل الفصول — All classes (${classes.length})</option>
           ${classes.map(c=>`<option value="${String(c).replace(/"/g,'&quot;')}">${c}</option>`).join('')}
         </select></div>
-      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">مُدرّسة الفصل — Class Teacher (اختياري)</div><input type="text" id="ar-teacher" placeholder="T. ..." style="${inp}"></div>
-      <div><div style="font-size:.72rem;font-weight:700;margin-bottom:3px">مساعدة الفصل — Class Assistant (اختياري)</div><input type="text" id="ar-assistant" placeholder="T. ..." style="${inp}"></div>
     </div>
-    <div style="font-size:.7rem;color:#9ca3af;margin-bottom:10px">اسم المدرّسة والمساعدة بيتكتبوا على الكشف لو الفصل واحد. مع "كل الفصول" الخانتين بيفضلوا فاضيين تتكتب بخط اليد.</div>
+    <div style="font-size:.7rem;color:#9ca3af;margin-bottom:10px">خانة المُدرّسة والمساعدة بتفضل فاضية على الكشف عشان تتكتب بخط اليد.</div>
     <button onclick="printAttendanceRegister()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:900;font-size:.95rem">🖨️ طباعة — Print</button>`);
 }
 
 function printAttendanceRegister(){
   const mon=el('ar-month')?.value;
   const clsSel=el('ar-class')?.value||'__all__';
-  const teacher=(el('ar-teacher')?.value||'').trim();
-  const assistant=(el('ar-assistant')?.value||'').trim();
+  const b=CB(); const branchEn=b.en||b.ar||''; const branchAr=b.ar&&b.ar!==branchEn?b.ar:'';
   if(!mon){ alert('اختاري الشهر'); return; }
   const [yy,mm]=mon.split('-').map(Number);
   const daysInMonth=new Date(yy,mm,0).getDate();
@@ -13323,6 +13320,14 @@ function printAttendanceRegister(){
   // weekend columns (Fri, Sat, Sun) shaded like the paper form
   const isWk=d=>{const w=new Date(yy,mm-1,d).getDay();return w===5||w===6||w===0;};
   const dayHead=Array.from({length:31},(_,i)=>{const d=i+1;const off=d>daysInMonth;return `<th class="d${off?' off':''}${!off&&isWk(d)?' wk':''}">${d}</th>`;}).join('');
+  // A child who attends on a Fri/Sat/Sun (duty day or weekend fee) gets a white box on that day
+  const DOW=['sun','mon','tue','wed','thu','fri','sat'];
+  const attendsOn=(c,dow)=>{
+    if(!c) return false;
+    const days=(c.dutyDays||'').split(',').map(x=>x.trim().toLowerCase().slice(0,3));
+    if(days.includes(DOW[dow])) return true;
+    return (dow===5&&(c.friFee||0)>0)||(dow===6&&(c.satFee||0)>0)||(dow===0&&(c.sunFee||0)>0);
+  };
   const pages=[];
   for(const cls of wanted){
     const kids=inMonth.filter(c=>(c.className||'—')===cls).sort((a,b)=>(a.name||'').trim().localeCompare((b.name||'').trim(),'en',{sensitivity:'base'}));
@@ -13330,15 +13335,15 @@ function printAttendanceRegister(){
     chunks.forEach((chunk,ci)=>{
       const rows=Array.from({length:ROWS},(_,r)=>{
         const c=chunk[r]; const no=ci*ROWS+r+1;
-        const cells=Array.from({length:31},(_,i)=>{const d=i+1;const off=d>daysInMonth;return `<td class="${off?'off':(isWk(d)?'wk':'')}"></td>`;}).join('');
+        const cells=Array.from({length:31},(_,i)=>{const d=i+1;const off=d>daysInMonth;const shade=!off&&isWk(d)&&!(c&&attendsOn(c,new Date(yy,mm-1,d).getDay()));return `<td class="${off?'off':(shade?'wk':'')}"></td>`;}).join('');
         const tm=c?(c.kidsTime&&!/^full day$/i.test(c.kidsTime.trim())?c.kidsTime:(c.kidsTime||'')):'';
         return `<tr><td class="no">${c?no:no}</td><td class="nm">${c?esc(c.name):''}</td><td class="tm">${esc(tm)}</td>${cells}</tr>`;
       }).join('');
       pages.push(`<div class="pg">
-        <div class="hd"><div class="h1">Child Care Nurseries Group<br><span>British Montessori Preschool</span></div>
+        <div class="hd"><div class="h1">${esc(branchEn)}<br><span>${esc(branchAr)}</span></div>
           <div class="h2"><b>KIDS ATTENDANCE REGISTER</b><br><span>Monthly Class Attendance Tracker</span></div>
-          <div class="h3">CHILD CARE NURSERIES<br>GROUP</div></div>
-        <table class="meta"><tr><td class="l">Class Teacher</td><td class="v">${esc(clsSel==='__all__'?'':teacher)}</td><td class="l">Class Name</td><td class="v"><b>${esc(cls)}</b></td><td class="l">Class Assistant</td><td class="v">${esc(clsSel==='__all__'?'':assistant)}</td><td class="l">Month / Year</td><td class="v"><b>${monLabel}</b></td></tr></table>
+          <div class="h3">${esc(branchEn.toUpperCase())}</div></div>
+        <table class="meta"><tr><td class="l">Class Teacher</td><td class="v"></td><td class="l">Class Name</td><td class="v"><b>${esc(cls)}</b></td><td class="l">Class Assistant</td><td class="v"></td><td class="l">Month / Year</td><td class="v"><b>${monLabel}</b></td></tr></table>
         <table class="g"><thead><tr><th class="no">NO.</th><th class="nm">NAME</th><th class="tm">KIDS<br>TIMING</th>${dayHead}</tr></thead><tbody>${rows}</tbody></table>
         <div class="ft"><span>Class Teacher: ________________</span><span>Class Assistant: ________________</span><span>Manager Name: ________________</span><span>Date: ____________</span></div>
         <div class="doc">Document No: CCNG-ED-F-001 &nbsp;|&nbsp; Rev 01 &nbsp;|&nbsp; Kids Attendance Register &nbsp;|&nbsp; Page ${ci+1} of ${chunks.length} &nbsp;|&nbsp; ${esc(cls)}</div>
