@@ -2396,7 +2396,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-10-31-2';
+const APP_VERSION='2026-10-31-3';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -13340,35 +13340,39 @@ function printAttendanceRegister(){
         return `<tr><td class="no">${c?no:no}</td><td class="nm">${c?esc(c.name):''}</td><td class="tm">${esc(tm)}</td>${cells}</tr>`;
       }).join('');
       pages.push(`<div class="pg">
-        <div class="hd"><div class="h1">${esc(branchEn)}<br><span>${esc(branchAr)}</span></div>
-          <div class="h2"><b>KIDS ATTENDANCE REGISTER</b><br><span>Monthly Class Attendance Tracker</span></div>
-          <div class="h3">${esc(branchEn.toUpperCase())}</div></div>
+        <div class="hd"><div class="h1">${esc(branchEn)}${branchAr?`<br><span>${esc(branchAr)}</span>`:''}</div>
+          <div class="h2"><b>KIDS ATTENDANCE REGISTER</b><span>Monthly Class Attendance Tracker</span></div>
+          <div class="h3">Doc No: CCNG-ED-F-001<br>Rev 01</div></div>
         <table class="meta"><tr><td class="l">Class Teacher</td><td class="v"></td><td class="l">Class Name</td><td class="v"><b>${esc(cls)}</b></td><td class="l">Class Assistant</td><td class="v"></td><td class="l">Month / Year</td><td class="v"><b>${monLabel}</b></td></tr></table>
         <table class="g"><thead><tr><th class="no">NO.</th><th class="nm">NAME</th><th class="tm">KIDS<br>TIMING</th>${dayHead}</tr></thead><tbody>${rows}</tbody></table>
         <div class="ft"><span>Class Teacher: ________________</span><span>Class Assistant: ________________</span><span>Manager Name: ________________</span><span>Date: ____________</span></div>
-        <div class="doc">Document No: CCNG-ED-F-001 &nbsp;|&nbsp; Rev 01 &nbsp;|&nbsp; Kids Attendance Register &nbsp;|&nbsp; Page ${ci+1} of ${chunks.length} &nbsp;|&nbsp; ${esc(cls)}</div>
+        <div class="doc">Kids Attendance Register &nbsp;|&nbsp; ${esc(cls)} &nbsp;|&nbsp; ${monLabel} &nbsp;|&nbsp; Page ${ci+1} of ${chunks.length}</div>
       </div>`);
     });
   }
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Kids Attendance Register — ${monLabel}</title><style>
     @page{size:A4 landscape;margin:6mm} *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#111}
-    .pg{width:285mm;height:198mm;page-break-after:always;position:relative}
+    .pg{width:285mm;height:193mm;overflow:hidden;page-break-after:always;position:relative}
     .pg:last-child{page-break-after:auto}
-    .hd{display:flex;border:1px solid #666;margin-bottom:3mm}
-    .hd>div{padding:2.5mm 4mm}.h1{flex:1.1;font-size:10pt;font-weight:700;color:#1e3a8a;border-right:1px solid #666}.h1 span{font-size:7pt;font-weight:400;font-style:italic;color:#555}
-    .h2{flex:1.6;text-align:center;font-size:13pt;border-right:1px solid #666}.h2 span{font-size:8pt;color:#444}
-    .h3{flex:.8;text-align:center;font-size:7pt;font-weight:700;color:#1e3a8a;display:flex;align-items:center;justify-content:center}
+    .hd{display:flex;align-items:stretch;border:1.4px solid #444;margin-bottom:3mm;height:18mm}
+    .hd>div{padding:0 5mm;display:flex;flex-direction:column;justify-content:center}
+    .h1{flex:1.2;font-size:15pt;font-weight:700;color:#1e3a8a;border-right:1.4px solid #444;line-height:1.15}.h1 span{font-size:9.5pt;font-weight:400;font-style:italic;color:#555}
+    .h2{flex:1.6;text-align:center;font-size:17pt;font-weight:700;border-right:1.4px solid #444;line-height:1.2;gap:.5mm}.h2 b{display:block}.h2 span{display:block;font-size:9.5pt;font-weight:400;color:#444}
+    .h3{flex:.8;text-align:center;font-size:9.5pt;font-weight:700;color:#1e3a8a;line-height:1.5}
     table{border-collapse:collapse;width:100%}
-    .meta td{padding:1.4mm 2mm;font-size:9pt}.meta .l{background:#8a8a8a;color:#fff;font-weight:700;font-size:7.5pt;width:15mm;text-transform:uppercase}.meta .v{border-bottom:1px solid #888;width:35mm;font-size:11pt}
     .meta{margin-bottom:3mm;table-layout:fixed}
+    .meta td{padding:0 2mm;height:9mm;font-size:9pt;vertical-align:middle}
+    .meta .l{background:#6b6b6b;color:#fff;font-weight:700;font-size:8.5pt;width:11%;text-transform:uppercase;border:1px solid #444}
+    .meta .v{border:1px solid #444;border-bottom:1.4px solid #444;font-size:13pt}
     .g{table-layout:fixed;border:1.4px solid #222}
-    .g th{background:#6b6b6b;color:#fff;font-size:7pt;border:1px solid #222;padding:1mm 0;height:7mm}
-    .g td{border:1px solid #333;height:7.6mm;font-size:8.5pt}
-    .g .no{width:8mm;text-align:center}.g .nm{width:62mm;padding-left:1.5mm;font-weight:700;font-size:9pt;white-space:nowrap;overflow:hidden}.g .tm{width:19mm;text-align:center;font-size:8pt}
-    .g .d{width:auto}.g .wk{background:#f9a8d4}.g .off{background:#d1d5db}
-    .ft{display:flex;justify-content:space-between;margin-top:3mm;font-size:8.5pt}
-    .doc{text-align:center;font-size:7pt;color:#555;margin-top:2mm}
+    .g th{background:#6b6b6b;color:#fff;font-size:8.5pt;border:1px solid #222;padding:0;height:8mm;line-height:1.1}
+    .g td{border:1px solid #333;height:6.8mm;font-size:9pt;padding:0}
+    .g .no{width:9mm;text-align:center;font-size:9.5pt}.g .nm{width:78mm;padding-left:2mm;font-weight:700;font-size:10.5pt;white-space:nowrap;overflow:hidden;text-align:left}.g .tm{width:25mm;text-align:center;font-size:9.5pt}
+    .g th.nm{text-align:center;font-size:9.5pt}
+    .g .d{width:auto;font-size:9pt}.g .wk{background:#f9a8d4}.g .off{background:#d1d5db}.g th.wk{color:#111}.g th.off{background:#d1d5db;color:#6b7280}
+    .ft{display:flex;justify-content:space-between;margin-top:3mm;font-size:10pt}
+    .doc{text-align:center;font-size:8.5pt;color:#555;margin-top:2mm}
     .bar{background:#1f2937;color:#fff;padding:6px;text-align:center;font-size:12px}@media print{.bar{display:none}}
   </style></head><body><div class="bar">اضغطي Ctrl+P للطباعة — Print landscape A4</div>${pages.join('')}</body></html>`;
   const w=window.open('','_blank');
