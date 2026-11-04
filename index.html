@@ -1503,11 +1503,17 @@ main{padding:12px;max-width:960px;margin:0 auto}
     📊 <b>العدد بيتحسب على الفترات:</b> 8–11 / 11–1 / 1–3 / 3–5 (مثلاً 11–1 في مجموعة C = أطفال C + CF)<br>
     ⚖️ لو C أقل من 10 في أي فترة بيضمّ أصغر أطفال سنتين من نفس الميعاد (لحد 10 وميعدّيش 12) — ولو D أقل من 12 بيضمّ أصغر أطفال 3 سنين من نفس الميعاد (لحد 12 وميعدّيش 15)<br>
     ⚖️ فصل E وفصل E2 الصبح قريبين في العدد (الفرق ميعدّيش 2) — لو E أقل بياخد أكبر أطفال 3 سنين من E2<br>
+    🧷 <b>ثبات الأطفال:</b> السن بيتحسب بتاريخ ثابت (أول الترم) مش النهارده — والطفل بيفضل في فصله إلا لو قاعدة بتفرض نقله. والضم لتكميل العدد مش بياخد طفل أكبر من أكبر طفل في المجموعة بأكتر من 8 شهور<br>
     🚫 مفيش طفل لوحده في فصل — بيتنقل لنفس الميعاد في المجموعة اللي بعدها (CN ← DN)<br>
     ✂️ لو أي مجموعة عدّت الحد الأقصى بتتقسم لفصلين بالتساوي حسب السن (الأصغر في الأول) وياخدوا رقم: D2، CS2، S2... (فصل E الثاني اسمه E3 لأن E2 محجوز)<br>
     ⚠️ الأطفال اللي ميعادهم أو تاريخ ميلادهم مش واضح مش بيتغير فصلهم<br>
     🔒 الطفل الجديد بيتقترح له فصله أوتوماتيك، وأي طفل موجود مبيتنقلش إلا بزرار «معاينة» ثم «تطبيق»<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
+  </div>
+  <div style="background:#fefce8;border:1.5px solid #facc15;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#713f12;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b>📅 السن بيتحسب بتاريخ:</b>
+    <input type="date" id="class-ref-date" onchange="saveClassRefDate()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif">
+    <span>(أول يوم في الترم / سبتمبر) — الطفل بيفضل في فصله لحد ما تغيّري التاريخ ده. غيّريه مرة واحدة في الترم بس.</span>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
     <button onclick="previewAutoClasses()"
@@ -2403,7 +2409,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-05-2';
+const APP_VERSION='2026-11-05-3';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14905,7 +14911,12 @@ function _ageMonths(dob){
 // 3 years+: S morning | F midday | E full day + 8-1 aged 4+ | EN afternoon aged 4+ |
 //           E2 8-1 aged 3 | E2N afternoon aged 3 — max 15 present together.
 // Head-counts are per time slot (8-11 / 11-1 / 1-3 / 3-5) over the whole group (C+CS+CF+CN...).
-const INFANT_MAX_MO=15, INFANT_CLASS_MAX=4;
+//
+// Stability (so children don't change class all the time):
+//  - age is measured on a fixed date (start of term, saved per device), not today;
+//  - a child stays in the class (room) he is already in unless a rule forces a move;
+//  - a group is topped up only with children at most MAX_PULL_GAP_MO older than its oldest child.
+const INFANT_MAX_MO=15, INFANT_CLASS_MAX=4, MAX_PULL_GAP_MO=8;
 const SLOT_LABELS=['8–11','11–1','1–3','3–5'];
 const TG_SLOTS={fullday:[0,1,2,3], eight1:[0,1], morning:[0], midday:[1,2], afternoon:[2,3]};
 const FAMS={a:{cap:INFANT_CLASS_MAX}, b:{cap:INFANT_CLASS_MAX}, c:{cap:12,min:10}, d:{cap:15,min:12}, e:{cap:15}, e2:{cap:15}};
@@ -14913,6 +14924,37 @@ const PULL_TIMES=['fullday','eight1','morning','midday'];
 const _slotCounts=arr=>{ const n=[0,0,0,0]; arr.forEach(x=>(TG_SLOTS[x.tg]||[]).forEach(s=>n[s]++)); return n; };
 const _famOf=cls=>/^A/.test(cls)?'a':/^B/.test(cls)?'b':/^C/.test(cls)?'c':/^D/.test(cls)?'d':/^E2/.test(cls)?'e2':'e';
 const _roomName=(cls,k)=>k<=1?cls:cls==='E'?'E'+(k+1):cls==='E2'?'E2-'+k:cls+k; // E2 is taken by the 3-year-old 8-1 class
+
+// Reference date for the age rules (first day of the term). Saved on this device.
+function _classRefDate(){
+  let v=''; try{ v=localStorage.getItem('ccng_class_ref_date')||''; }catch(e){}
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const now=new Date(); let y=now.getFullYear(); if(now<new Date(y,8,1)) y--;
+  return y+'-09-01';
+}
+function _classAgeMonths(dob){
+  if(!dob) return 999;
+  return Math.floor((new Date(_classRefDate())-new Date(dob))/(1000*60*60*24*30.44));
+}
+function syncClassRefDateInput(){ const i=el('class-ref-date'); if(i&&!i.value) i.value=_classRefDate(); }
+function saveClassRefDate(){
+  const v=el('class-ref-date')?.value;
+  if(!v) return;
+  try{ localStorage.setItem('ccng_class_ref_date',v); }catch(e){}
+  showToast('✅ تاريخ حساب السن اتحفظ — اضغطي «معاينة التوزيع»');
+}
+setTimeout(syncClassRefDateInput,0);
+document.addEventListener('DOMContentLoaded',syncClassRefDateInput);
+
+// Reads a class name like C, CS2, E3 (= second room of E), E2N, E2-2 → {base, room}.
+function _parseClass(name){
+  const m=String(name||'').trim().toUpperCase().match(/^(A|B|CS|CF|CN|C|DS|DF|DN|D|EN|E2N|E2|E|S|F)(?:-?(\d+))?$/);
+  if(!m) return null;
+  let room=m[2]?parseInt(m[2]):1;
+  if(m[1]==='E'&&m[2]) room=room-1;
+  if(room<1) return null;
+  return {base:m[1],room};
+}
 
 function _nameFor(band,tg,mo){
   const sfx={fullday:'',eight1:'',morning:'S',midday:'F',afternoon:'N'}[tg];
@@ -14951,46 +14993,73 @@ function _splitRooms(kids,cap){
   return kids.map((_,i)=>1+cuts.filter(c=>i>=c).length);
 }
 
+// Put `mem` into `k` rooms: a child keeps the room number he already has (same family) when it
+// still fits; the rest go to the room with space whose children are closest in age.
+// `fits(roomKids, kid)` says whether the kid can join. Returns the room number per kid, or null
+// when some kid fits nowhere.
+function _assignRooms(mem,k,fits){
+  const rooms=Array.from({length:k},()=>[]);
+  const room=new Array(mem.length).fill(0);
+  let overflow=false;
+  mem.forEach((i,ix)=>{
+    const pref=_parseClass(i.c.className);
+    const r=pref&&_famOf(pref.base)===i.fam?pref.room:0;
+    if(r>=1&&r<=k&&fits(rooms[r-1],i)){ rooms[r-1].push(i); room[ix]=r; }
+  });
+  mem.forEach((i,ix)=>{
+    if(room[ix]) return;
+    const avg=r=>r.length?r.reduce((s,o)=>s+o.mo,0)/r.length:i.mo;
+    let best=-1, bs=Infinity;
+    rooms.forEach((r,ri)=>{ if(!fits(r,i)) return; const sc=Math.abs(avg(r)-i.mo)+r.length*2; if(sc<bs){ bs=sc; best=ri; } });
+    if(best<0){ overflow=true; return; } // nobody has space → caller re-splits the whole group evenly
+    rooms[best].push(i); room[ix]=best+1;
+  });
+  return overflow?null:room;
+}
+
 // `extraKids` lets the registration form simulate a child who isn't saved yet.
 function _buildClassAssignments(extraKids){
   const active=DB.children.filter(c=>!c.leaveDate).concat(extraKids||[]);
   const assignments=[];
   const items=[];
   active.forEach(c=>{
-    const tg=_getTimeGroup(c.kidsTime), mo=_ageMonths(c.dob);
+    const tg=_getTimeGroup(c.kidsTime), mo=_classAgeMonths(c.dob);
     if(!c.dob||tg==='other'){
       // no readable time / no birth date → can't place automatically, leave the class alone
       assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className||'',noChange:true});
       return;
     }
-    items.push({c,tg,mo,band:mo<INFANT_MAX_MO?'inf':mo<24?'c':mo<36?'d':'e',cls:''});
+    items.push({c,tg,mo,band:mo<INFANT_MAX_MO?'inf':mo<24?'c':mo<36?'d':'e',cls:'',reason:''});
   });
   items.sort((x,y)=>(x.mo-y.mo)||String(x.c.name||'').localeCompare(String(y.c.name||''),'ar'));
 
-  // ── Infants: A = morning arrivals, B = 11 or later; max 4, split evenly into A2/B2... ──
+  // ── Infants: A = morning arrivals, B = 11 or later; max 4 per class → A2 / B2... ──
   ['a','b'].forEach(f=>{
     const kids=items.filter(i=>i.band==='inf'&&(['morning','eight1','fullday'].includes(i.tg)?'a':'b')===f);
     if(!kids.length) return;
-    const k=Math.ceil(kids.length/INFANT_CLASS_MAX), base=Math.floor(kids.length/k), extra=kids.length%k;
-    let idx=0;
-    for(let g=0;g<k;g++){
-      const size=base+(g<extra?1:0);
-      kids.slice(idx,idx+size).forEach(i=>{ i.cls=f.toUpperCase()+(g?g+1:''); i.fam=f; i.room=g+1; });
-      idx+=size;
-    }
+    kids.forEach(i=>{ i.fam=f; i.base=f.toUpperCase(); });
+    const k=Math.ceil(kids.length/INFANT_CLASS_MAX);
+    const rooms=_assignRooms(kids,k,(r)=>r.length<INFANT_CLASS_MAX)||kids.map((_,ix)=>1+Math.floor(ix*k/kids.length));
+    kids.forEach((i,ix)=>{ i.room=rooms[ix]; i.cls=_roomName(i.base,i.room); });
   });
 
   // ── Top up a young group that is below its minimum in some slot with the youngest kids of
-  //    the next age group having a matching time, without going over its maximum ──
+  //    the next age group having a matching time (never above its maximum, and never more than
+  //    MAX_PULL_GAP_MO older than the group's oldest child). Kids already in the group stay. ──
   const pull=(dst,src,min,max)=>{
+    const dstKids=items.filter(i=>i.band===dst);
+    if(!dstKids.length) return;
+    const limit=Math.max(...dstKids.map(i=>i.mo))+MAX_PULL_GAP_MO;
+    const inDstNow=i=>{ const p=_parseClass(i.c.className); return p&&_famOf(p.base)===(dst==='c'?'c':'d')?0:1; };
     for(let guard=0; guard<200; guard++){
       const cnt=_slotCounts(items.filter(i=>i.band===dst));
       const low=cnt.map((n,s)=>(n>0&&n<min)?s:-1).filter(s=>s>=0);
       if(!low.length) break;
-      const cand=items.filter(i=>i.band===src&&PULL_TIMES.includes(i.tg)&&
-        TG_SLOTS[i.tg].some(s=>low.includes(s))&&TG_SLOTS[i.tg].every(s=>cnt[s]+1<=max));
+      const cand=items.filter(i=>i.band===src&&PULL_TIMES.includes(i.tg)&&i.mo<=limit&&
+        TG_SLOTS[i.tg].some(s=>low.includes(s))&&TG_SLOTS[i.tg].every(s=>cnt[s]+1<=max))
+        .sort((x,y)=>(inDstNow(x)-inDstNow(y))||(x.mo-y.mo));
       if(!cand.length) break;
-      cand[0].band=dst; // items are sorted youngest first
+      cand[0].band=dst; cand[0].reason='ضُم لتكملة عدد الفصل';
     }
   };
   pull('c','d',FAMS.c.min,FAMS.c.cap);
@@ -15000,14 +15069,15 @@ function _buildClassAssignments(extraKids){
   kids.forEach(i=>{ i.cls=_nameFor(i.band,i.tg,i.mo); });
 
   // ── E and E2 (8-1 aged 3) in the morning must stay within 2 of each other:
-  //    if E is smaller, it takes the oldest 3-year-olds from E2 ──
+  //    if E is smaller, it takes 3-year-olds from E2 (the ones already in E first, then the oldest) ──
   for(let guard=0; guard<100; guard++){
     const E=kids.filter(i=>i.cls==='E'), E2=kids.filter(i=>i.cls==='E2');
     if(E2.length-E.length<=2) break;
     const cnt=_slotCounts(kids.filter(i=>_famOf(i.cls)==='e'));
-    const mover=[...E2].sort((x,y)=>y.mo-x.mo)[0];
+    const inE=i=>{ const p=_parseClass(i.c.className); return p&&p.base==='E'?0:1; };
+    const mover=[...E2].sort((x,y)=>(inE(x)-inE(y))||(y.mo-x.mo))[0];
     if(!TG_SLOTS[mover.tg].every(s=>cnt[s]+1<=FAMS.e.cap)) break;
-    mover.cls='E';
+    mover.cls='E'; mover.reason='توازن عدد E مع E2';
   }
 
   // ── Nobody alone in a class: move to the same time in the next age group ──
@@ -15024,34 +15094,46 @@ function _buildClassAssignments(extraKids){
   for(let pass=0; pass<3; pass++){
     const cnt={}; kids.forEach(i=>{ cnt[i.cls]=(cnt[i.cls]||0)+1; });
     let moved=false;
-    kids.filter(i=>cnt[i.cls]===1).forEach(i=>{ const nx=nextClass(i); if(nx&&nx!==i.cls){ i.cls=nx; moved=true; } });
+    kids.filter(i=>cnt[i.cls]===1).forEach(i=>{ const nx=nextClass(i); if(nx&&nx!==i.cls){ i.cls=nx; i.reason='كان لوحده في الفصل'; moved=true; } });
     if(!moved) break;
   }
 
-  // ── Group over its cap in some slot → split into rooms by age: D2, CS2, S2... ──
+  // ── Group over its cap in some slot → split into rooms: D2, CS2, S2... Children keep the room
+  //    they are in when it still fits; a fresh group is split evenly by age (youngest first). ──
   ['c','d','e','e2'].forEach(f=>{
     const mem=kids.filter(i=>_famOf(i.cls)===f);
     mem.forEach(i=>{ i.fam=f; i.room=1; i.base=i.cls; });
-    if(!mem.length||Math.max(..._slotCounts(mem))<=FAMS[f].cap) return;
-    const rooms=_splitRooms(mem,FAMS[f].cap);
+    const cap=FAMS[f].cap;
+    if(!mem.length||Math.max(..._slotCounts(mem))<=cap) return;
+    const k=Math.max(..._splitRooms(mem,cap));
+    const fits=(r,kid)=>{ const c=_slotCounts(r); return TG_SLOTS[kid.tg].every(s=>c[s]+1<=cap); };
+    let rooms=_assignRooms(mem,k,fits);
+    if(!rooms){ // kept rooms are full → split the group fresh, evenly by age
+      rooms=_splitRooms(mem,cap);
+      mem.forEach(i=>{ if(!i.reason) i.reason='الفصول امتلت — اتعاد تقسيم المجموعة'; });
+    }
     mem.forEach((i,ix)=>{ i.room=rooms[ix]; i.cls=_roomName(i.base,i.room); });
     // the split must not leave a child alone in a room's class (EN + EN2 with one child each):
     // move them to the same-time class of another room if that room has space
     mem.forEach(i=>{
       if(mem.filter(o=>o.base===i.base&&o.room===i.room).length!==1) return;
-      const rooms2=[...new Set(mem.filter(o=>o.base===i.base&&o.room!==i.room).map(o=>o.room))]
+      const others=[...new Set(mem.filter(o=>o.base===i.base&&o.room!==i.room).map(o=>o.room))]
         .sort((x,y)=>Math.abs(x-i.room)-Math.abs(y-i.room));
-      for(const r of rooms2){
-        const cnt=_slotCounts(mem.filter(o=>o.room===r));
-        if(TG_SLOTS[i.tg].every(sl=>cnt[sl]+1<=FAMS[f].cap)){ i.room=r; i.cls=_roomName(i.base,r); break; }
+      for(const r of others){
+        if(fits(mem.filter(o=>o.room===r),i)){ i.room=r; i.cls=_roomName(i.base,r); break; }
       }
     });
   });
 
   items.forEach(i=>{
     const f=FAMS[i.fam]||{};
+    let reason='';
+    if(i.c.className!==i.cls){
+      const old=_parseClass(i.c.className);
+      reason=i.reason||(!i.c.className?'بدون فصل':(old&&old.base===i.base?'إعادة ترتيب الغرف':'السن أو الميعاد بيحدد فصل تاني'));
+    }
     assignments.push({id:i.c.id,name:i.c.name,dob:i.c.dob,kidsTime:i.c.kidsTime,oldClass:i.c.className,newClass:i.cls,
-      cap:f.cap,min:f.min,fam:i.fam,room:i.room,tg:i.tg});
+      cap:f.cap,min:f.min,fam:i.fam,room:i.room,tg:i.tg,reason});
   });
   return assignments;
 }
@@ -15102,6 +15184,9 @@ function previewAutoClasses(){
   });
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
+  const reasonCnt={}; asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).forEach(a=>{ reasonCnt[a.reason]=(reasonCnt[a.reason]||0)+1; });
+  const reasonLine=Object.keys(reasonCnt).length?`<div style="font-weight:400;margin-top:4px">سبب النقل: ${Object.entries(reasonCnt).map(([r,n])=>`${r} (${n})`).join(' | ')}</div>`:'';
+  syncClassRefDateInput();
 
   const classColorsBase={A:'#7c3aed',B:'#8b5cf6',C:'#be185d',CS:'#be185d',CF:'#be185d',CN:'#be185d',D:'#15803d',DS:'#15803d',DF:'#15803d',DN:'#15803d',E:'#d97706',EN:'#d97706',E2:'#b45309',E2N:'#b45309',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
   const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/-?\d+$/,'')]||'#6b7280';
@@ -15131,7 +15216,8 @@ function previewAutoClasses(){
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
-    📋 معاينة التوزيع — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} تغيير جديد
+    📋 معاينة التوزيع (السن بتاريخ ${_classRefDate()}) — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} هيتنقلوا | ${asgn.filter(a=>!a.noChange).length-changed} فاضلين في فصولهم
+    ${reasonLine}
   </div>
   ${slotTable}
   ${Object.entries(byClass).sort(([a],[b])=>a.localeCompare(b)).map(([cls,kids])=>`
@@ -15147,7 +15233,7 @@ function previewAutoClasses(){
         <div style="display:flex;align-items:center;gap:8px">
           <span style="color:#6b7280">${k.dob?calcAge(k.dob):'—'}</span>
           <span style="font-size:.65rem;color:#9ca3af">${k.kidsTime||'—'}</span>
-          ${k.oldClass!==k.newClass?`<span style="background:#fef3c7;color:#92400e;font-size:.63rem;padding:1px 6px;border-radius:6px">${k.oldClass||'—'} → ${k.newClass}</span>`:'<span style="background:#d1fae5;color:#065f46;font-size:.63rem;padding:1px 6px;border-radius:6px">✓ كما هو</span>'}
+          ${k.oldClass!==k.newClass?`<span style="background:#fef3c7;color:#92400e;font-size:.63rem;padding:1px 6px;border-radius:6px">${k.oldClass||'—'} → ${k.newClass}${k.reason?` — ${k.reason}`:''}</span>`:'<span style="background:#d1fae5;color:#065f46;font-size:.63rem;padding:1px 6px;border-radius:6px">✓ كما هو</span>'}
         </div>
       </div>`).join('')}
     </div>
