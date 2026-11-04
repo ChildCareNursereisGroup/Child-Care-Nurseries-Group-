@@ -2397,7 +2397,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-05-8';
+const APP_VERSION='2026-11-05-9';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -15024,16 +15024,17 @@ function previewAutoClasses(){
   // Group by newClass
   const byClass={};
   asgn.forEach(a=>{
-    if(a.noChange) return;
+    if(a.noChange&&!a.fixed) return;
     if(!byClass[a.newClass]) byClass[a.newClass]=[];
     byClass[a.newClass].push(a);
   });
+  Object.values(byClass).forEach(list=>list.sort((x,y)=>(y.dob||'').localeCompare(x.dob||''))); // youngest first
   const fixedCount=asgn.filter(a=>a.fixed).length;
   const noTime=asgn.filter(a=>a.noChange&&!a.fixed);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
 
-  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
-  const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/\d+$/,'')]||'#6b7280';
+  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',C:'#be185d',D:'#15803d',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
+  const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/\d+$/,'')]||classColorsBase[String(cls).charAt(0).toUpperCase()]||'#6b7280';
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
@@ -15043,7 +15044,7 @@ function previewAutoClasses(){
   <div style="border:1.5px solid ${colorForClass(cls)};border-radius:10px;margin-bottom:8px;overflow:hidden">
     <div style="background:${colorForClass(cls)};color:#fff;padding:7px 12px;font-weight:800;font-size:.82rem;display:flex;justify-content:space-between;align-items:center">
       <span>فصل ${cls} — Class ${cls}</span>
-      <span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 10px;font-size:.72rem">${kids.length} طفل</span>
+      <span style="background:rgba(255,255,255,.25);border-radius:10px;padding:1px 10px;font-size:.72rem">${kids.length} طفل${kids.some(k=>!k.fixed)?` (منهم ${kids.filter(k=>!k.fixed).length} جديد)`:''}</span>
     </div>
     <div style="padding:8px 12px">
       ${kids.map((k,i)=>`
@@ -15052,7 +15053,7 @@ function previewAutoClasses(){
         <div style="display:flex;align-items:center;gap:8px">
           <span style="color:#6b7280">${k.dob?calcAge(k.dob):'—'}</span>
           <span style="font-size:.65rem;color:#9ca3af">${k.kidsTime||'—'}</span>
-          ${k.oldClass!==k.newClass?`<span style="background:#fef3c7;color:#92400e;font-size:.63rem;padding:1px 6px;border-radius:6px">${k.oldClass||'—'} → ${k.newClass}</span>`:'<span style="background:#d1fae5;color:#065f46;font-size:.63rem;padding:1px 6px;border-radius:6px">✓ كما هو</span>'}
+          ${k.fixed?'<span style="background:#d1fae5;color:#065f46;font-size:.63rem;padding:1px 6px;border-radius:6px">✓ في فصله</span>':`<span style="background:#fef3c7;color:#92400e;font-size:.63rem;padding:1px 6px;border-radius:6px">🆕 جديد → ${k.newClass}</span>`}
         </div>
       </div>`).join('')}
     </div>
