@@ -1494,14 +1494,19 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="card" style="border:2px solid #0891b2">
   <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
-    <b>قواعد التوزيع الجديدة (نوفمبر 2026):</b><br>
-    🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى <b>4 أطفال</b> لكل فصل، أي وقت حضور<br>
-    ⏰ <b>ميعاد الحضور خط أحمر</b> — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
-    👶 <b>من سنة و3 شهور لحد سنتين:</b> حد أقصى <b>12 طفل</b> — الفصول <b>C</b> (يوم كامل) | <b>CS</b> (صباحي) | <b>CF</b> (نص يوم) | <b>CN</b> (بعد الظهر)<br>
-    🧒 <b>من سنتين لحد 3 سنين:</b> حد أقصى <b>15 طفل</b> — الفصول <b>D</b> (يوم كامل) | <b>DS</b> (صباحي) | <b>DF</b> (نص يوم) | <b>DN</b> (بعد الظهر)<br>
-    🎒 <b>من 3 سنين فوق:</b> حد أقصى <b>17 طفل</b> — الفصول <b>E</b> (يوم كامل) | <b>S</b> (صباحي) | <b>F</b> (نص يوم) | <b>N</b> (بعد الظهر)<br>
-    لو عدد الأطفال في فصل أكتر من الحد، بيتقسموا بالتساوي على أكتر من فصل وياخدوا رقم بعد الاسم (زي E2, CS2...)<br>
-    لو الفصل فيه أقل من <b>10 أطفال</b>، السيستم بيضمّ له أطفال من أقرب سن في نفس الميعاد (بدون ما يعدّي الحد الأقصى)<br>
+    <b>قواعد التوزيع (نوفمبر 2026):</b><br>
+    ⏰ <b>الميعاد من خانة Time:</b> ينتهي 11 = صباحي (S) | يبدأ 11 = نص يوم (F) | يبدأ 1 الظهر = بعد الظهر (N) | يبدأ 7–9 وينتهي 1 = 8–1 | يبدأ 7–9 وينتهي 2 أو بعدها = يوم كامل<br>
+    🍼 <b>الرضّع (أقل من 15 شهر):</b> <b>A</b> = اللي بيجوا الصبح | <b>B</b> = اللي بيجوا 11 — حد أقصى <b>4</b> في الفصل، ولو زادوا A2 / B2<br>
+    👶 <b>من 15 لـ 23 شهر:</b> <b>C</b> = يوم كامل (و 8–1) | <b>CS</b> = صباحي | <b>CF</b> = نص يوم | <b>CN</b> = بعد الظهر — المستهدف <b>10–12</b> طفل موجودين في نفس الوقت<br>
+    🧒 <b>من 24 لـ 35 شهر:</b> <b>D</b> = يوم كامل (و 8–1) | <b>DS</b> | <b>DF</b> | <b>DN</b> — المستهدف <b>12–15</b> طفل موجودين في نفس الوقت<br>
+    🎒 <b>من 3 سنين فوق:</b> <b>S</b> = صباحي | <b>F</b> = نص يوم | <b>E</b> = يوم كامل + 8–1 (4 سنين فأكتر) | <b>EN</b> = بعد الظهر (4 فأكتر) | <b>E2</b> = 8–1 (3 سنين) | <b>E2N</b> = بعد الظهر (3 سنين) — حد أقصى <b>15</b> موجودين في نفس الوقت<br>
+    📊 <b>العدد بيتحسب على الفترات:</b> 8–11 / 11–1 / 1–3 / 3–5 (مثلاً 11–1 في مجموعة C = أطفال C + CF)<br>
+    ⚖️ لو C أقل من 10 في أي فترة بيضمّ أصغر أطفال سنتين من نفس الميعاد (لحد 10 وميعدّيش 12) — ولو D أقل من 12 بيضمّ أصغر أطفال 3 سنين من نفس الميعاد (لحد 12 وميعدّيش 15)<br>
+    ⚖️ فصل E وفصل E2 الصبح قريبين في العدد (الفرق ميعدّيش 2) — لو E أقل بياخد أكبر أطفال 3 سنين من E2<br>
+    🚫 مفيش طفل لوحده في فصل — بيتنقل لنفس الميعاد في المجموعة اللي بعدها (CN ← DN)<br>
+    ✂️ لو أي مجموعة عدّت الحد الأقصى بتتقسم لفصلين بالتساوي حسب السن (الأصغر في الأول) وياخدوا رقم: D2، CS2، S2... (فصل E الثاني اسمه E3 لأن E2 محجوز)<br>
+    ⚠️ الأطفال اللي ميعادهم أو تاريخ ميلادهم مش واضح مش بيتغير فصلهم<br>
+    🔒 الطفل الجديد بيتقترح له فصله أوتوماتيك، وأي طفل موجود مبيتنقلش إلا بزرار «معاينة» ثم «تطبيق»<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -2398,7 +2403,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-05-1';
+const APP_VERSION='2026-11-05-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14863,55 +14868,29 @@ async function _findReceiptBranchIssues(){
 }
 
 // ─── Auto Class Assignment ─────────────────────────────────────────────────
+// Time group from the Kids Time field (owner rules, Nov 2026):
+//   ends 11 = morning (S) | starts 11 = midday (F) | starts 1pm+ = afternoon (N)
+//   starts 7-9 and ends 1 = "8-1" | starts 7-9 and ends 2pm or later = full day
+// Understands 8:00-1:00, 08:00- 11:00 AM, 1:00-5:00PM, and typos like 08:00-03-00 / 11;00-03;00.
+// Returns fullday | eight1 | morning | midday | afternoon | other (unreadable / empty).
 function _getTimeGroup(kidsTime){
   const t=(kidsTime||'').replace(/\s/g,'').toLowerCase();
-  if(/fullday|fulltime|full/.test(t)) return 'fullday';
-
-  // ── Parse start and end hours ──
-  // Tolerate common typos in the Kids Time field: "-", "_" or ";" used instead of ":"
-  // between hour/minute (e.g. "08:00-03-00", "11;00-03;00"), or "_" used instead of "-"
-  // between start/end (e.g. "08:00_01:00"). Spaces are already stripped before this runs.
-  const timeMatch = t.match(/(\d{1,2})[:;_-]?(\d{2})[-–_]+(\d{1,2})[:;_-]?(\d{2})/);
-  if(timeMatch){
-    let startH=parseInt(timeMatch[1]);
-    let endH=parseInt(timeMatch[3]);
-
-    // Normalize: end 1–5 means 13–17 when start is morning (6–11)
-    if(startH>=6 && startH<=11 && endH>=1 && endH<=5) endH+=12;
-
-    // Fix reversed times: e.g. 09:00-06:00 → likely means 09:00-18:00 (6pm)
-    if(endH < startH && endH>=6 && endH<=11) endH+=12;
-
-    // ── RULE 1: Start 6 or 7 AM ends at 12:00+ → fullday (C/D/E) ──
-    if((startH===6||startH===7) && endH>=12) return 'fullday';
-
-    // ── RULE 2: Start 8 or 9 AM ends at 13:00 (1PM) or after → fullday (C/D/E) ──
-    if((startH===8||startH===9) && endH>=13) return 'fullday';
-
-    // ── RULE 3: Start 10 or 11 AM ends at 15:00 (3PM) or after → midday (CF/F/H) ──
-    if((startH===10||startH===11) && endH>=15) return 'midday';
-
-    // ── RULE 4: Start 6,7,8 AM ends at 11:00 or 12:00 → morning (CS/S/G) ──
-    if((startH===6||startH===7||startH===8) && (endH===11||endH===12)) return 'morning';
-
-    // ── RULE 5: Start 9 AM ends at 12:00 → morning (CS/S/G) ──
-    if(startH===9 && endH===12) return 'morning';
-
-    // ── RULE 6: Start 10 or 11 AM ends before 13:00 → morning (CS/S/G) ──
-    if((startH===10||startH===11) && endH<13) return 'morning';
-
-    // ── RULE 5: Afternoon start 13:00+ → (M/N) ──
-    if(startH>=13) return 'afternoon';
-    if(startH===1 && endH>=17) return 'afternoon';
-  }
-
-  // Fallback regex — same typo tolerance as the primary parse above (";", "_" or "-"
-  // instead of ":", and "_" instead of "-" between start/end).
-  if(/08[:;_-]?00[-–_]+(0?1|0?2|0?3|0?4|0?5)[:;_-]?00/.test(t)) return 'fullday';
-  if(/08[:;_-]?00[-–_]+(13|14|15|16|17)[:;_-]?00/.test(t)) return 'fullday';
-  if(/11[:;_-]?00[-–_]+(0?3|15)[:;_-]?00/.test(t)) return 'midday';
-  if(/(0?1|13)[:;_-]?00[-–_]+(0?5|17)[:;_-]?00/.test(t)) return 'afternoon';
-  return 'other';
+  if(!t) return 'other';
+  if(/full/.test(t)) return 'fullday';
+  const m=t.match(/(\d{1,2})(?:[:;._-](\d{2}))?(am|pm)?(?:[-–—_]+|to|until)(\d{1,2})(?:[:;._-](\d{2}))?(am|pm)?/);
+  if(!m) return 'other';
+  let s=parseInt(m[1])+(m[2]?parseInt(m[2])/60:0);
+  let e=parseInt(m[4])+(m[5]?parseInt(m[5])/60:0);
+  const sp=m[3], ep=m[6];
+  if(sp==='pm'&&s<12) s+=12;
+  else if(!sp&&s<6) s+=12;               // "1:00-5:00" means 1pm
+  if(ep==='pm'&&e<12) e+=12;
+  else if(ep!=='am'&&e<s&&e<12) e+=12;    // "8:00-1:00" means 1pm
+  if(s<6||s>=18) return 'other';
+  if(s>=12) return 'afternoon';
+  if(e<=12.5&&s<11) return 'morning';
+  if(s>=10) return 'midday';
+  return e<=13.5?'eight1':'fullday';
 }
 
 function _ageMonths(dob){
@@ -14919,131 +14898,183 @@ function _ageMonths(dob){
   return Math.floor((Date.now()-new Date(dob))/(1000*60*60*24*30.44));
 }
 
-// Class rules (per owner, updated Nov 2026): infants are always kept apart, any headcount,
-// capped at 4/class. Everyone else is split by age band AND schedule: schedule time is a hard
-// boundary and is NEVER mixed. Caps: 15-23 months = 12 per class (C, CS, CF, CN), 2-3 years
-// = 15 per class (D, DS, DF, DN), 3 years+ = 17 per class (E, S, F, N). A band over its cap
-// splits evenly into numbered classes (E2, CS2...). A class with fewer than 10 children is
-// topped up from / merged into the neighbouring-age class of the SAME schedule (closest age
-// first), as long as the caps still hold.
-const INFANT_MAX_MO=15, INFANT_CLASS_MAX=4, MIN_CLASS_SIZE=10;
-const AGE_BANDS=[
-  {fromMo:15, toMo:24,       cap:12, prefix:'C'},
-  {fromMo:24, toMo:36,       cap:15, prefix:'D'},
-  {fromMo:36, toMo:Infinity, cap:17, prefix:''}
-];
-const SCHEDULE_SUFFIX={fullday:'', morning:'S', midday:'F', afternoon:'N', other:'X'};
-const OLDEST_BAND_NAME={fullday:'E', morning:'S', midday:'F', afternoon:'N', other:'X'};
-const _bandOf=mo=>AGE_BANDS.find(b=>mo>=b.fromMo&&mo<b.toMo);
-const _bandClassName=(band,tg)=>band.prefix ? band.prefix+(tg in SCHEDULE_SUFFIX?SCHEDULE_SUFFIX[tg]:'X') : (OLDEST_BAND_NAME[tg]||'X');
+// Class rules (per owner, Nov 2026).
+// Infants (<15 months): A = arrive in the morning, B = arrive at 11 or later; max 4 per class (A2, B2...).
+// 15-23 months: C (full day + 8-1) | CS morning | CF midday | CN afternoon — target 10-12 present together.
+// 24-35 months: D | DS | DF | DN — target 12-15 present together.
+// 3 years+: S morning | F midday | E full day + 8-1 aged 4+ | EN afternoon aged 4+ |
+//           E2 8-1 aged 3 | E2N afternoon aged 3 — max 15 present together.
+// Head-counts are per time slot (8-11 / 11-1 / 1-3 / 3-5) over the whole group (C+CS+CF+CN...).
+const INFANT_MAX_MO=15, INFANT_CLASS_MAX=4;
+const SLOT_LABELS=['8–11','11–1','1–3','3–5'];
+const TG_SLOTS={fullday:[0,1,2,3], eight1:[0,1], morning:[0], midday:[1,2], afternoon:[2,3]};
+const FAMS={a:{cap:INFANT_CLASS_MAX}, b:{cap:INFANT_CLASS_MAX}, c:{cap:12,min:10}, d:{cap:15,min:12}, e:{cap:15}, e2:{cap:15}};
+const PULL_TIMES=['fullday','eight1','morning','midday'];
+const _slotCounts=arr=>{ const n=[0,0,0,0]; arr.forEach(x=>(TG_SLOTS[x.tg]||[]).forEach(s=>n[s]++)); return n; };
+const _famOf=cls=>/^A/.test(cls)?'a':/^B/.test(cls)?'b':/^C/.test(cls)?'c':/^D/.test(cls)?'d':/^E2/.test(cls)?'e2':'e';
+const _roomName=(cls,k)=>k<=1?cls:cls==='E'?'E'+(k+1):cls==='E2'?'E2-'+k:cls+k; // E2 is taken by the 3-year-old 8-1 class
+
+function _nameFor(band,tg,mo){
+  const sfx={fullday:'',eight1:'',morning:'S',midday:'F',afternoon:'N'}[tg];
+  if(band==='c') return 'C'+sfx;
+  if(band==='d') return 'D'+sfx;
+  if(tg==='morning') return 'S';
+  if(tg==='midday') return 'F';
+  const old=mo>=48;
+  if(tg==='afternoon') return old?'EN':'E2N';
+  return (tg==='fullday'||old)?'E':'E2';
+}
+
+// Split a family that is over its cap in some slot into rooms by age (youngest first).
+// Returns the room number (1-based) for each kid, kids already sorted youngest first.
+function _splitRooms(kids,cap){
+  const n=kids.length;
+  const maxc=Math.max(..._slotCounts(kids));
+  const viol=arr=>_slotCounts(arr).reduce((s,v)=>s+Math.max(0,v-cap),0);
+  let fallback=null;
+  for(let R=Math.max(2,Math.ceil(maxc/cap)); R<=4; R++){
+    let best=null;
+    const consider=cuts=>{
+      const parts=[]; let prev=0;
+      [...cuts,n].forEach(x=>{ parts.push(kids.slice(prev,x)); prev=x; });
+      if(parts.some(p=>!p.length)) return;
+      const sizes=parts.map(p=>p.length);
+      const score=parts.reduce((s,p)=>s+viol(p),0)*1000+(Math.max(...sizes)-Math.min(...sizes));
+      if(!best||score<best.score) best={score,cuts:[...cuts]};
+    };
+    if(R===2){ for(let a=1;a<n;a++) consider([a]); }
+    else if(R===3){ for(let a=1;a<n;a++) for(let b=a+1;b<n;b++) consider([a,b]); }
+    else { consider([1,2,3].map(i=>Math.round(n*i/4))); }
+    if(best){ fallback=best; if(best.score<1000) break; }
+  }
+  const cuts=fallback?fallback.cuts:[];
+  return kids.map((_,i)=>1+cuts.filter(c=>i>=c).length);
+}
 
 // `extraKids` lets the registration form simulate a child who isn't saved yet.
 function _buildClassAssignments(extraKids){
   const active=DB.children.filter(c=>!c.leaveDate).concat(extraKids||[]);
+  const assignments=[];
+  const items=[];
+  active.forEach(c=>{
+    const tg=_getTimeGroup(c.kidsTime), mo=_ageMonths(c.dob);
+    if(!c.dob||tg==='other'){
+      // no readable time / no birth date → can't place automatically, leave the class alone
+      assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className||'',noChange:true});
+      return;
+    }
+    items.push({c,tg,mo,band:mo<INFANT_MAX_MO?'inf':mo<24?'c':mo<36?'d':'e',cls:''});
+  });
+  items.sort((x,y)=>(x.mo-y.mo)||String(x.c.name||'').localeCompare(String(y.c.name||''),'ar'));
 
-  // Sort by age: youngest first
-  const byAge=arr=>[...arr].sort((a,b)=>{
-    if(!a.dob&&!b.dob) return (a.name||'').localeCompare(b.name||'','ar');
-    if(!a.dob) return 1; if(!b.dob) return -1;
-    return b.dob.localeCompare(a.dob);
+  // ── Infants: A = morning arrivals, B = 11 or later; max 4, split evenly into A2/B2... ──
+  ['a','b'].forEach(f=>{
+    const kids=items.filter(i=>i.band==='inf'&&(['morning','eight1','fullday'].includes(i.tg)?'a':'b')===f);
+    if(!kids.length) return;
+    const k=Math.ceil(kids.length/INFANT_CLASS_MAX), base=Math.floor(kids.length/k), extra=kids.length%k;
+    let idx=0;
+    for(let g=0;g<k;g++){
+      const size=base+(g<extra?1:0);
+      kids.slice(idx,idx+size).forEach(i=>{ i.cls=f.toUpperCase()+(g?g+1:''); i.fam=f; i.room=g+1; });
+      idx+=size;
+    }
   });
 
-  const assignments=[];
-  const add=(c,newClass,cap)=>assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass,cap});
-
-  // Infants: own classes regardless of headcount, any schedule mixed, capped at 4/class,
-  // overflowing A → B → B2 → B3...
-  const infCnt={};
-  const infSlot=()=>{
-    for(const name of ['A','B']){
-      if(!infCnt[name]) infCnt[name]=0;
-      if(infCnt[name]<INFANT_CLASS_MAX){ infCnt[name]++; return name; }
-    }
-    let n=2;
-    while(true){
-      const name='B'+n;
-      if(!infCnt[name]) infCnt[name]=0;
-      if(infCnt[name]<INFANT_CLASS_MAX){ infCnt[name]++; return name; }
-      n++;
+  // ── Top up a young group that is below its minimum in some slot with the youngest kids of
+  //    the next age group having a matching time, without going over its maximum ──
+  const pull=(dst,src,min,max)=>{
+    for(let guard=0; guard<200; guard++){
+      const cnt=_slotCounts(items.filter(i=>i.band===dst));
+      const low=cnt.map((n,s)=>(n>0&&n<min)?s:-1).filter(s=>s>=0);
+      if(!low.length) break;
+      const cand=items.filter(i=>i.band===src&&PULL_TIMES.includes(i.tg)&&
+        TG_SLOTS[i.tg].some(s=>low.includes(s))&&TG_SLOTS[i.tg].every(s=>cnt[s]+1<=max));
+      if(!cand.length) break;
+      cand[0].band=dst; // items are sorted youngest first
     }
   };
-  byAge(active.filter(c=>_ageMonths(c.dob)<INFANT_MAX_MO)).forEach(c=>add(c,infSlot(),INFANT_CLASS_MAX));
+  pull('c','d',FAMS.c.min,FAMS.c.cap);
+  pull('d','e',FAMS.d.min,FAMS.d.cap);
 
-  // 15 months+: schedule is a hard boundary; inside it, split by age band with that band's cap.
-  const bySchedule={};
-  active.filter(c=>_ageMonths(c.dob)>=INFANT_MAX_MO).forEach(c=>{
-    const tg=_getTimeGroup(c.kidsTime)||'other';
-    (bySchedule[tg]=bySchedule[tg]||[]).push(c);
-  });
-  Object.entries(bySchedule).forEach(([tg,kids])=>{
-    const sorted=byAge(kids);
-    const classes=[]; // youngest → oldest
-    AGE_BANDS.forEach(band=>{
-      const inBand=sorted.filter(c=>_bandOf(_ageMonths(c.dob))===band);
-      if(!inBand.length) return;
-      const k=Math.ceil(inBand.length/band.cap);
-      const base=Math.floor(inBand.length/k), extra=inBand.length%k;
-      let idx=0;
-      for(let g=0; g<k; g++){
-        const size=base+(g<extra?1:0);
-        classes.push({kids:inBand.slice(idx,idx+size), band, cap:band.cap});
-        idx+=size;
+  const kids=items.filter(i=>i.band!=='inf');
+  kids.forEach(i=>{ i.cls=_nameFor(i.band,i.tg,i.mo); });
+
+  // ── E and E2 (8-1 aged 3) in the morning must stay within 2 of each other:
+  //    if E is smaller, it takes the oldest 3-year-olds from E2 ──
+  for(let guard=0; guard<100; guard++){
+    const E=kids.filter(i=>i.cls==='E'), E2=kids.filter(i=>i.cls==='E2');
+    if(E2.length-E.length<=2) break;
+    const cnt=_slotCounts(kids.filter(i=>_famOf(i.cls)==='e'));
+    const mover=[...E2].sort((x,y)=>y.mo-x.mo)[0];
+    if(!TG_SLOTS[mover.tg].every(s=>cnt[s]+1<=FAMS.e.cap)) break;
+    mover.cls='E';
+  }
+
+  // ── Nobody alone in a class: move to the same time in the next age group ──
+  const nextClass=it=>{
+    const f=_famOf(it.cls);
+    if(f==='c') return _nameFor('d',it.tg,it.mo);
+    if(f==='d') return _nameFor('e',it.tg,it.mo);
+    if(it.cls==='E2') return 'E';
+    if(it.cls==='E2N') return 'EN';
+    if(it.cls==='E'&&it.tg==='eight1'&&kids.some(i=>i.cls==='E2')) return 'E2';
+    if(it.cls==='EN'&&kids.some(i=>i.cls==='E2N')) return 'E2N';
+    return null;
+  };
+  for(let pass=0; pass<3; pass++){
+    const cnt={}; kids.forEach(i=>{ cnt[i.cls]=(cnt[i.cls]||0)+1; });
+    let moved=false;
+    kids.filter(i=>cnt[i.cls]===1).forEach(i=>{ const nx=nextClass(i); if(nx&&nx!==i.cls){ i.cls=nx; moved=true; } });
+    if(!moved) break;
+  }
+
+  // ── Group over its cap in some slot → split into rooms by age: D2, CS2, S2... ──
+  ['c','d','e','e2'].forEach(f=>{
+    const mem=kids.filter(i=>_famOf(i.cls)===f);
+    mem.forEach(i=>{ i.fam=f; i.room=1; i.base=i.cls; });
+    if(!mem.length||Math.max(..._slotCounts(mem))<=FAMS[f].cap) return;
+    const rooms=_splitRooms(mem,FAMS[f].cap);
+    mem.forEach((i,ix)=>{ i.room=rooms[ix]; i.cls=_roomName(i.base,i.room); });
+    // the split must not leave a child alone in a room's class (EN + EN2 with one child each):
+    // move them to the same-time class of another room if that room has space
+    mem.forEach(i=>{
+      if(mem.filter(o=>o.base===i.base&&o.room===i.room).length!==1) return;
+      const rooms2=[...new Set(mem.filter(o=>o.base===i.base&&o.room!==i.room).map(o=>o.room))]
+        .sort((x,y)=>Math.abs(x-i.room)-Math.abs(y-i.room));
+      for(const r of rooms2){
+        const cnt=_slotCounts(mem.filter(o=>o.room===r));
+        if(TG_SLOTS[i.tg].every(sl=>cnt[sl]+1<=FAMS[f].cap)){ i.room=r; i.cls=_roomName(i.base,r); break; }
       }
-    });
-
-    // Top up any class below the minimum from its closest-age neighbour (same schedule).
-    const edgeGap=(younger,older)=>_ageMonths(older.kids[0].dob)-_ageMonths(younger.kids[younger.kids.length-1].dob);
-    let changed=true, guard=0;
-    while(changed && guard++<200){
-      changed=false;
-      const small=classes.map((_,i)=>i).filter(i=>classes[i].kids.length<MIN_CLASS_SIZE)
-        .sort((i,j)=>classes[i].kids.length-classes[j].kids.length);
-      for(const i of small){
-        const me=classes[i];
-        const cand=[];
-        if(i>0) cand.push({j:i-1, gap:edgeGap(classes[i-1],me)});
-        if(i<classes.length-1) cand.push({j:i+1, gap:edgeGap(me,classes[i+1])});
-        cand.sort((a,b)=>a.gap-b.gap);
-        let done=false;
-        for(const {j} of cand){
-          const nb=classes[j];
-          const mergedCap=Math.min(me.cap,nb.cap);
-          if(me.kids.length+nb.kids.length<=mergedCap){
-            const younger=j>i?me:nb, older=j>i?nb:me;
-            const band=younger.kids.length>older.kids.length?younger.band:older.band;
-            classes.splice(Math.min(i,j),2,{kids:younger.kids.concat(older.kids), band, cap:mergedCap});
-            done=true; break;
-          }
-          const need=MIN_CLASS_SIZE-me.kids.length;
-          if(nb.kids.length-need>=MIN_CLASS_SIZE){
-            if(j>i) me.kids=me.kids.concat(nb.kids.splice(0,need));
-            else me.kids=nb.kids.splice(nb.kids.length-need,need).concat(me.kids);
-            done=true; break;
-          }
-        }
-        if(done){ changed=true; break; }
-      }
-    }
-
-    const cnt={};
-    classes.forEach(cl=>{
-      const base=_bandClassName(cl.band,tg);
-      cnt[base]=(cnt[base]||0)+1;
-      const clsName=cnt[base]===1?base:base+cnt[base];
-      cl.kids.forEach(c=>add(c,clsName,cl.cap));
     });
   });
 
+  items.forEach(i=>{
+    const f=FAMS[i.fam]||{};
+    assignments.push({id:i.c.id,name:i.c.name,dob:i.c.dob,kidsTime:i.c.kidsTime,oldClass:i.c.className,newClass:i.cls,
+      cap:f.cap,min:f.min,fam:i.fam,room:i.room,tg:i.tg});
+  });
   return assignments;
 }
 
-// Suggest a class name for ONE new child (registration form): runs the same bulk
-// assignment with the new child included and returns the class they land in.
+// Head-count per time slot for every room (A, B, C group, D group, ...) — used by the preview.
+function _slotStats(asgn){
+  const rooms={};
+  asgn.filter(a=>a.fam).forEach(a=>{
+    const key=a.fam+':'+a.room;
+    (rooms[key]=rooms[key]||{fam:a.fam,room:a.room,cap:a.cap,min:a.min,kids:[]}).kids.push(a);
+  });
+  const order=['a','b','c','d','e','e2'];
+  return Object.values(rooms).map(r=>({...r,counts:_slotCounts(r.kids),names:[...new Set(r.kids.map(k=>k.newClass))].sort()}))
+    .sort((x,y)=>order.indexOf(x.fam)-order.indexOf(y.fam)||x.room-y.room);
+}
+
+// Suggest a class name for ONE new child (registration form): runs the same assignment with the
+// new child included and returns the class they land in. Existing children are never moved.
 function _suggestClassName(dob, kidsTime){
   if(!dob) return '';
   const probe={id:'__new__',name:'__new__',dob,kidsTime:kidsTime||'',className:''};
   const a=_buildClassAssignments([probe]).find(x=>x.id==='__new__');
-  return a?a.newClass:'';
+  return a&&!a.noChange?a.newClass:'';
 }
 
 // Auto-fills the registration form's Class Name field as the manager enters DOB/Kids Time —
@@ -15072,13 +15103,37 @@ function previewAutoClasses(){
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
 
-  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',C:'#be185d',CS:'#be185d',CF:'#be185d',CN:'#be185d',CX:'#be185d',D:'#15803d',DS:'#15803d',DF:'#15803d',DN:'#15803d',DX:'#15803d',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
-  const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/\d+$/,'')]||'#6b7280';
+  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',C:'#be185d',CS:'#be185d',CF:'#be185d',CN:'#be185d',D:'#15803d',DS:'#15803d',DF:'#15803d',DN:'#15803d',E:'#d97706',EN:'#d97706',E2:'#b45309',E2N:'#b45309',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
+  const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/-?\d+$/,'')]||'#6b7280';
+
+  // Head-count per time slot for every room — what the 12 / 15 caps and 10 / 12 minimums are checked against
+  const famLabel={a:'🍼 A — رضّع صباحي',b:'🍼 B — رضّع 11',c:'👶 C — من 15 لـ 23 شهر',d:'🧒 D — من 24 لـ 35 شهر',e:'🎒 S / F / E / EN — 3 سنين فوق',e2:'🎒 E2 / E2N — 3 سنين'};
+  const stats=_slotStats(asgn);
+  const cell=(n,r,show)=>{
+    let bg='#f0fdf4',col='#065f46';
+    if(n>r.cap){bg='#fee2e2';col='#b91c1c';}
+    else if(r.min&&n>0&&n<r.min){bg='#fef3c7';col='#92400e';}
+    else if(!n){bg='#f9fafb';col='#9ca3af';}
+    return `<td style="padding:5px 8px;text-align:center;font-weight:800;background:${bg};color:${col};border:1px solid #e5e7eb">${n}</td>`;
+  };
+  const slotTable=stats.length?`
+  <div style="border:1.5px solid #0891b2;border-radius:10px;margin-bottom:10px;overflow:auto">
+    <div style="background:#0891b2;color:#fff;padding:7px 12px;font-weight:800;font-size:.82rem">📊 عدد الأطفال الموجودين في نفس الوقت — كل فترة</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+      <thead><tr style="background:#ecfeff"><th style="padding:5px 8px;text-align:right">المجموعة</th><th style="padding:5px 8px;text-align:right">الفصول</th>${SLOT_LABELS.map(l=>`<th style="padding:5px 8px">${l}</th>`).join('')}<th style="padding:5px 8px">الهدف</th></tr></thead>
+      <tbody>${stats.map(r=>`<tr>
+        <td style="padding:5px 8px;font-weight:700;border:1px solid #e5e7eb">${famLabel[r.fam]}${r.room>1?' — فصل '+r.room:''}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb">${r.names.join(' · ')}</td>
+        ${r.counts.map(n=>cell(n,r)).join('')}
+        <td style="padding:5px 8px;text-align:center;color:#6b7280;border:1px solid #e5e7eb">${r.min?r.min+'–'+r.cap:'حد أقصى '+r.cap}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`:'';
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
     📋 معاينة التوزيع — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} تغيير جديد
   </div>
+  ${slotTable}
   ${Object.entries(byClass).sort(([a],[b])=>a.localeCompare(b)).map(([cls,kids])=>`
   <div style="border:1.5px solid ${colorForClass(cls)};border-radius:10px;margin-bottom:8px;overflow:hidden">
     <div style="background:${colorForClass(cls)};color:#fff;padding:7px 12px;font-weight:800;font-size:.82rem;display:flex;justify-content:space-between;align-items:center">
@@ -15098,7 +15153,7 @@ function previewAutoClasses(){
     </div>
   </div>`).join('')}
   ${noTime.length?`<div style="background:#f1f5f9;border-radius:8px;padding:8px 12px;font-size:.75rem;color:#6b7280">
-    ⚠️ ${noTime.length} طفل بدون وقت محدد — لن يتغير فصلهم: ${noTime.map(a=>a.name).join(' · ')}
+    ⚠️ ${noTime.length} طفل ميعادهم أو تاريخ ميلادهم مش واضح — لن يتغير فصلهم: ${noTime.map(a=>a.name).join(' · ')}
   </div>`:''}`;
 }
 
@@ -17494,8 +17549,7 @@ function openAutoAssignClasses(){
   const summaryHtml=Object.keys(classCounts).sort().map(k=>{
     const cnt=classCounts[k];
     const cap=classCaps[k]||17;
-    const infant=/^(A|Bd*)$/.test(k);
-    const col=cnt>cap?'#dc2626':(!infant&&cnt<MIN_CLASS_SIZE)?'#d97706':'#059669';
+    const col=cnt>cap?'#dc2626':'#059669';
     return`<span style="background:${col}20;border:1.5px solid ${col};border-radius:7px;padding:2px 10px;font-size:.8rem;font-weight:800;color:${col}">${k}: ${cnt}${cnt>cap?' ⚠️':''}</span>`;
   }).join(' ');
   const ov=document.createElement('div');
