@@ -1499,7 +1499,8 @@ main{padding:12px;max-width:960px;margin:0 auto}
     🍼 <b>الرضّع (أقل من سنة و3 شهور):</b> <b>A</b> ثم <b>B</b> ثم B2... — حد أقصى <b>4 أطفال</b> في الفصل، أي وقت حضور<br>
     👶 <b>من سنة و3 شهور لحد سنتين:</b> مجموعة واحدة (<b>C</b>) — حد أقصى <b>12 طفل</b> بغض النظر عن الوقت<br>
     🧒 <b>من سنتين فأكتر:</b> حسب الميعاد — <b>E</b> = يوم كامل | <b>S</b> = صباحي | <b>F</b> = نص يوم | <b>N</b> = بعد الظهر — حد أقصى <b>15 طفل</b> في كل مجموعة<br>
-    🆕 الطفل الجديد بيدخل الفصل المناسب اللي فيه مكان (الأقرب له في السن)، ولو كل الفصول المناسبة اتملت بيتفتح فصل جديد برقم (E2, S2, C2...)<br>
+    ⚖️ <b>التساوي:</b> الطفل الجديد بيدخل <b>أصغر فصل في العدد</b> من الفصول المناسبة له (مثلاً S فيه 12 وS2 فيه 16 ← الجداد يروحوا S لحد ما يتساووا) — ولو فصلين بنفس العدد بيدخل الأقرب له في السن<br>
+    🆕 ولو كل الفصول المناسبة اتملت بيتفتح فصل جديد برقم (E2, S2, C2...)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -2396,7 +2397,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-05-7';
+const APP_VERSION='2026-11-05-8';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14922,6 +14923,7 @@ function _ageMonths(dob){
 // class that suits them, and a new class opens only when every suitable class is full:
 //  - under 15 months → infant classes A, then B, B2... — max 4 each, any schedule
 //  - 15 to 23 months → one group (C, C2...) — max 12, regardless of schedule
+//  A new child goes to the smallest suitable class (so classes of the same kind end up equal in size).
 //  - 24 months and over → by schedule: E full day | S morning | F midday | N afternoon — max 15 per class
 const INFANT_MAX_MO=15, TODDLER_MAX_MO=24;
 const INFANT_CLASS_MAX=4, TODDLER_CLASS_MAX=12, CLASS_MAX=15;
@@ -14979,9 +14981,10 @@ function _buildClassAssignments(extraKids){
       if(tg==='other'){ assignments.push({...base(c),newClass:'',noChange:true}); return; }
       cap=CLASS_MAX; prefix=SCHEDULE_LETTER[tg]||'X';
     }
-    // an existing class of the same kind with space — the one closest in age
+    // an existing class of the same kind with space — the SMALLEST one, so sizes even out as new children
+    // fill the places of those who left (closest age breaks a tie)
     const cands=Object.values(profiles).filter(p=>p.band===band&&(band!=='old'||p.tg===tg)&&p.n<cap)
-      .sort((x,y)=>Math.abs((x.mean??mo)-mo)-Math.abs((y.mean??mo)-mo)||x.name.localeCompare(y.name));
+      .sort((x,y)=>(x.n-y.n)||Math.abs((x.mean??mo)-mo)-Math.abs((y.mean??mo)-mo)||x.name.localeCompare(y.name));
     let p=cands[0];
     if(!p){ // every suitable class is full (or there is none yet) → open a new one
       const name=band==='inf'?nextFreeName(null,['A','B']):nextFreeName(prefix);
