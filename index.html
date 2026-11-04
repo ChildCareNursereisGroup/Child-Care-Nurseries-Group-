@@ -1493,7 +1493,27 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <!-- AUTO CLASS ASSIGNMENT -->
 <div class="card" style="border:2px solid #0891b2">
   <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
-  <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
+  <div style="background:#f5f3ff;border:1.5px solid #8b5cf6;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#4c1d95;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b>⚙️ طريقة التوزيع لهذا الفرع:</b>
+    <select id="class-mode" onchange="saveClassMode()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif">
+      <option value="detailed">مفصّلة — فئات سن (C / D / E) وفصول كتير</option>
+      <option value="simple">بسيطة — بالميعاد بس (E / S / F / N وحد أقصى 20) — للفروع اللي فيها فصول قليلة</option>
+    </select>
+    <span>الفرحة بسيطة، وباقي الفروع مفصّلة. الاختيار بيتحفظ لكل فرع على الجهاز ده.</span>
+  </div>
+  <div id="class-rules-simple" style="display:none;background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
+    <b>قواعد التوزيع — الطريقة البسيطة:</b><br>
+    🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى <b>4 أطفال</b> لكل فصل، أي وقت حضور (A ثم B ثم B2...)<br>
+    ⏰ <b>باقي الأعمار (سنة و3 شهور فأكتر):</b> ميعاد الحضور خط أحمر — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
+    🌟 <b>E</b> = يوم كامل (و 8–1) &nbsp;|&nbsp; <b>S</b> = صباحي &nbsp;|&nbsp; <b>F</b> = نص يوم &nbsp;|&nbsp; <b>N</b> = بعد الظهر<br>
+    داخل نفس الميعاد، الأعمار بتتضم في نفس الفصل — حد أقصى <b>20 طفل</b> لكل فصل<br>
+    لو عدد أطفال الميعاد ده عدّى الـ20، بيتقسموا بالتساوي حسب السن (الأصغر أولاً) وياخدوا رقم بعد اسم الفصل (زي E2, S2...)<br>
+    🆕 الطفل الجديد بيدخل الفصل اللي فيه مكان، ولو كل الفصول اتملت بيتفتح فصل جديد. وأي طفل موجود مبيتنقلش إلا بزرار «معاينة» ثم «تطبيق»<br>
+    🍼 الرضّع بيتنقلوا للفصل الأكبر أول ما يكبروا عن 15 شهر<br>
+    ⚠️ الأطفال اللي ميعادهم أو تاريخ ميلادهم مش واضح مش بيتغير فصلهم<br>
+    <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
+  </div>
+  <div id="class-rules-detailed" style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
     <b>قواعد التوزيع (نوفمبر 2026):</b><br>
     ⏰ <b>الميعاد من خانة Time:</b> ينتهي 11 = صباحي (S) | يبدأ 11 = نص يوم (F) | يبدأ 1 الظهر = بعد الظهر (N) | يبدأ 7–9 وينتهي 1 = 8–1 | يبدأ 7–9 وينتهي 2 أو بعدها = يوم كامل<br>
     🍼 <b>الرضّع (أقل من 15 شهر):</b> <b>A</b> = اللي بيجوا الصبح | <b>B</b> = اللي بيجوا 11 — حد أقصى <b>4</b> في الفصل، ولو زادوا A2 / B2<br>
@@ -1515,7 +1535,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
     🔒 الطفل الجديد بيتقترح له فصله أوتوماتيك، وأي طفل موجود مبيتنقلش إلا بزرار «معاينة» ثم «تطبيق»<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
-  <div style="background:#fefce8;border:1.5px solid #facc15;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#713f12;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <div id="class-ref-box" style="background:#fefce8;border:1.5px solid #facc15;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#713f12;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <b>📅 السن بيتحسب بتاريخ (أول السنة الدراسية):</b>
     <input type="date" id="class-ref-date" onchange="saveClassRefDate()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:7px;font-family:'Tajawal',sans-serif">
     <span>الطفل بيفضل في فصله طول السنة. غيّريه مرة واحدة في بداية كل سنة دراسية. الرضّع بس بيتنقلوا لما يكبروا عن حجرة الرضّع (15 شهر).</span>
@@ -2414,7 +2434,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-05-5';
+const APP_VERSION='2026-11-05-6';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -15005,13 +15025,12 @@ function _splitRooms(kids,cap){
 // still fits; the rest go to the room with space whose children are closest in age.
 // `fits(roomKids, kid)` says whether the kid can join. When every room is full a new room opens
 // (openNew) — otherwise the function returns null.
-function _assignRooms(mem,k,fits,openNew){
+function _assignRooms(mem,k,fits,openNew,prefOf){
   const rooms=Array.from({length:k},()=>[]);
   const room=new Array(mem.length).fill(0);
   let overflow=false;
   mem.forEach((i,ix)=>{
-    const pref=_parseClass(i.c.className);
-    const r=pref&&_famOf(pref.base)===i.fam?pref.room:0;
+    const r=prefOf?prefOf(i):(()=>{ const pref=_parseClass(i.c.className); return pref&&_famOf(pref.base)===i.fam?pref.room:0; })();
     if(r>=1&&r<=k&&fits(rooms[r-1],i)){ rooms[r-1].push(i); room[ix]=r; }
   });
   mem.forEach((i,ix)=>{
@@ -15028,8 +15047,88 @@ function _assignRooms(mem,k,fits,openNew){
   return overflow?null:room;
 }
 
+// ── Simple mode (branches with only a few classes, e.g. Al Farha) ──
+// Infants (<15 months): A, then B, B2... (max 4 each, any time). Everyone else: class by schedule only —
+// E full day (8-1 counts as full day) | S morning | F midday | N afternoon — max 20 per class; over 20 the
+// group is split evenly by age into E, E2... A new child joins the class with space, a new class opens only
+// when all are full, and nobody else moves. Infants move up when they pass 15 months.
+const SIMPLE_CLASS_MAX=20;
+const CLASS_MODE_DEFAULT={b1:'simple'}; // Al Farha has only 3 classes; every other branch uses the detailed rules
+function _classMode(){
+  let v=''; try{ v=localStorage.getItem('ccng_class_mode_'+curBid)||''; }catch(e){}
+  return (v==='simple'||v==='detailed')?v:(CLASS_MODE_DEFAULT[curBid]||'detailed');
+}
+function syncClassModeUI(){
+  const mode=_classMode();
+  const sel=el('class-mode'); if(sel) sel.value=mode;
+  const show=(id,on)=>{ const e=el(id); if(e) e.style.display=on?'':'none'; };
+  show('class-rules-detailed',mode==='detailed'); show('class-rules-simple',mode==='simple'); show('class-ref-box',mode==='detailed');
+  syncClassRefDateInput();
+}
+function saveClassMode(){
+  const v=el('class-mode')?.value; if(!v) return;
+  try{ localStorage.setItem('ccng_class_mode_'+curBid,v); }catch(e){}
+  syncClassModeUI();
+  const out=el('auto-class-output'); if(out) out.innerHTML='';
+  showToast('✅ طريقة التوزيع اتحفظت لهذا الفرع — اضغطي «معاينة التوزيع»');
+}
+setTimeout(syncClassModeUI,0);
+document.addEventListener('DOMContentLoaded',syncClassModeUI);
+
+function _buildSimpleAssignments(extraKids){
+  const active=DB.children.filter(c=>!c.leaveDate).concat(extraKids||[]);
+  const assignments=[], items=[];
+  active.forEach(c=>{
+    let tg=_getTimeGroup(c.kidsTime);
+    if(!c.dob||tg==='other'){
+      assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:c.className||'',noChange:true});
+      return;
+    }
+    if(tg==='eight1') tg='fullday';
+    items.push({c,tg,mo:_ageMonths(c.dob),reason:''});
+  });
+  items.sort((x,y)=>(x.mo-y.mo)||String(x.c.name||'').localeCompare(String(y.c.name||''),'ar'));
+
+  const emit=(i,cls,fam,room,cap)=>{
+    let reason='';
+    if(i.c.className!==cls){
+      const old=String(i.c.className||'').trim().toUpperCase();
+      reason=!old?'بدون فصل':(/^[AB]\d*$/.test(old)&&!/^[AB]/.test(cls)?'كبر عن حجرة الرضّع':
+        (old.replace(/\d+$/,'')===cls.replace(/\d+$/,'')?'إعادة ترتيب الفصول':'السن أو الميعاد بيحدد فصل تاني'));
+    }
+    assignments.push({id:i.c.id,name:i.c.name,dob:i.c.dob,kidsTime:i.c.kidsTime,oldClass:i.c.className,newClass:cls,
+      cap,fam,room,tg:i.tg,reason});
+  };
+  const evenRooms=(mem,k)=>{ const base=Math.floor(mem.length/k), extra=mem.length%k, out=[]; for(let g=0;g<k;g++) for(let j=0;j<base+(g<extra?1:0);j++) out.push(g+1); return out; };
+  const parse=(name,letters)=>String(name||'').trim().toUpperCase().match(new RegExp('^(['+letters+'])(\\d*)$'));
+
+  // infants: A, B, B2, B3...
+  const inf=items.filter(i=>i.mo<INFANT_MAX_MO);
+  if(inf.length){
+    const k=Math.ceil(inf.length/INFANT_CLASS_MAX);
+    const prefOf=i=>{ const m=parse(i.c.className,'AB'); return !m?0:(m[1]==='A'?1:(m[2]?+m[2]+1:2)); };
+    const rooms=(inf.some(i=>prefOf(i)>0)&&_assignRooms(inf,k,r=>r.length<INFANT_CLASS_MAX,true,prefOf))||inf.map((_,ix)=>1+Math.floor(ix/INFANT_CLASS_MAX)); // fresh: A fills first, then B
+    inf.forEach((i,ix)=>{ const r=rooms[ix]; emit(i,r===1?'A':r===2?'B':'B'+(r-1),'xinf',r,INFANT_CLASS_MAX); });
+  }
+
+  // 15 months+: by schedule, max 20 per class
+  const LETTER={fullday:'E',morning:'S',midday:'F',afternoon:'N'};
+  Object.keys(LETTER).forEach(tg=>{
+    const mem=items.filter(i=>i.mo>=INFANT_MAX_MO&&i.tg===tg);
+    if(!mem.length) return;
+    const L=LETTER[tg], k=Math.ceil(mem.length/SIMPLE_CLASS_MAX);
+    const prefOf=i=>{ const m=parse(i.c.className,L); return m?(m[2]?+m[2]:1):0; };
+    let rooms;
+    if(k===1) rooms=mem.map(()=>1);
+    else rooms=(mem.some(i=>prefOf(i)>0)&&_assignRooms(mem,k,r=>r.length<SIMPLE_CLASS_MAX,true,prefOf))||evenRooms(mem,k);
+    mem.forEach((i,ix)=>{ i.fam='x'+L; emit(i,rooms[ix]===1?L:L+rooms[ix],'x'+L,rooms[ix],SIMPLE_CLASS_MAX); });
+  });
+  return assignments;
+}
+
 // `extraKids` lets the registration form simulate a child who isn't saved yet.
 function _buildClassAssignments(extraKids){
+  if(_classMode()==='simple') return _buildSimpleAssignments(extraKids);
   const active=DB.children.filter(c=>!c.leaveDate).concat(extraKids||[]);
   const assignments=[];
   const items=[];
@@ -15193,8 +15292,9 @@ function _slotStats(asgn){
     (rooms[key]=rooms[key]||{fam:a.fam,room:a.room,cap:a.cap,min:a.min,kids:[]}).kids.push(a);
   });
   const order=['a','b','c','d','sf','e','e2'];
+  const ord=f=>{ const i=order.indexOf(f); return i<0?50:i; };
   return Object.values(rooms).map(r=>({...r,counts:_slotCounts(r.kids),names:[...new Set(r.kids.map(k=>k.newClass))].sort()}))
-    .sort((x,y)=>order.indexOf(x.fam)-order.indexOf(y.fam)||x.room-y.room);
+    .sort((x,y)=>ord(x.fam)-ord(y.fam)||String(x.fam).localeCompare(String(y.fam))||x.room-y.room);
 }
 
 // Suggest a class name for ONE new child (registration form): runs the same assignment with the
@@ -15231,7 +15331,7 @@ function previewAutoClasses(){
   });
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
-  syncClassRefDateInput();
+  syncClassModeUI();
   const reasonCnt={}; asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).forEach(a=>{ reasonCnt[a.reason]=(reasonCnt[a.reason]||0)+1; });
   const reasonLine=Object.keys(reasonCnt).length?`<div style="font-weight:400;margin-top:4px">سبب النقل: ${Object.entries(reasonCnt).map(([r,n])=>`${r} (${n})`).join(' | ')}</div>`:'';
 
@@ -15239,7 +15339,7 @@ function previewAutoClasses(){
   const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/-?\d+$/,'')]||'#6b7280';
 
   // Head-count per time slot for every room — what the 12 / 15 caps and 10 / 12 minimums are checked against
-  const famLabel={a:'🍼 A — رضّع صباحي',b:'🍼 B — رضّع 11',c:'👶 C — من 15 لـ 23 شهر',d:'🧒 D — من 24 لـ 35 شهر',sf:'🎒 S / F — صباحي ونص يوم (3 سنين فوق)',e:'🎒 E / EN — يوم كامل وبعد الظهر (3 سنين فوق)',e2:'🎒 E2 / E2N — 3 سنين'};
+  const famLabel={xinf:'🍼 الرضّع (A / B)',xE:'🌟 E — يوم كامل',xS:'☀️ S — صباحي',xF:'🕦 F — نص يوم',xN:'🌙 N — بعد الظهر',a:'🍼 A — رضّع صباحي',b:'🍼 B — رضّع 11',c:'👶 C — من 15 لـ 23 شهر',d:'🧒 D — من 24 لـ 35 شهر',sf:'🎒 S / F — صباحي ونص يوم (3 سنين فوق)',e:'🎒 E / EN — يوم كامل وبعد الظهر (3 سنين فوق)',e2:'🎒 E2 / E2N — 3 سنين'};
   const stats=_slotStats(asgn);
   const cell=(n,r,show)=>{
     let bg='#f0fdf4',col='#065f46';
@@ -15263,7 +15363,7 @@ function previewAutoClasses(){
 
   box.innerHTML=`
   <div style="background:#d1fae5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.78rem;color:#065f46;font-weight:700">
-    📋 معاينة التوزيع (السن بتاريخ ${_classRefDate()}) — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} هيتنقلوا | ${asgn.filter(a=>!a.noChange).length-changed} فاضلين في فصولهم
+    📋 معاينة التوزيع (${_classMode()==='simple'?'الطريقة البسيطة':'السن بتاريخ '+_classRefDate()}) — ${asgn.filter(a=>!a.noChange).length} طفل | ${changed} هيتنقلوا | ${asgn.filter(a=>!a.noChange).length-changed} فاضلين في فصولهم
     ${reasonLine}
   </div>
   ${slotTable}
