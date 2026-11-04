@@ -1494,12 +1494,14 @@ main{padding:12px;max-width:960px;margin:0 auto}
 <div class="card" style="border:2px solid #0891b2">
   <div class="ch"><div class="ct" style="color:#0e7490">🎓 توزيع الأطفال على الفصول تلقائياً — Auto Class Assignment</div></div>
   <div style="background:#ecfeff;border-radius:9px;padding:10px;margin-bottom:12px;font-size:.79rem;color:#164e63">
-    <b>قواعد التوزيع الجديدة (2026):</b><br>
-    🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى 4 أطفال لكل فصل، أي وقت حضور<br>
-    ⏰ <b>باقي الأعمار (سنة و3 شهور فأكتر):</b> ميعاد الحضور خط أحمر — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
-    🌟 <b>E</b> = يوم كامل &nbsp;|&nbsp; <b>S</b> = صباحي &nbsp;|&nbsp; <b>F</b> = نص يوم &nbsp;|&nbsp; <b>N</b> = بعد الظهر<br>
-    داخل نفس الميعاد، الأعمار القريبة من بعض بتتضم في نفس الفصل — مفيش طفل لوحده في فصل، وحد أقصى <b>20 طفل</b> لكل فصل<br>
-    لو عدد أطفال الميعاد ده عدّى الـ20، بيتقسموا بالتساوي على أكتر من فصل (الأعمار المتقاربة مع بعض) وياخدوا رقم بعد اسم الفصل (زي E2, S2...)<br>
+    <b>قواعد التوزيع الجديدة (نوفمبر 2026):</b><br>
+    🍼 <b>A ثم B</b> → الرضّع (أقل من سنة و3 شهور) — دايماً فصل لوحدهم مهما كان عددهم، حد أقصى <b>4 أطفال</b> لكل فصل، أي وقت حضور<br>
+    ⏰ <b>ميعاد الحضور خط أحمر</b> — مينفعش يتخلط صباحي مع نص يوم مع بعد الظهر مع يوم كامل<br>
+    👶 <b>من سنة و3 شهور لحد سنتين:</b> حد أقصى <b>12 طفل</b> — الفصول <b>C</b> (يوم كامل) | <b>CS</b> (صباحي) | <b>CF</b> (نص يوم) | <b>CN</b> (بعد الظهر)<br>
+    🧒 <b>من سنتين لحد 3 سنين:</b> حد أقصى <b>15 طفل</b> — الفصول <b>D</b> (يوم كامل) | <b>DS</b> (صباحي) | <b>DF</b> (نص يوم) | <b>DN</b> (بعد الظهر)<br>
+    🎒 <b>من 3 سنين فوق:</b> حد أقصى <b>17 طفل</b> — الفصول <b>E</b> (يوم كامل) | <b>S</b> (صباحي) | <b>F</b> (نص يوم) | <b>N</b> (بعد الظهر)<br>
+    لو عدد الأطفال في فصل أكتر من الحد، بيتقسموا بالتساوي على أكتر من فصل وياخدوا رقم بعد الاسم (زي E2, CS2...)<br>
+    لو الفصل فيه أقل من <b>10 أطفال</b>، السيستم بيضمّ له أطفال من أقرب سن في نفس الميعاد (بدون ما يعدّي الحد الأقصى)<br>
     <b>الترتيب داخل كل فصل: حسب العمر (الأصغر أولاً)</b>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -2396,7 +2398,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-10-31-3';
+const APP_VERSION='2026-11-05-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14917,22 +14919,27 @@ function _ageMonths(dob){
   return Math.floor((Date.now()-new Date(dob))/(1000*60*60*24*30.44));
 }
 
-// Class rules (per owner, 2026): infants are always kept apart, any headcount, capped
-// at 4/class — schedule time is a hard boundary for everyone else and is NEVER mixed,
-// but nearby ages ARE merged together within the same schedule so no class ends up
-// with just one or two kids. Cap: 20 children per class — once a same-schedule group
-// goes over 20, open a new class for it (evenly split, so nearby ages stay together
-// and neither class ends up needlessly small).
-const INFANT_MAX_MO=15, MAX_CLASS_SIZE=20;
-const SCHEDULE_LETTER={fullday:'E', morning:'S', midday:'F', afternoon:'N', other:'X'};
+// Class rules (per owner, updated Nov 2026): infants are always kept apart, any headcount,
+// capped at 4/class. Everyone else is split by age band AND schedule: schedule time is a hard
+// boundary and is NEVER mixed. Caps: 15-23 months = 12 per class (C, CS, CF, CN), 2-3 years
+// = 15 per class (D, DS, DF, DN), 3 years+ = 17 per class (E, S, F, N). A band over its cap
+// splits evenly into numbered classes (E2, CS2...). A class with fewer than 10 children is
+// topped up from / merged into the neighbouring-age class of the SAME schedule (closest age
+// first), as long as the caps still hold.
+const INFANT_MAX_MO=15, INFANT_CLASS_MAX=4, MIN_CLASS_SIZE=10;
+const AGE_BANDS=[
+  {fromMo:15, toMo:24,       cap:12, prefix:'C'},
+  {fromMo:24, toMo:36,       cap:15, prefix:'D'},
+  {fromMo:36, toMo:Infinity, cap:17, prefix:''}
+];
+const SCHEDULE_SUFFIX={fullday:'', morning:'S', midday:'F', afternoon:'N', other:'X'};
+const OLDEST_BAND_NAME={fullday:'E', morning:'S', midday:'F', afternoon:'N', other:'X'};
+const _bandOf=mo=>AGE_BANDS.find(b=>mo>=b.fromMo&&mo<b.toMo);
+const _bandClassName=(band,tg)=>band.prefix ? band.prefix+(tg in SCHEDULE_SUFFIX?SCHEDULE_SUFFIX[tg]:'X') : (OLDEST_BAND_NAME[tg]||'X');
 
-// How many classes a same-schedule, age-sorted group of `n` children should split into.
-function _splitIntoClasses(n){
-  return Math.max(1, Math.ceil(n/MAX_CLASS_SIZE));
-}
-
-function _buildClassAssignments(){
-  const active=DB.children.filter(c=>!c.leaveDate);
+// `extraKids` lets the registration form simulate a child who isn't saved yet.
+function _buildClassAssignments(extraKids){
+  const active=DB.children.filter(c=>!c.leaveDate).concat(extraKids||[]);
 
   // Sort by age: youngest first
   const byAge=arr=>[...arr].sort((a,b)=>{
@@ -14942,6 +14949,7 @@ function _buildClassAssignments(){
   });
 
   const assignments=[];
+  const add=(c,newClass,cap)=>assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass,cap});
 
   // Infants: own classes regardless of headcount, any schedule mixed, capped at 4/class,
   // overflowing A → B → B2 → B3...
@@ -14949,22 +14957,19 @@ function _buildClassAssignments(){
   const infSlot=()=>{
     for(const name of ['A','B']){
       if(!infCnt[name]) infCnt[name]=0;
-      if(infCnt[name]<4){ infCnt[name]++; return name; }
+      if(infCnt[name]<INFANT_CLASS_MAX){ infCnt[name]++; return name; }
     }
     let n=2;
     while(true){
       const name='B'+n;
       if(!infCnt[name]) infCnt[name]=0;
-      if(infCnt[name]<4){ infCnt[name]++; return name; }
+      if(infCnt[name]<INFANT_CLASS_MAX){ infCnt[name]++; return name; }
       n++;
     }
   };
-  byAge(active.filter(c=>_ageMonths(c.dob)<INFANT_MAX_MO)).forEach(c=>{
-    assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:infSlot()});
-  });
+  byAge(active.filter(c=>_ageMonths(c.dob)<INFANT_MAX_MO)).forEach(c=>add(c,infSlot(),INFANT_CLASS_MAX));
 
-  // 15 months+: group by schedule (hard boundary), then merge nearby ages within each
-  // schedule into as few classes as the 20-child cap allows.
+  // 15 months+: schedule is a hard boundary; inside it, split by age band with that band's cap.
   const bySchedule={};
   active.filter(c=>_ageMonths(c.dob)>=INFANT_MAX_MO).forEach(c=>{
     const tg=_getTimeGroup(c.kidsTime)||'other';
@@ -14972,51 +14977,73 @@ function _buildClassAssignments(){
   });
   Object.entries(bySchedule).forEach(([tg,kids])=>{
     const sorted=byAge(kids);
-    const letter=SCHEDULE_LETTER[tg]||'X';
-    const numClasses=_splitIntoClasses(sorted.length);
-    const base=Math.floor(sorted.length/numClasses), extra=sorted.length%numClasses;
-    let idx=0;
-    for(let g=0; g<numClasses; g++){
-      const size=base+(g<extra?1:0);
-      const clsName=g===0?letter:letter+(g+1);
-      for(let i=0;i<size;i++){
-        const c=sorted[idx++];
-        assignments.push({id:c.id,name:c.name,dob:c.dob,kidsTime:c.kidsTime,oldClass:c.className,newClass:clsName});
+    const classes=[]; // youngest → oldest
+    AGE_BANDS.forEach(band=>{
+      const inBand=sorted.filter(c=>_bandOf(_ageMonths(c.dob))===band);
+      if(!inBand.length) return;
+      const k=Math.ceil(inBand.length/band.cap);
+      const base=Math.floor(inBand.length/k), extra=inBand.length%k;
+      let idx=0;
+      for(let g=0; g<k; g++){
+        const size=base+(g<extra?1:0);
+        classes.push({kids:inBand.slice(idx,idx+size), band, cap:band.cap});
+        idx+=size;
+      }
+    });
+
+    // Top up any class below the minimum from its closest-age neighbour (same schedule).
+    const edgeGap=(younger,older)=>_ageMonths(older.kids[0].dob)-_ageMonths(younger.kids[younger.kids.length-1].dob);
+    let changed=true, guard=0;
+    while(changed && guard++<200){
+      changed=false;
+      const small=classes.map((_,i)=>i).filter(i=>classes[i].kids.length<MIN_CLASS_SIZE)
+        .sort((i,j)=>classes[i].kids.length-classes[j].kids.length);
+      for(const i of small){
+        const me=classes[i];
+        const cand=[];
+        if(i>0) cand.push({j:i-1, gap:edgeGap(classes[i-1],me)});
+        if(i<classes.length-1) cand.push({j:i+1, gap:edgeGap(me,classes[i+1])});
+        cand.sort((a,b)=>a.gap-b.gap);
+        let done=false;
+        for(const {j} of cand){
+          const nb=classes[j];
+          const mergedCap=Math.min(me.cap,nb.cap);
+          if(me.kids.length+nb.kids.length<=mergedCap){
+            const younger=j>i?me:nb, older=j>i?nb:me;
+            const band=younger.kids.length>older.kids.length?younger.band:older.band;
+            classes.splice(Math.min(i,j),2,{kids:younger.kids.concat(older.kids), band, cap:mergedCap});
+            done=true; break;
+          }
+          const need=MIN_CLASS_SIZE-me.kids.length;
+          if(nb.kids.length-need>=MIN_CLASS_SIZE){
+            if(j>i) me.kids=me.kids.concat(nb.kids.splice(0,need));
+            else me.kids=nb.kids.splice(nb.kids.length-need,need).concat(me.kids);
+            done=true; break;
+          }
+        }
+        if(done){ changed=true; break; }
       }
     }
+
+    const cnt={};
+    classes.forEach(cl=>{
+      const base=_bandClassName(cl.band,tg);
+      cnt[base]=(cnt[base]||0)+1;
+      const clsName=cnt[base]===1?base:base+cnt[base];
+      cl.kids.forEach(c=>add(c,clsName,cl.cap));
+    });
   });
 
   return assignments;
 }
 
-// Suggest a class name for ONE new child (registration form), based on current occupancy
-// of the branch's active children — same age/schedule/merge rules as the bulk assignment tool.
+// Suggest a class name for ONE new child (registration form): runs the same bulk
+// assignment with the new child included and returns the class they land in.
 function _suggestClassName(dob, kidsTime){
   if(!dob) return '';
-  const mo=_ageMonths(dob);
-  const asgn=_buildClassAssignments();
-
-  if(mo<INFANT_MAX_MO){
-    const cnt={};
-    asgn.forEach(a=>{ if(a.newClass==='A'||a.newClass.startsWith('B')) cnt[a.newClass]=(cnt[a.newClass]||0)+1; });
-    for(const name of ['A','B']){ if((cnt[name]||0)<4) return name; }
-    let n=2;
-    while(true){ const name='B'+n; if((cnt[name]||0)<4) return name; n++; }
-  }
-
-  const tg=_getTimeGroup(kidsTime)||'other';
-  const letter=SCHEDULE_LETTER[tg]||'X';
-  const sameSchedule=asgn.filter(a=>a.newClass===letter || (a.newClass.startsWith(letter) && /^\d+$/.test(a.newClass.slice(letter.length))));
-  if(!sameSchedule.length) return letter; // first child on this schedule — starts the first class
-  const groups={};
-  sameSchedule.forEach(a=>{ (groups[a.newClass]=groups[a.newClass]||[]).push(_ageMonths(a.dob)); });
-  let best=letter, bestDiff=Infinity;
-  Object.entries(groups).forEach(([name,ages])=>{
-    const avg=ages.reduce((s,v)=>s+v,0)/ages.length;
-    const diff=Math.abs(avg-mo);
-    if(diff<bestDiff){ bestDiff=diff; best=name; }
-  });
-  return best;
+  const probe={id:'__new__',name:'__new__',dob,kidsTime:kidsTime||'',className:''};
+  const a=_buildClassAssignments([probe]).find(x=>x.id==='__new__');
+  return a?a.newClass:'';
 }
 
 // Auto-fills the registration form's Class Name field as the manager enters DOB/Kids Time —
@@ -15045,7 +15072,7 @@ function previewAutoClasses(){
   const noTime=asgn.filter(a=>a.noChange);
   const changed=asgn.filter(a=>!a.noChange&&a.oldClass!==a.newClass).length;
 
-  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
+  const classColorsBase={A:'#7c3aed',B:'#8b5cf6',C:'#be185d',CS:'#be185d',CF:'#be185d',CN:'#be185d',CX:'#be185d',D:'#15803d',DS:'#15803d',DF:'#15803d',DN:'#15803d',DX:'#15803d',E:'#d97706',S:'#1d4ed8',F:'#dc2626',N:'#0e7490',X:'#6b7280'};
   const colorForClass=cls=>classColorsBase[cls]||classColorsBase[String(cls).replace(/\d+$/,'')]||'#6b7280';
 
   box.innerHTML=`
@@ -17456,17 +17483,20 @@ function openAutoAssignClasses(){
   const suggestions=asgn.map(a=>({
     id:a.id, name:a.name, dob:a.dob, kidsTime:a.kidsTime, className:a.oldClass,
     ageM:_ageMonths(a.dob),
-    suggested:a.newClass,
+    suggested:a.newClass, cap:a.cap,
     changed:!a.noChange && a.newClass!==a.oldClass
   })).sort((a,b)=>a.suggested.localeCompare(b.suggested)||(a.ageM-b.ageM));
   const classCounts={};
-  suggestions.forEach(c=>{classCounts[c.suggested]=(classCounts[c.suggested]||0)+1;});
+  const classCaps={};
+  suggestions.forEach(c=>{classCounts[c.suggested]=(classCounts[c.suggested]||0)+1; classCaps[c.suggested]=c.cap;});
   const changed=suggestions.filter(c=>c.changed);
   const unchanged=suggestions.filter(c=>!c.changed);
   const summaryHtml=Object.keys(classCounts).sort().map(k=>{
     const cnt=classCounts[k];
-    const col=cnt>15?'#dc2626':cnt>12?'#d97706':'#059669';
-    return`<span style="background:${col}20;border:1.5px solid ${col};border-radius:7px;padding:2px 10px;font-size:.8rem;font-weight:800;color:${col}">${k}: ${cnt}${cnt>15?' ⚠️':''}</span>`;
+    const cap=classCaps[k]||17;
+    const infant=/^(A|Bd*)$/.test(k);
+    const col=cnt>cap?'#dc2626':(!infant&&cnt<MIN_CLASS_SIZE)?'#d97706':'#059669';
+    return`<span style="background:${col}20;border:1.5px solid ${col};border-radius:7px;padding:2px 10px;font-size:.8rem;font-weight:800;color:${col}">${k}: ${cnt}${cnt>cap?' ⚠️':''}</span>`;
   }).join(' ');
   const ov=document.createElement('div');
   ov.id='auto-class-ov';
