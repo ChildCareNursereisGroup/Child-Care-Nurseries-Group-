@@ -2420,7 +2420,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-17-1';
+const APP_VERSION='2026-11-17-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -6981,17 +6981,12 @@ function calcEOSPayment(){
   const diffMs = end - start;
   if(diffMs < 0){ el('eos-pay-calc').innerHTML='<div style="color:#dc2626;font-size:.8rem">⚠️ End date before start date</div>'; return; }
 
-  const totalDays = Math.floor(diffMs/(1000*60*60*24)) + Number(s.daysWorkedBefore||0);
-  const years = totalDays/365;
+  slrEnsure(calcEOSPayment);
   const dailyRate = basic/30;
 
-  // Gratuity calculation (UAE Federal Decree No. 33/2021 — full gratuity, no resignation penalty)
-  let gratuity = 0;
-  if(years >= 1){
-    const yrs1to5 = Math.min(years, 5);
-    const yrsAfter5 = Math.max(0, years - 5);
-    gratuity = (dailyRate * 21 * yrs1to5) + (dailyRate * 30 * yrsAfter5);
-  }
+  // Gratuity (UAE Federal Decree-Law 33/2021 art. 51) on actual service: unpaid absence days removed
+  const _g = slrGratuity(staffId, endDate);
+  const totalDays = Math.round(_g.days), years = _g.years, gratuity = _g.amount;
 
   // Leave balance
   const leaveData = calcLeaveBalance(staffId, endDate);
@@ -7003,7 +6998,7 @@ function calcEOSPayment(){
 
   el('eos-pay-calc').innerHTML = `
     <div style="background:#ede9fe;border-radius:8px;padding:10px;font-size:.78rem;color:#5b21b6">
-      <b>${s.name}</b> | Service: ${years.toFixed(2)} years (${totalDays} days) | 
+      <b>${s.name}</b> | Service: ${years.toFixed(2)} years (${totalDays} days after removing ${slrNum(_g.unpaid)} unpaid absence days) | 
       Basic: ${fmtNum(basic)} AED/month | Daily: ${fmtNum(dailyRate.toFixed(2))} AED
     </div>`;
 
@@ -18482,6 +18477,7 @@ function openStaffLeaveDashboard(staffId){
   el('staff-leave-dashboard-modal').classList.add('on');
   const body = el('staff-leave-dashboard-body');
   body.innerHTML = '<div style="text-align:center;padding:20px;color:#6b7280">⏳ جاري الحساب...</div>';
+  if(!slrEnsure(()=>openStaffLeaveDashboard(staffId))) return;
 
   setTimeout(()=>{
     const bal       = calcLeaveBalance(s.id);
@@ -18523,15 +18519,14 @@ function openStaffLeaveDashboard(staffId){
     const alarm         = remaining >= 15; // UAE law: can't accumulate more than 30 days
 
     // ── Gratuity calculation ──
-    const gratuityYears = getServiceYears(s.id); // calendar-based (UAE labour law), not attendance count
-    let gratuity = 0, gratuityBreakdown = '';
+    const _g = slrGratuity(s.id); // actual service: unpaid absence days removed (UAE law art. 51)
+    const gratuityYears = _g.years;
+    let gratuity = _g.amount, gratuityBreakdown = '';
     if(gratuityYears >= 1){
-      const y1to5   = Math.min(gratuityYears, 5);
-      const yAfter5 = Math.max(0, gratuityYears-5);
-      gratuity = (basic/30)*21*y1to5 + (basic/30)*30*yAfter5;
-      gratuityBreakdown = yAfter5>0
-        ? `(${y1to5.toFixed(2)} سنة × 21 يوم) + (${yAfter5.toFixed(2)} سنة × 30 يوم)`
-        : `${y1to5.toFixed(2)} سنة × 21 يوم`;
+      gratuityBreakdown = (_g.y2>0
+        ? `(${_g.y1.toFixed(2)} سنة × 21 يوم) + (${_g.y2.toFixed(2)} سنة × 30 يوم)`
+        : `${_g.y1.toFixed(2)} سنة × 21 يوم`)
+        + ` — مدة الخدمة ${Math.round(_g.days)} يوم بعد خصم ${slrNum(_g.unpaid)} يوم غياب بدون أجر`;
     }
 
     // ── Month-by-month salary history ──
@@ -26154,7 +26149,8 @@ async function slrLoad(force){
       const r1=await sb.from('staff_leave_opening').select('*');
       if(!r1.error){
         tables=true;
-        (r1.data||[]).forEach(x=>{ opening[String(x.staff_id)]={asOf:String(x.as_of||'').slice(0,10),start:String(x.start_used||'').slice(0,10),basedOn:x.based_on||'',worked:Number(x.worked_days||0),taken:Number(x.leave_taken||0),note:x.note||''}; });
+        (r1.data||[]).forEach(x=>{ opening[String(x.staff_id)]={asOf:String(x.as_of||'').slice(0,10),start:String(x.start_used||'').slice(0,10),basedOn:x.based_on||'',worked:Number(x.worked_days||0),taken:Number(x.leave_taken||0),note:x.note||'',
+          serviceStart:String(x.service_start||'').slice(0,10),unpaidBefore:(x.unpaid_before===null||x.unpaid_before===undefined)?null:Number(x.unpaid_before)}; });
         const hr=await fetchAll(()=>sb.from('staff_leave_history').select('staff_id,month,present,absent,sick,annual_leave,notes').order('staff_id').order('month'));
         hr.forEach(x=>{ const k=String(x.staff_id); (history[k]=history[k]||[]).push({m:x.month,p:x.present,a:x.absent,s:x.sick,l:x.annual_leave,n:x.notes||''}); });
       }
@@ -26175,7 +26171,13 @@ async function slrLoad(force){
 
 // All known daily records of one staff member: the long list of non-present days + whatever the screens loaded.
 function slrDayMap(staffId, extra){
-  const k=String(staffId), m=Object.assign({},SLR.att[k]||{},extra||{});
+  const k=String(staffId), m=Object.assign({},SLR.att[k]||{});
+  SLR.leaves.forEach(l=>{
+    if(l.staffId!==k||l.type!=='unpaid'||l.status==='rejected'||!l.start) return;
+    const e=l.end||l.start; let n=0;
+    for(let d=l.start; d<=e&&n<400; d=slrAdd(d,1),n++) m[d]='غياب';
+  });
+  Object.assign(m,extra||{});
   Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{ const st=map&&(map[staffId]||map[k]); if(st) m[date]=st; });
   return m;
 }
@@ -26210,6 +26212,64 @@ function slrLeaveDaysIn(staffId, types, from, to){
   return t;
 }
 
+// Unpaid absence days between two dates, month by month, so an absence typed only in
+// "Monthly Entry" (no daily marks) is not missed.
+function slrUnpaidTotal(s, from, end, map, hist){
+  let unpaid=0;
+  for(let a=from; a&&end&&a<=end; ){
+    const mon=a.slice(0,7), dim=new Date(Number(mon.slice(0,4)),Number(mon.slice(5,7)),0).getDate();
+    const mEnd=mon+'-'+String(dim).padStart(2,'0'), b=mEnd<end?mEnd:end;
+    let u=slrUnpaid(s.id,a,b,map);
+    if(a===mon+'-01'&&b===mEnd){
+      const e=(hist||[]).find(r=>r.month===mon);
+      if(e&&e.absentDays!==undefined&&e.absentDays!==null) u=Math.max(u,Math.max(0,Number(e.absentDays||0)-Number(e.annualLeaveDays||0))+Number(e.unpaidLeaveDays||0));
+    }
+    unpaid+=u; a=slrAdd(b,1);
+  }
+  return unpaid;
+}
+
+// Length of service for the end-of-service gratuity: calendar days from the start of service
+// minus every day of absence without pay (UAE Decree-Law 33/2021, art. 51). Sick leave and
+// approved paid leave stay in.
+function slrService(staffId, endDateStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId)); if(!s) return null;
+  const o=SLR.opening[String(s.id)], now=today();
+  const end=endDateStr||((s.lastWorkingDay&&s.lastWorkingDay<now)?s.lastWorkingDay:now);
+  const map=slrDayMap(s.id), hist=(typeof getSalaryHistory==='function'?getSalaryHistory(s.id):[])||[];
+  let start, unpaid, days, source;
+  if(o&&o.serviceStart&&o.unpaidBefore!==null&&end>=o.asOf){
+    start=o.serviceStart; source='history';
+    unpaid=o.unpaidBefore+slrUnpaidTotal(s,slrAdd(o.asOf,1),end,map,hist);
+    days=slrDiff(start,end)-unpaid;
+  } else {
+    start=s.contractStart||''; source='attendance';
+    if(!start) return null;
+    unpaid=slrUnpaidTotal(s,start,end,map,hist);
+    days=slrDiff(start,end)+Number(s.daysWorkedBefore||0)-unpaid;
+  }
+  days=Math.max(0,days);
+  return {start,end,days,years:days/365,unpaid,source};
+}
+// Gratuity (art. 51): nothing before one full year; 21 days of BASIC wage per year for the first
+// five years, 30 days per year after that; part of a year pro rata; never more than two years' wage.
+function slrGratuity(staffId, endDateStr){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const sv=slrService(staffId,endDateStr), basic=Number(s?.basicSalary||0);
+  const out={start:sv?.start||'',end:sv?.end||'',days:sv?.days||0,years:sv?.years||0,unpaid:sv?.unpaid||0,basic,amount:0,y1:0,y2:0,capped:false};
+  if(!sv||out.years<1) return out;
+  out.y1=Math.min(out.years,5); out.y2=Math.max(0,out.years-5);
+  out.amount=(basic/30)*21*out.y1+(basic/30)*30*out.y2;
+  if(out.amount>basic*24){ out.amount=basic*24; out.capped=true; }
+  return out;
+}
+// Screens opened before the leave data arrived redraw themselves once it is there.
+function slrEnsure(redraw){
+  if(SLR.loaded) return true;
+  slrLoad().then(()=>{ try{ redraw&&redraw(); }catch(e){} }).catch(()=>{});
+  return false;
+}
+
 // The whole calculation for one staff member, as it stands on a given day.
 function slrCalc(staffId, onDate){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
@@ -26224,19 +26284,8 @@ function slrCalc(staffId, onDate){
   const anchor=o?o.asOf:start;                 // day the count continues from
   const from=o?slrAdd(o.asOf,1):start;         // first day checked for absence
   const cal=Math.max(0,slrDiff(anchor,end));
-  // month by month, so an absence typed only in "Monthly Entry" (no daily marks) is not missed
-  let unpaid=0;
   const hist=(typeof getSalaryHistory==='function'?getSalaryHistory(s.id):[])||[];
-  for(let a=from; a<=end; ){
-    const mon=a.slice(0,7), dim=new Date(Number(mon.slice(0,4)),Number(mon.slice(5,7)),0).getDate();
-    const mEnd=mon+'-'+String(dim).padStart(2,'0'), b=mEnd<end?mEnd:end;
-    let u=slrUnpaid(s.id,a,b,map);
-    if(a===mon+'-01'&&b===mEnd){
-      const e=hist.find(r=>r.month===mon);
-      if(e&&e.absentDays!==undefined&&e.absentDays!==null) u=Math.max(u,Math.max(0,Number(e.absentDays||0)-Number(e.annualLeaveDays||0))+Number(e.unpaidLeaveDays||0));
-    }
-    unpaid+=u; a=slrAdd(b,1);
-  }
+  const unpaid=slrUnpaidTotal(s,from,end,map,hist);
   const worked=Math.max(0,(o?o.worked:Number(s.daysWorkedBefore||0))+cal-unpaid);
   const years=Math.floor(worked/365), earned=years*30;
   // leave used: requests (annual leave or allowance paid in cash) vs the monthly entries — the bigger of the two
@@ -26366,7 +26415,7 @@ function slrReportHTML(staffId, fullMap){
     <tbody>${Object.keys(years).sort().map(y=>`<tr><td>${y}</td><td>${slrNum(years[y].p)}</td><td>${slrNum(years[y].a)}</td><td>${slrNum(years[y].s)}</td><td>${slrNum(years[y].l)}</td></tr>`).join('')}</tbody></table>
     <div class="ft${c.due?' due':''}">${slrEsc(foot)}</div>
     ${c.due?`<div class="al">LEAVE ALLOWANCE DUE: ${slrNum(c.balance)} days = ${Number(c.aed).toLocaleString('en')} AED (30 days = one full monthly salary)</div>`:''}
-    <div class="sm">Sick leave in the last ${SLR_SICK_WINDOW_MONTHS} months: ${slrNum(sickWin)} of ${SLR_SICK_FULL} fully paid days.${c.hasOpening?' Months up to the opening date ('+slrDMY(c.anchor)+') are from the reviewed records; later months are counted automatically from the daily staff attendance.':' Counted from the contract start date and the daily staff attendance.'}${c.note?' Note: '+slrEsc(c.note):''}</div>
+    <div class="sm">Sick leave in the last ${SLR_SICK_WINDOW_MONTHS} months: ${slrNum(sickWin)} of ${SLR_SICK_FULL} fully paid days (per year after probation: ${SLR_SICK_FULL} days full pay, next 30 days half pay, next 45 days unpaid).${c.hasOpening?' Months up to the opening date ('+slrDMY(c.anchor)+') are from the reviewed records; later months are counted automatically from the daily staff attendance.':' Counted from the contract start date and the daily staff attendance.'}${c.note?' Note: '+slrEsc(c.note):''}</div>
     <div class="sg"><span>Prepared on ${slrDMY(today())}</span><span>Employee signature: ____________________</span><span>Management: ____________________</span></div>
   </div>`;
 }
@@ -26516,6 +26565,7 @@ function getAbsenceDaysInRange(staffId, fromDateStr, toDateStr){
 }
 
 function getServiceYears(staffId, endDateStr){
+  if(typeof SLR!=='undefined'&&SLR.loaded){ const sv=slrService(staffId,endDateStr); if(sv) return sv.years; }
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
   if(!s||!s.contractStart) return 0;
   const endStr=endDateStr||today();
@@ -26792,9 +26842,11 @@ function calcEOG(){
   const diffMs=end-start;
   if(diffMs<0){ res.innerHTML=`<div class="alert aerr">⚠️ تاريخ الانتهاء قبل تاريخ البداية</div>`; return; }
 
-  // Gratuity is based on calendar length of service (UAE labour law), not attendance records
+  // Gratuity is based on actual service: calendar days minus every unpaid absence day (art. 51)
+  slrEnsure(calcEOG);
   const actualDays = getActualWorkDaysCount(s.id); // informational only
-  const years = getServiceYears(s.id, endDate);
+  const _g = slrGratuity(s.id, endDate);
+  const years = SLR.loaded ? _g.years : getServiceYears(s.id, endDate);
   const totalDays = Math.round(years*365);
   const usingActual=false;
   const basic=Number(s.basicSalary||0);
@@ -26821,8 +26873,10 @@ function calcEOG(){
       ? `(${yrs1to5.toFixed(2)} yrs × 21 days) + (${yrsAfter5.toFixed(2)} yrs × 30 days)`
       : `${yrs1to5.toFixed(2)} yrs × 21 days`;
 
-    // Federal Decree No. 33/2021: Full gratuity regardless of resignation or termination
-    gratuity = fullGratuity;
+    // Federal Decree No. 33/2021: Full gratuity regardless of resignation or termination,
+    // never more than two years' wage
+    gratuity = Math.min(fullGratuity, basic*24);
+    if(fullGratuity>basic*24) gratuityBreakdown += ' — capped at 2 years of wage';
     if(reason==='resignation')       gratuityNote='Resignation: Full gratuity (Federal Decree No. 33/2021)';
     else if(reason==='termination')  gratuityNote='Termination by employer: Full gratuity';
     else                             gratuityNote='End of contract: Full gratuity';
@@ -26887,7 +26941,7 @@ function calcEOG(){
       <div style="font-weight:900;color:#065f46;font-size:1rem;margin-bottom:12px">📋 End of Service Calculation — ${s.name}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <div class="sc"><div class="si">📅</div><div class="sv">${Math.floor(years)} yr ${Math.floor((years%1)*12)} mo</div><div class="sk">Service Duration ${usingActual?'(Actual)':'(Contract)'}</div></div>
-        <div class="sc"><div class="si">🗓️</div><div class="sv">${totalDays}</div><div class="sk">Total Working Days</div></div>
+        <div class="sc"><div class="si">🗓️</div><div class="sv">${totalDays}</div><div class="sk">Service Days (after removing ${SLR.loaded?slrNum(_g.unpaid):'0'} unpaid absence days)</div></div>
         <div class="sc"><div class="si">💰</div><div class="sv">${fmtNum(basic)}</div><div class="sk">Basic Salary (AED)</div></div>
         <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining} days</div><div class="sk">Remaining Leave Balance</div></div>
         <div class="sc"><div class="si">📆</div><div class="sv">${fmtNum(dailyRate)}</div><div class="sk">Daily Rate (AED)</div></div>
@@ -28486,12 +28540,9 @@ async function renderLeaveAttDashboard(){
     // Gratuity estimate
     const basic   = Number(s.basicSalary||0);
     const gross   = Number(s.grossSalary||s.basicSalary||0);
-    const gratuityYears = getServiceYears(s.id); // calendar-based (UAE labour law), not attendance count
-    let gratuity=0;
-    if(gratuityYears>=1){
-      const y1=Math.min(gratuityYears,5), y2=Math.max(0,gratuityYears-5);
-      gratuity=Math.round((basic/30)*21*y1+(basic/30)*30*y2);
-    }
+    const _g = slrGratuity(s.id); // actual service: unpaid absence days removed (UAE law art. 51)
+    const gratuityYears = _g.years;
+    const gratuity = Math.round(_g.amount);
 
     const recentRows = recent.length ? recent.map(r=>`
       <td style="padding:4px 6px;font-size:.72rem;color:#6b7280">${r.month}</td>
@@ -28572,7 +28623,7 @@ async function renderLeaveAttDashboard(){
         <div style="padding:10px 12px;text-align:center">
           <div style="font-size:.65rem;color:#6b7280;margin-bottom:3px">🏁 Gratuity Est.</div>
           <div style="font-size:1.1rem;font-weight:900;color:#0369a1">${gratuity>0?fmtNum(gratuity)+' AED':'< 1 year'}</div>
-          <div style="font-size:.62rem;color:#9ca3af">Based on ${totalD} days</div>
+          <div style="font-size:.62rem;color:#9ca3af">${Math.round(_g.days)} service days (−${slrNum(_g.unpaid)} unpaid)</div>
         </div>
       </div>
 
