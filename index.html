@@ -1619,6 +1619,27 @@ main{padding:12px;max-width:960px;margin:0 auto}
       style="padding:8px 18px;background:#fff;color:#374151;border:none;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer">
       📅 Monthly Entry — إدخال الشهور
     </button>
+    <button id="lad-view-leave365-btn" onclick="ladShowView('leave365',this)"
+      style="padding:8px 18px;background:#fff;color:#374151;border:none;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer">
+      📄 Leave Report — تقرير الإجازات (365 يوم)
+    </button>
+  </div>
+
+  <!-- ═══ VIEW 3: LEAVE REPORT (365 worked days) ═══ -->
+  <div id="lad-view-leave365" style="display:none">
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <select id="slr-branch-filter" onchange="renderSLR()"
+        style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.8rem">
+        <option value="all">🏢 All Branches</option>
+      </select>
+      <input type="text" id="slr-search" placeholder="🔍 Search staff..." oninput="renderSLR()"
+        style="padding:6px 10px;border:1.5px solid var(--border);border-radius:9px;font-family:'Tajawal',sans-serif;font-size:.8rem;min-width:160px">
+      <button onclick="renderSLR(true)" style="background:#1e3a8a;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">🔄 Refresh</button>
+      <button onclick="slrPrintSummary()" style="background:#059669;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">🖨️ Print summary</button>
+      <button onclick="slrPrintAll()" style="background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:6px 13px;cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;font-size:.8rem">📄 Print all reports</button>
+    </div>
+    <div id="slr-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px"></div>
+    <div id="slr-content"></div>
   </div>
 
   <!-- ═══ VIEW 1: OVERVIEW ═══ -->
@@ -2399,7 +2420,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-10-1';
+const APP_VERSION='2026-11-17-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -3757,6 +3778,7 @@ function renderDashboard(){
   const tot=VK().length;const act=VK().filter(c=>!c.leaveDate).length;
   const income=DB.receipts.filter(r=>!r.isCancelled).reduce((s,r)=>s+r.total,0);const bus=VK().filter(c=>(c.bus==='Yes'||c.bus==='نعم')&&!c.leaveDate).length;
   el('htot').textContent=act;
+  slrDashAlarm();
   el('dstats').innerHTML=`
     <div class="sc"><div class="si">👧</div><div class="sv">${act}</div><div class="sk">${t('activeChildren')}</div></div>
     ${curRole==='admin'?`<div class="sc"><div class="si">💵</div><div class="sv">${fmtNum(income)}</div><div class="sk">${t('totalRevenue')}</div></div>`:''}
@@ -15933,6 +15955,7 @@ async function loadStaff(){
       }
     }
   }
+  try{ slrDashAlarm(); }catch(e){}
 }
 
 let _staffAttLoading=false;
@@ -26100,6 +26123,340 @@ function populateLeaveStaffFilter(){
     DB.staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
 }
 
+// ═══════════════════════════════════════════════
+//  STAFF LEAVE REPORT — 30 days for every completed 365 WORKED days
+//  Owner's rule (Nov 2026): unpaid absence only DELAYS the year; sick leave and approved
+//  leave do not. Old history (before the system) comes from the owner's final Excel:
+//    staff_leave_opening  = one row per staff: worked days + leave taken on a given date
+//    staff_leave_history  = one row per staff per month (present / absent / sick / annual leave)
+//  From the opening date onward everything is counted from the daily staff attendance.
+//  If the two tables are not there, it falls back to the contract start date.
+// ═══════════════════════════════════════════════
+const SLR_SICK_FULL=15;          // fully paid sick days ...
+const SLR_SICK_WINDOW_MONTHS=12; // ... per this many months (UAE Labour Law art. 31: per year)
+const SLR_SOON_DAYS=30;          // "coming soon" window for the alarm
+const SLR={loaded:false,loading:null,tables:false,opening:{},history:{},att:{},leaves:[]};
+
+function slrD(iso){ return new Date(String(iso).slice(0,10)+'T00:00:00'); }
+function slrIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function slrAdd(iso,n){ const d=slrD(iso); d.setDate(d.getDate()+n); return slrIso(d); }
+function slrDiff(a,b){ return Math.round((slrD(b)-slrD(a))/86400000); }
+function slrNum(x){ const n=Math.round(Number(x||0)*100)/100; return String(n); }
+function slrEsc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function slrDMY(iso){ if(!iso) return '—'; const p=String(iso).slice(0,10).split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:String(iso); }
+
+async function slrLoad(force){
+  if(SLR.loaded&&!force) return;
+  if(SLR.loading) return SLR.loading;
+  SLR.loading=(async()=>{
+    const opening={},history={},att={};let leaves=[],tables=false;
+    try{
+      const r1=await sb.from('staff_leave_opening').select('*');
+      if(!r1.error){
+        tables=true;
+        (r1.data||[]).forEach(x=>{ opening[String(x.staff_id)]={asOf:String(x.as_of||'').slice(0,10),start:String(x.start_used||'').slice(0,10),basedOn:x.based_on||'',worked:Number(x.worked_days||0),taken:Number(x.leave_taken||0),note:x.note||''}; });
+        const hr=await fetchAll(()=>sb.from('staff_leave_history').select('staff_id,month,present,absent,sick,annual_leave,notes').order('staff_id').order('month'));
+        hr.forEach(x=>{ const k=String(x.staff_id); (history[k]=history[k]||[]).push({m:x.month,p:x.present,a:x.absent,s:x.sick,l:x.annual_leave,n:x.notes||''}); });
+      }
+    }catch(e){ console.warn('slrLoad tables:',e); }
+    try{
+      // Every day that is NOT a normal present day, all time (a small list). The screens keep only 3 months.
+      const rows=await fetchAll(()=>sb.from('staff_attendance').select('staff_id,date,status').neq('status','حضور').order('date').order('staff_id'));
+      rows.forEach(x=>{ const k=String(x.staff_id); (att[k]=att[k]||{})[x.date]=x.status; });
+    }catch(e){ console.warn('slrLoad attendance:',e); }
+    try{
+      const lv=await fetchAll(()=>sb.from('staff_leaves').select('staff_id,type,start_date,end_date,days,status').order('start_date').order('staff_id'));
+      leaves=lv.map(x=>({staffId:String(x.staff_id),type:x.type||'annual',start:x.start_date||'',end:x.end_date||x.start_date||'',days:Number(x.days||0),status:x.status||'approved'}));
+    }catch(e){ console.warn('slrLoad leaves:',e); }
+    Object.assign(SLR,{opening,history,att,leaves,tables,loaded:true});
+  })();
+  try{ await SLR.loading; } finally{ SLR.loading=null; }
+}
+
+// All known daily records of one staff member: the long list of non-present days + whatever the screens loaded.
+function slrDayMap(staffId, extra){
+  const k=String(staffId), m=Object.assign({},SLR.att[k]||{},extra||{});
+  Object.entries(DB.staffAtt||{}).forEach(([date,map])=>{ const st=map&&(map[staffId]||map[k]); if(st) m[date]=st; });
+  return m;
+}
+
+// Unpaid absence days between two dates (both included). Same rule as payroll: a day off or an
+// approved-leave day counts as absence only when it sits next to a real absence.
+function slrUnpaid(staffId, from, to, map){
+  if(!from||!to||to<from) return 0;
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  const workDays=(s?.workDays||'0,1,2,3,4').split(',').map(Number);
+  let absent=0;
+  for(let d=from; d<=to; d=slrAdd(d,1)){
+    const st=map[d];
+    if(st&&st!=='إجازة'){ if(st==='غياب') absent+=1; else if(st==='نص يوم') absent+=0.5; continue; }
+    if(st||!workDays.includes(slrD(d).getDay())){
+      const p=_nearestAttStatus(map,workDays,d,-1,from,to), n=_nearestAttStatus(map,workDays,d,1,from,to);
+      if(p==='غياب'||n==='غياب') absent++;
+    }
+  }
+  return absent;
+}
+
+function slrLeaveDaysIn(staffId, types, from, to){
+  let t=0;
+  SLR.leaves.forEach(l=>{
+    if(l.staffId!==String(staffId)||!types.includes(l.type)||l.status==='rejected'||!l.start) return;
+    const a=l.start>from?l.start:from, b=(l.end||l.start)<to?(l.end||l.start):to;
+    if(b<a) return;
+    const span=slrDiff(a,b)+1;
+    t+=(l.start>=from&&(l.end||l.start)<=to)?(l.days||span):Math.min(span,l.days||span);
+  });
+  return t;
+}
+
+// The whole calculation for one staff member, as it stands on a given day.
+function slrCalc(staffId, onDate){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  if(!s) return null;
+  const k=String(s.id), o=SLR.opening[k], now=onDate||today();
+  const end=(s.lastWorkingDay&&s.lastWorkingDay<now)?s.lastWorkingDay:now;
+  const start=o?o.start:(s.contractStart||'');
+  const gross=Number(s.grossSalary||s.basicSalary||0);
+  const base={s,start,basedOn:o?o.basedOn:'Contract start',hasOpening:!!o,note:o?o.note:'',gross};
+  if(!start) return Object.assign(base,{noStart:true,worked:0,years:0,earned:0,taken:0,balance:0,aed:0,next:'',due:false,soon:false,status:'No start date in the staff file'});
+  const map=slrDayMap(s.id);
+  const anchor=o?o.asOf:start;                 // day the count continues from
+  const from=o?slrAdd(o.asOf,1):start;         // first day checked for absence
+  const cal=Math.max(0,slrDiff(anchor,end));
+  // month by month, so an absence typed only in "Monthly Entry" (no daily marks) is not missed
+  let unpaid=0;
+  const hist=(typeof getSalaryHistory==='function'?getSalaryHistory(s.id):[])||[];
+  for(let a=from; a<=end; ){
+    const mon=a.slice(0,7), dim=new Date(Number(mon.slice(0,4)),Number(mon.slice(5,7)),0).getDate();
+    const mEnd=mon+'-'+String(dim).padStart(2,'0'), b=mEnd<end?mEnd:end;
+    let u=slrUnpaid(s.id,a,b,map);
+    if(a===mon+'-01'&&b===mEnd){
+      const e=hist.find(r=>r.month===mon);
+      if(e&&e.absentDays!==undefined&&e.absentDays!==null) u=Math.max(u,Math.max(0,Number(e.absentDays||0)-Number(e.annualLeaveDays||0))+Number(e.unpaidLeaveDays||0));
+    }
+    unpaid+=u; a=slrAdd(b,1);
+  }
+  const worked=Math.max(0,(o?o.worked:Number(s.daysWorkedBefore||0))+cal-unpaid);
+  const years=Math.floor(worked/365), earned=years*30;
+  // leave used: requests (annual leave or allowance paid in cash) vs the monthly entries — the bigger of the two
+  const reqTaken=SLR.leaves.filter(l=>l.staffId===k&&(l.type==='annual'||l.type==='compensation')&&l.status!=='rejected'&&(!o||l.start>o.asOf)).reduce((t,l)=>t+(l.days||0),0);
+  const entTaken=hist.filter(r=>!o||r.month>o.asOf.slice(0,7)).reduce((t,r)=>t+Number(r.annualLeaveDays||0),0);
+  const taken=(o?o.taken:Number(s.leavesTakenBefore||0))+Math.max(reqTaken,entTaken);
+  const balance=Math.max(0,earned-taken);
+  const toNext=365-(worked-years*365);
+  const next=slrAdd(end,Math.max(1,Math.floor(toNext)));
+  const left=s.lastWorkingDay&&s.lastWorkingDay<now;
+  const due=balance>0, soon=!left&&slrDiff(now,next)<=SLR_SOON_DAYS;
+  const status=due?('DUE: '+slrNum(balance)+' days due'):(years>0?'Up to date - next on '+next:'Not yet - first on '+next);
+  return Object.assign(base,{worked,years,earned,taken,balance,advance:Math.max(0,taken-earned),aed:Math.round(balance*gross/30),next,due,soon,status,unpaidSince:unpaid,anchor,end});
+}
+
+function slrActiveStaff(bf){
+  const seen=new Set();
+  return (DB.staff||[]).filter(s=>{
+    if(s.lastWorkingDay&&s.lastWorkingDay<today()) return false;
+    if(bf&&bf!=='all'&&String(s.branchId)!==String(bf)&&String(s.workBranch)!==String(bf)) return false;
+    if(seen.has(String(s.id))) return false; seen.add(String(s.id)); return true;
+  });
+}
+function slrBranchName(s){ const b=BRANCHES.find(x=>x.id===s.branchId); return b?(b.en||b.ar||''):''; }
+
+// ── Summary screen (Staff → Leave & Attendance → Leave report) ──
+async function renderSLR(force){
+  const box=el('slr-content'); if(!box) return;
+  const sel=el('slr-branch-filter');
+  if(sel&&sel.options.length<2) sel.innerHTML='<option value="all">🏢 All Branches</option>'+BRANCHES.map(b=>`<option value="${b.id}">${b.icon||''} ${slrEsc(b.en||b.ar)}</option>`).join('');
+  if(!SLR.loaded||force) box.innerHTML='<div style="text-align:center;padding:30px;color:#6b7280">⏳ Loading…</div>';
+  await slrLoad(force);
+  const bf=sel?.value||'all', q=(el('slr-search')?.value||'').toLowerCase();
+  const rows=slrActiveStaff(bf).filter(s=>!q||(s.name||'').toLowerCase().includes(q)).map(s=>slrCalc(s.id)).filter(Boolean)
+    .sort((a,b)=>slrBranchName(a.s).localeCompare(slrBranchName(b.s))||(a.s.name||'').localeCompare(b.s.name||''));
+  const dueN=rows.filter(r=>r.due).length, soonN=rows.filter(r=>!r.due&&r.soon).length, aed=rows.reduce((t,r)=>t+r.aed,0);
+  el('slr-summary').innerHTML=`
+    <div class="sbox" style="background:#e0f2fe"><div class="sv" style="color:#0369a1">${rows.length}</div><div class="sk">Active Staff</div></div>
+    <div class="sbox sr"><div class="sv">${dueN}</div><div class="sk">🔔 Leave allowance DUE</div></div>
+    <div class="sbox sy"><div class="sv">${soonN}</div><div class="sk">⏳ Due within ${SLR_SOON_DAYS} days</div></div>
+    <div class="sbox" style="background:#fdf4ff"><div class="sv" style="color:#5b21b6">${Number(aed).toLocaleString('en')}</div><div class="sk">Balance (AED)</div></div>`;
+  const noHist=rows.filter(r=>!r.hasOpening&&!r.noStart).length;
+  const warn=!SLR.tables
+    ? `<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:9px 12px;font-size:.78rem;color:#92400e;margin-bottom:10px">⚠️ The old history (final Excel) is not loaded into the system yet — the figures below are counted from the contract start date only.</div>`
+    : (noHist?`<div style="background:#f1f5f9;border-radius:10px;padding:7px 12px;font-size:.74rem;color:#475569;margin-bottom:10px">ℹ️ ${noHist} staff are not in the final Excel — they are counted from their contract start date (marked “Contract start”).</div>`:'');
+  const td='padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:.76rem;white-space:nowrap';
+  const body=rows.map(r=>{
+    const bg=r.due?'#fef2f2':(r.soon?'#fffbeb':'#fff');
+    const st=r.noStart?`<span style="color:#9ca3af">${r.status}</span>`
+      :r.due?`<span style="background:#dc2626;color:#fff;border-radius:6px;padding:2px 8px;font-weight:800">🔔 ${r.status}</span>`
+      :r.soon?`<span style="background:#f59e0b;color:#fff;border-radius:6px;padding:2px 8px;font-weight:800">⏳ Due on ${r.next}</span>`
+      :`<span style="color:#166534;font-weight:700">${r.status}</span>`;
+    return `<tr style="background:${bg}">
+      <td style="${td}"><button onclick="slrOpenReport('${r.s.id}')" style="background:#1e3a8a;color:#fff;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.72rem;font-weight:700;font-family:'Tajawal',sans-serif">📄 Report</button></td>
+      <td style="${td};font-weight:800;white-space:normal;min-width:150px">${slrEsc(r.s.name)}<div style="font-weight:400;color:#64748b;font-size:.68rem">${slrEsc(slrBranchName(r.s))}</div></td>
+      <td style="${td}">${r.start||'—'}<div style="color:#64748b;font-size:.66rem">${slrEsc(r.basedOn)}</div></td>
+      <td style="${td};text-align:center;font-weight:700">${slrNum(r.worked)}<div style="font-weight:400;color:#64748b;font-size:.66rem">${r.years} year(s)</div></td>
+      <td style="${td};text-align:center">${r.earned} / ${slrNum(r.taken)}</td>
+      <td style="${td};text-align:center;font-weight:800;color:${r.due?'#dc2626':'#1e293b'}">${slrNum(r.balance)}</td>
+      <td style="${td};text-align:center">${r.aed?Number(r.aed).toLocaleString('en'):'0'}</td>
+      <td style="${td};min-width:215px">${st}${r.due&&r.next?`<div style="color:#64748b;font-size:.66rem;margin-top:3px">Next year completes on ${r.next}</div>`:''}${r.note?`<div style="color:#64748b;font-size:.66rem;margin-top:3px;white-space:normal;max-width:240px">${slrEsc(r.note)}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  const th='padding:7px 8px;text-align:left;font-size:.72rem;color:#fff;background:#1e3a8a;white-space:nowrap';
+  box.innerHTML=warn+`<div style="font-size:.74rem;color:#475569;margin-bottom:8px;direction:ltr;text-align:left">Rule: 30 days for every completed 365 worked days from the start date. Unpaid absence delays the year; sick and approved leave do not.</div>
+  <div style="overflow-x:auto;border:1.5px solid #e5e7eb;border-radius:12px;direction:ltr"><table style="border-collapse:collapse;width:100%;direction:ltr">
+    <thead><tr>${['','Employee','Start date used','Worked days','Earned / Taken','Balance (days)','Balance (AED)','Status'].map(h=>`<th style="${th}">${h}</th>`).join('')}</tr></thead>
+    <tbody>${body||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca3af">No staff</td></tr>'}</tbody></table></div>`;
+  window._slrRows=rows;
+}
+
+// ── One report per staff member (same layout as the owner's Excel sheet) ──
+function slrMonthRows(staffId, fullMap){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId)); if(!s) return [];
+  const k=String(s.id), o=SLR.opening[k], now=today();
+  const end=(s.lastWorkingDay&&s.lastWorkingDay<now)?s.lastWorkingDay:now;
+  const rows=((SLR.history[k]||[]).slice().sort((a,b)=>a.m.localeCompare(b.m))).map(r=>({m:r.m,p:r.p,a:r.a,s:r.s,l:r.l,n:r.n||'',src:'history'}));
+  const start=o?o.start:(s.contractStart||'');
+  let mon=rows.length?slrAdd(rows[rows.length-1].m+'-28',7).slice(0,7):(start?start.slice(0,7):now.slice(0,7));
+  const hist=(typeof getSalaryHistory==='function'?getSalaryHistory(s.id):[])||[];
+  const map=slrDayMap(s.id,fullMap);
+  const live=[];
+  for(let guard=0; mon<=end.slice(0,7)&&guard<240; guard++){
+    const dim=new Date(Number(mon.slice(0,4)),Number(mon.slice(5,7)),0).getDate();
+    const mStart=mon+'-01', mEnd=mon+'-'+String(dim).padStart(2,'0');
+    const a=(start&&start>mStart)?start:mStart, b=mEnd<end?mEnd:end;
+    const marks=Object.keys(fullMap||{}).filter(d=>d>=a&&d<=b).length+Object.keys(DB.staffAtt||{}).filter(d=>d>=a&&d<=b&&DB.staffAtt[d]&&(DB.staffAtt[d][s.id]||DB.staffAtt[d][k])).length;
+    const e=hist.find(r=>r.month===mon);
+    if(b>=a&&marks>0){
+      const days=slrDiff(a,b)+1;
+      const unpaid=slrUnpaid(s.id,a,b,map);
+      const leaveMarks=Object.keys(map).filter(d=>d>=a&&d<=b&&map[d]==='إجازة').length;
+      const sick=Math.min(days,slrLeaveDaysIn(s.id,['sick'],a,b));
+      const annual=Math.max(0,Math.min(days,Math.max(slrLeaveDaysIn(s.id,['annual'],a,b),leaveMarks-sick)));
+      const absent=Math.min(days,unpaid+annual);
+      const notes=[]; if(annual) notes.push('Annual leave '+slrNum(annual)+' days'); if(b<mEnd&&mon===now.slice(0,7)) notes.push('Month in progress (to '+slrDMY(b)+')');
+      live.push({m:mon,p:Math.max(0,days-absent-sick),a:absent,s:sick||null,l:annual||null,n:notes.join(' | '),src:'attendance',unpaid});
+    } else if(e&&e.presentDays!==undefined&&e.presentDays!==null){
+      live.push({m:mon,p:Number(e.presentDays||0),a:Number(e.absentDays||0)+Number(e.unpaidLeaveDays||0),s:Number(e.sickDays||0)||null,l:Number(e.annualLeaveDays||0)||null,n:'From Monthly Entry',src:'entry'});
+    } else if(b>=a){
+      live.push({m:mon,p:null,a:null,s:null,l:null,n:'No attendance recorded',src:'none'});
+    }
+    mon=slrAdd(mEnd,1).slice(0,7);
+  }
+  // staff without old history: do not list the empty months before the first month that has data
+  if(!rows.length){ while(live.length&&live[0].src==='none') live.shift(); }
+  return rows.concat(live);
+}
+
+function slrReportHTML(staffId, fullMap){
+  const c=slrCalc(staffId); if(!c) return '';
+  const s=c.s, rows=slrMonthRows(staffId,fullMap);
+  const v=x=>(x===null||x===undefined||x==='')?'':slrNum(x);
+  const years={};
+  rows.forEach(r=>{ const y=r.m.slice(0,4); const t=years[y]=years[y]||{p:0,a:0,s:0,l:0}; t.p+=Number(r.p||0); t.a+=Number(r.a||0); t.s+=Number(r.s||0); t.l+=Number(r.l||0); });
+  const cut=slrAdd(today(),-Math.round(SLR_SICK_WINDOW_MONTHS*30.44)).slice(0,7);
+  const sickWin=rows.filter(r=>r.m>cut).reduce((t,r)=>t+Number(r.s||0),0);
+  const info=[s.nationality?'Nationality: '+slrEsc(s.nationality):'', 'DOB: '+slrDMY(s.dob), 'Start date used: '+slrDMY(c.start)+(c.basedOn?' ('+slrEsc(c.basedOn)+')':''),
+    'Contract: '+slrDMY(s.contractStart)+' - '+slrDMY(s.contractEnd), 'Salary '+Number(c.gross||0).toLocaleString('en')+' (basic '+Number(s.basicSalary||0).toLocaleString('en')+')', 'Status: '+((s.lastWorkingDay&&s.lastWorkingDay<today())?'Left '+slrDMY(s.lastWorkingDay):'Active')].filter(Boolean).join(' | ');
+  const foot=c.noStart?'No start date in the staff file — cannot count the 365 days.'
+    :`Start ${c.start} | ${slrNum(c.worked)} worked days = ${c.years} completed year(s) -> earned ${c.earned} days | Taken ${slrNum(c.taken)} | Balance ${slrNum(c.balance)} days${c.due?' DUE':''} | Next entitlement ${c.next}`;
+  return `<div class="rep">
+    <div class="hd"><img src="data:image/jpeg;base64,${LOGO_B64}" alt=""><div><h1>${slrEsc(s.name)}${s.position?' - '+slrEsc(s.position):''} - ${slrEsc(slrBranchName(s))}</h1><div class="inf">${info}</div></div></div>
+    <table><thead><tr><th>Month</th><th>Days present</th><th>Absent days</th><th>Sick days</th><th>Annual leave (days)</th><th class="nt">Notes</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr${r.src!=='history'?' class="lv"':''}><td>${r.m}</td><td>${v(r.p)}</td><td>${v(r.a)}</td><td>${v(r.s)}</td><td>${v(r.l)}</td><td class="nt">${slrEsc(r.n)}</td></tr>`).join('')||'<tr><td colspan="6">No months recorded yet</td></tr>'}</tbody></table>
+    <table class="tot"><thead><tr><th>TOTALS</th><th>Days present</th><th>Absent days</th><th>Sick days</th><th>Annual leave (days)</th></tr></thead>
+    <tbody>${Object.keys(years).sort().map(y=>`<tr><td>${y}</td><td>${slrNum(years[y].p)}</td><td>${slrNum(years[y].a)}</td><td>${slrNum(years[y].s)}</td><td>${slrNum(years[y].l)}</td></tr>`).join('')}</tbody></table>
+    <div class="ft${c.due?' due':''}">${slrEsc(foot)}</div>
+    ${c.due?`<div class="al">LEAVE ALLOWANCE DUE: ${slrNum(c.balance)} days = ${Number(c.aed).toLocaleString('en')} AED (30 days = one full monthly salary)</div>`:''}
+    <div class="sm">Sick leave in the last ${SLR_SICK_WINDOW_MONTHS} months: ${slrNum(sickWin)} of ${SLR_SICK_FULL} fully paid days.${c.hasOpening?' Months up to the opening date ('+slrDMY(c.anchor)+') are from the reviewed records; later months are counted automatically from the daily staff attendance.':' Counted from the contract start date and the daily staff attendance.'}${c.note?' Note: '+slrEsc(c.note):''}</div>
+    <div class="sg"><span>Prepared on ${slrDMY(today())}</span><span>Employee signature: ____________________</span><span>Management: ____________________</span></div>
+  </div>`;
+}
+
+function slrPrintWindow(title, inner, landscape){
+  const w=window.open('','_blank');
+  if(!w){ alert('Please allow pop-ups to open the report.'); return; }
+  w.document.write(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${slrEsc(title)}</title><style>
+  *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:14px;background:#f1f5f9}
+  .bar{max-width:800px;margin:0 auto 10px;display:flex;gap:8px} .bar button{background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:14px}
+  .rep{background:#fff;max-width:800px;margin:0 auto 16px;padding:18px 20px;border-radius:8px;page-break-after:always} .rep:last-child{page-break-after:auto}
+  .hd{display:flex;gap:12px;align-items:center;border-bottom:2px solid #1e3a8a;padding-bottom:8px;margin-bottom:10px} .hd img{width:58px;height:58px;object-fit:contain}
+  h1{font-size:16px;margin:0 0 4px;color:#1e3a8a} .inf{font-size:11px;color:#444;line-height:1.5}
+  table{border-collapse:collapse;width:100%;margin-bottom:10px;font-size:11.5px} th{background:#1e3a8a;color:#fff;padding:5px 6px;text-align:center;border:1px solid #1e3a8a}
+  td{border:1px solid #cbd5e1;padding:3px 6px;text-align:center} td.nt,th.nt{text-align:left} tr.lv td{background:#f0fdf4} .tot{width:70%}
+  .ft{font-weight:700;font-size:12px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:6px;padding:8px 10px;margin-bottom:6px} .ft.due{background:#fef2f2;border-color:#fca5a5}
+  .al{font-weight:800;font-size:12.5px;color:#b91c1c;margin-bottom:6px} .sm{font-size:10px;color:#555;line-height:1.5;margin-bottom:22px} .sg{display:flex;justify-content:space-between;font-size:11px}
+  .sum th,.sum td{font-size:10px;padding:4px 5px} .sum td.l{text-align:left}
+  @media print{body{background:#fff;padding:0} .bar{display:none} .rep{max-width:none;margin:0;padding:0;border-radius:0} thead{display:table-header-group} tr{page-break-inside:avoid} @page{size:A4${landscape?' landscape':''};margin:${landscape?'9mm':'12mm'}}}
+  ${landscape?'.rep{max-width:1150px} .sum td.nw{white-space:nowrap}':''}
+  </style></head><body><div class="bar"><button onclick="window.print()">🖨️ Print / Save as PDF</button><button onclick="window.close()" style="background:#64748b">Close</button></div>${inner}</body></html>`);
+  w.document.close();
+}
+
+async function slrFullDaily(staffIds, fromDate){
+  const out={}; staffIds.forEach(id=>out[String(id)]={});
+  for(let i=0;i<staffIds.length;i+=50){
+    const batch=staffIds.slice(i,i+50);
+    const rows=await fetchAll(()=>sb.from('staff_attendance').select('staff_id,date,status').in('staff_id',batch).gte('date',fromDate).order('date').order('staff_id'));
+    rows.forEach(x=>{ (out[String(x.staff_id)]=out[String(x.staff_id)]||{})[x.date]=x.status; });
+  }
+  return out;
+}
+function slrLiveFrom(staffId){
+  const s=DB.staff.find(x=>String(x.id)===String(staffId)), k=String(staffId), h=SLR.history[k]||[];
+  if(h.length){ const last=h.map(r=>r.m).sort().pop(); return slrAdd(last+'-28',7).slice(0,7)+'-01'; }
+  return (SLR.opening[k]?.start||s?.contractStart||today()).slice(0,7)+'-01';
+}
+async function slrOpenReport(staffId){
+  await slrLoad();
+  const full=await slrFullDaily([staffId],slrLiveFrom(staffId));
+  const s=DB.staff.find(x=>String(x.id)===String(staffId));
+  slrPrintWindow('Attendance & Leave - '+(s?.name||''),slrReportHTML(staffId,full[String(staffId)]||{}));
+}
+async function slrPrintAll(){
+  await slrLoad();
+  const list=(window._slrRows||[]).map(r=>r.s); if(!list.length) return;
+  const from=list.map(s=>slrLiveFrom(s.id)).sort()[0];
+  const full=await slrFullDaily(list.map(s=>s.id),from);
+  slrPrintWindow('Attendance & Leave - all staff',list.map(s=>slrReportHTML(s.id,full[String(s.id)]||{})).join(''));
+}
+function slrPrintSummary(){
+  const rows=window._slrRows||[]; if(!rows.length) return;
+  const h=['Employee','Branch','Start date used','Based on','Worked days','Completed years','Leave earned','Leave taken','Balance (days)','Balance (AED)','Next entitlement','Status','Note'];
+  slrPrintWindow('Annual leave summary',`<div class="rep"><div class="hd"><img src="data:image/jpeg;base64,${LOGO_B64}" alt=""><div><h1>Annual leave - all current staff (as of ${slrDMY(today())})</h1>
+    <div class="inf">Rule: 30 days for every completed 365 worked days from the start date. Unpaid absence delays the year; sick and approved leave do not.</div></div></div>
+    <table class="sum"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td class="l"><b>${slrEsc(r.s.name)}</b></td><td class="l">${slrEsc(slrBranchName(r.s))}</td><td>${r.start||''}</td><td class="l">${slrEsc(r.basedOn)}</td><td>${slrNum(r.worked)}</td><td>${r.years}</td><td>${r.earned}</td><td>${slrNum(r.taken)}</td><td><b>${slrNum(r.balance)}</b></td><td>${r.aed||0}</td><td class="nw">${r.next||''}</td><td class="l nw">${slrEsc(r.status)}</td><td class="l">${slrEsc(r.note)}</td></tr>`).join('')}</tbody></table></div>`,true);
+}
+
+// ── Alarm on the home page (admin only): who completed 365 worked days, and who is about to ──
+async function slrDashAlarm(){
+  if(curRole!=='admin') { const o=el('slr-dash-alarm'); if(o) o.remove(); return; }
+  try{
+    if(!(DB.staff||[]).length) return;
+    await slrLoad();
+    if(!SLR.tables||!Object.keys(SLR.opening).length){ const o=el('slr-dash-alarm'); if(o) o.innerHTML=''; return; }
+    const anchor=el('dstats'); if(!anchor) return;
+    let box=el('slr-dash-alarm');
+    if(!box){ box=document.createElement('div'); box.id='slr-dash-alarm'; anchor.insertAdjacentElement('afterend',box); }
+    const rows=slrActiveStaff('all').map(s=>slrCalc(s.id)).filter(r=>r&&!r.noStart);
+    const due=rows.filter(r=>r.due), soon=rows.filter(r=>!r.due&&r.soon).sort((a,b)=>a.next.localeCompare(b.next));
+    if(!due.length&&!soon.length){ box.innerHTML=''; return; }
+    const chip=(r,bg,txt)=>`<span onclick="slrOpenReport('${r.s.id}')" style="display:inline-block;background:${bg};color:#fff;border-radius:8px;padding:3px 9px;margin:2px;font-size:.74rem;font-weight:700;cursor:pointer">${slrEsc(r.s.name)} — ${txt}</span>`;
+    box.innerHTML=`<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:10px 12px;margin:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div style="font-weight:900;color:#92400e;font-size:.86rem">🔔 بدل الإجازة — 365 يوم عمل</div>
+        <button onclick="slrGo()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:4px 11px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Tajawal',sans-serif">عرض الكل</button>
+      </div>
+      ${due.length?`<div style="font-size:.76rem;color:#92400e;font-weight:700;margin-top:4px">مستحق دلوقتي (${due.length}):</div><div>${due.map(r=>chip(r,'#dc2626',slrNum(r.balance)+' يوم')).join('')}</div>`:''}
+      ${soon.length?`<div style="font-size:.76rem;color:#92400e;font-weight:700;margin-top:4px">هيستحق خلال ${SLR_SOON_DAYS} يوم (${soon.length}):</div><div>${soon.map(r=>chip(r,'#d97706',slrDMY(r.next))).join('')}</div>`:''}
+    </div>`;
+  }catch(e){ console.warn('slrDashAlarm:',e); }
+}
+async function slrGo(){
+  await showPage('staff',null);
+  const btn=[...document.querySelectorAll('.hr-tab')].find(b=>(b.getAttribute('onclick')||'').includes('hr-leave-dashboard'));
+  showHRTab('hr-leave-dashboard',btn||null);
+  ladShowView('leave365');
+}
+
 function getActualWorkDaysCount(staffId){
   // Total actual working days from salary history + live attendance
   const history=getSalaryHistory(staffId);
@@ -26206,6 +26563,14 @@ function calcLeaveBalance(staffId, endDateStr){
   const takenFromMonthly=Math.max(0, takenFromEntry-takenInSystem); // extra days from monthly entry not in requests
   const remaining=Math.max(0,entitled-taken);
   const compensation=Math.round(remaining*dailyRate*100)/100;
+
+  // Once the reviewed leave history is loaded for this staff member, the day figures come from
+  // the leave report (slrCalc) so every screen shows the same numbers. The money rate is unchanged here.
+  if(typeof SLR!=='undefined'&&SLR.loaded&&SLR.opening[String(staffId)]){
+    const r=slrCalc(staffId,endDateStr);
+    if(r&&!r.noStart) return {entitled:r.earned,taken:r.taken,takenInSystem,takenBefore,remaining:r.balance,
+      compensation:Math.round(r.balance*dailyRate*100)/100,dailyRate,yearsWorked:Math.round(r.worked/365*100)/100,actualDays,calcMethod:'تقرير الإجازات (365 يوم عمل)'};
+  }
 
   return {entitled,taken,takenInSystem,takenBefore,remaining,compensation,dailyRate,
     yearsWorked:Math.round(yearsWorked*100)/100,actualDays,calcMethod};
@@ -27039,6 +27404,12 @@ function ladShowView(view, btn){
   el('lad-view-overview-btn').style.color = view==='overview'?'#fff':'#374151';
   el('lad-view-entry-btn').style.background = view==='entry'?'#1e3a8a':'#fff';
   el('lad-view-entry-btn').style.color = view==='entry'?'#fff':'#374151';
+  if(el('lad-view-leave365')){
+    el('lad-view-leave365').style.display = view==='leave365' ? '' : 'none';
+    el('lad-view-leave365-btn').style.background = view==='leave365'?'#1e3a8a':'#fff';
+    el('lad-view-leave365-btn').style.color = view==='leave365'?'#fff':'#374151';
+    if(view==='leave365') renderSLR();
+  }
   if(view==='entry'){ populateLADEntryStaff(); }
 }
 
@@ -28015,6 +28386,7 @@ function populateLADBranchFilter(){
 }
 
 async function renderLeaveAttDashboard(){
+  try{ await slrLoad(); }catch(e){}
   // Pre-load ALL salary history for current branch staff (to get accurate work day counts)
   const branchStaffIds = (DB.staff||[])
     .filter(s=>(s.branchId===curBid||s.workBranch===curBid))
