@@ -2420,7 +2420,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-17-2';
+const APP_VERSION='2026-11-17-3';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -26377,9 +26377,8 @@ function slrMonthRows(staffId, fullMap){
     if(b>=a&&marks>0){
       const days=slrDiff(a,b)+1;
       const unpaid=slrUnpaid(s.id,a,b,map);
-      const leaveMarks=Object.keys(map).filter(d=>d>=a&&d<=b&&map[d]==='إجازة').length;
       const sick=Math.min(days,slrLeaveDaysIn(s.id,['sick'],a,b));
-      const annual=Math.max(0,Math.min(days,Math.max(slrLeaveDaysIn(s.id,['annual'],a,b),leaveMarks-sick)));
+      const annual=Math.max(0,Math.min(days,Math.max(slrLeaveDaysIn(s.id,['annual'],a,b),Number(e?.annualLeaveDays||0))));
       const absent=Math.min(days,unpaid+annual);
       const notes=[]; if(annual) notes.push('Annual leave '+slrNum(annual)+' days'); if(b<mEnd&&mon===now.slice(0,7)) notes.push('Month in progress (to '+slrDMY(b)+')');
       live.push({m:mon,p:Math.max(0,days-absent-sick),a:absent,s:sick||null,l:annual||null,n:notes.join(' | '),src:'attendance',unpaid});
@@ -26408,7 +26407,7 @@ function slrReportHTML(staffId, fullMap){
   const foot=c.noStart?'No start date in the staff file — cannot count the 365 days.'
     :`Start ${c.start} | ${slrNum(c.worked)} worked days = ${c.years} completed year(s) -> earned ${c.earned} days | Taken ${slrNum(c.taken)} | Balance ${slrNum(c.balance)} days${c.due?' DUE':''} | Next entitlement ${c.next}`;
   return `<div class="rep">
-    <div class="hd"><img src="data:image/jpeg;base64,${LOGO_B64}" alt=""><div><h1>${slrEsc(s.name)}${s.position?' - '+slrEsc(s.position):''} - ${slrEsc(slrBranchName(s))}</h1><div class="inf">${info}</div></div></div>
+    <div class="hd"><span class="lg"></span><div><h1>${slrEsc(s.name)}${s.position?' - '+slrEsc(s.position):''} - ${slrEsc(slrBranchName(s))}</h1><div class="inf">${info}</div></div></div>
     <table><thead><tr><th>Month</th><th>Days present</th><th>Absent days</th><th>Sick days</th><th>Annual leave (days)</th><th class="nt">Notes</th></tr></thead>
     <tbody>${rows.map(r=>`<tr${r.src!=='history'?' class="lv"':''}><td>${r.m}</td><td>${v(r.p)}</td><td>${v(r.a)}</td><td>${v(r.s)}</td><td>${v(r.l)}</td><td class="nt">${slrEsc(r.n)}</td></tr>`).join('')||'<tr><td colspan="6">No months recorded yet</td></tr>'}</tbody></table>
     <table class="tot"><thead><tr><th>TOTALS</th><th>Days present</th><th>Absent days</th><th>Sick days</th><th>Annual leave (days)</th></tr></thead>
@@ -26424,7 +26423,8 @@ function slrPrintWindow(title, inner, landscape){
   const w=window.open('','_blank');
   if(!w){ alert('Please allow pop-ups to open the report.'); return; }
   w.document.write(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${slrEsc(title)}</title><style>
-  *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:14px;background:#f1f5f9}
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:14px;background:#f1f5f9}
+  .lg{display:block;flex:0 0 58px;width:58px;height:58px;background:url(data:image/jpeg;base64,${LOGO_B64}) center/contain no-repeat}
   .bar{max-width:800px;margin:0 auto 10px;display:flex;gap:8px} .bar button{background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:14px}
   .rep{background:#fff;max-width:800px;margin:0 auto 16px;padding:18px 20px;border-radius:8px;page-break-after:always} .rep:last-child{page-break-after:auto}
   .hd{display:flex;gap:12px;align-items:center;border-bottom:2px solid #1e3a8a;padding-bottom:8px;margin-bottom:10px} .hd img{width:58px;height:58px;object-fit:contain}
@@ -26470,7 +26470,7 @@ async function slrPrintAll(){
 function slrPrintSummary(){
   const rows=window._slrRows||[]; if(!rows.length) return;
   const h=['Employee','Branch','Start date used','Based on','Worked days','Completed years','Leave earned','Leave taken','Balance (days)','Balance (AED)','Next entitlement','Status','Note'];
-  slrPrintWindow('Annual leave summary',`<div class="rep"><div class="hd"><img src="data:image/jpeg;base64,${LOGO_B64}" alt=""><div><h1>Annual leave - all current staff (as of ${slrDMY(today())})</h1>
+  slrPrintWindow('Annual leave summary',`<div class="rep"><div class="hd"><span class="lg"></span><div><h1>Annual leave - all current staff (as of ${slrDMY(today())})</h1>
     <div class="inf">Rule: 30 days for every completed 365 worked days from the start date. Unpaid absence delays the year; sick and approved leave do not.</div></div></div>
     <table class="sum"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td class="l"><b>${slrEsc(r.s.name)}</b></td><td class="l">${slrEsc(slrBranchName(r.s))}</td><td>${r.start||''}</td><td class="l">${slrEsc(r.basedOn)}</td><td>${slrNum(r.worked)}</td><td>${r.years}</td><td>${r.earned}</td><td>${slrNum(r.taken)}</td><td><b>${slrNum(r.balance)}</b></td><td>${r.aed||0}</td><td class="nw">${r.next||''}</td><td class="l nw">${slrEsc(r.status)}</td><td class="l">${slrEsc(r.note)}</td></tr>`).join('')}</tbody></table></div>`,true);
 }
@@ -26579,7 +26579,7 @@ function getServiceYears(staffId, endDateStr){
 
 function calcLeaveBalance(staffId, endDateStr){
   const s=DB.staff.find(x=>String(x.id)===String(staffId));
-  if(!s||!s.contractStart) return {entitled:0,taken:0,remaining:0,compensation:0,actualDays:0};
+  if(!s||!s.contractStart) return {entitled:0,taken:0,takenInSystem:0,takenBefore:0,remaining:0,compensation:0,dailyRate:0,yearsWorked:0,actualDays:0};
 
   const basic=Number(s.basicSalary||0);
   const dailyRate=basic/30;
@@ -27025,7 +27025,7 @@ function generateStaffReport(){
   const daysInMonth=new Date(yr,mo,0).getDate();
 
   el('staff-report-body').innerHTML=staff.map(s=>{
-    const basic=Number(s.basicSalary||0);
+    const basic=Number(s.grossSalary||s.basicSalary||0); // monthly salary used for this card
     const absCount=countAbsences(s.id,mon);
     const sickDays=countSickLeave(s.id,mon);
     const bal=calcLeaveBalance(s.id);
@@ -27043,8 +27043,9 @@ function generateStaffReport(){
       if(!date.startsWith(mon)) return;
       attDays++;
       const st=map[s.id]||map[String(s.id)];
-      if(st==='حضور'||st==='present') attPresent++;
-      else if(st) attAbsent++;
+      if(st==='حضور'||st==='present'||st==='تعويض') attPresent++;
+      else if(st==='غياب') attAbsent++;
+      else if(st==='نص يوم'){ attPresent+=0.5; attAbsent+=0.5; }
     });
 
     return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;border-right:5px solid #1e3a8a">
@@ -27066,13 +27067,13 @@ function generateStaffReport(){
         <div class="sc"><div class="si">🏖️</div><div class="sv">${bal.remaining}</div><div class="sk">رصيد الإجازة</div></div>
       </div>
       ${basic>0?`<div style="background:#f8fafc;border-radius:9px;padding:9px;font-size:.78rem">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>الراتب الأساسي</span><span><b>${fmtNum(basic)} AED</b></span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>الراتب الشهري</span><span><b>${fmtNum(basic)} AED</b></span></div>
         ${absDed>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>Absence Deduction</span><span>- ${fmtNum(absDed)}</span></div>`:''}
         ${sickDed>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#d97706"><span>خصم مرضي</span><span>- ${fmtNum(sickDed)}</span></div>`:''}
         ${(s.bonus||0)>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#059669"><span>بونص</span><span>+ ${fmtNum(s.bonus)}</span></div>`:''}
         ${(s.deductions||0)>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#dc2626"><span>خصومات</span><span>- ${fmtNum(s.deductions)}</span></div>`:''}
         <div style="border-top:1px solid #e5e7eb;margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;font-weight:800;color:#059669"><span>الصافي</span><span>${fmtNum(net)} AED</span></div>
-      </div>`:'<div style="color:#9ca3af;font-size:.75rem">لم يُحدد الراتب الأساسي</div>'}
+      </div>`:'<div style="color:#9ca3af;font-size:.75rem">لم يُحدد الراتب</div>'}
       ${leaves.length?`<div style="margin-top:8px;font-size:.75rem;color:#6b7280">
         <b>الإجازات هذا الشهر:</b> ${leaves.map(l=>`${l.type} (${l.days} يوم)`).join(', ')}
       </div>`:''}
