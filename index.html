@@ -2420,7 +2420,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-17-3';
+const APP_VERSION='2026-11-17-4';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -6990,7 +6990,7 @@ function calcEOSPayment(){
 
   // Leave balance
   const leaveData = calcLeaveBalance(staffId, endDate);
-  const leaveComp = leaveData.remaining * (basic/30);
+  const leaveComp = leaveData.compensation; // full monthly salary / 30 per day (owner's policy)
 
   el('eos-pay-gratuity').value = Math.round(gratuity);
   el('eos-pay-leave').value = Math.round(leaveComp);
@@ -26582,7 +26582,8 @@ function calcLeaveBalance(staffId, endDateStr){
   if(!s||!s.contractStart) return {entitled:0,taken:0,takenInSystem:0,takenBefore:0,remaining:0,compensation:0,dailyRate:0,yearsWorked:0,actualDays:0};
 
   const basic=Number(s.basicSalary||0);
-  const dailyRate=basic/30;
+  // Owner's policy (Nov 2026): leave allowance = full monthly salary for 30 days, in every screen
+  const dailyRate=Number(s.grossSalary||s.basicSalary||0)/30;
   const actualDays=getActualWorkDaysCount(staffId); // informational only — see getServiceYears
 
   const yearsWorked=getServiceYears(staffId, endDateStr);
@@ -26766,7 +26767,7 @@ function calcLeaveDays(){
     </div>`;
   } else if(type==='compensation'){
     info.innerHTML=`<div style="background:#d1fae5;border-radius:8px;padding:8px;font-size:.78rem;color:#065f46">
-      💰 بدل الإجازة المستحق: <b>${fmtNum(bal.remaining*dailyRate)} AED</b> (${bal.remaining} يوم × ${fmtNum(dailyRate)} AED)
+      💰 بدل الإجازة المستحق: <b>${fmtNum(bal.compensation)} AED</b> (${bal.remaining} يوم × ${fmtNum(Math.round(bal.dailyRate*100)/100)} AED — الراتب الكامل)
     </div>`;
   }
 }
@@ -26884,7 +26885,7 @@ function calcEOG(){
 
   // ── Leave balance compensation ──
   const bal=calcLeaveBalance(s.id, endDate);
-  const leaveComp=bal.remaining*(basic/30);
+  const leaveComp=bal.compensation; // full monthly salary / 30 per day (owner's policy)
   const total=gratuity+leaveComp;
 
   // ── Notice period ──
@@ -26954,7 +26955,7 @@ function calcEOG(){
         <div style="font-size:.72rem;color:#6b7280;margin-bottom:2px;font-style:italic">${gratuityNote}</div>
         <div style="font-size:.7rem;color:#9ca3af;margin-bottom:6px">${gratuityBreakdown} × (${fmtNum(basic)}/30 = ${fmtNum(Math.round(basic/30*100)/100)} AED/day)</div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85rem">
-          <span>Leave Compensation (${bal.remaining} days × ${fmtNum(Math.round(basic/30*100)/100)} AED)</span>
+          <span>Leave Compensation (${bal.remaining} days × ${fmtNum(Math.round(bal.dailyRate*100)/100)} AED — full salary)</span>
           <span style="font-weight:700">${fmtNum(leaveComp)} AED</span>
         </div>
         <div style="font-size:.7rem;color:#9ca3af;margin-bottom:4px">
@@ -27661,6 +27662,7 @@ function ladBuildYearTable(staffId, yr, recMap, gross, daily, monthNames, monthN
   </div>`;
 }
 
+function calcCompDue(s){ return s?calcLeaveBalance(s.id).compensation:0; }
 function ladOnCompPaidChange(mon, val){
   // When switching to Yes — suggest the accrued comp amount in bonus if bonus is empty
   if(val==='1'){
