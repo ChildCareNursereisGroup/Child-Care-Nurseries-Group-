@@ -2433,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-20-3';
+const APP_VERSION='2026-11-20-4';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -4132,10 +4132,28 @@ function _feeFlags(c){
     noRegTools: !recs.some(r=>(r.reg>0)||(r.tools>0)),
   };
 }
+// A child who uses the bus but has no driver chosen for the pick-up and/or the drop-off they need.
+let _busDotLoading=false;
+function _busDriverMissing(c){
+  if(!(c.bus==='Yes'||c.bus==='نعم')||c.leaveDate) return '';
+  if(!DB._busAssignLoaded){
+    if(!_busDotLoading){ _busDotLoading=true;
+      loadAllBusAssignments().then(()=>{ try{ if(el('chlist')&&el('pg-children')&&getComputedStyle(el('pg-children')).display!=='none') renderChildren(); }catch(e){} }).catch(()=>{ _busDotLoading=false; }); }
+    return '';
+  }
+  const oneWay=c.busDirection==='one_way';
+  const needPick=!oneWay||c.busPickDrop!=='drop', needDrop=!oneWay||c.busPickDrop==='drop';
+  const buses=DB.allBuses||DB.buses||[];
+  const has=t=>{ const a=getBusAssign(String(c.id),t); if(!a||(!a.busId&&!a.busNumber)) return false; return !buses.length||buses.some(b=>String(b.id)===String(a.busId)||(a.busNumber&&b.busNumber===a.busNumber)); };
+  const noPick=needPick&&!has('pick'), noDrop=needDrop&&!has('drop');
+  if(!noPick&&!noDrop) return '';
+  return noPick&&noDrop?'pick + drop':(noPick?'pick':'drop');
+}
 function feeFlagBadges(c){
-  const f=_feeFlags(c);
-  if(!f.noClothes && !f.noRegTools) return '';
+  const f=_feeFlags(c), nb=_busDriverMissing(c);
+  if(!f.noClothes && !f.noRegTools && !nb) return '';
   return `<span style="display:inline-flex;gap:3px;vertical-align:middle">`
+    + (nb?`<span title="مفيش سواق متحدد (${nb}) — No bus driver assigned (${nb})" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#16a34a"></span>`:'')
     + (f.noClothes?'<span title="لسه مادفعش رسوم ملابس — Uniforms fee not paid" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626"></span>':'')
     + (f.noRegTools?'<span title="لسه مادفعش رسوم تسجيل/أدوات دراسية — Registration/Stationery fee not paid" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2563eb"></span>':'')
     + `</span>`;
@@ -16675,8 +16693,8 @@ function renderMonthlyBusRoster(){
   }
 
   BUS_TRIPS.forEach(trip=>{
-    const tripLabel=ar?(trip.labelAR||trip.label||''):(trip.labelEN||trip.label||'');
-    const tripSub=ar?(trip.subAR||trip.sub||''):(trip.subEN||trip.sub||'');
+    const tripLabel=ar?(trip.ar||trip.labelAR||trip.label||''):(trip.en||trip.labelEN||trip.label||'');
+    const tripSub=ar?(trip.arSub||trip.subAR||trip.sub||''):(trip.enSub||trip.subEN||trip.sub||'');
     const kids=allKids.filter(c=>_matchTrip(c,trip))
       .sort((a,b)=>{
         const sA=DB.busAssignments?.[String(a.id)]?.stopNumber||999;
@@ -16976,6 +16994,16 @@ function showToast(msg){
   setTimeout(()=>t.remove(),3000);
 }
 
+// Staff who ride the bus, shaped like a roster row (same source as the on-screen Bus Roster)
+function _busStaffForPrint(branchSel){
+  const td=today();
+  const raw=window._rosterStaff||(DB.staff||[]).filter(s=>s.usesBus&&(!s.lastWorkingDay||s.lastWorkingDay>=td));
+  return raw.filter(s=>!branchSel||branchSel==='all'||s.branchId===branchSel).map(s=>{
+    const br=BRANCHES.find(b=>b.id===s.branchId)||{}, full=(DB.staff||[]).find(x=>String(x.id)===String(s.id))||{};
+    return {...s,entityType:'staff',isStaff:true,branchName:br.ar||'',branchEN:br.en||br.ar||'',branchColor:br.c||'#374151',branchIcon:br.icon||'🏫',
+      className:'Staff',kidsTime:(s.shiftStart||'?')+'–'+(s.shiftEnd||'?'),busArea:s.homeArea||'',contact:full.contact||s.contact||''};
+  });
+}
 function printMonthlyBusRoster(){
   const branchSel=el('mbr-branch')?.value||'all';
   const targetBranches=branchSel==='all'?BRANCHES:BRANCHES.filter(b=>b.id===branchSel);
@@ -16989,10 +17017,12 @@ function printMonthlyBusRoster(){
   });
 
   const arP=lang==='ar';
+  const busStaffP=_busStaffForPrint(branchSel);
   let html='';
   BUS_TRIPS.forEach(trip=>{
     const kids=allKids.filter(c=>_matchTrip(c,trip));
-    if(!kids.length) return;
+    const tripStaff=busStaffP.filter(st=>_matchTrip(st,trip));
+    if(!kids.length&&!tripStaff.length) return;
     const col=trip.type==='pick'?'#059669':trip.type==='mixed'?'#d97706':'#dc2626';
     const bgL=trip.type==='pick'?'#f0fdf4':trip.type==='mixed'?'#fefce8':'#fef2f2';
 
@@ -17005,11 +17035,19 @@ function printMonthlyBusRoster(){
       if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
       byDriver[key].kids.push(c);
     });
+    // staff who ride this trip go under their driver too
+    tripStaff.forEach(st=>{
+      const assign=getStaffBusAssign(String(st.id),(trip.type==='pick'||trip.type==='staff_pick')?'pick':'drop');
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||(allBuses.find(b=>b.busNumber===assign.busNumber))):null;
+      const key=bus?(bus.driverName||bus.busNumber):'غير محدد';
+      if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
+      byDriver[key].kids.push(st);
+    });
 
     html+=`<div style="margin-bottom:8mm;break-inside:avoid">
       <div style="background:${col};color:#fff;padding:5px 10px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between">
-        <div style="font-weight:900;font-size:10.5pt">${arP?(trip.labelAR||trip.label||""):(trip.labelEN||trip.label||"")}</div>
-        <div style="font-size:9pt">${arP?(trip.subAR||trip.sub||""):(trip.subEN||trip.sub||"")} — 👶 ${kids.length}</div>
+        <div style="font-weight:900;font-size:10.5pt">${arP?(trip.ar||trip.labelAR||trip.label||""):(trip.en||trip.labelEN||trip.label||"")}${trip.time?' · '+trip.time:''}</div>
+        <div style="font-size:9pt">${arP?(trip.arSub||trip.subAR||trip.sub||""):(trip.enSub||trip.subEN||trip.sub||"")} — 👶 ${kids.length}${tripStaff.length?' + 👩‍🏫 '+tripStaff.length:''}</div>
       </div>
       ${Object.entries(byDriver).map(([key,grp])=>`
       <div style="background:${bgL};border:1px solid ${col}44;padding:4px 0;margin-top:3mm">
@@ -17017,7 +17055,7 @@ function printMonthlyBusRoster(){
         <table style="width:100%;border-collapse:collapse;font-size:8.5pt">
           <thead><tr style="background:rgba(0,0,0,.05)">
             <th style="padding:3px 8px;text-align:right">#</th>
-            <th style="padding:3px 8px;text-align:right">الطفل</th>
+            <th style="padding:3px 8px;text-align:right">الطفل / الموظف</th>
             <th style="padding:3px 8px;text-align:right">الفصل</th>
             ${branchSel==='all'?'<th style="padding:3px 8px;text-align:right">الفرع</th>':''}
             <th style="padding:3px 8px;text-align:right">الوقت</th>
@@ -17026,14 +17064,14 @@ function printMonthlyBusRoster(){
             <th style="padding:3px 8px;text-align:center;width:28px">✅</th>
           </tr></thead>
           <tbody>
-            ${grp.kids.map((c,i)=>`<tr style="${i%2===0?'':'background:rgba(255,255,255,.5)'}">
+            ${grp.kids.map((c,i)=>`<tr style="${c.isStaff?'background:#dbeafe':(i%2===0?'':'background:rgba(255,255,255,.5)')}">
               <td style="padding:3px 8px;color:#9ca3af">${i+1}</td>
-              <td style="padding:3px 8px;font-weight:700">${c.name}</td>
-              <td style="padding:3px 8px;color:#6b7280">${c.className||'—'}</td>
+              <td style="padding:3px 8px;font-weight:700">${c.isStaff?'👩‍🏫 ':''}${c.name}${c.isStaff&&c.position?' <span style="font-weight:400;color:#6b7280;font-size:7.5pt">('+c.position+')</span>':''}</td>
+              <td style="padding:3px 8px;color:#6b7280">${c.isStaff?'موظف — Staff':(c.className||'—')}</td>
               ${branchSel==='all'?`<td style="padding:3px 8px;font-size:7.5pt">${c.branchIcon} ${c.branchName}</td>`:''}
               <td style="padding:3px 8px;color:#0369a1;font-weight:700">${c.kidsTime||'—'}</td>
               <td style="padding:3px 8px">${c.busArea||'—'}</td>
-              <td style="padding:3px 8px;font-size:8pt">${c.parentMom?'👩 '+c.parentMom:''}${c.parentDad?'<br>👨 '+c.parentDad:''}${!c.parentMom&&!c.parentDad?'—':''}</td>
+              <td style="padding:3px 8px;font-size:8pt">${c.isStaff?(c.contact?'📞 '+c.contact:'—'):((c.parentMom?'👩 '+c.parentMom:'')+(c.parentDad?'<br>👨 '+c.parentDad:'')+(!c.parentMom&&!c.parentDad?'—':''))}</td>
               <td style="padding:3px 8px;text-align:center">□</td>
             </tr>`).join('')}
           </tbody>
@@ -17304,6 +17342,14 @@ async function printTwoWeekBusRoster(){
       if(!driverTrips[dk]) driverTrips[dk]={driverName:bus?.driverName||'Unassigned',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',trip,kids:[]};
       driverTrips[dk].kids.push({...c,stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
     });
+    // staff who ride this trip
+    _busStaffForPrint('all').filter(st=>_matchTrip(st,trip)).forEach(st=>{
+      const assign=getStaffBusAssign(String(st.id),(trip.type==='pick'||trip.type==='staff_pick')?'pick':'drop');
+      const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
+      const dk=`${bus?.driverName||'Unassigned'}|||${trip.key}`;
+      if(!driverTrips[dk]) driverTrips[dk]={driverName:bus?.driverName||'Unassigned',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',trip,kids:[]};
+      driverTrips[dk].kids.push({...st,stopNum:DB.staffBusAssignments?.[String(st.id)]?.stopNumber||999});
+    });
   });
 
   Object.values(driverTrips).forEach(g=>
@@ -17311,7 +17357,7 @@ async function printTwoWeekBusRoster(){
   );
 
   const groups=Object.values(driverTrips).filter(g=>g.driverName!=='Unassigned'&&g.kids.length>0);
-  if(!groups.length){alert('No assigned children. Save assignments first.');return;}
+  if(!groups.length){alert('No assigned children or staff. Save assignments first.');return;}
 
   // Build day header columns (combined W1+W2 side by side)
   const mkDayHeads=wk=>wk.map(dt=>`
@@ -17331,10 +17377,11 @@ async function printTwoWeekBusRoster(){
       const isMixedPick=trip.type==='mixed'&&(trip.startH2||[]).includes(_parseKT(ch.kidsTime).sh);
       const typeTag=trip.type==='mixed'
         ?`<span style="background:${isMixedPick?'#dcfce7':'#fee2e2'};color:${isMixedPick?'#166534':'#991b1b'};padding:0 5px;border-radius:4px;font-size:6.5pt;font-weight:800">${isMixedPick?'PICK':'DROP'}</span>`:'';
-      return`<tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
+      const staffTag=ch.isStaff?'<span style="background:#dbeafe;color:#1e40af;padding:0 5px;border-radius:4px;font-size:6.5pt;font-weight:800">STAFF</span>':'';
+      return`<tr style="${ch.isStaff?'background:#eff6ff':(i%2===0?'background:#f8fafc':'background:#fff')}">
         <td style="padding:3px 5px;text-align:center;font-weight:900;color:#d97706;border:1px solid #e5e7eb;font-size:8pt">${ch.stopNum<999?ch.stopNum:'—'}</td>
-        <td style="padding:3px 7px;font-weight:700;border:1px solid #e5e7eb;font-size:8pt;white-space:nowrap">${i+1}. ${ch.name} ${typeTag}</td>
-        <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-size:7pt;color:#6b7280">${ch.className||'—'}</td>
+        <td style="padding:3px 7px;font-weight:700;border:1px solid #e5e7eb;font-size:8pt;white-space:nowrap">${i+1}. ${ch.name} ${ch.isStaff?staffTag:typeTag}</td>
+        <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-size:7pt;color:#6b7280">${ch.isStaff?'Staff':(ch.className||'—')}</td>
         <td style="padding:3px 5px;border:1px solid #e5e7eb;font-size:7pt;color:${ch.branchColor};font-weight:700">${ch.branchIcon} ${ch.branchEN}</td>
         <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-size:7pt;color:#0369a1;font-weight:700">${ch.kidsTime||'—'}</td>
         <td style="padding:3px 5px;border:1px solid #e5e7eb;font-size:7pt">${ch.busArea||'—'}</td>
@@ -19080,6 +19127,7 @@ async function loadAllBusAssignments(){
   const {data} = await sb.from('bus_assignments').select('*');
   DB.busAssignments = {};
   DB.staffBusAssignments = {};
+  DB._busAssignLoaded = true;
   (data||[]).forEach(r=>{
     const isStaff = r.entity_type==='staff' || (r.staff_id != null && !r.child_id);
     if(isStaff){
