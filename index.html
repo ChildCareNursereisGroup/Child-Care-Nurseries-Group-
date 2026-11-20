@@ -1071,6 +1071,7 @@ main{padding:12px;max-width:960px;margin:0 auto}
       <div style="display:flex;gap:5px">
         <button id="expmode-quick" class="btn bsm bp" onclick="setExpMode('quick')">⚡ إدخال سريع</button>
         <button id="expmode-full" class="btn bsm bg" onclick="setExpMode('full')">📋 تفصيلي</button>
+        <button id="ir-open-btn" class="btn bsm" style="display:none;background:#0f766e;color:#fff;border:none;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.79rem;font-weight:700" onclick="openInvoiceGuide()">📬 الفواتير بتوصل فين — Invoice Guide</button>
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
@@ -1565,6 +1566,18 @@ main{padding:12px;max-width:960px;margin:0 auto}
 </div>
 </div>
 
+
+<!-- INVOICE EMAIL GUIDE (admin only) -->
+<div id="ir-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.55);align-items:center;justify-content:center;padding:10px" onclick="if(event.target===this)closeInvoiceGuide()">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:1040px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden">
+    <div style="background:linear-gradient(135deg,#0f766e,#1e3a8a);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div><div style="font-weight:900;font-size:1rem">📬 دليل الفواتير — Invoice Email Guide</div>
+        <div style="font-size:.74rem;opacity:.9">كل فاتورة بتوصل على أي إيميل وإمتى — Which mailbox each invoice arrives at, and when</div></div>
+      <button onclick="closeInvoiceGuide()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:1rem;flex:0 0 auto">✕</button>
+    </div>
+    <div id="ir-body" style="padding:14px 16px;overflow-y:auto"></div>
+  </div>
+</div>
 
 <!-- STAFF PAGE -->
 <div class="page" id="pg-staff">
@@ -2420,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-17-5';
+const APP_VERSION='2026-11-20-1';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -10904,6 +10917,7 @@ function renderExpPills(){
 }
 function setEF(f){expFilt=f;renderExps();}
 function renderExps(){
+  irSyncBtn();
   renderExpPills();
   const fm=el('efmon')?.value||'';
   let list=[...DB.expenses].filter(e=>e.category!=='chexp2025'&&e.category!=='chexp2026');
@@ -26504,6 +26518,182 @@ async function slrGo(){
   const btn=[...document.querySelectorAll('.hr-tab')].find(b=>(b.getAttribute('onclick')||'').includes('hr-leave-dashboard'));
   showHRTab('hr-leave-dashboard',btn||null);
   ladShowView('leave365');
+}
+
+// ═══════════════════════════════════════════════
+//  INVOICE EMAIL GUIDE — which mailbox each supplier's invoice arrives at (admin only)
+//  The data lives in Supabase (invoice_routing, invoice_followups), never in this file.
+// ═══════════════════════════════════════════════
+const IR={loaded:false,tables:true,rows:[],fups:[],tab:'guide',nursery:'all',email:'all',q:''};
+const IR_BR=[['b1','Al Farha','الفرحة',/al\s*farha/i],['b2','Al Saada','السعادة',/al\s*saada(?!\s*for\s*kids)/i],['b4','Al Saada For Kids','السعادة للأطفال',/for\s*kids/i],['b5','Abtal Al Baraiem','أبطال البراعم',/abtal/i],['b3','Dolphin','الدولفين',/dolphin/i]];
+const IR_ST={Open:['مفتوح','Open','#dc2626'],Filtered:['متفلتر','Filtered','#d97706'],Done:['تم','Done','#059669']};
+function irBranches(n){ return IR_BR.filter(b=>b[3].test(n||'')).map(b=>b[0]); }
+function irEmails(e){ return String(e||'').split(/\s*[+,;]\s*/).map(x=>x.trim()).filter(x=>x.includes('@')); }
+function irColor(bid){ const b=BRANCHES.find(x=>x.id===bid); return b?b.c:'#64748b'; }
+
+async function irLoad(force){
+  if(IR.loaded&&!force) return;
+  try{
+    const a=await sb.from('invoice_routing').select('*').order('sort',{ascending:true}).order('id',{ascending:true});
+    if(a.error){ IR.tables=false; IR.rows=[]; IR.fups=[]; }
+    else{
+      IR.tables=true; IR.rows=(a.data||[]).filter(r=>r.active!==false);
+      const b=await sb.from('invoice_followups').select('*').order('id',{ascending:true});
+      IR.fups=b.error?[]:(b.data||[]);
+    }
+  }catch(e){ IR.tables=false; IR.rows=[]; IR.fups=[]; }
+  IR.loaded=true;
+}
+function irSyncBtn(){ const b=el('ir-open-btn'); if(b) b.style.display=curRole==='admin'?'':'none'; }
+async function openInvoiceGuide(){
+  if(curRole!=='admin') return;
+  el('ir-modal').style.display='flex';
+  el('ir-body').innerHTML='<div style="text-align:center;padding:40px;color:#6b7280">⏳ Loading…</div>';
+  await irLoad();
+  irRender();
+}
+function closeInvoiceGuide(){ el('ir-modal').style.display='none'; }
+function irCopy(btn){
+  const v=btn.getAttribute('data-v')||''; const done=()=>{ const o=btn.innerHTML; btn.innerHTML='✅'; setTimeout(()=>{btn.innerHTML=o;},1200); };
+  try{ navigator.clipboard.writeText(v).then(done,()=>{ irCopyOld(v); done(); }); }catch(e){ irCopyOld(v); done(); }
+}
+function irCopyOld(v){ const t=document.createElement('textarea'); t.value=v; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); }catch(e){} t.remove(); }
+
+function irFiltered(){
+  const q=IR.q.trim().toLowerCase();
+  return IR.rows.filter(r=>r.kind!=='mailbox').filter(r=>{
+    if(IR.nursery!=='all'){ const bs=irBranches(r.nursery); if(IR.nursery==='other'?bs.length>0:!bs.includes(IR.nursery)) return false; }
+    if(IR.email!=='all'&&!irEmails(r.email).includes(IR.email)) return false;
+    if(q&&![r.vendor,r.nursery,r.email,r.doc_type,r.arrives,r.account_ref,r.notes].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function irAllEmails(){ const s=new Set(); IR.rows.forEach(r=>irEmails(r.email).forEach(e=>s.add(e))); return [...s].sort(); }
+
+function irRender(){
+  const body=el('ir-body'); if(!body) return;
+  if(!IR.tables){ body.innerHTML='<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:12px;padding:14px;color:#92400e;font-size:.85rem">⚠️ جدول دليل الفواتير لسه ما اتعملش في قاعدة البيانات — The invoice guide tables are not created yet.</div>'; return; }
+  const inv=IR.rows.filter(r=>r.kind!=='mailbox'), openF=IR.fups.filter(f=>f.status!=='Done').length;
+  const tb=(id,txt)=>`<button onclick="IR.tab='${id}';irRender()" style="padding:8px 14px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800;background:${IR.tab===id?'#1e3a8a':'#fff'};color:${IR.tab===id?'#fff':'#374151'}">${txt}</button>`;
+  let h=`<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:11px;overflow:hidden;width:fit-content;max-width:100%;flex-wrap:wrap;margin-bottom:12px">
+    ${tb('guide','🔎 الدليل — Guide ('+inv.length+')')}${tb('mail','📧 حسب الإيميل — By email ('+irAllEmails().length+')')}${tb('fup','📌 متابعات — Follow-ups ('+openF+')')}</div>`;
+  if(IR.tab==='guide'){
+    const chip=(id,txt,c)=>`<button onclick="IR.nursery='${id}';irRender()" style="padding:5px 11px;border-radius:999px;border:1.5px solid ${IR.nursery===id?c:'#e5e7eb'};background:${IR.nursery===id?c:'#fff'};color:${IR.nursery===id?'#fff':'#374151'};cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.76rem;font-weight:700">${txt}</button>`;
+    h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <input id="ir-q" type="text" value="${slrEsc(IR.q)}" oninput="IR.q=this.value;irRenderList()" placeholder="🔍 ابحثي: مورّد، حضانة، رقم حساب — Search vendor, nursery, account no."
+        style="flex:1;min-width:240px;padding:9px 12px;border:2px solid #1e3a8a;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem">
+      <select onchange="IR.email=this.value;irRenderList()" style="padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.8rem;direction:ltr">
+        <option value="all">📧 كل الإيميلات — All mailboxes</option>${irAllEmails().map(e=>`<option value="${slrEsc(e)}" ${IR.email===e?'selected':''}>${slrEsc(e)}</option>`).join('')}</select>
+      <button onclick="irEditRow(null)" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:8px 13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:800">➕ إضافة — Add</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${chip('all','الكل — All','#1e3a8a')}${IR_BR.map(b=>chip(b[0],b[2]+' — '+b[1],irColor(b[0]))).join('')}${chip('other','أخرى — Other','#64748b')}</div>
+    <div id="ir-list"></div>`;
+    body.innerHTML=h; irRenderList(); return;
+  }
+  if(IR.tab==='mail'){
+    const boxes=irAllEmails().map(e=>({e,lines:inv.filter(r=>irEmails(r.email).includes(e)),info:IR.rows.filter(r=>r.kind==='mailbox'&&irEmails(r.email).includes(e))}))
+      .sort((a,b)=>b.lines.length-a.lines.length);
+    h+=boxes.map(x=>`<div style="border:1.5px solid #e5e7eb;border-radius:13px;margin-bottom:10px;overflow:hidden">
+      <div style="background:#f1f5f9;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="direction:ltr;font-weight:900;color:#1e3a8a;font-size:.9rem">📧 ${slrEsc(x.e)} <button data-v="${slrEsc(x.e)}" onclick="irCopy(this)" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.72rem">📋 نسخ Copy</button></div>
+        <div style="font-size:.76rem;font-weight:800;color:${x.lines.length?'#059669':'#94a3b8'}">${x.lines.length?x.lines.length+' فاتورة — invoice lines':'مفيش فواتير — No invoices'}</div>
+      </div>
+      <div style="padding:8px 12px;direction:ltr;text-align:left;font-size:.8rem">
+        ${x.lines.map(r=>`<div style="padding:4px 0;border-bottom:1px dashed #f1f5f9"><b>${slrEsc(r.vendor)}</b> — ${slrEsc(r.nursery)} <span style="color:#64748b">· ${slrEsc(r.doc_type||'')} · ${slrEsc(r.arrives||'')}</span></div>`).join('')}
+        ${x.info.map(r=>`<div style="padding:4px 0;color:#64748b">ℹ️ ${slrEsc(r.notes||r.doc_type||'')}</div>`).join('')}
+        ${x.lines.length?`<button onclick="IR.email='${slrEsc(x.e)}';IR.nursery='all';IR.q='';IR.tab='guide';irRender()" style="margin-top:6px;border:none;background:#1e3a8a;color:#fff;border-radius:8px;padding:4px 11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.74rem;font-weight:700">التفاصيل — Details</button>`:''}
+      </div></div>`).join('')||'<div style="text-align:center;padding:30px;color:#9ca3af">—</div>';
+    body.innerHTML=h; return;
+  }
+  h+=`<div style="margin-bottom:10px"><button onclick="irEditFup(null)" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:7px 13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:800">➕ متابعة جديدة — New follow-up</button></div>`
+    +(IR.fups.map((f,i)=>{ const st=IR_ST[f.status]||IR_ST.Open; return `<div style="border:1.5px solid #e5e7eb;border-right:5px solid ${st[2]};border-radius:12px;padding:10px 12px;margin-bottom:9px;${f.status==='Done'?'opacity:.6':''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+        <div style="direction:ltr;text-align:left;font-weight:800;font-size:.86rem;flex:1;min-width:220px">${i+1}. ${slrEsc(f.issue)}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select onchange="irSetFup(${f.id},this.value)" style="padding:4px 8px;border:1.5px solid ${st[2]};border-radius:8px;font-family:'Tajawal',sans-serif;font-size:.76rem;font-weight:800;color:${st[2]}">
+            ${Object.keys(IR_ST).map(k=>`<option value="${k}" ${f.status===k?'selected':''}>${IR_ST[k][0]} — ${IR_ST[k][1]}</option>`).join('')}</select>
+          <button onclick="irEditFup(${f.id})" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:3px 8px;cursor:pointer;font-size:.74rem">✏️</button>
+        </div>
+      </div>
+      <div style="direction:ltr;text-align:left;font-size:.78rem;color:#475569;margin-top:5px">🏫 ${slrEsc(f.nursery||'—')} &nbsp;·&nbsp; 📧 ${slrEsc(f.email||'—')}</div>
+      <div style="direction:ltr;text-align:left;font-size:.8rem;margin-top:5px;background:#f8fafc;border-radius:8px;padding:6px 9px">➡️ ${slrEsc(f.action||'')}</div>
+    </div>`; }).join('')||'<div style="text-align:center;padding:30px;color:#9ca3af">مفيش متابعات — No follow-ups</div>');
+  body.innerHTML=h;
+}
+
+function irRenderList(){
+  const box=el('ir-list'); if(!box) return;
+  const list=irFiltered();
+  const line=(ic,lab,val,copy)=>val?`<div style="display:flex;gap:6px;align-items:flex-start;font-size:.79rem;margin-top:4px"><span style="flex:0 0 auto">${ic}</span><span style="color:#64748b;flex:0 0 auto">${lab}:</span><span style="direction:ltr;text-align:left;flex:1;word-break:break-word">${slrEsc(val)}</span>${copy?`<button data-v="${slrEsc(val)}" onclick="irCopy(this)" title="Copy" style="flex:0 0 auto;border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:0 6px;cursor:pointer;font-size:.68rem">📋</button>`:''}</div>`:'';
+  const vend=v=>{ const m=String(v||'').match(/^(.*?)\s*\(([^()]*@[^()]*)\)\s*$/); return m?[m[1],m[2]]:[v||'','']; };
+  box.innerHTML=`<div style="font-size:.76rem;color:#64748b;margin-bottom:8px">${list.length} نتيجة — results</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px">`+list.map(r=>{
+    const bs=irBranches(r.nursery), c=bs.length===1?irColor(bs[0]):'#64748b';
+    return `<div style="border:1.5px solid #e5e7eb;border-top:4px solid ${c};border-radius:13px;padding:10px 12px;background:#fff">
+      <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start">
+        <div style="direction:ltr;text-align:left;font-weight:900;font-size:.9rem;color:#0f172a;word-break:break-word;flex:1">${slrEsc(vend(r.vendor)[0])}${vend(r.vendor)[1]?`<div style="font-weight:400;font-size:.68rem;color:#64748b;word-break:break-all">from: ${slrEsc(vend(r.vendor)[1])}</div>`:''}</div>
+        <button onclick="irEditRow(${r.id})" title="Edit" style="border:1px solid #e5e7eb;background:#fff;border-radius:7px;padding:1px 7px;cursor:pointer;font-size:.72rem;flex:0 0 auto">✏️</button>
+      </div>
+      <div style="direction:ltr;text-align:left;margin:4px 0 6px"><span style="background:${c};color:#fff;border-radius:7px;padding:1px 9px;font-size:.72rem;font-weight:800">🏫 ${slrEsc(r.nursery||'—')}</span></div>
+      ${irEmails(r.email).map(e=>`<div style="direction:ltr;text-align:left;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;padding:6px 9px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span style="font-weight:800;color:#1e3a8a;font-size:.84rem;word-break:break-all">📧 ${slrEsc(e)}</span>
+        <button data-v="${slrEsc(e)}" onclick="irCopy(this)" style="border:none;background:#1e3a8a;color:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.7rem;font-weight:700;flex:0 0 auto">📋 نسخ</button></div>`).join('')}
+      ${line('📄','النوع Type',r.doc_type)}${line('🗓️','بتوصل Arrives',r.arrives)}${line('🔢','رقم الحساب Account',r.account_ref,true)}${line('📝','ملاحظات Notes',r.notes)}
+    </div>`; }).join('')+`</div>`+(list.length?'':'<div style="text-align:center;padding:30px;color:#9ca3af">مفيش نتائج — No results</div>');
+}
+
+function irForm(title, fields, onSave, extraBtn){
+  const body=el('ir-body');
+  body.innerHTML=`<div style="font-weight:900;color:#1e3a8a;margin-bottom:10px">${title}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:9px">${fields.map(f=>`<div style="${f.wide?'grid-column:1/-1':''}"><label style="font-size:.74rem;font-weight:700;display:block;margin-bottom:3px">${f.label}</label>
+      ${f.options?`<select id="irf_${f.k}" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:9px;font-family:'Tajawal',sans-serif">${f.options.map(o=>`<option value="${o[0]}" ${String(f.v||'')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>`
+      :f.wide?`<textarea id="irf_${f.k}" rows="2" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:9px;font-family:'Tajawal',sans-serif;direction:ltr;box-sizing:border-box">${slrEsc(f.v||'')}</textarea>`
+      :`<input id="irf_${f.k}" type="text" value="${slrEsc(f.v||'')}" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:9px;font-family:'Tajawal',sans-serif;direction:ltr;box-sizing:border-box">`}</div>`).join('')}</div>
+    <div id="irf_msg" style="font-size:.8rem;min-height:18px;margin-top:6px;color:#dc2626"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <button id="irf_save" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:9px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:800">💾 حفظ — Save</button>
+      <button onclick="irRender()" style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 18px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">رجوع — Back</button>
+      ${extraBtn||''}</div>`;
+  el('irf_save').onclick=async()=>{
+    const row={}; fields.forEach(f=>{ row[f.k]=(el('irf_'+f.k).value||'').trim(); });
+    el('irf_save').disabled=true;
+    const err=await onSave(row);
+    if(err){ el('irf_msg').textContent='❌ '+(err.message||err); el('irf_save').disabled=false; return; }
+    await irLoad(true); irRender();
+  };
+}
+function irEditRow(id){
+  const r=id?IR.rows.find(x=>x.id===id):{};
+  irForm(id?'✏️ تعديل — Edit invoice line':'➕ مورّد جديد — New invoice line',[
+    {k:'vendor',label:'المورّد / المرسل — Vendor / sender',v:r.vendor},{k:'nursery',label:'الحضانة — Nursery',v:r.nursery},
+    {k:'email',label:'بتوصل على إيميل — Arrives at (email)',v:r.email},{k:'doc_type',label:'نوع الفاتورة — Document type',v:r.doc_type},
+    {k:'arrives',label:'بتوصل إمتى — When it arrives',v:r.arrives},{k:'account_ref',label:'رقم الحساب / المرجع — Account / reference',v:r.account_ref},
+    {k:'notes',label:'ملاحظات — Notes',v:r.notes,wide:true}],
+    async row=>{ if(!row.vendor||!row.email) return {message:'اكتبي المورّد والإيميل — Vendor and email are required'};
+      row.updated_at=new Date().toISOString();
+      const q=id?await sb.from('invoice_routing').update(row).eq('id',id):await sb.from('invoice_routing').insert(Object.assign({kind:'invoice',active:true},row)); return q.error; },
+    id?`<button onclick="irArchiveRow(${id})" style="background:#fff;border:1.5px solid #fca5a5;color:#b91c1c;border-radius:10px;padding:9px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;margin-inline-start:auto">🗂️ إخفاء من الدليل — Archive</button>`:'');
+}
+async function irArchiveRow(id){
+  if(!confirm('إخفاء السطر ده من الدليل؟ (مش بيتمسح — يتأرشف بس)\nHide this line from the guide? (archived, not deleted)')) return;
+  const q=await sb.from('invoice_routing').update({active:false,updated_at:new Date().toISOString()}).eq('id',id);
+  if(q.error){ alert('❌ '+q.error.message); return; }
+  await irLoad(true); irRender();
+}
+function irEditFup(id){
+  const f=id?IR.fups.find(x=>x.id===id):{status:'Open'};
+  irForm(id?'✏️ تعديل متابعة — Edit follow-up':'➕ متابعة جديدة — New follow-up',[
+    {k:'issue',label:'المشكلة — Issue',v:f.issue,wide:true},{k:'nursery',label:'الحضانة — Nursery',v:f.nursery},{k:'email',label:'الإيميل — Email',v:f.email},
+    {k:'status',label:'الحالة — Status',v:f.status,options:Object.keys(IR_ST).map(k=>[k,IR_ST[k][0]+' — '+IR_ST[k][1]])},
+    {k:'action',label:'المطلوب — Suggested action',v:f.action,wide:true}],
+    async row=>{ if(!row.issue) return {message:'اكتبي المشكلة — Issue is required'};
+      row.updated_at=new Date().toISOString();
+      const q=id?await sb.from('invoice_followups').update(row).eq('id',id):await sb.from('invoice_followups').insert(row); return q.error; });
+}
+async function irSetFup(id,status){
+  const q=await sb.from('invoice_followups').update({status,updated_at:new Date().toISOString()}).eq('id',id);
+  if(q.error){ alert('❌ '+q.error.message); }
+  await irLoad(true); irRender();
 }
 
 function getActualWorkDaysCount(staffId){
