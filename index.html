@@ -2433,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-20-1';
+const APP_VERSION='2026-11-20-2';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -26544,7 +26544,7 @@ async function irLoad(force){
   }catch(e){ IR.tables=false; IR.rows=[]; IR.fups=[]; }
   IR.loaded=true;
 }
-function irSyncBtn(){ const b=el('ir-open-btn'); if(b) b.style.display=curRole==='admin'?'':'none'; }
+function irSyncBtn(){ const b=el('ir-open-btn'); if(b) b.style.display=curRole==='admin'?'':'none'; if(curRole==='admin') irBadge(); }
 async function openInvoiceGuide(){
   if(curRole!=='admin') return;
   el('ir-modal').style.display='flex';
@@ -26576,7 +26576,8 @@ function irRender(){
   const inv=IR.rows.filter(r=>r.kind!=='mailbox'), openF=IR.fups.filter(f=>f.status!=='Done').length;
   const tb=(id,txt)=>`<button onclick="IR.tab='${id}';irRender()" style="padding:8px 14px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800;background:${IR.tab===id?'#1e3a8a':'#fff'};color:${IR.tab===id?'#fff':'#374151'}">${txt}</button>`;
   let h=`<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:11px;overflow:hidden;width:fit-content;max-width:100%;flex-wrap:wrap;margin-bottom:12px">
-    ${tb('guide','🔎 الدليل — Guide ('+inv.length+')')}${tb('mail','📧 حسب الإيميل — By email ('+irAllEmails().length+')')}${tb('fup','📌 متابعات — Follow-ups ('+openF+')')}</div>`;
+    ${tb('guide','🔎 الدليل — Guide ('+inv.length+')')}${tb('miss','🧾 الناقص الشهر ده — Missing'+(IR.missNow?' ('+IR.missNow+')':''))}${tb('mail','📧 حسب الإيميل — By email ('+irAllEmails().length+')')}${tb('fup','📌 متابعات — Follow-ups ('+openF+')')}</div>`;
+  if(IR.tab==='miss'){ IR._head=h; irRenderMiss(h); return; }
   if(IR.tab==='guide'){
     const chip=(id,txt,c)=>`<button onclick="IR.nursery='${id}';irRender()" style="padding:5px 11px;border-radius:999px;border:1.5px solid ${IR.nursery===id?c:'#e5e7eb'};background:${IR.nursery===id?c:'#fff'};color:${IR.nursery===id?'#fff':'#374151'};cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.76rem;font-weight:700">${txt}</button>`;
     h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
@@ -26640,6 +26641,120 @@ function irRenderList(){
         <button data-v="${slrEsc(e)}" onclick="irCopy(this)" style="border:none;background:#1e3a8a;color:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.7rem;font-weight:700;flex:0 0 auto">📋 نسخ</button></div>`).join('')}
       ${line('📄','النوع Type',r.doc_type)}${line('🗓️','بتوصل Arrives',r.arrives)}${line('🔢','رقم الحساب Account',r.account_ref,true)}${line('📝','ملاحظات Notes',r.notes)}
     </div>`; }).join('')+`</div>`+(list.length?'':'<div style="text-align:center;padding:30px;color:#9ca3af">مفيش نتائج — No results</div>');
+}
+
+// ── Invoice guide, part 2: expected monthly invoices vs the expenses that were recorded ──
+// A line is expected every month when "arrives" starts with "Monthly" and the document is a real
+// invoice / bill / statement (not a reminder or an alert). It counts as recorded when an expense of
+// that month mentions the line's account number, or — failing that — the supplier name in the same nursery.
+const IR_ALIAS=[[/sewa/i,['sewa','sharjah electricity']],[/etihad/i,['etihad']],[/sewerage/i,['sewerage']],[/wio/i,['wio']],[/edenred/i,['edenred']],
+  [/adcb/i,['adcb','abu dhabi commercial']],[/afs/i,['arab financial services','afs ']],[/e&|etisalat/i,['etisalat','e&','emirates telecommunications']],
+  [/rakbank/i,['rakbank','rak bank']],[/adnoc/i,['adnoc']]];
+function irKeys(vendor){ const v=String(vendor||''); for(const a of IR_ALIAS) if(a[0].test(v)) return a[1]; const w=(v.toLowerCase().match(/[a-z؀-ۿ]{3,}/)||[''])[0]; return w?[w]:[]; }
+function irAccNums(ref){ return (String(ref||'').match(/\d{8,}/g)||[]).map(x=>x.replace(/^0+/,'')); }
+function irTracked(r){
+  if(r.kind==='mailbox'||r.track===false) return false;
+  if(r.track===true) return true;
+  const d=String(r.doc_type||'');
+  return /^\s*monthly/i.test(r.arrives||'')&&/invoice|bill|statement/i.test(d)&&!/reminder|alerts? only|not an invoice|statement notice|overdue/i.test(d);
+}
+function irDueDay(r, month){
+  const dim=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
+  if(r.due_day) return Math.min(dim,Number(r.due_day));
+  const m=String(r.arrives||'').match(/(\d{1,2})(?:st|nd|rd|th)(?:\s*[–-]\s*~?(\d{1,2})(?:st|nd|rd|th))?/);
+  if(!m) return dim;
+  const a=Number(m[1]), b=Number(m[2]||0);
+  return Math.min(dim,b>a?b:a);
+}
+// A bill that arrives in the first 10 days of a month is the bill of the month before (it is recorded
+// with that month's date), so its deadline for bill-month M falls in month M+1.
+function irDeadline(r, month){
+  const d=irDueDay(r,month);
+  if(d>10) return month+'-'+String(d).padStart(2,'0');
+  const nm=irMonthAdd(month,1), dim=new Date(Number(nm.slice(0,4)),Number(nm.slice(5,7)),0).getDate();
+  return nm+'-'+String(Math.min(d,dim)).padStart(2,'0');
+}
+function irMonthAdd(month,n){ const d=new Date(Number(month.slice(0,4)),Number(month.slice(5,7))-1+n,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+async function irLoadExp(month, force){
+  IR.exp=IR.exp||{};
+  if(IR.exp[month]&&!force) return IR.exp[month];
+  const from=irMonthAdd(month,-5)+'-01', dim=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate(), to=month+'-'+String(dim).padStart(2,'0');
+  const rows=await fetchAll(()=>sb.from('expenses').select('id,date,category,sub_type,supplier_name,invoice_number,amount,total_amount,branch_id,note').gte('date',from).lte('date',to).order('date').order('id'));
+  const by={};
+  rows.forEach(e=>{ e._t=[e.supplier_name,e.sub_type,e.note,e.invoice_number].join(' ').toLowerCase(); const m=String(e.date||'').slice(0,7); (by[m]=by[m]||[]).push(e); });
+  return IR.exp[month]=by;
+}
+function irMatch(line, exps, allAcc){
+  const acc=irAccNums(line.account_ref), keys=irKeys(line.vendor), bs=irBranches(line.nursery);
+  const pos=/card machine|pos\b/i.test(line.doc_type||''), isAdcb=/adcb/i.test(line.vendor||'');
+  const exact=[], loose=[];
+  (exps||[]).forEach(e=>{ const t=e._t;
+    if(acc.length&&acc.some(a=>t.includes(a))){ exact.push(e); return; }
+    if(!keys.some(k=>t.includes(k))) return;
+    if(bs.length===1&&e.branch_id!==bs[0]) return;
+    if(allAcc.some(a=>!acc.includes(a)&&t.includes(a))) return;       // that entry names another account
+    if(isAdcb&&(/commission|بطاقة|merchant|card/i.test(t))!==pos) return; // bank fees vs card-machine commission
+    loose.push(e);
+  });
+  return {exact,loose};
+}
+function irStatus(line, month, exps, allAcc){
+  const m=irMatch(line,exps,allAcc), all=m.exact.concat(m.loose);
+  const dl=irDeadline(line,month);
+  const st=all.length?'ok':(today()<=slrAdd(dl,2)?'wait':'miss');
+  return {st,n:all.length,exact:m.exact.length,sum:all.reduce((t,e)=>t+Number(e.total_amount||e.amount||0),0),due:dl};
+}
+async function irCompute(month, force){
+  await irLoad(force);
+  const by=await irLoadExp(month,force);
+  const lines=IR.rows.filter(irTracked), allAcc=[].concat(...lines.map(l=>irAccNums(l.account_ref)));
+  const months=[-5,-4,-3,-2,-1,0].map(n=>irMonthAdd(month,n));
+  return lines.map(l=>({l,now:irStatus(l,month,by[month],allAcc),hist:months.map(m=>({m,s:irStatus(l,m,by[m],allAcc).st}))}));
+}
+async function irBadge(){
+  if(curRole!=='admin'||IR._badge) return; IR._badge=true;
+  try{ const res=await irCompute(today().slice(0,7));
+    // this month + last month
+    const n=res.filter(x=>x.now.st==='miss').length+res.filter(x=>x.hist[x.hist.length-2].s==='miss').length; IR.missNow=n;
+    const b=el('ir-open-btn'); if(b) b.innerHTML='📬 الفواتير بتوصل فين — Invoice Guide'+(n?` <span style="background:#dc2626;border-radius:999px;padding:0 7px;margin-inline-start:4px">${n} ناقص</span>`:'');
+  }catch(e){ IR._badge=false; }
+}
+async function irRenderMiss(head, force){
+  const body=el('ir-body'); if(!body) return;
+  const month=IR.month||(IR.month=today().slice(0,7));
+  body.innerHTML=head+'<div style="text-align:center;padding:30px;color:#6b7280">⏳ بقارن الفواتير بالمصاريف… Comparing with the expenses…</div>';
+  let res; try{ res=await irCompute(month,force); }catch(e){ body.innerHTML=head+'<div style="color:#dc2626;padding:20px">❌ '+slrEsc(e.message||e)+'</div>'; return; }
+  if(IR.tab!=='miss') return;
+  const ord={miss:0,wait:1,ok:2}; res.sort((a,b)=>ord[a.now.st]-ord[b.now.st]||String(a.now.due).localeCompare(String(b.now.due)));
+  const cnt=k=>res.filter(x=>x.now.st===k).length;
+  const ST={miss:['#dc2626','#fef2f2','❌ ناقصة — Missing'],wait:['#d97706','#fffbeb','⏳ لسه ميعادها — Not due yet'],ok:['#059669','#f0fdf4','✅ متسجلة — Recorded']};
+  const box=(k,n)=>`<div style="background:${ST[k][1]};border:1.5px solid ${ST[k][0]};border-radius:11px;padding:8px 14px;text-align:center;min-width:120px"><div style="font-size:1.3rem;font-weight:900;color:${ST[k][0]}">${n}</div><div style="font-size:.72rem;font-weight:700;color:${ST[k][0]}">${ST[k][2]}</div></div>`;
+  const mm=m=>m.slice(5);
+  body.innerHTML=head+`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      ${[0,-1,-2].map(k=>{ const mo=irMonthAdd(today().slice(0,7),k); return `<button onclick="IR.month='${mo}';irRender()" style="padding:6px 12px;border-radius:999px;border:1.5px solid #1e3a8a;background:${mo===month?'#1e3a8a':'#fff'};color:${mo===month?'#fff':'#1e3a8a'};cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.78rem;font-weight:800">${k===0?'الشهر ده — This month':k===-1?'الشهر اللي فات — Last month':mo}</button>`; }).join('')}
+      <label style="font-size:.8rem;font-weight:800">أو — or:</label>
+      <input type="month" value="${month}" onchange="IR.month=this.value;irRender()" style="padding:7px 10px;border:2px solid #1e3a8a;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.86rem">
+      <button onclick="irRenderMiss(IR._head,true)" style="background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:8px 13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:800">🔄 تحديث — Refresh</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${box('miss',cnt('miss'))}${box('wait',cnt('wait'))}${box('ok',cnt('ok'))}</div>
+    <div style="font-size:.72rem;color:#64748b;margin-bottom:10px;line-height:1.6">بيقارن الفواتير الشهرية في الدليل بالمصاريف المسجّلة بتاريخ الشهر المختار في كل الفروع: برقم الحساب أولاً، وبعده باسم المورّد والحضانة. الفاتورة اللي بتوصل في أول 10 أيام من الشهر بتبقى فاتورة الشهر اللي قبله. — Monthly invoices in the guide are compared with the expenses dated in the chosen month (all branches): by account number first, then by supplier name and nursery. A bill that arrives in the first 10 days of a month belongs to the month before.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px">`+res.map(x=>{ const l=x.l, s=x.now, c=ST[s.st], bs=irBranches(l.nursery), bc=bs.length===1?irColor(bs[0]):'#64748b';
+      return `<div style="border:1.5px solid ${c[0]};border-radius:13px;padding:10px 12px;background:${c[1]}">
+        <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start">
+          <div style="direction:ltr;text-align:left;font-weight:900;font-size:.9rem;color:#0f172a;flex:1;word-break:break-word">${slrEsc(String(l.vendor||'').replace(/\s*\([^()]*@[^()]*\)\s*$/,''))}</div>
+          <span style="background:${c[0]};color:#fff;border-radius:7px;padding:2px 8px;font-size:.7rem;font-weight:800;flex:0 0 auto;white-space:nowrap">${c[2]}</span>
+        </div>
+        <div style="direction:ltr;text-align:left;margin:4px 0 4px"><span style="background:${bc};color:#fff;border-radius:7px;padding:1px 9px;font-size:.72rem;font-weight:800">🏫 ${slrEsc(l.nursery||'—')}</span></div>
+        <div style="font-size:.76rem;color:#475569;direction:ltr;text-align:left">📄 ${slrEsc(l.doc_type||'')}</div>
+        <div style="font-size:.76rem;color:#475569;margin-top:2px">🗓️ المفروض توصل قبل — expected by: <b>${slrDMY(s.due)}</b> <span style="direction:ltr;display:inline-block;color:#94a3b8">(${slrEsc(l.arrives||'')})</span></div>
+        ${s.st==='ok'?`<div style="font-size:.78rem;font-weight:800;color:#065f46;margin-top:5px">✅ ${s.n} قيد — entr${s.n>1?'ies':'y'} · ${Number(Math.round(s.sum)).toLocaleString('en')} AED <span style="font-weight:400;color:#64748b">(${s.exact?'برقم الحساب — by account no.':'باسم المورّد — by supplier name'})</span></div>`
+          :irEmails(l.email).map(e=>`<div style="direction:ltr;text-align:left;background:#fff;border:1.5px solid #bfdbfe;border-radius:9px;padding:5px 9px;margin-top:5px;display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <span style="font-weight:800;color:#1e3a8a;font-size:.82rem;word-break:break-all">${s.st==='miss'?'🔎 دوّري في — look in: ':'📧 '}${slrEsc(e)}</span>
+            <button data-v="${slrEsc(e)}" onclick="irCopy(this)" style="border:none;background:#1e3a8a;color:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.7rem;font-weight:700;flex:0 0 auto">📋 نسخ</button></div>`).join('')}
+        ${l.account_ref&&s.st!=='ok'?`<div style="font-size:.74rem;color:#475569;margin-top:4px;direction:ltr;text-align:left">🔢 ${slrEsc(l.account_ref)}</div>`:''}
+        <div style="display:flex;gap:3px;margin-top:7px;direction:ltr" title="آخر 6 شهور — last 6 months">${x.hist.map(h=>`<span style="flex:1;text-align:center;border-radius:5px;padding:1px 0;font-size:.64rem;font-weight:800;color:#fff;background:${h.s==='ok'?'#10b981':h.s==='wait'?'#f59e0b':'#ef4444'}">${mm(h.m)}</span>`).join('')}</div>
+      </div>`; }).join('')+`</div>
+    <div style="font-size:.7rem;color:#64748b;margin-top:10px">المربعات الصغيرة = آخر 6 شهور: أخضر متسجلة، أحمر مش متسجلة، برتقالي لسه ميعادها. — Small boxes = last 6 months: green recorded, red not recorded, orange not due yet.</div>`;
 }
 
 function irForm(title, fields, onSave, extraBtn){
