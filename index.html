@@ -2433,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-20-2';
+const APP_VERSION='2026-11-20-3';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -26528,7 +26528,9 @@ const IR={loaded:false,tables:true,rows:[],fups:[],tab:'guide',nursery:'all',ema
 const IR_BR=[['b1','Al Farha','الفرحة',/al\s*farha/i],['b2','Al Saada','السعادة',/al\s*saada(?!\s*for\s*kids)/i],['b4','Al Saada For Kids','السعادة للأطفال',/for\s*kids/i],['b5','Abtal Al Baraiem','أبطال البراعم',/abtal/i],['b3','Dolphin','الدولفين',/dolphin/i]];
 const IR_ST={Open:['مفتوح','Open','#dc2626'],Filtered:['متفلتر','Filtered','#d97706'],Done:['تم','Done','#059669']};
 function irBranches(n){ return IR_BR.filter(b=>b[3].test(n||'')).map(b=>b[0]); }
-function irEmails(e){ return String(e||'').split(/\s*[+,;]\s*/).map(x=>x.trim()).filter(x=>x.includes('@')); }
+// the mailbox(es) of a line; when there is no e-mail in it, the whole text is the source (portal, WhatsApp...)
+function irEmails(e){ const t=String(e||'').trim(), m=t.split(/\s*[+,;]\s*/).map(x=>x.trim()).filter(x=>x.includes('@')); return m.length?m:(t?[t]:[]); }
+function irIco(e){ return String(e).includes('@')?'📧':'📍'; }
 function irColor(bid){ const b=BRANCHES.find(x=>x.id===bid); return b?b.c:'#64748b'; }
 
 async function irLoad(force){
@@ -26576,7 +26578,7 @@ function irRender(){
   const inv=IR.rows.filter(r=>r.kind!=='mailbox'), openF=IR.fups.filter(f=>f.status!=='Done').length;
   const tb=(id,txt)=>`<button onclick="IR.tab='${id}';irRender()" style="padding:8px 14px;border:none;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.82rem;font-weight:800;background:${IR.tab===id?'#1e3a8a':'#fff'};color:${IR.tab===id?'#fff':'#374151'}">${txt}</button>`;
   let h=`<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:11px;overflow:hidden;width:fit-content;max-width:100%;flex-wrap:wrap;margin-bottom:12px">
-    ${tb('guide','🔎 الدليل — Guide ('+inv.length+')')}${tb('miss','🧾 الناقص الشهر ده — Missing'+(IR.missNow?' ('+IR.missNow+')':''))}${tb('mail','📧 حسب الإيميل — By email ('+irAllEmails().length+')')}${tb('fup','📌 متابعات — Follow-ups ('+openF+')')}</div>`;
+    ${tb('guide','🔎 الدليل — Guide ('+inv.length+')')}${tb('miss','🧾 الناقص الشهر ده — Missing'+(IR.missNow?' ('+IR.missNow+')':''))}${tb('mail','📧 حسب الإيميل — By email / source ('+irAllEmails().length+')')}${tb('fup','📌 متابعات — Follow-ups ('+openF+')')}</div>`;
   if(IR.tab==='miss'){ IR._head=h; irRenderMiss(h); return; }
   if(IR.tab==='guide'){
     const chip=(id,txt,c)=>`<button onclick="IR.nursery='${id}';irRender()" style="padding:5px 11px;border-radius:999px;border:1.5px solid ${IR.nursery===id?c:'#e5e7eb'};background:${IR.nursery===id?c:'#fff'};color:${IR.nursery===id?'#fff':'#374151'};cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.76rem;font-weight:700">${txt}</button>`;
@@ -26584,7 +26586,7 @@ function irRender(){
       <input id="ir-q" type="text" value="${slrEsc(IR.q)}" oninput="IR.q=this.value;irRenderList()" placeholder="🔍 ابحثي: مورّد، حضانة، رقم حساب — Search vendor, nursery, account no."
         style="flex:1;min-width:240px;padding:9px 12px;border:2px solid #1e3a8a;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.88rem">
       <select onchange="IR.email=this.value;irRenderList()" style="padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:.8rem;direction:ltr">
-        <option value="all">📧 كل الإيميلات — All mailboxes</option>${irAllEmails().map(e=>`<option value="${slrEsc(e)}" ${IR.email===e?'selected':''}>${slrEsc(e)}</option>`).join('')}</select>
+        <option value="all">📧 كل الإيميلات والمصادر — All mailboxes / sources</option>${irAllEmails().map(e=>`<option value="${slrEsc(e)}" ${IR.email===e?'selected':''}>${slrEsc(e)}</option>`).join('')}</select>
       <button onclick="irEditRow(null)" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:8px 13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.8rem;font-weight:800">➕ إضافة — Add</button>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${chip('all','الكل — All','#1e3a8a')}${IR_BR.map(b=>chip(b[0],b[2]+' — '+b[1],irColor(b[0]))).join('')}${chip('other','أخرى — Other','#64748b')}</div>
@@ -26596,7 +26598,7 @@ function irRender(){
       .sort((a,b)=>b.lines.length-a.lines.length);
     h+=boxes.map(x=>`<div style="border:1.5px solid #e5e7eb;border-radius:13px;margin-bottom:10px;overflow:hidden">
       <div style="background:#f1f5f9;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <div style="direction:ltr;font-weight:900;color:#1e3a8a;font-size:.9rem">📧 ${slrEsc(x.e)} <button data-v="${slrEsc(x.e)}" onclick="irCopy(this)" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.72rem">📋 نسخ Copy</button></div>
+        <div style="direction:ltr;font-weight:900;color:#1e3a8a;font-size:.9rem">${irIco(x.e)} ${slrEsc(x.e)} <button data-v="${slrEsc(x.e)}" onclick="irCopy(this)" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:2px 8px;cursor:pointer;font-size:.72rem">📋 نسخ Copy</button></div>
         <div style="font-size:.76rem;font-weight:800;color:${x.lines.length?'#059669':'#94a3b8'}">${x.lines.length?x.lines.length+' فاتورة — invoice lines':'مفيش فواتير — No invoices'}</div>
       </div>
       <div style="padding:8px 12px;direction:ltr;text-align:left;font-size:.8rem">
@@ -26637,7 +26639,7 @@ function irRenderList(){
       </div>
       <div style="direction:ltr;text-align:left;margin:4px 0 6px"><span style="background:${c};color:#fff;border-radius:7px;padding:1px 9px;font-size:.72rem;font-weight:800">🏫 ${slrEsc(r.nursery||'—')}</span></div>
       ${irEmails(r.email).map(e=>`<div style="direction:ltr;text-align:left;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;padding:6px 9px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;gap:6px">
-        <span style="font-weight:800;color:#1e3a8a;font-size:.84rem;word-break:break-all">📧 ${slrEsc(e)}</span>
+        <span style="font-weight:800;color:#1e3a8a;font-size:.84rem;word-break:break-word">${irIco(e)} ${slrEsc(e)}</span>
         <button data-v="${slrEsc(e)}" onclick="irCopy(this)" style="border:none;background:#1e3a8a;color:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.7rem;font-weight:700;flex:0 0 auto">📋 نسخ</button></div>`).join('')}
       ${line('📄','النوع Type',r.doc_type)}${line('🗓️','بتوصل Arrives',r.arrives)}${line('🔢','رقم الحساب Account',r.account_ref,true)}${line('📝','ملاحظات Notes',r.notes)}
     </div>`; }).join('')+`</div>`+(list.length?'':'<div style="text-align:center;padding:30px;color:#9ca3af">مفيش نتائج — No results</div>');
@@ -26749,7 +26751,7 @@ async function irRenderMiss(head, force){
         <div style="font-size:.76rem;color:#475569;margin-top:2px">🗓️ المفروض توصل قبل — expected by: <b>${slrDMY(s.due)}</b> <span style="direction:ltr;display:inline-block;color:#94a3b8">(${slrEsc(l.arrives||'')})</span></div>
         ${s.st==='ok'?`<div style="font-size:.78rem;font-weight:800;color:#065f46;margin-top:5px">✅ ${s.n} قيد — entr${s.n>1?'ies':'y'} · ${Number(Math.round(s.sum)).toLocaleString('en')} AED <span style="font-weight:400;color:#64748b">(${s.exact?'برقم الحساب — by account no.':'باسم المورّد — by supplier name'})</span></div>`
           :irEmails(l.email).map(e=>`<div style="direction:ltr;text-align:left;background:#fff;border:1.5px solid #bfdbfe;border-radius:9px;padding:5px 9px;margin-top:5px;display:flex;justify-content:space-between;align-items:center;gap:6px">
-            <span style="font-weight:800;color:#1e3a8a;font-size:.82rem;word-break:break-all">${s.st==='miss'?'🔎 دوّري في — look in: ':'📧 '}${slrEsc(e)}</span>
+            <span style="font-weight:800;color:#1e3a8a;font-size:.82rem;word-break:break-all">${s.st==='miss'?'🔎 دوّري في — look in: ':irIco(e)+' '}${slrEsc(e)}</span>
             <button data-v="${slrEsc(e)}" onclick="irCopy(this)" style="border:none;background:#1e3a8a;color:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:.7rem;font-weight:700;flex:0 0 auto">📋 نسخ</button></div>`).join('')}
         ${l.account_ref&&s.st!=='ok'?`<div style="font-size:.74rem;color:#475569;margin-top:4px;direction:ltr;text-align:left">🔢 ${slrEsc(l.account_ref)}</div>`:''}
         <div style="display:flex;gap:3px;margin-top:7px;direction:ltr" title="آخر 6 شهور — last 6 months">${x.hist.map(h=>`<span style="flex:1;text-align:center;border-radius:5px;padding:1px 0;font-size:.64rem;font-weight:800;color:#fff;background:${h.s==='ok'?'#10b981':h.s==='wait'?'#f59e0b':'#ef4444'}">${mm(h.m)}</span>`).join('')}</div>
@@ -26781,10 +26783,10 @@ function irEditRow(id){
   const r=id?IR.rows.find(x=>x.id===id):{};
   irForm(id?'✏️ تعديل — Edit invoice line':'➕ مورّد جديد — New invoice line',[
     {k:'vendor',label:'المورّد / المرسل — Vendor / sender',v:r.vendor},{k:'nursery',label:'الحضانة — Nursery',v:r.nursery},
-    {k:'email',label:'بتوصل على إيميل — Arrives at (email)',v:r.email},{k:'doc_type',label:'نوع الفاتورة — Document type',v:r.doc_type},
+    {k:'email',label:'بتوصل على إيميل أو مصدر تاني — Arrives at (email or other source)',v:r.email},{k:'doc_type',label:'نوع الفاتورة — Document type',v:r.doc_type},
     {k:'arrives',label:'بتوصل إمتى — When it arrives',v:r.arrives},{k:'account_ref',label:'رقم الحساب / المرجع — Account / reference',v:r.account_ref},
     {k:'notes',label:'ملاحظات — Notes',v:r.notes,wide:true}],
-    async row=>{ if(!row.vendor||!row.email) return {message:'اكتبي المورّد والإيميل — Vendor and email are required'};
+    async row=>{ if(!row.vendor||!row.email) return {message:'اكتبي المورّد والإيميل أو المصدر — Vendor and email / source are required'};
       row.updated_at=new Date().toISOString();
       const q=id?await sb.from('invoice_routing').update(row).eq('id',id):await sb.from('invoice_routing').insert(Object.assign({kind:'invoice',active:true},row)); return q.error; },
     id?`<button onclick="irArchiveRow(${id})" style="background:#fff;border:1.5px solid #fca5a5;color:#b91c1c;border-radius:10px;padding:9px 14px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;margin-inline-start:auto">🗂️ إخفاء من الدليل — Archive</button>`:'');
