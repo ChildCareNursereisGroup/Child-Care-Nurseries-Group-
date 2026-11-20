@@ -2433,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-20-4';
+const APP_VERSION='2026-11-20-5';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14089,6 +14089,17 @@ async function openDriverTripSheet(){
         stopNum: DB.busAssignments?.[String(c.id)]?.stopNumber || 999
       });
     });
+    // staff who ride this trip go on the same sheet, in the stop order with the children
+    _busStaffForPrint('all').filter(st => _matchTrip(st, trip)).forEach(st => {
+      const assign = getStaffBusAssign(String(st.id), (trip.type==='pick'||trip.type==='staff_pick') ? 'pick' : 'drop');
+      const bus = assign
+        ? (allBuses.find(b=>String(b.id)===String(assign.busId)) || allBuses.find(b=>b.busNumber===assign.busNumber))
+        : null;
+      const dName = bus?.driverName || '— Unassigned';
+      const key   = dName + '|||' + trip.key;
+      if(!driverMap[key]) driverMap[key] = {dName, bus, trip, kids:[]};
+      driverMap[key].kids.push({...st, stopNum: DB.staffBusAssignments?.[String(st.id)]?.stopNumber || 999});
+    });
   });
 
   // Sort children by stop#
@@ -14101,7 +14112,7 @@ async function openDriverTripSheet(){
   );
 
   if(!assigned.length){
-    alert('No assigned children found.\n\nSteps:\n1. Open Bus Roster\n2. Select a driver for each child\n3. Click Save Assignments\n4. Then click Driver Sheet\n\nIf you already saved, click Check DB to diagnose.');
+    alert('No assigned children or staff found.\n\nSteps:\n1. Open Bus Roster\n2. Select a driver for each child\n3. Click Save Assignments\n4. Then click Driver Sheet\n\nIf you already saved, click Check DB to diagnose.');
     return;
   }
 
@@ -14116,14 +14127,14 @@ async function openDriverTripSheet(){
     const bus   = g.bus;
 
     const rows = g.kids.map((ch,i) => `
-      <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}">
+      <tr style="${ch.isStaff?'background:#dbeafe':(i%2===0?'background:#f8fafc':'background:#fff')}">
         <td style="padding:6px 8px;text-align:center;font-weight:900;color:#d97706;border:1px solid #e5e7eb;font-size:11pt">${ch.stopNum<999?ch.stopNum:'—'}</td>
-        <td style="padding:6px 10px;font-weight:700;border:1px solid #e5e7eb">${i+1}. ${ch.name}</td>
-        <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb;color:#6b7280">${ch.className||'—'}</td>
+        <td style="padding:6px 10px;font-weight:700;border:1px solid #e5e7eb">${i+1}. ${ch.name}${ch.isStaff?' <span style="background:#1e40af;color:#fff;padding:0 6px;border-radius:4px;font-size:7.5pt;font-weight:800">STAFF</span>'+(ch.position?' <span style="font-weight:400;color:#6b7280;font-size:8pt">'+ch.position+'</span>':''):''}</td>
+        <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb;color:#6b7280">${ch.isStaff?'Staff':(ch.className||'—')}</td>
         <td style="padding:6px 7px;border:1px solid #e5e7eb;color:${ch.branchColor};font-weight:700;font-size:8.5pt">${ch.branchIcon} ${ch.branchEN}</td>
         <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb;color:#0369a1;font-weight:700">${ch.kidsTime||'—'}</td>
         <td style="padding:6px 7px;border:1px solid #e5e7eb">${ch.busArea||'—'}</td>
-        <td style="padding:6px 7px;border:1px solid #e5e7eb;font-size:8.5pt">${[ch.parentMom&&'👩 '+ch.parentMom, ch.parentDad&&'👨 '+ch.parentDad].filter(Boolean).join('<br>')||'—'}</td>
+        <td style="padding:6px 7px;border:1px solid #e5e7eb;font-size:8.5pt">${ch.isStaff?(ch.contact?'📞 '+ch.contact:'—'):([ch.parentMom&&'👩 '+ch.parentMom, ch.parentDad&&'👨 '+ch.parentDad].filter(Boolean).join('<br>')||'—')}</td>
         <td style="padding:6px 7px;text-align:center;border:1px solid #e5e7eb">
           <div style="width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;margin:auto"></div>
         </td>
@@ -14144,19 +14155,19 @@ async function openDriverTripSheet(){
       </div>
       <div style="background:${col}20;border-bottom:2px solid ${col}44;padding:1.5mm 8mm;font-size:8pt;font-weight:700;color:#374151;display:flex;gap:20mm">
         <span>📅 ${fmtDate()}</span>
-        <span>👶 ${g.kids.length} children</span>
-        <span>${g.trip.type==='pick'?'▲ Pick-up':'▼ Drop-off'}</span>
+        <span>👶 ${g.kids.filter(k=>!k.isStaff).length} children${g.kids.some(k=>k.isStaff)?' &nbsp;+&nbsp; 👩‍🏫 '+g.kids.filter(k=>k.isStaff).length+' staff':''}</span>
+        <span>${(g.trip.type==='pick'||g.trip.type==='staff_pick')?'▲ Pick-up':'▼ Drop-off'}</span>
       </div>
       <div style="padding:2mm 5mm">
         <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
           <thead><tr style="background:${col};color:#fff">
             <th style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:44px">Stop#</th>
-            <th style="padding:5px 10px;text-align:left;border:1px solid rgba(255,255,255,.3)">Child Name</th>
+            <th style="padding:5px 10px;text-align:left;border:1px solid rgba(255,255,255,.3)">Name (child / staff)</th>
             <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Class</th>
             <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Branch</th>
             <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Hours</th>
             <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Area</th>
-            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Parent Contact</th>
+            <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3)">Contact</th>
             <th style="padding:5px 7px;text-align:center;border:1px solid rgba(255,255,255,.3);min-width:34px">✓</th>
           </tr></thead>
           <tbody>${rows}</tbody>
@@ -17043,6 +17054,8 @@ function printMonthlyBusRoster(){
       if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
       byDriver[key].kids.push(st);
     });
+    const _stopOf=x=>Number((x.isStaff?DB.staffBusAssignments:DB.busAssignments)?.[String(x.id)]?.stopNumber||999);
+    Object.values(byDriver).forEach(g=>g.kids.sort((a,b)=>_stopOf(a)-_stopOf(b)||String(a.name||'').localeCompare(String(b.name||''),'ar')));
 
     html+=`<div style="margin-bottom:8mm;break-inside:avoid">
       <div style="background:${col};color:#fff;padding:5px 10px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between">
@@ -17065,7 +17078,7 @@ function printMonthlyBusRoster(){
           </tr></thead>
           <tbody>
             ${grp.kids.map((c,i)=>`<tr style="${c.isStaff?'background:#dbeafe':(i%2===0?'':'background:rgba(255,255,255,.5)')}">
-              <td style="padding:3px 8px;color:#9ca3af">${i+1}</td>
+              <td style="padding:3px 8px;color:#9ca3af">${i+1}${_stopOf(c)<999?' <b style="color:#d97706">· '+_stopOf(c)+'</b>':''}</td>
               <td style="padding:3px 8px;font-weight:700">${c.isStaff?'👩‍🏫 ':''}${c.name}${c.isStaff&&c.position?' <span style="font-weight:400;color:#6b7280;font-size:7.5pt">('+c.position+')</span>':''}</td>
               <td style="padding:3px 8px;color:#6b7280">${c.isStaff?'موظف — Staff':(c.className||'—')}</td>
               ${branchSel==='all'?`<td style="padding:3px 8px;font-size:7.5pt">${c.branchIcon} ${c.branchName}</td>`:''}
