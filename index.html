@@ -2433,7 +2433,7 @@ let ANTHROPIC_KEY = localStorage.getItem('anthropic_key') || '';
 // Bump this string on every future edit to index.html — checkForUpdate() compares it
 // against the live deployed file so an open tab can prompt for a refresh instead of
 // silently running stale code (open tabs on shared/manager devices never reload on their own).
-const APP_VERSION='2026-11-20-5';
+const APP_VERSION='2026-11-20-6';
 const SUPA_URL = 'https://gsosfpjknvoqltzusmsu.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdzb3NmcGprbnZvcWx0enVzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDA4MTQsImV4cCI6MjA4NzQ3NjgxNH0.d2h2mi7rxzgC4vYgPKiFdh5OCVJk_mHlQ1SVaiTVauM';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {auth:{persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}});
@@ -14086,7 +14086,7 @@ async function openDriverTripSheet(){
       if(!driverMap[key]) driverMap[key] = {dName, bus, trip, kids:[]};
       driverMap[key].kids.push({
         ...c,
-        stopNum: DB.busAssignments?.[String(c.id)]?.stopNumber || 999
+        stopNum: busStopOf(c, _tripStopType(c, trip))
       });
     });
     // staff who ride this trip go on the same sheet, in the stop order with the children
@@ -14098,7 +14098,7 @@ async function openDriverTripSheet(){
       const dName = bus?.driverName || '— Unassigned';
       const key   = dName + '|||' + trip.key;
       if(!driverMap[key]) driverMap[key] = {dName, bus, trip, kids:[]};
-      driverMap[key].kids.push({...st, stopNum: DB.staffBusAssignments?.[String(st.id)]?.stopNumber || 999});
+      driverMap[key].kids.push({...st, stopNum: busStopOf(st, _tripStopType(st, trip))});
     });
   });
 
@@ -16649,7 +16649,7 @@ function renderMonthlyBusRoster(){
       </div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
         <thead><tr style="background:#1e40af;color:#fff">
-          <th style="padding:6px 8px;min-width:50px">Stop#</th>
+          <th style="padding:6px 8px;min-width:96px">Stop# 🟢 استلام / 🔴 توصيل</th>
           <th style="padding:6px 10px;text-align:right">الموظف</th>
           <th style="padding:6px 7px">الفرع</th>
           <th style="padding:6px 7px">الشيفت</th>
@@ -16662,12 +16662,15 @@ function renderMonthlyBusRoster(){
         <tbody>${busStaff.map((s,i)=>{
           const pA=getStaffBusAssign(String(s.id),'pick');
           const dA=getStaffBusAssign(String(s.id),'drop');
-          const stop=(DB.staffBusAssignments||{})[String(s.id)]?.stopNumber||'';
+          const stopP=_stopVal(busStopOf(s,'pick')), stopD=_stopVal(busStopOf(s,'drop'));
           return`<tr style="${i%2===0?'background:#eff6ff':'background:#fff'}">
             <td style="padding:4px 8px;text-align:center">
-              <input type="number" min="1" max="99" value="${stop}" placeholder="—"
-                data-sid="${s.id}" class="staff-stop-inp"
-                style="width:44px;padding:3px;border:1.5px solid #93c5fd;border-radius:6px;font-size:.78rem;font-weight:900;text-align:center;color:#1d4ed8">
+              <input type="number" min="1" max="99" value="${stopP}" placeholder="🟢" title="رقم المحطة في الاستلام — Pick-up stop"
+                data-sid="${s.id}" data-stop-type="pick" data-orig="${stopP}" class="staff-stop-inp"
+                style="width:40px;padding:3px;border:1.5px solid #86efac;border-radius:6px;font-size:.78rem;font-weight:900;text-align:center;color:#166534">
+              <input type="number" min="1" max="99" value="${stopD}" placeholder="🔴" title="رقم المحطة في التوصيل — Drop-off stop"
+                data-sid="${s.id}" data-stop-type="drop" data-orig="${stopD}" class="staff-stop-inp"
+                style="width:40px;padding:3px;border:1.5px solid #fca5a5;border-radius:6px;font-size:.78rem;font-weight:900;text-align:center;color:#991b1b">
             </td>
             <td style="padding:4px 10px;font-weight:700">${s.name}<br><span style="color:#6b7280;font-size:.7rem">${s.position||''}</span></td>
             <td style="padding:4px 7px"><span style="background:${s.branchColor}22;color:${s.branchColor};padding:1px 6px;border-radius:5px;font-size:.7rem;font-weight:700">${s.branchIcon} ${s.branchName}</span></td>
@@ -16708,8 +16711,8 @@ function renderMonthlyBusRoster(){
     const tripSub=ar?(trip.arSub||trip.subAR||trip.sub||''):(trip.enSub||trip.subEN||trip.sub||'');
     const kids=allKids.filter(c=>_matchTrip(c,trip))
       .sort((a,b)=>{
-        const sA=DB.busAssignments?.[String(a.id)]?.stopNumber||999;
-        const sB=DB.busAssignments?.[String(b.id)]?.stopNumber||999;
+        const sA=busStopOf(a,_tripStopType(a,trip));
+        const sB=busStopOf(b,_tripStopType(b,trip));
         return sA-sB || a.name.localeCompare(b.name,'ar');
       });
     if(!kids.length){
@@ -16764,7 +16767,8 @@ function renderMonthlyBusRoster(){
               // For mixed trip: show BOTH pick and drop dropdowns
               const assignedBusId=isDropTrip||isMixedDrop ? (dropAssign.busId||'') : (pickAssign.busId||'');
               const tripTypeAttr=isDropTrip?'drop':isMixedDrop?'drop':'pick';
-              const stopNum=DB.busAssignments?.[String(c.id)]?.stopNumber||'';
+              const stopType=_tripStopType(c,trip);
+              const stopNum=_stopVal(busStopOf(c,stopType));
               const{sh:rSh,eh:rEh}=_parseKT(c.kidsTime);
               const isMixedPick=trip.type==='mixed'&&(trip.startH2||[]).includes(rSh);
               const typeCell=trip.type==='mixed'
@@ -16776,7 +16780,8 @@ function renderMonthlyBusRoster(){
               return`<tr style="${i%2===0?'background:rgba(255,255,255,.6)':''}">
                 <td style="padding:5px 7px;text-align:center">
                   <input type="number" min="1" max="99" value="${stopNum}" placeholder="—"
-                    data-cid="${c.id}" class="stop-num-inp"
+                    data-cid="${c.id}" data-stop-type="${stopType}" data-orig="${stopNum}" class="stop-num-inp"
+                    title="${stopType==='pick'?'رقم المحطة في رحلة الاستلام — Pick-up stop':'رقم المحطة في رحلة التوصيل — Drop-off stop'}"
                     style="width:46px;padding:4px 4px;border:1.5px solid #fbbf24;border-radius:7px;font-size:.8rem;font-weight:900;text-align:center;color:#d97706;background:#fffbeb"
                     oninput="this.style.borderColor=this.value?'#f59e0b':'#fbbf24'">
                 </td>
@@ -16802,7 +16807,7 @@ function renderMonthlyBusRoster(){
       </div>
       ${(()=>{
         // Staff section for this trip
-        const tripStaff=busStaff.filter(s=>_matchTrip(s,trip));
+        const tripStaff=busStaff.filter(s=>_matchTrip(s,trip)).sort((a,b)=>busStopOf(a,_tripStopType(a,trip))-busStopOf(b,_tripStopType(b,trip))||String(a.name||'').localeCompare(String(b.name||''),'ar'));
         if(!tripStaff.length) return '';
         const tType=trip.type==='pick'||trip.type==='staff_pick'?'pick':'drop';
         return`<div style="background:#f0f9ff;border-top:2px dashed ${tripColor}66;padding:8px 12px">
@@ -16820,11 +16825,12 @@ function renderMonthlyBusRoster(){
             <tbody>${tripStaff.map((s,i)=>{
               const assign=getStaffBusAssign(String(s.id),tType);
               const assignedId=assign?.busId||'';
-              const sStopNum=(DB.staffBusAssignments||{})[String(s.id)]?.stopNumber||'';
+              const sStopType=_tripStopType(s,trip);
+              const sStopNum=_stopVal(busStopOf(s,sStopType));
               return`<tr style="${i%2===0?'background:#f0f9ff':'background:#fff'}">
                 <td style="padding:4px 10px;text-align:center">
                   <input type="number" min="1" max="99" value="${sStopNum}" placeholder="—"
-                    data-sid="${s.id}" class="staff-stop-inp"
+                    data-sid="${s.id}" data-stop-type="${sStopType}" data-orig="${sStopNum}" class="staff-stop-inp"
                     style="width:46px;padding:4px;border:1.5px solid #93c5fd;border-radius:7px;font-size:.8rem;font-weight:900;text-align:center;color:#0369a1;background:#fff">
                 </td>
                 <td style="padding:4px 10px;font-weight:700">${s.name}</td>
@@ -16878,10 +16884,9 @@ async function saveAllBusAssignments(){
     if(tType==='pick'){ staffMap[sid].pickBusId=bus.id; staffMap[sid].pickBusNum=bus.busNumber; }
     if(tType==='drop'){ staffMap[sid].dropBusId=bus.id; staffMap[sid].dropBusNum=bus.busNumber; }
   });
-  document.querySelectorAll('.staff-stop-inp').forEach(inp=>{
-    const sid=inp.dataset.sid; const val=parseInt(inp.value);
-    if(sid&&!isNaN(val)&&staffMap[sid]) staffMap[sid].stopNum=val;
-  });
+  // stop numbers that were changed on screen (pick-up and drop-off are separate)
+  const stopChanges=_collectStopChanges();
+  stopChanges.forEach(_applyStopLocal);
   if(!Object.keys(byChild).length && !Object.keys(staffMap).length){showToast('⚠️ No changes to save — choose a driver first');return;}
 
   // 2) Save children
@@ -16910,6 +16915,7 @@ async function saveAllBusAssignments(){
         drop_bus_id:dd?Number(dd.busId):null,
         drop_bus_number:dd?.busNumber||'',
         stop_number:stopNum,
+        ..._stopCols(DB.busAssignments[cid]),
       }).select();
       if(error){
         console.error('Bus save INSERT error:',error?.message||error,{cid,pBid,pBnum});
@@ -16929,7 +16935,6 @@ async function saveAllBusAssignments(){
     if(!DB.staffBusAssignments[sid]) DB.staffBusAssignments[sid]={};
     if(sm.pickBusId) DB.staffBusAssignments[sid].pick={busId:String(sm.pickBusId),busNumber:sm.pickBusNum};
     if(sm.dropBusId) DB.staffBusAssignments[sid].drop={busId:String(sm.dropBusId),busNumber:sm.dropBusNum};
-    if(sm.stopNum)   DB.staffBusAssignments[sid].stopNumber=sm.stopNum;
     try{
       await sb.from('bus_assignments').delete().eq('staff_id',Number(sid)).eq('entity_type','staff');
       const pickId=sm.pickBusId||sm.dropBusId;
@@ -16941,12 +16946,16 @@ async function saveAllBusAssignments(){
         bus_id:Number(pickId), bus_number:pickNum,
         pick_bus_id:Number(pickId), pick_bus_number:pickNum,
         drop_bus_id:Number(dropId), drop_bus_number:dropNum,
-        stop_number:sm.stopNum||null,
+        stop_number:(DB.staffBusAssignments[sid].stopNumber&&DB.staffBusAssignments[sid].stopNumber<999)?DB.staffBusAssignments[sid].stopNumber:null,
+        ..._stopCols(DB.staffBusAssignments[sid]),
       });
       if(error){ console.error('Staff assign error:',sid,error.message); staffFail++; }
       else staffSaved++;
     }catch(e){ staffFail++; console.error('Staff assign exception:',e); }
   }
+
+  // stop numbers of people whose driver was not touched
+  if(stopChanges.length) await _saveStopChanges(stopChanges);
 
   // 4) Reload from the database to confirm, then redraw the roster
   await loadAllBusAssignments();
@@ -16960,6 +16969,14 @@ async function saveAllBusAssignments(){
 }
 
 async function saveStopNumbers(){
+  const changes=_collectStopChanges();
+  if(!changes.length){ showToast(lang==='ar'?'مفيش أرقام محطات اتغيرت':'No stop numbers were changed'); return; }
+  changes.forEach(_applyStopLocal);
+  const r=await _saveStopChanges(changes);
+  renderMonthlyBusRoster();
+  showToast('✅ Stop numbers saved: '+r.kids+' children'+(r.staff?' + '+r.staff+' staff':'')+(r.fail?' — ⚠️ '+r.fail+' not saved (choose a driver first)':''));
+}
+async function _saveStopNumbersOld(){
   const inputs=document.querySelectorAll('.stop-num-inp');
   if(!inputs.length && !document.querySelectorAll('.staff-stop-inp').length){showToast('No stop numbers to save');return;}
   let saved=0, skipped=0;
@@ -17054,7 +17071,7 @@ function printMonthlyBusRoster(){
       if(!byDriver[key]) byDriver[key]={driver:bus?.driverName||'غير محدد',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',kids:[]};
       byDriver[key].kids.push(st);
     });
-    const _stopOf=x=>Number((x.isStaff?DB.staffBusAssignments:DB.busAssignments)?.[String(x.id)]?.stopNumber||999);
+    const _stopOf=x=>busStopOf(x,_tripStopType(x,trip));
     Object.values(byDriver).forEach(g=>g.kids.sort((a,b)=>_stopOf(a)-_stopOf(b)||String(a.name||'').localeCompare(String(b.name||''),'ar')));
 
     html+=`<div style="margin-bottom:8mm;break-inside:avoid">
@@ -17353,7 +17370,7 @@ async function printTwoWeekBusRoster(){
       const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
       const dk=`${bus?.driverName||'Unassigned'}|||${trip.key}`;
       if(!driverTrips[dk]) driverTrips[dk]={driverName:bus?.driverName||'Unassigned',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',trip,kids:[]};
-      driverTrips[dk].kids.push({...c,stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
+      driverTrips[dk].kids.push({...c,stopNum:busStopOf(c,_tripStopType(c,trip))});
     });
     // staff who ride this trip
     _busStaffForPrint('all').filter(st=>_matchTrip(st,trip)).forEach(st=>{
@@ -17361,7 +17378,7 @@ async function printTwoWeekBusRoster(){
       const bus=assign?(allBuses.find(b=>String(b.id)===String(assign.busId))||allBuses.find(b=>b.busNumber===assign.busNumber)):null;
       const dk=`${bus?.driverName||'Unassigned'}|||${trip.key}`;
       if(!driverTrips[dk]) driverTrips[dk]={driverName:bus?.driverName||'Unassigned',busNum:bus?.busNumber||'—',assistant:bus?.assistantName||'',trip,kids:[]};
-      driverTrips[dk].kids.push({...st,stopNum:DB.staffBusAssignments?.[String(st.id)]?.stopNumber||999});
+      driverTrips[dk].kids.push({...st,stopNum:busStopOf(st,_tripStopType(st,trip))});
     });
   });
 
@@ -17595,7 +17612,7 @@ function renderRoutePlanner(){
     if(String(assign.busId)!==String(bus.id)&&assign.busNumber!==bus.busNumber) return;
     const br=BRANCHES.find(b=>b.id===c.branchId)||{};
     kids.push({...c,branchEN:br.en||br.ar||'',branchColor:br.c||'#1e3a8a',branchIcon:br.icon||'🏫',
-      stopNum:DB.busAssignments?.[String(c.id)]?.stopNumber||999});
+      stopNum:busStopOf(c,_tripStopType(c,trip)),stopType:_tripStopType(c,trip)});
   });
   kids.sort((a,b)=>a.stopNum-b.stopNum||(a.busArea||'').localeCompare(b.busArea||''));
   if(!kids.length){
@@ -17625,7 +17642,7 @@ function renderRoutePlanner(){
         <tr style="${i%2===0?'background:#f8fafc':'background:#fff'}" id="rp-row-${c.id}">
           <td style="padding:7px 10px;text-align:center">
             <input type="number" min="1" max="99" value="${c.stopNum<999?c.stopNum:''}" placeholder="—"
-              data-cid="${c.id}" class="rp-stop-inp"
+              data-cid="${c.id}" data-stop-type="${c.stopType}" class="rp-stop-inp"
               style="width:56px;padding:5px 4px;border:2px solid ${col}66;border-radius:8px;font-size:.92rem;font-weight:900;text-align:center;color:${col};background:#fff"
               oninput="this.closest('tr').style.background=this.value?'#f0fdf4':'${i%2===0?'#f8fafc':'#fff'}'">
           </td>
@@ -17650,9 +17667,9 @@ async function saveRoutePlan(){
     if(!cid||isNaN(val)) continue;
     if(!DB.busAssignments) DB.busAssignments={};
     if(!DB.busAssignments[cid]) DB.busAssignments[cid]={};
-    DB.busAssignments[cid].stopNumber=val;
-    const {error}=await sb.from('bus_assignments').update({stop_number:val}).eq('child_id',Number(cid));
-    if(error) await sb.from('bus_assignments').upsert({child_id:Number(cid),bus_number:'',stop_number:val},{onConflict:'child_id'});
+    const _ch={isStaff:false,id:String(cid),type:inp.dataset.stopType||'both',val};
+    _applyStopLocal(_ch);
+    await _saveStopChanges([_ch]);
     saved++;
   }
   showToast(`✅ Saved ${saved} stop numbers`);
@@ -19119,6 +19136,61 @@ async function saveLicenseForm(branchId){
 //  BUS FUNCTIONS
 // ═══════════════════════════════════════════════
 // Helper: get bus assignment for a child, respecting pick/drop split
+// Stop numbers: one for the pick-up trip and one for the drop-off trip (columns pick_stop_number /
+// drop_stop_number). Until one of them is filled, the old single stop number is used for that trip.
+function _tripStopType(x, trip){
+  if(trip.type==='pick'||trip.type==='staff_pick') return 'pick';
+  if(trip.type==='drop') return 'drop';
+  if(x&&(x.isStaff||x.entityType==='staff')) return (trip.endH||[]).includes(_parseShiftH(x.shiftEnd||x.shift_end||''))?'drop':'pick';
+  return (trip.startH2||[]).includes(_parseKT(x?.kidsTime).sh)?'pick':'drop';   // mixed trip: is this child arriving or leaving?
+}
+function busStopOf(x, tType){
+  const a=((x&&(x.isStaff||x.entityType==='staff'))?DB.staffBusAssignments:DB.busAssignments)?.[String(x?.id)];
+  if(!a) return 999;
+  const n=Number((tType==='pick'?a.pickStop:tType==='drop'?a.dropStop:null)||a.stopNumber||999);
+  return n>0?n:999;
+}
+function _stopVal(n){ return n&&n<999?n:''; }
+function _stopCols(a){ return DB._busStopCols?{pick_stop_number:a?.pickStop||null,drop_stop_number:a?.dropStop||null}:{}; }
+// Stop inputs on screen whose value was changed (the same person can have several inputs)
+function _collectStopChanges(){
+  const m={};
+  document.querySelectorAll('.stop-num-inp,.staff-stop-inp').forEach(inp=>{
+    const isStaff=inp.classList.contains('staff-stop-inp'), id=isStaff?inp.dataset.sid:inp.dataset.cid; if(!id) return;
+    const type=inp.dataset.stopType||'both', raw=String(inp.value||'').trim(), orig=String(inp.dataset.orig??'');
+    if(raw===orig) return;
+    const val=raw===''?null:parseInt(raw); if(raw!==''&&(isNaN(val)||val<1)) return;
+    m[(isStaff?'s':'c')+'|'+id+'|'+type]={isStaff,id:String(id),type,val};
+  });
+  return Object.values(m);
+}
+function _applyStopLocal(ch){
+  const store=ch.isStaff?(DB.staffBusAssignments=DB.staffBusAssignments||{}):(DB.busAssignments=DB.busAssignments||{});
+  const a=store[ch.id]=store[ch.id]||{};
+  if(DB._busStopCols&&ch.type==='pick') a.pickStop=ch.val;
+  else if(DB._busStopCols&&ch.type==='drop') a.dropStop=ch.val;
+  else if(ch.val) a.stopNumber=ch.val;
+}
+async function _saveStopChanges(changes){
+  let kids=0,staff=0,fail=0;
+  for(const ch of changes){
+    let patch;
+    if(DB._busStopCols&&ch.type==='pick') patch={pick_stop_number:ch.val};
+    else if(DB._busStopCols&&ch.type==='drop') patch={drop_stop_number:ch.val};
+    else { if(!ch.val) continue; patch={stop_number:ch.val}; }
+    try{
+      if(ch.isStaff){
+        const {data,error}=await sb.from('bus_assignments').update(patch).eq('staff_id',Number(ch.id)).eq('entity_type','staff').select('id');
+        if(error||!(data||[]).length) fail++; else staff++;      // staff need a driver saved first
+      } else {
+        let {data,error}=await sb.from('bus_assignments').update(patch).eq('child_id',Number(ch.id)).select('id');
+        if(!error&&!(data||[]).length){ const ins=await sb.from('bus_assignments').insert(Object.assign({child_id:Number(ch.id),bus_number:''},patch)).select('id'); error=ins.error; }
+        if(error) fail++; else kids++;
+      }
+    }catch(e){ fail++; }
+  }
+  return {kids,staff,fail};
+}
 function getBusAssign(childId, tripType){
   const a=(DB.busAssignments||{})[String(childId)];
   if(!a) return null;
@@ -19141,6 +19213,7 @@ async function loadAllBusAssignments(){
   DB.busAssignments = {};
   DB.staffBusAssignments = {};
   DB._busAssignLoaded = true;
+  DB._busStopCols = !!(data&&data.length&&('pick_stop_number' in data[0]));
   (data||[]).forEach(r=>{
     const isStaff = r.entity_type==='staff' || (r.staff_id != null && !r.child_id);
     if(isStaff){
@@ -19156,6 +19229,8 @@ async function loadAllBusAssignments(){
       DB.staffBusAssignments[sid].busId=pickBusId?String(pickBusId):(r.bus_id?String(r.bus_id):'');
       DB.staffBusAssignments[sid].busNumber=pickBusNum||r.bus_number||'';
       DB.staffBusAssignments[sid].stopNumber=r.stop_number||999;
+      DB.staffBusAssignments[sid].pickStop=r.pick_stop_number||null;
+      DB.staffBusAssignments[sid].dropStop=r.drop_stop_number||null;
     } else {
       const cid=String(r.child_id||'');
       if(!cid) return;
@@ -19169,6 +19244,8 @@ async function loadAllBusAssignments(){
       DB.busAssignments[cid].busId=pickBusId?String(pickBusId):(r.bus_id?String(r.bus_id):'');
       DB.busAssignments[cid].busNumber=pickBusNum||r.bus_number||'';
       DB.busAssignments[cid].stopNumber=r.stop_number||999;
+      DB.busAssignments[cid].pickStop=r.pick_stop_number||null;
+      DB.busAssignments[cid].dropStop=r.drop_stop_number||null;
     }
   });
 }
