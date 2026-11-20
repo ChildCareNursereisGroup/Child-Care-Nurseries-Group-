@@ -4144,7 +4144,7 @@ function _busDriverMissing(c){
   const oneWay=c.busDirection==='one_way';
   const needPick=!oneWay||c.busPickDrop!=='drop', needDrop=!oneWay||c.busPickDrop==='drop';
   const buses=DB.allBuses||DB.buses||[];
-  const has=t=>{ const a=getBusAssign(String(c.id),t); if(!a||(!a.busId&&!a.busNumber)) return false; return !buses.length||buses.some(b=>String(b.id)===String(a.busId)||(a.busNumber&&b.busNumber===a.busNumber)); };
+  const has=t=>{ const a=getBusAssign(String(c.id),t); if(!a||(!a.busId&&!a.busNumber)) return false; return !buses.length||buses.some(b=>(String(b.id)===String(a.busId)||(a.busNumber&&b.busNumber===a.busNumber))&&String(b.driverName||'').trim()); }; // the bus must exist and have a driver name
   const noPick=needPick&&!has('pick'), noDrop=needDrop&&!has('drop');
   if(!noPick&&!noDrop) return '';
   return noPick&&noDrop?'pick + drop':(noPick?'pick':'drop');
